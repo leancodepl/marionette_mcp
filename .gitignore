@@ -1,0 +1,17 @@
+# Dart/Flutter generated files
+.dart_tool/
+.fvm/
+.fvmrc
+.packages
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

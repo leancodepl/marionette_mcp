@@ -1,0 +1,2 @@
+# Library packages should not commit pubspec.lock
+pubspec.lock
