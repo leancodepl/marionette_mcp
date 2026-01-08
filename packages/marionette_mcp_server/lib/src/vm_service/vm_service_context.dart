@@ -1,0 +1,434 @@
+import 'dart:convert';
+
+import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp_server/src/vm_service/vm_service_connector.dart';
+import 'package:mcp_dart/mcp_dart.dart';
+
+/// Context for managing VM service connection and registering MCP tools.
+final class VmServiceContext {
+  VmServiceContext()
+      : connector = VmServiceConnector(),
+        _logger = logging.Logger('VmServiceContext');
+
+  final VmServiceConnector connector;
+  final logging.Logger _logger;
+
+  /// Registers all VM service related tools with the MCP server.
+  void registerTools(McpServer server) {
+    // Connection management tools
+    server
+      ..tool(
+        'app.connect',
+        description:
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other app.* tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode.',
+        annotations: const ToolAnnotations(
+          title: 'Connect to App',
+        ),
+        toolInputSchema: const ToolInputSchema(
+          properties: {
+            'uri': {
+              'type': 'string',
+              'description':
+                  'VM service URI (e.g., ws://127.0.0.1:8181/ws). This is printed in the Flutter app console when running in debug mode.',
+            },
+          },
+          required: ['uri'],
+        ),
+        callback: ({args, extra}) async {
+          final uri = args!['uri'] as String;
+          _logger.info('Connecting to app at $uri');
+
+          try {
+            await connector.connect(uri);
+            return CallToolResult.fromContent(
+              content: [
+                TextContent(text: 'Successfully connected to app at $uri'),
+              ],
+            );
+          } catch (err) {
+            _logger.severe('Failed to connect to app', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(
+                  text: 'Failed to connect to app: $err',
+                ),
+              ],
+            );
+          }
+        },
+      )
+      ..tool(
+        'app.disconnect',
+        description:
+            'Disconnects from the currently connected Flutter app. After disconnecting, you must call app.connect again to use any app.* tools.',
+        annotations: const ToolAnnotations(
+          title: 'Disconnect from App',
+        ),
+        toolInputSchema: const ToolInputSchema(properties: {}),
+        callback: ({args, extra}) async {
+          _logger.info('Disconnecting from app');
+
+          try {
+            await connector.disconnect();
+            return CallToolResult.fromContent(
+              content: [
+                const TextContent(text: 'Successfully disconnected from app'),
+              ],
+            );
+          } catch (err) {
+            _logger.severe('Error during disconnect', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(
+                  text: 'Error during disconnect: $err',
+                ),
+              ],
+            );
+          }
+        },
+      )
+      // Interactive elements inspection
+      ..tool(
+        'app.get_interactive_elements',
+        description:
+            'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Requires an active connection established via app.connect.',
+        annotations: const ToolAnnotations(
+          title: 'Get Interactive Elements',
+          readOnlyHint: true,
+          idempotentHint: true,
+        ),
+        toolInputSchema: const ToolInputSchema(properties: {}),
+        callback: ({args, extra}) async {
+          _logger.info('Getting interactive elements');
+
+          try {
+            final response = await connector.getInteractiveElements();
+            final elements = response['elements'] as List<dynamic>;
+
+            // Format the elements nicely
+            final buffer = StringBuffer()
+              ..writeln('Found ${elements.length} interactive element(s):\n');
+
+            for (final element in elements) {
+              buffer.writeln(_formatElement(element as Map<String, dynamic>));
+            }
+
+            return CallToolResult.fromContent(
+              content: [
+                TextContent(text: buffer.toString()),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to get interactive elements', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(text: err.toString()),
+              ],
+            );
+          }
+        },
+      )
+      // Tap interaction
+      ..tool(
+        'app.tap',
+        description:
+            'Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>) or by their visible text content. Only one of key or text should be provided. Requires an active connection established via app.connect.',
+        annotations: const ToolAnnotations(
+          title: 'Tap Element',
+        ),
+        toolInputSchema: const ToolInputSchema(
+          properties: {
+            'key': {
+              'type': 'string',
+              'description':
+                  'The key of the element to tap. You can get the key of an element by calling app.get_interactive_elements.',
+            },
+            'text': {
+              'type': 'string',
+              'description':
+                  'The visible text content of the element to tap. Use this for elements that display text like buttons or labels.',
+            },
+          },
+        ),
+        callback: ({args, extra}) async {
+          final matcher = _buildMatcher(args);
+          _logger.info('Tapping element with matcher: $matcher');
+
+          try {
+            final response = await connector.tapElement(matcher);
+            final message = response['message'] as String?;
+
+            return CallToolResult.fromContent(
+              content: [
+                TextContent(
+                  text: message ?? 'Successfully tapped element',
+                ),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to tap element', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(text: err.toString()),
+              ],
+            );
+          }
+        },
+      )
+      // Text input
+      ..tool(
+        'app.enter_text',
+        description:
+            'Enters text into a text field in the Flutter app that matches the given criteria. This simulates typing text into the field. Requires an active connection established via app.connect.',
+        annotations: const ToolAnnotations(
+          title: 'Enter Text',
+        ),
+        toolInputSchema: const ToolInputSchema(
+          properties: {
+            'input': {
+              'type': 'string',
+              'description': 'The text to enter into the text field.',
+            },
+            'key': {
+              'type': 'string',
+              'description':
+                  'The key of the text field. You can get the key of an element by calling app.get_interactive_elements.',
+            },
+          },
+          required: ['input', 'key'],
+        ),
+        callback: ({args, extra}) async {
+          final input = args!['input'] as String;
+          final matcher = _buildMatcher(args);
+          _logger.info('Entering text into element with matcher: $matcher');
+
+          try {
+            final response = await connector.enterText(matcher, input);
+            final message = response['message'] as String?;
+
+            return CallToolResult.fromContent(
+              content: [
+                TextContent(
+                  text: message ?? 'Successfully entered text',
+                ),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to enter text', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(text: err.toString()),
+              ],
+            );
+          }
+        },
+      )
+      // Scroll to element
+      ..tool(
+        'app.scroll_to',
+        description:
+            'Scrolls the view until an element matching the given criteria becomes visible. You can match elements by their key (a ValueKey<String>) or by their visible text content. This is useful when you need to interact with elements that are not currently visible on screen. Requires an active connection established via app.connect.',
+        annotations: const ToolAnnotations(
+          title: 'Scroll to Element',
+        ),
+        toolInputSchema: const ToolInputSchema(
+          properties: {
+            'key': {
+              'type': 'string',
+              'description':
+                  'The key of the element to scroll to. You can get the key of an element by calling app.get_interactive_elements.',
+            },
+            'text': {
+              'type': 'string',
+              'description':
+                  'The visible text content of the element to scroll to.',
+            },
+          },
+        ),
+        callback: ({args, extra}) async {
+          final matcher = _buildMatcher(args);
+          _logger.info('Scrolling to element with matcher: $matcher');
+
+          try {
+            final response = await connector.scrollToElement(matcher);
+            final message = response['message'] as String?;
+
+            return CallToolResult.fromContent(
+              content: [
+                TextContent(
+                  text: message ?? 'Successfully scrolled to element',
+                ),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to scroll to element', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(text: err.toString()),
+              ],
+            );
+          }
+        },
+      )
+      // Get logs
+      ..tool(
+        'app.get_logs',
+        description:
+            'Retrieves all application logs collected from the Flutter app since connection or since the last log retrieval. This includes debug messages, errors, and other log output from the running app. Requires an active connection established via app.connect.',
+        annotations: const ToolAnnotations(
+          title: 'Get Application Logs',
+          readOnlyHint: true,
+        ),
+        toolInputSchema: const ToolInputSchema(properties: {}),
+        callback: ({args, extra}) async {
+          _logger.info('Getting application logs');
+
+          try {
+            final response = await connector.getLogs();
+            final logs = response['logs'] as List;
+            final count = response['count'] as int;
+
+            if (count == 0) {
+              return CallToolResult.fromContent(
+                content: [
+                  const TextContent(text: 'No logs collected'),
+                ],
+              );
+            }
+
+            // Format logs nicely
+            final buffer = StringBuffer()
+              ..writeln(
+                  'Collected $count log entr${count == 1 ? 'y' : 'ies'}:\n');
+
+            for (final log in logs) {
+              buffer.writeln(log);
+            }
+
+            return CallToolResult.fromContent(
+              content: [
+                TextContent(text: buffer.toString()),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to get logs', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(text: err.toString()),
+              ],
+            );
+          }
+        },
+      )
+      // Take screenshots
+      ..tool(
+        'app.take_screenshots',
+        description:
+            'Takes screenshots of all views in the Flutter app. Returns base64-encoded PNG images that can be decoded and saved. This captures the current visual state of the app. Requires an active connection established via app.connect.',
+        annotations: const ToolAnnotations(
+          title: 'Take Screenshots',
+          readOnlyHint: true,
+        ),
+        toolInputSchema: const ToolInputSchema(properties: {}),
+        callback: ({args, extra}) async {
+          _logger.info('Taking screenshots');
+
+          try {
+            final response = await connector.takeScreenshots();
+            final screenshots =
+                (response['screenshots'] as List<dynamic>).cast<String>();
+
+            if (screenshots.isEmpty) {
+              return CallToolResult.fromContent(
+                content: [
+                  const TextContent(text: 'No screenshots captured'),
+                ],
+              );
+            } else {
+              return CallToolResult.fromContent(
+                  content: screenshots
+                      .map((screenshot) =>
+                          ImageContent(data: screenshot, mimeType: 'image/png'))
+                      .toList());
+            }
+          } catch (err) {
+            _logger.warning('Failed to take screenshots', err);
+            return CallToolResult.fromContent(
+              isError: true,
+              content: [
+                TextContent(text: err.toString()),
+              ],
+            );
+          }
+        },
+      );
+  }
+
+  /// Builds a widget matcher map from tool arguments.
+  Map<String, dynamic> _buildMatcher(Map<String, dynamic>? args) {
+    if (args == null) {
+      return {};
+    }
+
+    final matcher = <String, dynamic>{};
+    if (args.containsKey('key')) {
+      matcher['key'] = args['key'];
+    }
+    if (args.containsKey('text')) {
+      matcher['text'] = args['text'];
+    }
+    return matcher;
+  }
+
+  /// Formats an element for display.
+  String _formatElement(Map<String, dynamic> element) {
+    final buffer = StringBuffer();
+
+    // Element type
+    if (element['type'] != null) {
+      buffer.write('Type: ${element['type']}');
+    }
+
+    // Key
+    if (element['key'] != null) {
+      buffer.write(', Key: "${element['key']}"');
+    }
+
+    // Text content
+    if (element['text'] != null && element['text'] != '') {
+      buffer.write(', Text: "${element['text']}"');
+    }
+
+    // Additional properties
+    final additionalProps = <String>[];
+    element.forEach((key, value) {
+      if (key != 'type' && key != 'key' && key != 'text' && value != null) {
+        additionalProps.add('$key: ${_formatValue(value)}');
+      }
+    });
+
+    if (additionalProps.isNotEmpty) {
+      buffer.write(', ${additionalProps.join(', ')}');
+    }
+
+    return buffer.toString();
+  }
+
+  /// Formats a value for display.
+  String _formatValue(dynamic value) {
+    if (value is String) {
+      return '"$value"';
+    }
+    if (value is Map || value is List) {
+      return jsonEncode(value);
+    }
+    return value.toString();
+  }
+}
