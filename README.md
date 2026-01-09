@@ -185,6 +185,25 @@ Once connected, the AI agent has access to these tools:
 | `marionette.get_logs` | Retrieves application logs collected since the last check. |
 | `marionette.take_screenshots` | Captures screenshots of all active views and returns them as base64 images. |
 
+## Example Scenarios
+
+Marionette MCP shines when used by coding agents to verify their work or explore the app. Here are some real-world scenarios:
+
+### 1. Verify a New Feature
+**Context:** You just asked the agent to implement a "Forgot Password" flow.
+**Prompt:**
+> "Now that you've implemented the Forgot Password screen, let's verify it. Connect to the app, navigate to the login screen, tap 'Forgot Password', enter a valid email, and submit. Check the logs to ensure the API call was made successfully."
+
+### 2. Post-Refactor Smoke Test
+**Context:** You performed a large refactor on the navigation logic.
+**Prompt:**
+> "I've refactored the routing. Please run a quick smoke test: connect to the app, cycle through all tabs in the bottom navigation bar, and verify that each screen loads without throwing exceptions in the logs."
+
+### 3. Debugging UI Issues
+**Context:** Users reported a button is unresponsive on the Settings page.
+**Prompt:**
+> "Investigate the 'Clear Cache' button on the Settings page. Connect to the app, navigate there, find the button using `get_interactive_elements`, tap it, and analyze the logs to see if an error is occurring or if the tap is being ignored."
+
 ## How It Works
 
 1.  **Initialization**: Your Flutter app initializes `MarionetteBinding`, which registers custom VM service extensions (`ext.flutter.marionette.*`).
