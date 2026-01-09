@@ -11,7 +11,7 @@ import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
 /// A custom binding that extends Flutter's default binding to provide
-/// VM service extensions for runtime widget inspection and interaction.
+/// integration points for the Marionette MCP.
 class MarionetteBinding extends WidgetsFlutterBinding {
   /// Creates and initializes the binding with the given configuration.
   ///
