@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "marionette": {
+      "type": "stdio",
+      "command": "dart run packages/marionette_mcp/bin/marionette_mcp.dart"
+    }
+  }
+}
