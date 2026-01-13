@@ -18,9 +18,9 @@ final class VmServiceContext {
     // Connection management tools
     server
       ..registerTool(
-        'marionette.connect',
+        'connect',
         description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other marionette.* tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode.',
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode.',
         annotations: const ToolAnnotations(
           title: 'Connect to App',
         ),
@@ -58,9 +58,9 @@ final class VmServiceContext {
         },
       )
       ..registerTool(
-        'marionette.disconnect',
+        'disconnect',
         description:
-            'Disconnects from the currently connected Flutter app. After disconnecting, you must call marionette.connect again to use any marionette.* tools.',
+            'Disconnects from the currently connected Flutter app. After disconnecting, you must call connect again to use any other tools.',
         annotations: const ToolAnnotations(
           title: 'Disconnect from App',
         ),
@@ -90,9 +90,9 @@ final class VmServiceContext {
       )
       // Interactive elements inspection
       ..registerTool(
-        'marionette.get_interactive_elements',
+        'get_interactive_elements',
         description:
-            'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Requires an active connection established via marionette.connect.',
+            'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(
           title: 'Get Interactive Elements',
           readOnlyHint: true,
@@ -132,9 +132,9 @@ final class VmServiceContext {
       )
       // Tap interaction
       ..registerTool(
-        'marionette.tap',
+        'tap',
         description:
-            'Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>) or by their visible text content. Only one of key or text should be provided. Requires an active connection established via marionette.connect.',
+            'Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>) or by their visible text content. Only one of key or text should be provided. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(
           title: 'Tap Element',
         ),
@@ -142,7 +142,7 @@ final class VmServiceContext {
           properties: {
             'key': JsonSchema.string(
               description:
-                  'The key of the element to tap. You can get the key of an element by calling marionette.get_interactive_elements.',
+                  'The key of the element to tap. You can get the key of an element by calling get_interactive_elements.',
             ),
             'text': JsonSchema.string(
               description:
@@ -178,9 +178,9 @@ final class VmServiceContext {
       )
       // Text input
       ..registerTool(
-        'marionette.enter_text',
+        'enter_text',
         description:
-            'Enters text into a text field in the Flutter app that matches the given criteria. This simulates typing text into the field. Requires an active connection established via marionette.connect.',
+            'Enters text into a text field in the Flutter app that matches the given criteria. This simulates typing text into the field. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(
           title: 'Enter Text',
         ),
@@ -191,7 +191,7 @@ final class VmServiceContext {
             ),
             'key': JsonSchema.string(
               description:
-                  'The key of the text field. You can get the key of an element by calling marionette.get_interactive_elements.',
+                  'The key of the text field. You can get the key of an element by calling get_interactive_elements.',
             ),
           },
           required: ['input', 'key'],
@@ -225,9 +225,9 @@ final class VmServiceContext {
       )
       // Scroll to element
       ..registerTool(
-        'marionette.scroll_to',
+        'scroll_to',
         description:
-            'Scrolls the view until an element matching the given criteria becomes visible. You can match elements by their key (a ValueKey<String>) or by their visible text content. This is useful when you need to interact with elements that are not currently visible on screen. Requires an active connection established via marionette.connect.',
+            'Scrolls the view until an element matching the given criteria becomes visible. You can match elements by their key (a ValueKey<String>) or by their visible text content. This is useful when you need to interact with elements that are not currently visible on screen. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(
           title: 'Scroll to Element',
         ),
@@ -235,7 +235,7 @@ final class VmServiceContext {
           properties: {
             'key': JsonSchema.string(
               description:
-                  'The key of the element to scroll to. You can get the key of an element by calling marionette.get_interactive_elements.',
+                  'The key of the element to scroll to. You can get the key of an element by calling get_interactive_elements.',
             ),
             'text': JsonSchema.string(
               description:
@@ -271,9 +271,9 @@ final class VmServiceContext {
       )
       // Get logs
       ..registerTool(
-        'marionette.get_logs',
+        'get_logs',
         description:
-            'Retrieves all application logs collected from the Flutter app since connection or since the last log retrieval. This includes debug messages, errors, and other log output from the running app. Requires an active connection established via marionette.connect.',
+            'Retrieves all application logs collected from the Flutter app since connection or since the last log retrieval. This includes debug messages, errors, and other log output from the running app. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(
           title: 'Get Application Logs',
           readOnlyHint: true,
@@ -322,9 +322,9 @@ final class VmServiceContext {
       )
       // Take screenshots
       ..registerTool(
-        'marionette.take_screenshots',
+        'take_screenshots',
         description:
-            'Takes screenshots of all views in the Flutter app. Returns base64-encoded PNG images that can be decoded and saved. This captures the current visual state of the app. Requires an active connection established via marionette.connect.',
+            'Takes screenshots of all views in the Flutter app. Returns base64-encoded PNG images that can be decoded and saved. This captures the current visual state of the app. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(
           title: 'Take Screenshots',
           readOnlyHint: true,
