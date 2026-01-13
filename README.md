@@ -6,6 +6,10 @@
 # Marionette MCP
 
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
+[![marionette_mcp pub.dev badge](https://img.shields.io/pub/v/marionette_mcp)](https://pub.dev/packages/marionette_mcp)
+
+[pub-badge]: https://img.shields.io/pub/v/cqrs
+[pub-badge-link]: https://pub.dev/packages/cqrs
 
 **"Playwright MCP/Cursor Browser, but for Flutter apps"**
 
