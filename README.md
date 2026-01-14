@@ -2,20 +2,16 @@
   <img width="1920" height="623" alt="marionette_mcp" src="https://github.com/user-attachments/assets/12726942-57b3-4967-a1c8-bea06b397500" />
 </a>
 
-
 # Marionette MCP
 
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 [![marionette_mcp pub.dev badge](https://img.shields.io/pub/v/marionette_mcp)](https://pub.dev/packages/marionette_mcp)
 
-[pub-badge]: https://img.shields.io/pub/v/cqrs
-[pub-badge-link]: https://pub.dev/packages/cqrs
-
 **"Playwright MCP/Cursor Browser, but for Flutter apps"**
 
 Marionette MCP enables AI agents (like Cursor, Claude Code, etc.) to inspect and interact with running Flutter applications. It provides a bridge between the MCP protocol and the Flutter VM service, allowing agents to see the widget tree, tap elements, enter text, scroll, and capture screenshots for automated smoke testing and interaction.
 
-<https://github.com/user-attachments/assets/0f00b35b-592a-4a35-b305-a3d8e01870b3>
+![](https://github.com/leancodepl/marionette_mcp_attachments/blob/master/promo.gif)
 
 ## Marionette MCP vs Flutter MCP
 
@@ -48,7 +44,11 @@ dart pub global activate marionette_mcp
 > dart pub add dev:marionette_mcp
 > ```
 >
-> Remember then to invoke the MCP server as `dart run marionette_mcp`
+> Then invoke the MCP server as `dart run marionette_mcp`.
+> It might be necessary to change the working directory, so that `dart run` is able to find `marionette_mcp`.
+> You can do it like so: `cd ${workspaceFolder}/packages/mypackage && dart run marionette_mcp` (it will vary between tooling).
+>
+> If it does not work, we suggest using the global tool method.
 
 ### 2. Add Flutter Package
 
@@ -245,21 +245,23 @@ Marionette MCP shines when used by coding agents to verify their work or explore
   </a>
 </div>
 
-This package is built with 💙 by **[LeanCode](https://leancode.co?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)**. 
+This package is built with 💙 by **[LeanCode](https://leancode.co?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)**.
 We are **top-tier experts** focused on Flutter Enterprise solutions.
 
 ### Why LeanCode?
-* **Creators of [Patrol](https://patrol.leancode.co/?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)** – the next-gen testing framework for Flutter.
-* **Production-Ready** – We use this package in apps with millions of users.
-* **Full-Cycle Product Development** – We take your product from scratch to long-term maintenance.
+
+- **Creators of [Patrol](https://patrol.leancode.co/?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)** – the next-gen testing framework for Flutter.
+
+- **Production-Ready** – We use this package in apps with millions of users.
+- **Full-Cycle Product Development** – We take your product from scratch to long-term maintenance.
 
 <div align="center">
   <br />
-  
+
   **Need help with your Flutter project?**
-  
-  [**👉 Hire our team**](https://leancode.co/get-estimate?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp) 
-  &nbsp;&nbsp;•&nbsp;&nbsp; 
+
+  [**👉 Hire our team**](https://leancode.co/get-estimate?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)
+  &nbsp;&nbsp;•&nbsp;&nbsp;
   [Check our other packages](https://pub.dev/packages?q=publisher%3Aleancode.co&sort=downloads)
-  
+
 </div>
