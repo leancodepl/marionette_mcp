@@ -32,7 +32,9 @@ class ScreenshotService {
     // Wait for all screenshots to complete and filter out failures (nulls)
     final images = (await Future.wait(
       imageFutures,
-    )).whereType<String>().toList();
+    ))
+        .whereType<String>()
+        .toList();
 
     return images;
   }
