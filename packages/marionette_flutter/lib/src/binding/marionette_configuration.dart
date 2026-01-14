@@ -81,7 +81,7 @@ class MarionetteConfiguration {
 
   static bool _isBuiltInStopWidget(Type type) {
     return (type != GestureDetector && type != InkWell) &&
-        _isBuiltInInteractiveWidget(type);
+        (_isBuiltInInteractiveWidget(type) || type == Text);
   }
 
   static String? _extractBuiltInText(Widget widget) {
