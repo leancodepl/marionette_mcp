@@ -49,15 +49,13 @@ final class CopilotCompatStdioServerTransport implements Transport {
     }
     _started = true;
 
-    _linesSubscription = _stdin
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(
-          _onLine,
-          onError: _onErrorCallback,
-          onDone: _onStdinDone,
-          cancelOnError: false,
-        );
+    _linesSubscription =
+        _stdin.transform(utf8.decoder).transform(const LineSplitter()).listen(
+              _onLine,
+              onError: _onErrorCallback,
+              onDone: _onStdinDone,
+              cancelOnError: false,
+            );
   }
 
   void _onLine(String line) {
@@ -76,9 +74,8 @@ final class CopilotCompatStdioServerTransport implements Transport {
       final message = JsonRpcMessage.fromJson(messageMap);
       onmessage?.call(message);
     } catch (e, st) {
-      final err = (e is Error)
-          ? e
-          : StateError('Message parsing error: $e\n$st');
+      final err =
+          (e is Error) ? e : StateError('Message parsing error: $e\n$st');
       try {
         onerror?.call(err);
       } catch (handlerErr) {
@@ -142,7 +139,8 @@ final class CopilotCompatStdioServerTransport implements Transport {
       try {
         onerror?.call(dartError);
       } catch (handlerErr) {
-        _logger.warning('Error within onerror handler during send: $handlerErr');
+        _logger
+            .warning('Error within onerror handler during send: $handlerErr');
       }
       return Future.error(dartError);
     }
@@ -163,4 +161,3 @@ final class CopilotCompatStdioServerTransport implements Transport {
     }
   }
 }
-
