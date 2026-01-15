@@ -2,6 +2,8 @@
 
 import 'dart:io';
 
+import 'package:yaml/yaml.dart';
+
 void main() {
   // Paths to the pubspec.yaml files
   final mcpPubspecPath = 'packages/marionette_mcp/pubspec.yaml';
@@ -59,32 +61,30 @@ String extractVersion(String pubspecPath) {
     exit(1);
   }
 
-  final content = file.readAsStringSync();
-  final lines = content.split('\n');
-
-  for (final line in lines) {
-    final trimmed = line.trim();
-    // Match 'version:' at the start of the line (accounting for leading spaces)
-    if (trimmed.startsWith('version:')) {
-      // Extract version after 'version:', removing quotes if present
-      var version = trimmed.substring('version:'.length).trim();
-      
-      // Remove surrounding quotes if present
-      if ((version.startsWith('"') && version.endsWith('"')) ||
-          (version.startsWith("'") && version.endsWith("'"))) {
-        version = version.substring(1, version.length - 1);
-      }
-      
-      if (version.isEmpty) {
-        stderr.writeln('ERROR: Empty version in $pubspecPath');
-        exit(1);
-      }
-      return version;
+  try {
+    final content = file.readAsStringSync();
+    final yaml = loadYaml(content) as Map;
+    
+    if (!yaml.containsKey('version')) {
+      stderr.writeln('ERROR: Version not found in $pubspecPath');
+      exit(1);
     }
+    
+    final version = yaml['version']?.toString();
+    
+    if (version == null || version.isEmpty) {
+      stderr.writeln('ERROR: Empty version in $pubspecPath');
+      exit(1);
+    }
+    
+    return version;
+  } on YamlException catch (e) {
+    stderr.writeln('ERROR: Failed to parse YAML in $pubspecPath: $e');
+    exit(1);
+  } catch (e) {
+    stderr.writeln('ERROR: Failed to read $pubspecPath: $e');
+    exit(1);
   }
-
-  stderr.writeln('ERROR: Version not found in $pubspecPath');
-  exit(1);
 }
 
 bool isValidVersion(String version) {
