@@ -1,0 +1,9 @@
+name: marionette_mcp_tools
+description: Build and development tools for marionette_mcp
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  yaml: ^3.1.0
