@@ -3,6 +3,7 @@ description: MCP server for Flutter app interaction - enables AI agents to inspe
 version: 0.2.3
 repository: https://github.com/leancodepl/marionette-mcp
 issue_tracker: https://github.com/leancodepl/marionette-mcp/issues
+resolution: workspace
 
 executables:
   marionette_mcp: marionette_mcp
