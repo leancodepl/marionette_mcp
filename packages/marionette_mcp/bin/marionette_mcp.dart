@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/compat/copilot_stdio_server_transport.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -145,7 +146,8 @@ String _formatTime(DateTime time) {
 Future<int> runStdioServer(McpServer server) async {
   final logger = logging.Logger('main');
 
-  final transport = StdioServerTransport();
+  // Use a stdio transport with small compatibility fixes for clients like Copilot.
+  final transport = CopilotCompatStdioServerTransport();
 
   try {
     logger.fine('Running MCP server on stdio');

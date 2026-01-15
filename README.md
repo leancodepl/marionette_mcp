@@ -191,6 +191,20 @@ You can run the following command to add it:
 claude mcp add --transport stdio marionette -- marionette_mcp
 ```
 
+### Copilot
+Add to your `mcp.json`:
+
+```json
+{
+  "servers": {
+    "marionette": {
+      "command": "marionette_mcp",
+      "args": []
+    }
+  }
+}
+```
+
 ## Available Tools
 
 Once connected, the AI agent has access to these tools:
