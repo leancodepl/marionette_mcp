@@ -16,9 +16,9 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   /// Creates and initializes the binding with the given configuration.
   ///
   /// Returns the singleton instance of [MarionetteBinding].
-  static MarionetteBinding ensureInitialized(
-    MarionetteConfiguration configuration,
-  ) {
+  static MarionetteBinding ensureInitialized([
+    MarionetteConfiguration configuration = const MarionetteConfiguration(),
+  ]) {
     if (_instance == null) {
       MarionetteBinding._(configuration);
     }

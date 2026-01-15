@@ -3,7 +3,7 @@ import 'package:logging/logging.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 
 void main() {
-  MarionetteBinding.ensureInitialized(const MarionetteConfiguration());
+  MarionetteBinding.ensureInitialized();
 
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {

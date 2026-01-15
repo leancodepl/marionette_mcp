@@ -74,7 +74,7 @@ import 'package:marionette_flutter/marionette_flutter.dart';
 void main() {
   // Initialize Marionette only in debug mode
   if (kDebugMode) {
-    MarionetteBinding.ensureInitialized(const MarionetteConfiguration());
+    MarionetteBinding.ensureInitialized();
   } else {
     WidgetsFlutterBinding.ensureInitialized();
   }
