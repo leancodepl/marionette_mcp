@@ -1,3 +1,10 @@
+# 0.2.4
+
+- Add CI workflow with analyze, format, and version checks
+- Add version generation script with validation and robustness
+- Replace example symlinks with actual directories in both packages
+- Improve project structure and dependencies
+
 # 0.2.3
 
 - Add example symlinks for improved pub.dev package scoring
