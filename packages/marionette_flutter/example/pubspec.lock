@@ -142,14 +142,7 @@ packages:
   marionette_flutter:
     dependency: "direct main"
     description:
-      path: "../../packages/marionette_flutter"
-      relative: true
-    source: path
-    version: "0.2.3"
-  marionette_mcp:
-    dependency: "direct dev"
-    description:
-      path: "../../packages/marionette_mcp"
+      path: ".."
       relative: true
     source: path
     version: "0.2.3"
