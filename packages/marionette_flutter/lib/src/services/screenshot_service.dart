@@ -46,10 +46,7 @@ class ScreenshotService {
 
   @visibleForTesting
   static Size? calculateScaledSize(Size source, Size maxSize) {
-    if (source.width <= 0 ||
-        source.height <= 0 ||
-        maxSize.width <= 0 ||
-        maxSize.height <= 0) {
+    if (!_isValidSize(source) || !_isValidSize(maxSize)) {
       return null;
     }
 
@@ -171,7 +168,9 @@ class ScreenshotService {
       return null;
     } finally {
       // Dispose image immediately after use.
-      resizedImage?.dispose();
+      if (resizedImage != null && resizedImage != image) {
+        resizedImage.dispose();
+      }
       image?.dispose();
       // Ensure scene is always disposed.
       scene?.dispose();
@@ -204,5 +203,9 @@ class ScreenshotService {
     );
     picture.dispose();
     return resizedImage;
+  }
+
+  static bool _isValidSize(Size size) {
+    return size.width > 0 && size.height > 0;
   }
 }
