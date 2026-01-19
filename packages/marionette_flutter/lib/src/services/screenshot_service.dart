@@ -46,6 +46,13 @@ class ScreenshotService {
 
   @visibleForTesting
   static Size? calculateScaledSize(Size source, Size maxSize) {
+    if (source.width <= 0 ||
+        source.height <= 0 ||
+        maxSize.width <= 0 ||
+        maxSize.height <= 0) {
+      return null;
+    }
+
     if (source.width <= maxSize.width && source.height <= maxSize.height) {
       return null;
     }
@@ -55,12 +62,11 @@ class ScreenshotService {
       maxSize.height / source.height,
     );
 
-    if (scale <= 0) {
+    final targetWidth = (source.width * scale).floor();
+    final targetHeight = (source.height * scale).floor();
+    if (targetWidth < 1 || targetHeight < 1) {
       return null;
     }
-
-    final targetWidth = math.max(1, (source.width * scale).floor());
-    final targetHeight = math.max(1, (source.height * scale).floor());
     return Size(targetWidth.toDouble(), targetHeight.toDouble());
   }
 
