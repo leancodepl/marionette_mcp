@@ -16,11 +16,7 @@ ArgParser buildParser() {
       negatable: false,
       help: 'Print this usage information.',
     )
-    ..addFlag(
-      'version',
-      negatable: false,
-      help: 'Print the tool version.',
-    )
+    ..addFlag('version', negatable: false, help: 'Print the tool version.')
     ..addOption(
       'log-level',
       abbr: 'l',
@@ -73,9 +69,7 @@ Future<int> main(List<String> arguments) async {
     final server = McpServer(
       const Implementation(name: 'marionette-mcp', version: version),
       options: const McpServerOptions(
-        capabilities: ServerCapabilities(
-          tools: ServerCapabilitiesTools(),
-        ),
+        capabilities: ServerCapabilities(tools: ServerCapabilitiesTools()),
         instructions: '''
 Marionette MCP enables AI agents to interact with Flutter apps running in debug mode. It provides tools to inspect UI elements, tap buttons, enter text, scroll, take screenshots, retrieve logs, and perform hot reloads.
 
@@ -170,8 +164,10 @@ Future<int> runSseServer(McpServer server, int ssePort) async {
   final logger = logging.Logger('main');
   final sseServerManager = SseServerManager(server);
   try {
-    final httpServer =
-        await HttpServer.bind(InternetAddress.loopbackIPv4, ssePort);
+    final httpServer = await HttpServer.bind(
+      InternetAddress.loopbackIPv4,
+      ssePort,
+    );
     logger.fine('Running MCP server on SSE port $ssePort');
     unawaited(
       _ExitSignal().wait.then((signal) {
@@ -197,12 +193,17 @@ Future<int> runSseServer(McpServer server, int ssePort) async {
 
 class _ExitSignal {
   _ExitSignal() {
-    _sigtermSubscription = ProcessSignal.sigterm.watch().listen(_handleSignal);
+    // SIGTERM is not supported on Windows, only listen on non-Windows platforms
+    if (!Platform.isWindows) {
+      _sigtermSubscription = ProcessSignal.sigterm.watch().listen(
+        _handleSignal,
+      );
+    }
     _sigintSubscription = ProcessSignal.sigint.watch().listen(_handleSignal);
   }
 
   final _completer = Completer<ProcessSignal>();
-  late final StreamSubscription<ProcessSignal> _sigtermSubscription;
+  StreamSubscription<ProcessSignal>? _sigtermSubscription;
   late final StreamSubscription<ProcessSignal> _sigintSubscription;
 
   Future<ProcessSignal> get wait => _completer.future;
@@ -215,7 +216,7 @@ class _ExitSignal {
   }
 
   void _cleanup() {
-    _sigtermSubscription.cancel();
+    _sigtermSubscription?.cancel();
     _sigintSubscription.cancel();
   }
 }
