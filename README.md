@@ -101,6 +101,14 @@ If you use custom widgets in your design system, you can configure Marionette to
 
 By default, Marionette recognizes standard Flutter widgets like `ElevatedButton`, `TextField`, and `Switch`. If your app uses custom widgets (e.g., `MyPrimaryButton` that wraps styling around a `GestureDetector`), Marionette won't know they're tappable unless you tell it. The `isInteractiveWidget` callback lets you mark your custom widget types as interactive, so they appear in the element list and can be targeted by `tap` and other tools.
 
+**Why `extractText`?** The `extractText` callback serves two purposes:
+
+1. **Element discovery**: Widgets with extractable text are automatically included in the interactive elements tree returned by `get_interactive_elements`, even if they are not explicitly interactive. The extracted text appears in the element's `text` field, helping the AI agent understand what each element displays.
+
+2. **Text-based matching**: The `tap`, `scroll_to`, and other interaction tools can match elements by their text content using the `text` parameter (e.g., `tap(text: "Submit")`).
+
+By default, Marionette extracts text from standard Flutter widgets (`Text`, `RichText`, `EditableText`, `TextField`, `TextFormField`). Use `extractText` to add support for your custom text widgets.
+
 ```dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

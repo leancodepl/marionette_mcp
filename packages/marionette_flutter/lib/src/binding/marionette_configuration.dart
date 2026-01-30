@@ -27,8 +27,29 @@ class MarionetteConfiguration {
 
   /// Extracts text content from an app-specific widget instance.
   ///
-  /// This is called only after checking built-in Flutter widgets.
+  /// This callback serves two purposes:
+  /// 1. **Element discovery**: Widgets with extractable text are included in
+  ///    the interactive elements tree returned by `get_interactive_elements`,
+  ///    even if they are not explicitly interactive. The extracted text is
+  ///    exposed in the element's `text` field.
+  /// 2. **Text-based matching**: The `tap`, `scroll_to`, and other interaction
+  ///    tools can match elements by their text content using the `text`
+  ///    parameter.
+  ///
+  /// This callback is called only after checking built-in Flutter widgets
+  /// (Text, RichText, EditableText, TextField, TextFormField).
   /// Return the text content of your custom widgets, or null if not applicable.
+  ///
+  /// Example:
+  /// ```dart
+  /// MarionetteConfiguration(
+  ///   extractText: (widget) {
+  ///     if (widget is MyCustomLabel) return widget.labelText;
+  ///     if (widget is MyCustomInput) return widget.controller.text;
+  ///     return null;
+  ///   },
+  /// )
+  /// ```
   final String? Function(Widget widget)? extractText;
 
   /// Maximum size for screenshots in physical pixels.

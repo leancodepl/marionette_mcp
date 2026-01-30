@@ -80,6 +80,10 @@ class ElementTreeFinder {
       data['key'] = keyValue;
     }
 
+    if (text != null) {
+      data['text'] = text;
+    }
+
     // Get position and size if available
     if (renderObject is RenderBox && renderObject.hasSize) {
       try {
