@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:marionette_flutter/src/services/log_collector.dart';
 
 /// Configuration for the Marionette extensions.
 ///
@@ -10,6 +11,7 @@ class MarionetteConfiguration {
     this.shouldStopTraversal,
     this.extractText,
     this.maxScreenshotSize = const Size(2000, 2000),
+    this.logCollector,
   });
 
   /// Determines if an app-specific widget type is interactive.
@@ -57,6 +59,44 @@ class MarionetteConfiguration {
   /// If set, captured screenshots will be downscaled to fit within this size
   /// while preserving aspect ratio. Set to null to disable resizing.
   final Size? maxScreenshotSize;
+
+  /// Optional log collector for capturing application logs.
+  ///
+  /// If not provided, the `get_logs` MCP tool will return an error with
+  /// instructions on how to configure logging.
+  ///
+  /// ## Using the `logging` package
+  ///
+  /// ```dart
+  /// import 'package:marionette_logging/marionette_logging.dart';
+  ///
+  /// MarionetteBinding.ensureInitialized(
+  ///   MarionetteConfiguration(logCollector: LoggingLogCollector()),
+  /// );
+  /// ```
+  ///
+  /// ## Using the `logger` package
+  ///
+  /// ```dart
+  /// import 'package:marionette_logger/marionette_logger.dart';
+  ///
+  /// final collector = LoggerLogCollector();
+  /// MarionetteBinding.ensureInitialized(
+  ///   MarionetteConfiguration(logCollector: collector),
+  /// );
+  /// final logger = Logger(output: MultiOutput([ConsoleOutput(), collector]));
+  /// ```
+  ///
+  /// ## Using PrintLogCollector for custom logging
+  ///
+  /// ```dart
+  /// final collector = PrintLogCollector();
+  /// MarionetteBinding.ensureInitialized(
+  ///   MarionetteConfiguration(logCollector: collector),
+  /// );
+  /// // Call collector.addLog(message) from your logging listener
+  /// ```
+  final LogCollector? logCollector;
 
   /// Checks if a widget type is interactive (built-in + custom).
   bool isInteractiveWidgetType(Type type) {

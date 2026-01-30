@@ -7,5 +7,7 @@ environment:
 workspace:
   - packages/marionette_mcp
   - packages/marionette_flutter
+  - packages/marionette_logging
+  - packages/marionette_logger
   - example
   - tool

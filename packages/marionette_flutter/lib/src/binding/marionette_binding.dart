@@ -3,7 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
-import 'package:marionette_flutter/src/services/log_collector.dart';
+import 'package:marionette_flutter/src/services/log_store.dart';
 import 'package:marionette_flutter/src/services/screenshot_service.dart';
 import 'package:marionette_flutter/src/services/scroll_simulator.dart';
 import 'package:marionette_flutter/src/services/text_input_simulator.dart';
@@ -37,7 +37,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   // Service instances
   late final ElementTreeFinder _elementTreeFinder;
   late final GestureDispatcher _gestureDispatcher;
-  late final LogCollector _logCollector;
+  LogStore? _logStore;
   late final ScreenshotService _screenshotService;
   late final ScrollSimulator _scrollSimulator;
   late final TextInputSimulator _textInputSimulator;
@@ -52,15 +52,17 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     _widgetFinder = WidgetFinder();
     _elementTreeFinder = ElementTreeFinder(configuration);
     _gestureDispatcher = GestureDispatcher();
-    _logCollector = LogCollector();
     _screenshotService = ScreenshotService(
       maxScreenshotSize: configuration.maxScreenshotSize,
     );
     _scrollSimulator = ScrollSimulator(_gestureDispatcher, _widgetFinder);
     _textInputSimulator = TextInputSimulator(_widgetFinder);
 
-    // Initialize log collection
-    _logCollector.initialize();
+    // Initialize log collection if a collector is provided
+    if (configuration.logCollector != null) {
+      _logStore = LogStore();
+      configuration.logCollector!.start(_logStore!.add);
+    }
   }
 
   @override
@@ -165,8 +167,40 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     registerServiceExtension(
       name: 'marionette.getLogs',
       callback: (params) async {
+        if (_logStore == null) {
+          return <String, dynamic>{
+            'status': 'Error',
+            'error': '''Log collection is not configured.
+
+To enable log collection, provide a LogCollector via MarionetteConfiguration:
+
+Option 1: Using the "logging" package (pub.dev/packages/logging)
+  - Add dependency: flutter pub add marionette_logging
+  - Initialize: MarionetteBinding.ensureInitialized(
+      MarionetteConfiguration(logCollector: LoggingLogCollector()),
+    );
+
+Option 2: Using the "logger" package (pub.dev/packages/logger)
+  - Add dependency: flutter pub add marionette_logger
+  - Initialize: final collector = LoggerLogCollector();
+    MarionetteBinding.ensureInitialized(
+      MarionetteConfiguration(logCollector: collector),
+    );
+    final logger = Logger(output: MultiOutput([ConsoleOutput(), collector]));
+
+Option 3: Using PrintLogCollector for custom logging
+  - Initialize: final collector = PrintLogCollector();
+    MarionetteBinding.ensureInitialized(
+      MarionetteConfiguration(logCollector: collector),
+    );
+  - Call collector.addLog(message) from your logging listener.
+
+See https://pub.dev/packages/marionette_flutter for more details.''',
+          };
+        }
+
         try {
-          final logs = _logCollector.getFormattedLogs();
+          final logs = _logStore!.getLogs();
 
           return <String, dynamic>{
             'status': 'Success',
@@ -207,7 +241,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
 
   @override
   Future<void> reassembleApplication() {
-    _logCollector.clear();
+    _logStore?.clear();
     return super.reassembleApplication();
   }
 }

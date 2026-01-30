@@ -87,11 +87,98 @@ void main() {
 
 ### Log Collection (`get_logs`)
 
-Marionette collects application logs via Dart's [`logging`](https://pub.dev/packages/logging) package by listening to `Logger.root.onRecord`.
-This means **`logging` is required for the MCP to be able to scrape logs**.
+Marionette supports flexible log collection through the `LogCollector` interface. You can choose from several options depending on your logging setup:
 
-If your app doesn't use `logging` (or doesn't emit logs via `Logger(...)`), `get_logs` will likely be empty.
-If you already use another logging solution, you may need to bridge it into `logging` for `get_logs` to work. If you'd like first-class support for another logging solution, please open an issue describing your setup and expectations.
+#### Option 1: Using the `logging` package
+
+If your app uses Dart's [`logging`](https://pub.dev/packages/logging) package:
+
+```bash
+flutter pub add marionette_logging
+```
+
+```dart
+import 'package:flutter/foundation.dart';
+import 'package:logging/logging.dart';
+import 'package:marionette_flutter/marionette_flutter.dart';
+import 'package:marionette_logging/marionette_logging.dart';
+
+void main() {
+  if (kDebugMode) {
+    MarionetteBinding.ensureInitialized(
+      MarionetteConfiguration(logCollector: LoggingLogCollector()),
+    );
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+
+  Logger.root.level = Level.ALL;
+  runApp(const MyApp());
+}
+```
+
+#### Option 2: Using the `logger` package
+
+If your app uses the [`logger`](https://pub.dev/packages/logger) package:
+
+```bash
+flutter pub add marionette_logger
+```
+
+```dart
+import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
+import 'package:marionette_flutter/marionette_flutter.dart';
+import 'package:marionette_logger/marionette_logger.dart';
+
+void main() {
+  final logCollector = LoggerLogCollector();
+
+  if (kDebugMode) {
+    MarionetteBinding.ensureInitialized(
+      MarionetteConfiguration(logCollector: logCollector),
+    );
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+
+  final logger = Logger(
+    output: MultiOutput([ConsoleOutput(), logCollector]),
+  );
+
+  runApp(const MyApp());
+}
+```
+
+#### Option 3: Custom logging with `PrintLogCollector`
+
+For other logging solutions or custom setups, use `PrintLogCollector`:
+
+```dart
+import 'package:flutter/foundation.dart';
+import 'package:marionette_flutter/marionette_flutter.dart';
+
+void main() {
+  final collector = PrintLogCollector();
+
+  if (kDebugMode) {
+    MarionetteBinding.ensureInitialized(
+      MarionetteConfiguration(logCollector: collector),
+    );
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+
+  // Hook into your logging system
+  myLogger.onLog((message) => collector.addLog(message));
+
+  runApp(const MyApp());
+}
+```
+
+#### No logging
+
+If you don't need log collection, simply omit the `logCollector` parameter. The `get_logs` tool will return a helpful message explaining how to enable it.
 
 ### Custom Design System
 
@@ -234,7 +321,7 @@ Once connected, the AI agent has access to these tools:
 | `tap` | Taps an element matching a specific key or visible text. |
 | `enter_text` | Enters text into a text field matching a key. |
 | `scroll_to` | Scrolls the view until an element matching a key or text becomes visible. |
-| `get_logs` | Retrieves application logs collected since the last check (**scraped from Dart `logging` / `Logger.root.onRecord`**). |
+| `get_logs` | Retrieves application logs collected since the last check (requires a `LogCollector` to be configured). |
 | `take_screenshots` | Captures screenshots of all active views and returns them as base64 images. |
 | `hot_reload` | Performs a hot reload of the Flutter app, applying code changes without losing state. |
 

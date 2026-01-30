@@ -37,6 +37,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   marionette_flutter:
     path: ../packages/marionette_flutter
+  marionette_logging:
+    path: ../packages/marionette_logging
   logging: ^1.3.0
 
 dev_dependencies:

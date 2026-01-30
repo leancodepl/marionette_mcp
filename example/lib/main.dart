@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
+import 'package:marionette_logging/marionette_logging.dart';
 
 void main() {
-  MarionetteBinding.ensureInitialized();
+  MarionetteBinding.ensureInitialized(
+    MarionetteConfiguration(logCollector: LoggingLogCollector()),
+  );
 
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {

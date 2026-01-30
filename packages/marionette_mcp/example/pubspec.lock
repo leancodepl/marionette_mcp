@@ -145,14 +145,14 @@ packages:
       path: "../../marionette_flutter"
       relative: true
     source: path
-    version: "0.2.4"
+    version: "0.3.0"
   marionette_mcp:
     dependency: "direct dev"
     description:
       path: ".."
       relative: true
     source: path
-    version: "0.2.4"
+    version: "0.3.0"
   matcher:
     dependency: transitive
     description:
