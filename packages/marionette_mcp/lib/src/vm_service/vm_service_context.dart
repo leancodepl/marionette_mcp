@@ -381,6 +381,68 @@ final class VmServiceContext {
           }
         },
       )
+      // Call app-specific custom service extension (escape hatch).
+      // Intentionally no readOnlyHint or idempotentHint since the behavior
+      // depends entirely on the target extension.
+      ..registerTool(
+        'call_custom_extension',
+        description:
+            'Calls a custom VM service extension registered by the Flutter app. '
+            'This is an escape hatch for interacting with app-specific '
+            'extensions that are not part of marionette\'s built-in tools. '
+            'For marionette features, use the dedicated tools instead. '
+            'The extension name should not include the "ext.flutter." prefix as '
+            'it is added automatically. For example, use '
+            '"deckNavigation.goToSlide" instead of '
+            '"ext.flutter.deckNavigation.goToSlide". '
+            'Arguments are passed as string key-value pairs. '
+            'The available extensions depend on what the connected Flutter app '
+            'has registered. Check the app\'s source code for available extensions. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(
+          title: 'Call Custom Extension',
+        ),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'extension': JsonSchema.string(
+              description:
+                  'The extension name without the "ext.flutter." prefix '
+                  '(e.g., "deckNavigation.goToSlide").',
+            ),
+            'args': JsonSchema.object(
+              description:
+                  'Optional key-value pairs to pass as arguments. '
+                  'Values are passed as-is to the VM service extension.',
+              properties: {},
+            ),
+          },
+          required: ['extension'],
+        ),
+        callback: (args, extra) async {
+          final extensionName = args['extension'] as String;
+          final extensionArgs =
+              (args['args'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+          _logger.info(
+            'Calling custom extension: $extensionName with args: $extensionArgs',
+          );
+
+          try {
+            final response = await connector.callCustomExtension(
+              extensionName,
+              extensionArgs,
+            );
+            return CallToolResult(
+              content: [TextContent(text: jsonEncode(response))],
+            );
+          } catch (err) {
+            _logger.warning('Failed to call custom extension', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Hot reload
       ..registerTool(
         'hot_reload',

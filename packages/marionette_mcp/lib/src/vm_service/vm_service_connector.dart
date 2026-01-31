@@ -153,7 +153,10 @@ class VmServiceConnector {
     }
   }
 
-  /// Calls a VM service extension and handles the response.
+  /// Calls a marionette VM service extension and handles the response.
+  ///
+  /// This is an internal method used by the typed wrapper methods
+  /// (e.g., [tap], [getInteractiveElements]).
   Future<Map<String, dynamic>> _callExtension(
     String extensionName,
     Map<String, dynamic> args,
@@ -198,6 +201,39 @@ class VmServiceConnector {
   Future<String> getVersion() async {
     final response = await _callExtension('marionette.getVersion', {});
     return response['version'] as String;
+  }
+
+  /// Calls a custom VM service extension registered by the Flutter app.
+  ///
+  /// This is an escape hatch for calling app-specific extensions that are
+  /// not part of marionette's built-in tools. For marionette extensions,
+  /// use the dedicated methods (e.g., [tap], [getInteractiveElements]).
+  ///
+  /// [extensionName] should not include the `ext.flutter.` prefix as it
+  /// is added automatically.
+  ///
+  /// Throws [ArgumentError] if [extensionName] is empty or already
+  /// contains the `ext.flutter.` prefix.
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> callCustomExtension(
+    String extensionName, [
+    Map<String, dynamic> args = const {},
+  ]) {
+    if (extensionName.isEmpty) {
+      throw ArgumentError.value(
+        extensionName,
+        'extensionName',
+        'must not be empty',
+      );
+    }
+    if (extensionName.startsWith('ext.flutter.')) {
+      throw ArgumentError.value(
+        extensionName,
+        'extensionName',
+        'must not include the "ext.flutter." prefix, it is added automatically',
+      );
+    }
+    return _callExtension(extensionName, args);
   }
 
   /// Gets the list of interactive elements in the widget tree.
