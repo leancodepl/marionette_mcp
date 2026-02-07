@@ -16,19 +16,21 @@ void main() {
       );
     });
 
-    test('throws ArgumentError when extension name contains ext.flutter. prefix',
-        () {
-      expect(
-        () => connector.callCustomExtension('ext.flutter.myExtension'),
-        throwsA(
-          isA<ArgumentError>().having(
-            (e) => e.message,
-            'message',
-            contains('must not include the "ext.flutter." prefix'),
+    test(
+      'throws ArgumentError when extension name contains ext.flutter. prefix',
+      () {
+        expect(
+          () => connector.callCustomExtension('ext.flutter.myExtension'),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('must not include the "ext.flutter." prefix'),
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('throws NotConnectedException when not connected', () {
       expect(
@@ -48,10 +50,9 @@ void main() {
 
     test('accepts valid extension name with custom args', () {
       expect(
-        () => connector.callCustomExtension(
-          'deckNavigation.goToSlide',
-          {'slideNumber': '3'},
-        ),
+        () => connector.callCustomExtension('deckNavigation.goToSlide', {
+          'slideNumber': '3',
+        }),
         throwsA(isA<NotConnectedException>()),
       );
     });

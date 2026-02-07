@@ -399,9 +399,7 @@ final class VmServiceContext {
             'The available extensions depend on what the connected Flutter app '
             'has registered. Check the app\'s source code for available extensions. '
             'Requires an active connection established via connect.',
-        annotations: const ToolAnnotations(
-          title: 'Call Custom Extension',
-        ),
+        annotations: const ToolAnnotations(title: 'Call Custom Extension'),
         inputSchema: ToolInputSchema(
           properties: {
             'extension': JsonSchema.string(

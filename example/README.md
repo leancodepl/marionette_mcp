@@ -1,16 +1,56 @@
-# counter
+# Marionette MCP Example
 
-A new Flutter project.
+A multi-page Flutter app demonstrating **`call_custom_extension`** with Marionette MCP.
 
-## Getting Started
+## App Structure
 
-This project is a starting point for a Flutter application.
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Home | Welcome screen |
+| `/profile` | Profile | User profile |
+| `/settings` | Settings | Settings with link to Notifications |
+| `/settings/notifications` | Notifications | Nested page (2 taps via UI) |
 
-A few resources to get you started if this is your first Flutter project:
+## Custom VM Service Extensions
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### `appNavigation.getPageInfo`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Returns the current page and all available pages.
+
+```
+call_custom_extension(
+  extension: "appNavigation.getPageInfo"
+)
+→ {"status":"Success","currentPage":"home","currentPath":"/","availablePages":["home","profile","settings","notifications"]}
+```
+
+### `appNavigation.goToPage`
+
+Navigate directly to any page by name — even nested pages that require multiple UI taps.
+
+```
+call_custom_extension(
+  extension: "appNavigation.goToPage",
+  args: { page: "notifications" }
+)
+→ {"status":"Success","page":"notifications","path":"/settings/notifications"}
+```
+
+## Why `call_custom_extension` Matters
+
+The Notifications page is nested under Settings. Via the UI, reaching it requires:
+
+1. Tap the Settings tab
+2. Tap the Notifications list tile
+
+With `call_custom_extension`, an AI agent can jump there in a single call — no multi-step UI interaction needed.
+
+## Running
+
+```bash
+cd example
+flutter pub get
+flutter run -d macos   # or: flutter run -d chrome
+```
+
+Connect via Marionette MCP, then use `call_custom_extension` to navigate.
