@@ -33,14 +33,14 @@ void _registerNavigationExtensions() {
     final page = params['page'];
     if (page == null) {
       return ServiceExtensionResponse.error(
-        -1,
+        ServiceExtensionResponse.extensionError,
         'Missing required parameter: page',
       );
     }
     final path = availablePages[page];
     if (path == null) {
       return ServiceExtensionResponse.error(
-        -1,
+        ServiceExtensionResponse.extensionError,
         'Unknown page: $page. Available: ${availablePages.keys.join(', ')}',
       );
     }
