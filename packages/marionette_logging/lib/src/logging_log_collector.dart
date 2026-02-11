@@ -25,6 +25,7 @@ class LoggingLogCollector implements LogCollector {
 
   @override
   void start(void Function(String log) onLog) {
+    _subscription?.cancel();
     _subscription = Logger.root.onRecord.listen((record) {
       onLog(_formatLogRecord(record));
     });
