@@ -402,23 +402,19 @@ final class VmServiceContext {
 
           try {
             final response = await connector.listExtensions();
-            final extensions =
-                (response['extensions'] as List<dynamic>).cast<Map<String, dynamic>>();
+            final extensions = (response['extensions'] as List<dynamic>)
+                .cast<Map<String, dynamic>>();
 
             if (extensions.isEmpty) {
               return CallToolResult(
                 content: [
-                  const TextContent(
-                    text: 'No custom extensions registered.',
-                  ),
+                  const TextContent(text: 'No custom extensions registered.'),
                 ],
               );
             }
 
             final buffer = StringBuffer()
-              ..writeln(
-                'Found ${extensions.length} custom extension(s):\n',
-              );
+              ..writeln('Found ${extensions.length} custom extension(s):\n');
 
             for (final ext in extensions) {
               final name = ext['name'] as String;
