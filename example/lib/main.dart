@@ -1,5 +1,3 @@
-import 'dart:developer';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
@@ -26,46 +24,45 @@ void main() {
 }
 
 void _registerNavigationExtensions() {
-  registerExtension('ext.flutter.appNavigation.goToPage', (
-    method,
-    params,
-  ) async {
-    final page = params['page'];
-    if (page == null) {
-      return ServiceExtensionResponse.error(
-        ServiceExtensionResponse.extensionError,
-        'Missing required parameter: page',
-      );
-    }
-    final path = availablePages[page];
-    if (path == null) {
-      return ServiceExtensionResponse.error(
-        ServiceExtensionResponse.extensionError,
-        'Unknown page: $page. Available: ${availablePages.keys.join(', ')}',
-      );
-    }
-    router.go(path);
-    return ServiceExtensionResponse.result(
-      '{"status":"Success","page":"$page","path":"$path"}',
-    );
-  });
+  registerMarionetteExtension(
+    name: 'appNavigation.goToPage',
+    callback: (params) async {
+      final page = params['page'];
+      if (page == null) {
+        return MarionetteExtensionResult.invalidParams(
+          'Missing required parameter: page',
+        );
+      }
+      final path = availablePages[page];
+      if (path == null) {
+        return MarionetteExtensionResult.error(
+          0,
+          'Unknown page: $page. Available: ${availablePages.keys.join(', ')}',
+        );
+      }
+      router.go(path);
+      return MarionetteExtensionResult.success({'page': page, 'path': path});
+    },
+  );
 
-  registerExtension('ext.flutter.appNavigation.getPageInfo', (
-    method,
-    params,
-  ) async {
-    final location = router.routerDelegate.currentConfiguration.uri.path;
-    final currentPage =
-        availablePages.entries
-            .where((e) => e.value == location)
-            .map((e) => e.key)
-            .firstOrNull ??
-        'unknown';
-    final pages = availablePages.keys.toList();
-    return ServiceExtensionResponse.result(
-      '{"status":"Success","currentPage":"$currentPage","currentPath":"$location","availablePages":${pages.map((p) => '"$p"').toList()}}',
-    );
-  });
+  registerMarionetteExtension(
+    name: 'appNavigation.getPageInfo',
+    callback: (params) async {
+      final location = router.routerDelegate.currentConfiguration.uri.path;
+      final currentPage =
+          availablePages.entries
+              .where((e) => e.value == location)
+              .map((e) => e.key)
+              .firstOrNull ??
+          'unknown';
+      final pages = availablePages.keys.toList();
+      return MarionetteExtensionResult.success({
+        'currentPage': currentPage,
+        'currentPath': location,
+        'availablePages': pages,
+      });
+    },
+  );
 }
 
 class ExampleApp extends StatelessWidget {
