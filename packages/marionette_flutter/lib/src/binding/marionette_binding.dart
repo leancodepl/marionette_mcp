@@ -13,6 +13,7 @@ import 'package:marionette_flutter/src/services/scroll_simulator.dart';
 import 'package:marionette_flutter/src/services/text_input_simulator.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
+import 'package:marionette_flutter/src/version.g.dart' as v;
 
 /// A custom binding that extends Flutter's default binding to provide
 /// integration points for the Marionette MCP.
@@ -72,6 +73,14 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   @override
   void initServiceExtensions() {
     super.initServiceExtensions();
+
+    // Extension: Get binding version
+    _registerMarionetteExtension(
+      name: 'marionette.getVersion',
+      callback: (params) async {
+        return MarionetteExtensionResult.success({'version': v.version});
+      },
+    );
 
     // Extension: Get interactive elements tree
     _registerMarionetteExtension(

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -37,6 +38,40 @@ final class VmServiceContext {
 
           try {
             await connector.connect(uri);
+
+            // Version compatibility check
+            try {
+              final bindingVersion = await connector.getVersion();
+              if (bindingVersion != v.version) {
+                await connector.disconnect();
+                return CallToolResult(
+                  isError: true,
+                  content: [
+                    TextContent(
+                      text:
+                          'Version mismatch: marionette_mcp is ${v.version}, '
+                          'but marionette_flutter binding is $bindingVersion. '
+                          'Please ensure both packages are the same version.',
+                    ),
+                  ],
+                );
+              }
+            } catch (err) {
+              _logger.warning('Failed to check binding version', err);
+              await connector.disconnect();
+              return CallToolResult(
+                isError: true,
+                content: [
+                  TextContent(
+                    text:
+                        'Failed to verify marionette_flutter binding version. '
+                        'Please ensure marionette_flutter is up to date. '
+                        'Error: $err',
+                  ),
+                ],
+              );
+            }
+
             return CallToolResult(
               content: [
                 TextContent(text: 'Successfully connected to app at $uri'),

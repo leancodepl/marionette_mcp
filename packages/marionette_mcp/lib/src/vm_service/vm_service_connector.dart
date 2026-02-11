@@ -192,6 +192,14 @@ class VmServiceConnector {
     }
   }
 
+  /// Gets the version of the marionette_flutter binding.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<String> getVersion() async {
+    final response = await _callExtension('marionette.getVersion', {});
+    return response['version'] as String;
+  }
+
   /// Gets the list of interactive elements in the widget tree.
   ///
   /// Throws [NotConnectedException] if not connected.
