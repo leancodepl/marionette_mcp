@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    name: Publish marionette_mcp and marionette_flutter
+    name: Publish packages
     runs-on: ubuntu-latest
     if: |
       github.event.workflow_run.conclusion == 'success' &&
@@ -49,6 +49,14 @@ jobs:
       - name: Publish marionette_flutter to pub.dev
         run: flutter pub publish --force
         working-directory: packages/marionette_flutter
+
+      - name: Publish marionette_logger to pub.dev
+        run: flutter pub publish --force
+        working-directory: packages/marionette_logger
+
+      - name: Publish marionette_logging to pub.dev
+        run: flutter pub publish --force
+        working-directory: packages/marionette_logging
 
       - name: Publish marionette_mcp to pub.dev
         uses: leancodepl/mobile-tools/.github/actions/pub-release@pub-release-v1

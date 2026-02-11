@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: ['**']
-    tags: ['v*']
   pull_request:
     branches: ['**']
 
@@ -45,6 +44,16 @@ jobs:
           cd packages/marionette_flutter
           flutter pub get
 
+      - name: Install dependencies for marionette_logger
+        run: |
+          cd packages/marionette_logger
+          flutter pub get
+
+      - name: Install dependencies for marionette_logging
+        run: |
+          cd packages/marionette_logging
+          flutter pub get
+
       - name: Check version.g.dart is in sync
         run: |
           dart tool/generate_version.dart
@@ -63,6 +72,16 @@ jobs:
           cd packages/marionette_flutter
           flutter analyze --fatal-infos lib
 
+      - name: Analyze marionette_logger
+        run: |
+          cd packages/marionette_logger
+          flutter analyze --fatal-infos lib
+
+      - name: Analyze marionette_logging
+        run: |
+          cd packages/marionette_logging
+          flutter analyze --fatal-infos lib
+
       - name: Check formatting for marionette_mcp
         run: |
           cd packages/marionette_mcp
@@ -71,6 +90,16 @@ jobs:
       - name: Check formatting for marionette_flutter
         run: |
           cd packages/marionette_flutter
+          dart format --set-exit-if-changed lib
+
+      - name: Check formatting for marionette_logger
+        run: |
+          cd packages/marionette_logger
+          dart format --set-exit-if-changed lib
+
+      - name: Check formatting for marionette_logging
+        run: |
+          cd packages/marionette_logging
           dart format --set-exit-if-changed lib
 
       - name: Check formatting for tool
