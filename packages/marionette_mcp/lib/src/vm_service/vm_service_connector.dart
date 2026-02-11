@@ -236,6 +236,18 @@ class VmServiceConnector {
     return _callExtension(extensionName, args);
   }
 
+  /// Gets the list of custom extensions registered by the Flutter app.
+  ///
+  /// Returns extensions registered via [registerMarionetteExtension] that
+  /// are not built-in marionette extensions (i.e., not prefixed with
+  /// `marionette.`). Each extension includes its name and optional
+  /// description.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> listExtensions() {
+    return _callExtension('marionette.listExtensions', {});
+  }
+
   /// Gets the list of interactive elements in the widget tree.
   ///
   /// Throws [NotConnectedException] if not connected.

@@ -26,6 +26,9 @@ void main() {
 void _registerNavigationExtensions() {
   registerMarionetteExtension(
     name: 'appNavigation.goToPage',
+    description:
+        'Navigates to a page by name. '
+        'Requires a "page" parameter with the page name.',
     callback: (params) async {
       final page = params['page'];
       if (page == null) {
@@ -47,6 +50,9 @@ void _registerNavigationExtensions() {
 
   registerMarionetteExtension(
     name: 'appNavigation.getPageInfo',
+    description:
+        'Returns the current page name, path, and a list of all '
+        'available pages.',
     callback: (params) async {
       final location = router.routerDelegate.currentConfiguration.uri.path;
       final currentPage =

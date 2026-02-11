@@ -1,10 +1,9 @@
-import 'dart:convert';
-import 'dart:developer' as developer;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
+import 'package:marionette_flutter/src/binding/register_extension.dart';
+import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/log_store.dart';
@@ -75,7 +74,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     super.initServiceExtensions();
 
     // Extension: Get binding version
-    registerMarionetteExtension(
+    registerInternalMarionetteExtension(
       name: 'marionette.getVersion',
       callback: (params) async {
         return MarionetteExtensionResult.success({'version': v.version});
@@ -83,7 +82,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Get interactive elements tree
-    registerMarionetteExtension(
+    registerInternalMarionetteExtension(
       name: 'marionette.interactiveElements',
       callback: (params) async {
         final elements = _elementTreeFinder.findInteractiveElements();
@@ -92,7 +91,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Tap element by matcher
-    registerMarionetteExtension(
+    registerInternalMarionetteExtension(
       name: 'marionette.tap',
       callback: (params) async {
         final matcher = WidgetMatcher.fromJson(params);
@@ -105,7 +104,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Enter text into a text field
-    registerMarionetteExtension(
+    registerInternalMarionetteExtension(
       name: 'marionette.enterText',
       callback: (params) async {
         final matcher = WidgetMatcher.fromJson(params);
@@ -126,7 +125,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Scroll until widget is visible
-    registerMarionetteExtension(
+    registerInternalMarionetteExtension(
       name: 'marionette.scrollTo',
       callback: (params) async {
         final matcher = WidgetMatcher.fromJson(params);
@@ -140,7 +139,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Get logs
-    registerMarionetteExtension(
+    registerInternalMarionetteExtension(
       name: 'marionette.getLogs',
       callback: (params) async {
         if (_logStore == null) {
@@ -185,13 +184,23 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
     );
 
     // Extension: Take screenshots
-    registerMarionetteExtension(
+    registerInternalMarionetteExtension(
       name: 'marionette.takeScreenshots',
       callback: (params) async {
         final screenshots = await _screenshotService.takeScreenshots();
 
         return MarionetteExtensionResult.success({
           'screenshots': screenshots,
+        });
+      },
+    );
+
+    // Extension: List custom extensions
+    registerInternalMarionetteExtension(
+      name: 'marionette.listExtensions',
+      callback: (params) async {
+        return MarionetteExtensionResult.success({
+          'extensions': customExtensionRegistry,
         });
       },
     );
@@ -202,83 +211,4 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
     _logStore?.clear();
     return super.reassembleApplication();
   }
-}
-
-/// Registers a service extension with standardized result handling.
-///
-/// Use this to register custom app-specific extensions that follow the
-/// same conventions as the built-in Marionette extensions. The [callback]
-/// returns a [MarionetteExtensionResult] which is pattern-matched to
-/// produce the appropriate [ServiceExtensionResponse].
-///
-/// The `ext.flutter.` prefix is added automatically to [name].
-///
-/// Uses [developer.registerExtension] directly, bypassing Flutter's
-/// [BindingBase.registerServiceExtension].
-void registerMarionetteExtension({
-  required String name,
-  required Future<MarionetteExtensionResult> Function(
-    Map<String, String> params,
-  ) callback,
-}) {
-  final methodName = 'ext.flutter.$name';
-
-  developer.registerExtension(
-    methodName,
-    (method, parameters) async {
-      // Wait for the outer event loop, same as Flutter's
-      // registerServiceExtension, to avoid handling extensions in the middle
-      // of a frame.
-      await Future<void>.delayed(Duration.zero);
-
-      late final MarionetteExtensionResult result;
-      try {
-        result = await callback(parameters);
-      } on ArgumentError catch (e) {
-        return developer.ServiceExtensionResponse.error(
-          developer.ServiceExtensionResponse.invalidParams,
-          e.message?.toString() ?? e.toString(),
-        );
-      } catch (exception, stack) {
-        FlutterError.reportError(
-          FlutterErrorDetails(
-            exception: exception,
-            stack: stack,
-            context: ErrorDescription(
-              'during a service extension callback for "$method"',
-            ),
-          ),
-        );
-
-        return developer.ServiceExtensionResponse.error(
-          developer.ServiceExtensionResponse.extensionError,
-          json.encode(<String, String>{
-            'exception': exception.toString(),
-            'stack': stack.toString(),
-            'method': method,
-          }),
-        );
-      }
-
-      switch (result) {
-        case MarionetteExtensionSuccess(:final data):
-          data['type'] = '_extensionType';
-          data['method'] = method;
-          data['status'] = 'Success';
-          return developer.ServiceExtensionResponse.result(
-            json.encode(data),
-          );
-        case MarionetteExtensionError(:final code, :final detail):
-          return developer.ServiceExtensionResponse.error(
-            developer.ServiceExtensionResponse.extensionErrorMin + code,
-            detail,
-          );
-        case MarionetteExtensionInvalidParams(:final detail):
-          return developer.ServiceExtensionResponse.error(
-            developer.ServiceExtensionResponse.invalidParams,
-            detail,
-          );
-      }
-    },
-  );
 }
