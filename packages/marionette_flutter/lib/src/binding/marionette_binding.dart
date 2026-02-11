@@ -75,7 +75,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     super.initServiceExtensions();
 
     // Extension: Get binding version
-    _registerMarionetteExtension(
+    registerMarionetteExtension(
       name: 'marionette.getVersion',
       callback: (params) async {
         return MarionetteExtensionResult.success({'version': v.version});
@@ -83,7 +83,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Get interactive elements tree
-    _registerMarionetteExtension(
+    registerMarionetteExtension(
       name: 'marionette.interactiveElements',
       callback: (params) async {
         final elements = _elementTreeFinder.findInteractiveElements();
@@ -92,7 +92,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Tap element by matcher
-    _registerMarionetteExtension(
+    registerMarionetteExtension(
       name: 'marionette.tap',
       callback: (params) async {
         final matcher = WidgetMatcher.fromJson(params);
@@ -105,7 +105,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Enter text into a text field
-    _registerMarionetteExtension(
+    registerMarionetteExtension(
       name: 'marionette.enterText',
       callback: (params) async {
         final matcher = WidgetMatcher.fromJson(params);
@@ -126,7 +126,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Scroll until widget is visible
-    _registerMarionetteExtension(
+    registerMarionetteExtension(
       name: 'marionette.scrollTo',
       callback: (params) async {
         final matcher = WidgetMatcher.fromJson(params);
@@ -140,7 +140,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
 
     // Extension: Get logs
-    _registerMarionetteExtension(
+    registerMarionetteExtension(
       name: 'marionette.getLogs',
       callback: (params) async {
         if (_logStore == null) {
@@ -185,7 +185,7 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
     );
 
     // Extension: Take screenshots
-    _registerMarionetteExtension(
+    registerMarionetteExtension(
       name: 'marionette.takeScreenshots',
       callback: (params) async {
         final screenshots = await _screenshotService.takeScreenshots();
@@ -197,84 +197,88 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
     );
   }
 
-  /// Registers a Marionette service extension with standardized result
-  /// handling.
-  ///
-  /// Uses [developer.registerExtension] directly, bypassing Flutter's
-  /// [registerServiceExtension]. The [callback] returns a
-  /// [MarionetteExtensionResult] which is pattern-matched to produce
-  /// the appropriate [developer.ServiceExtensionResponse].
-  void _registerMarionetteExtension({
-    required String name,
-    required Future<MarionetteExtensionResult> Function(
-      Map<String, String> params,
-    ) callback,
-  }) {
-    final methodName = 'ext.flutter.$name';
-
-    developer.registerExtension(
-      methodName,
-      (method, parameters) async {
-        // Wait for the outer event loop, same as Flutter's
-        // registerServiceExtension, to avoid handling extensions in the middle
-        // of a frame.
-        await Future<void>.delayed(Duration.zero);
-
-        late final MarionetteExtensionResult result;
-        try {
-          result = await callback(parameters);
-        } on ArgumentError catch (e) {
-          return developer.ServiceExtensionResponse.error(
-            developer.ServiceExtensionResponse.invalidParams,
-            e.message?.toString() ?? e.toString(),
-          );
-        } catch (exception, stack) {
-          FlutterError.reportError(
-            FlutterErrorDetails(
-              exception: exception,
-              stack: stack,
-              context: ErrorDescription(
-                'during a service extension callback for "$method"',
-              ),
-            ),
-          );
-
-          return developer.ServiceExtensionResponse.error(
-            developer.ServiceExtensionResponse.extensionError,
-            json.encode(<String, String>{
-              'exception': exception.toString(),
-              'stack': stack.toString(),
-              'method': method,
-            }),
-          );
-        }
-
-        switch (result) {
-          case MarionetteExtensionSuccess(:final data):
-            data['type'] = '_extensionType';
-            data['method'] = method;
-            data['status'] = 'Success';
-            return developer.ServiceExtensionResponse.result(
-              json.encode(data),
-            );
-          case MarionetteExtensionError(:final code, :final detail):
-            return developer.ServiceExtensionResponse.error(
-              developer.ServiceExtensionResponse.extensionErrorMin + code,
-              detail,
-            );
-          case MarionetteExtensionInvalidParams(:final detail):
-            return developer.ServiceExtensionResponse.error(
-              developer.ServiceExtensionResponse.invalidParams,
-              detail,
-            );
-        }
-      },
-    );
-  }
-
   @override
   Future<void> reassembleApplication() {
     _logStore?.clear();
     return super.reassembleApplication();
   }
+}
+
+/// Registers a service extension with standardized result handling.
+///
+/// Use this to register custom app-specific extensions that follow the
+/// same conventions as the built-in Marionette extensions. The [callback]
+/// returns a [MarionetteExtensionResult] which is pattern-matched to
+/// produce the appropriate [ServiceExtensionResponse].
+///
+/// The `ext.flutter.` prefix is added automatically to [name].
+///
+/// Uses [developer.registerExtension] directly, bypassing Flutter's
+/// [BindingBase.registerServiceExtension].
+void registerMarionetteExtension({
+  required String name,
+  required Future<MarionetteExtensionResult> Function(
+    Map<String, String> params,
+  ) callback,
+}) {
+  final methodName = 'ext.flutter.$name';
+
+  developer.registerExtension(
+    methodName,
+    (method, parameters) async {
+      // Wait for the outer event loop, same as Flutter's
+      // registerServiceExtension, to avoid handling extensions in the middle
+      // of a frame.
+      await Future<void>.delayed(Duration.zero);
+
+      late final MarionetteExtensionResult result;
+      try {
+        result = await callback(parameters);
+      } on ArgumentError catch (e) {
+        return developer.ServiceExtensionResponse.error(
+          developer.ServiceExtensionResponse.invalidParams,
+          e.message?.toString() ?? e.toString(),
+        );
+      } catch (exception, stack) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: exception,
+            stack: stack,
+            context: ErrorDescription(
+              'during a service extension callback for "$method"',
+            ),
+          ),
+        );
+
+        return developer.ServiceExtensionResponse.error(
+          developer.ServiceExtensionResponse.extensionError,
+          json.encode(<String, String>{
+            'exception': exception.toString(),
+            'stack': stack.toString(),
+            'method': method,
+          }),
+        );
+      }
+
+      switch (result) {
+        case MarionetteExtensionSuccess(:final data):
+          data['type'] = '_extensionType';
+          data['method'] = method;
+          data['status'] = 'Success';
+          return developer.ServiceExtensionResponse.result(
+            json.encode(data),
+          );
+        case MarionetteExtensionError(:final code, :final detail):
+          return developer.ServiceExtensionResponse.error(
+            developer.ServiceExtensionResponse.extensionErrorMin + code,
+            detail,
+          );
+        case MarionetteExtensionInvalidParams(:final detail):
+          return developer.ServiceExtensionResponse.error(
+            developer.ServiceExtensionResponse.invalidParams,
+            detail,
+          );
+      }
+    },
+  );
 }
