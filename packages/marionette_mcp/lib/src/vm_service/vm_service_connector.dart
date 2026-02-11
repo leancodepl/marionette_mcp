@@ -15,9 +15,15 @@ class NotConnectedException implements Exception {
 
 /// Exception thrown when a VM service extension call fails.
 class VmServiceExtensionException implements Exception {
-  VmServiceExtensionException(this.message, this.error, this.stackTrace);
+  VmServiceExtensionException(
+    this.message, {
+    this.errorCode,
+    this.error,
+    this.stackTrace,
+  });
 
   final String message;
+  final int? errorCode;
   final String? error;
   final String? stackTrace;
 
@@ -167,23 +173,19 @@ class VmServiceConnector {
       if (responseJson == null) {
         throw VmServiceExtensionException(
           'Extension $extensionName returned null response',
-          null,
-          null,
         );
       }
 
       _logger.finest('Extension response: $responseJson');
 
-      // Check if the response indicates an error
-      if (responseJson['status'] == 'Error') {
-        throw VmServiceExtensionException(
-          'Extension $extensionName failed',
-          responseJson['error'] as String?,
-          responseJson['stackTrace'] as String?,
-        );
-      }
-
       return responseJson;
+    } on RPCError catch (e) {
+      _logger.severe('Error calling extension $extensionName', e);
+      throw VmServiceExtensionException(
+        'Extension $extensionName failed',
+        errorCode: e.code,
+        error: e.message,
+      );
     } catch (err) {
       _logger.severe('Error calling extension $extensionName', err);
       rethrow;
