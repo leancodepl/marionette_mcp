@@ -321,7 +321,7 @@ Once connected, the AI agent has access to these tools:
 | `tap` | Taps an element matching a specific key or visible text. |
 | `enter_text` | Enters text into a text field matching a key. |
 | `scroll_to` | Scrolls the view until an element matching a key or text becomes visible. |
-| `get_logs` | Retrieves application logs collected since the last check (requires a `LogCollector` to be configured). |
+| `get_logs` | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
 | `take_screenshots` | Captures screenshots of all active views and returns them as base64 images. |
 | `hot_reload` | Performs a hot reload of the Flutter app, applying code changes without losing state. |
 

@@ -257,7 +257,7 @@ final class VmServiceContext {
       ..registerTool(
         'get_logs',
         description:
-            'Retrieves all application logs collected from the Flutter app since connection or since the last log retrieval. This includes debug messages, errors, and other log output from the running app. Requires an active connection established via connect.',
+            'Retrieves all application logs collected from the Flutter app since app start or since the last hot reload. This includes debug messages, errors, and other log output from the running app. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(
           title: 'Get Application Logs',
           readOnlyHint: true,
@@ -289,6 +289,12 @@ final class VmServiceContext {
 
             return CallToolResult(
               content: [TextContent(text: buffer.toString())],
+            );
+          } on VmServiceExtensionException catch (err) {
+            _logger.warning('Failed to get logs', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.error ?? err.message)],
             );
           } catch (err) {
             _logger.warning('Failed to get logs', err);
