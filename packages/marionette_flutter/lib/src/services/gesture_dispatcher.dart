@@ -63,11 +63,13 @@ class GestureDispatcher {
       // Pointer down immediately
       [
         PointerAddedEvent(position: globalPosition, device: _kDeviceId),
-        PointerDownEvent(pointer: pointerId, position: globalPosition, device: _kDeviceId),
+        PointerDownEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
       ],
       // Pointer up after a short delay, then remove the device
       [
-        PointerUpEvent(pointer: pointerId, position: globalPosition, device: _kDeviceId),
+        PointerUpEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
         PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
       ],
     ];
@@ -105,7 +107,8 @@ class GestureDispatcher {
     final records = [
       [
         PointerAddedEvent(position: from, device: _kDeviceId),
-        PointerDownEvent(pointer: pointerId, position: from, device: _kDeviceId),
+        PointerDownEvent(
+            pointer: pointerId, position: from, device: _kDeviceId),
       ],
       ...moveRecords,
       [

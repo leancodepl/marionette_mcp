@@ -39,8 +39,7 @@ void main() {
           expect(
             event.device,
             isNot(equals(0)),
-            reason:
-                '${event.runtimeType} should use a unique device id, '
+            reason: '${event.runtimeType} should use a unique device id, '
                 'not 0 which is the real macOS mouse',
           );
         }
@@ -80,15 +79,79 @@ void main() {
             ));
         await tester.pump();
 
-        final removedEvents =
-            events.whereType<PointerRemovedEvent>().toList();
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
 
         expect(
           removedEvents,
           hasLength(2),
-          reason:
-              'Each tap should send a PointerRemovedEvent to properly '
+          reason: 'Each tap should send a PointerRemovedEvent to properly '
               'clean up pointer state',
+        );
+      },
+    );
+
+    testWidgets(
+      'drag should use a unique device id (not 0)',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.drag(const Offset(100, 100), const Offset(200, 200)),
+        );
+        await tester.pump();
+
+        expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+        for (final event in events) {
+          expect(
+            event.device,
+            isNot(equals(0)),
+            reason: '${event.runtimeType} should use a unique device id, '
+                'not 0 which is the real macOS mouse',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'drag should send PointerRemovedEvent to clean up pointer state',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.drag(const Offset(100, 100), const Offset(200, 200)),
+        );
+        await tester.pump();
+
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
+
+        expect(
+          removedEvents,
+          hasLength(1),
+          reason: 'A drag should send exactly one PointerRemovedEvent to '
+              'properly clean up pointer state',
         );
       },
     );
@@ -125,8 +188,7 @@ void main() {
             ),
           ),
           throwsA(isA<AssertionError>()),
-          reason:
-              'Duplicate PointerAddedEvent(kind: mouse, device: 0) should '
+          reason: 'Duplicate PointerAddedEvent(kind: mouse, device: 0) should '
               'trigger an assertion in MouseTracker — this is why '
               'GestureDispatcher must use a unique device id',
         );
