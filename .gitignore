@@ -13,3 +13,7 @@ build/
 
 # Logs
 *.log
+
+# Benchmark artifacts
+tool/benchmark_logs/
+tool/marionette
