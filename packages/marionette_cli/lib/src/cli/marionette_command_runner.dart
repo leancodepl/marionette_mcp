@@ -32,6 +32,11 @@ class MarionetteCommandRunner extends CommandRunner<int> {
         help: 'Name of the Flutter app instance to target.',
       )
       ..addOption(
+        'uri',
+        help: 'VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws). '
+            'Bypasses the instance registry. Mutually exclusive with --instance.',
+      )
+      ..addOption(
         'timeout',
         help: 'Connection timeout in seconds.',
         defaultsTo: '5',

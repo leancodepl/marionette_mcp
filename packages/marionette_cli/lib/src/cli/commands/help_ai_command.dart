@@ -21,9 +21,12 @@ const _reference = r'''
 # Marionette CLI — AI Agent Reference
 
 Marionette CLI controls Flutter apps running in debug mode. It supports
-multiple simultaneous app instances via a named instance registry.
+multiple simultaneous app instances via a named instance registry, or direct
+URI connections for fully stateless operation.
 
 ## Workflow
+
+### Option A: Named Instances (stateful)
 
 1. Start your Flutter app(s) in debug mode and note VM service URI(s)
    (printed in console, e.g., ws://127.0.0.1:XXXXX/ws).
@@ -31,12 +34,19 @@ multiple simultaneous app instances via a named instance registry.
 3. Interact using: `marionette -i <name> <command> [args]`
 4. Clean up when done: `marionette unregister <name>`
 
-Each command opens a fresh WebSocket connection, executes, and disconnects.
-Multiple commands can run concurrently against different instances.
+### Option B: Direct URI (stateless)
+
+1. Start your Flutter app in debug mode and note the VM service URI.
+2. Interact directly: `marionette --uri <ws-uri> <command> [args]`
+
+No registration, no cleanup, no files on disk. Each command opens a fresh
+WebSocket connection, executes, and disconnects.
 
 ## Global Options
 
-  -i, --instance <name>    Target instance (required for interaction commands)
+  -i, --instance <name>    Target instance (required unless --uri is used)
+      --uri <ws-uri>       VM service WebSocket URI — bypasses registry,
+                           mutually exclusive with --instance
       --timeout <seconds>  Connection timeout (default: 5)
 
 ## Commands
@@ -103,10 +113,11 @@ List all registered instances.
 
 List interactive UI elements in the app's widget tree.
 
-  Requires: -i <instance>
+  Requires: -i <instance> or --uri <ws-uri>
 
-  Example:
+  Examples:
     marionette -i my-app elements
+    marionette --uri ws://127.0.0.1:8181/ws elements
 
   Output (stdout), one line per element:
     Found 3 interactive element(s):
@@ -124,7 +135,7 @@ List interactive UI elements in the app's widget tree.
 
 Tap an element. Provide exactly one matching strategy.
 
-  Requires: -i <instance>
+  Requires: -i <instance> or --uri <ws-uri>
 
   Options:
     --key <string>    Match by ValueKey<String> (most reliable)
@@ -136,6 +147,7 @@ Tap an element. Provide exactly one matching strategy.
   Examples:
     marionette -i my-app tap --key submit_button
     marionette -i my-app tap --text "Submit"
+    marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
     marionette -i my-app tap --x 100 --y 200
 
   Output (stdout):
@@ -147,7 +159,7 @@ Tap an element. Provide exactly one matching strategy.
 
 Enter text into a text field.
 
-  Requires: -i <instance>
+  Requires: -i <instance> or --uri <ws-uri>
 
   Options (all required):
     --key <string>      Match text field by key (or use --text)
@@ -166,7 +178,7 @@ Enter text into a text field.
 
 Scroll until an element becomes visible.
 
-  Requires: -i <instance>
+  Requires: -i <instance> or --uri <ws-uri>
 
   Options:
     --key <string>    Match by ValueKey<String>
@@ -184,7 +196,7 @@ Scroll until an element becomes visible.
 
 Capture screenshots and save to PNG files.
 
-  Requires: -i <instance>
+  Requires: -i <instance> or --uri <ws-uri>
 
   Options:
     -o, --output <path>   Output file path (mandatory)
@@ -206,7 +218,7 @@ Capture screenshots and save to PNG files.
 
 Retrieve collected application logs.
 
-  Requires: -i <instance>
+  Requires: -i <instance> or --uri <ws-uri>
 
   Example:
     marionette -i my-app logs
@@ -227,7 +239,7 @@ Retrieve collected application logs.
 
 Perform a hot reload of the Flutter app.
 
-  Requires: -i <instance>
+  Requires: -i <instance> or --uri <ws-uri>
 
   Example:
     marionette -i my-app hot-reload
@@ -283,11 +295,16 @@ Run the Marionette MCP server (preserves original marionette_mcp behavior).
 ## Error Recovery
 
 If a command fails with a connection error, the app may have stopped.
-Run `marionette doctor` to check all instances, then
-`marionette unregister <name>` to clean up stale entries.
+
+- **--instance mode**: Run `marionette doctor` to check all instances, then
+  `marionette unregister <name>` to clean up stale entries.
+- **--uri mode**: Verify the URI is correct and the app is still running.
+  Re-run `flutter run` if needed and use the new URI.
 
 ## Tips
 
+- Prefer --uri for one-off interactions (no setup/cleanup overhead)
+- Prefer --instance for repeated interactions with the same app (shorter commands)
 - Prefer --key over --text for matching elements (keys are stable, text may change)
 - Run `elements` first to discover what's on screen before interacting
 - Instance names are alphanumeric with hyphens/underscores: [a-zA-Z0-9_-]+

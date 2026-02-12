@@ -431,7 +431,20 @@ marionette help-ai
 
 Include this as a first step in your agent's system prompt or tool configuration so it can bootstrap itself.
 
-### Usage
+### Direct URI Mode (Stateless)
+
+Pass the VM service URI directly with `--uri` — no registration, no cleanup, no files on disk:
+
+```bash
+# Interact directly using the VM service URI from flutter run output
+marionette --uri ws://127.0.0.1:8181/ws elements
+marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
+marionette --uri ws://127.0.0.1:8181/ws screenshot --output ./screenshot.png
+```
+
+`--uri` and `--instance` are mutually exclusive. Use `--uri` for one-off interactions and `--instance` when targeting the same app repeatedly.
+
+### Named Instance Mode (Stateful)
 
 ```bash
 # Register Flutter app instances (use the VM service URI from flutter run output)
@@ -452,7 +465,11 @@ marionette -i my-app hot-reload
 marionette list
 marionette unregister my-app
 marionette doctor              # Check connectivity of all instances
+```
 
+### Other Commands
+
+```bash
 # AI agent onboarding — prints full CLI reference with expected inputs/outputs
 marionette help-ai
 

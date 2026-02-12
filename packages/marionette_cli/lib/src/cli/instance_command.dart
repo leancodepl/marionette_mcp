@@ -19,18 +19,43 @@ abstract class InstanceCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final instanceName = globalResults?['instance'] as String?;
-    if (instanceName == null || instanceName.isEmpty) {
-      usageException('--instance (-i) is required for this command.');
+    final rawInstance = globalResults?['instance'] as String?;
+    final rawUri = globalResults?['uri'] as String?;
+    final instanceName =
+        (rawInstance != null && rawInstance.isNotEmpty) ? rawInstance : null;
+    final directUri =
+        (rawUri != null && rawUri.isNotEmpty) ? rawUri : null;
+
+    if (instanceName != null && directUri != null) {
+      usageException(
+        '--instance (-i) and --uri are mutually exclusive. Use one or the other.',
+      );
     }
 
-    final info = registry.get(instanceName);
-    if (info == null) {
-      stderr.writeln(
-        'Instance "$instanceName" not found. '
-        'Use "marionette list" to see registered instances.',
+    if (instanceName == null && directUri == null) {
+      usageException(
+        '--instance (-i) or --uri is required for this command.',
       );
-      return 1;
+    }
+
+    late final String uri;
+    late final String displayName;
+    final isStateless = directUri != null;
+
+    if (directUri != null) {
+      uri = directUri;
+      displayName = directUri;
+    } else if (instanceName != null) {
+      final info = registry.get(instanceName);
+      if (info == null) {
+        stderr.writeln(
+          'Instance "$instanceName" not found. '
+          'Use "marionette list" to see registered instances.',
+        );
+        return 1;
+      }
+      uri = info.uri;
+      displayName = instanceName;
     }
 
     final timeoutSeconds =
@@ -38,19 +63,21 @@ abstract class InstanceCommand extends Command<int> {
     final connector = VmServiceConnector();
 
     try {
-      await connector.connect(info.uri).timeout(
+      await connector.connect(uri).timeout(
             Duration(seconds: timeoutSeconds),
             onTimeout: () => throw TimeoutException(
-              'Connection to "${info.name}" at ${info.uri} timed out '
+              'Connection to "$displayName" at $uri timed out '
               'after ${timeoutSeconds}s. Is the app still running?',
             ),
           );
       return await execute(connector);
     } on SocketException catch (e) {
+      final hint = isStateless
+          ? 'Check the URI and ensure the app is still running.'
+          : 'The app may have stopped. '
+              'Try "marionette doctor" or "marionette unregister $displayName".';
       stderr.writeln(
-        'Could not connect to "$instanceName" at ${info.uri}: $e\n'
-        'The app may have stopped. '
-        'Try "marionette doctor" or "marionette unregister $instanceName".',
+        'Could not connect to "$displayName" at $uri: $e\n$hint',
       );
       return 1;
     } on TimeoutException catch (e) {
