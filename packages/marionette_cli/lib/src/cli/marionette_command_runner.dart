@@ -6,6 +6,7 @@ import 'package:args/command_runner.dart';
 import '../instance_registry.dart';
 import 'commands/doctor_command.dart';
 import 'commands/elements_command.dart';
+import 'commands/help_ai_command.dart';
 import 'commands/enter_text_command.dart';
 import 'commands/hot_reload_command.dart';
 import 'commands/list_command.dart';
@@ -47,6 +48,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(LogsCommand(_registry));
     addCommand(HotReloadCommand(_registry));
     addCommand(DoctorCommand(_registry));
+    addCommand(HelpAiCommand());
     addCommand(McpCommand());
   }
 
