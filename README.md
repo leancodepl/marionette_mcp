@@ -385,6 +385,94 @@ Marionette MCP shines when used by coding agents to verify their work or explore
 
 - **“Your mileage may vary” interactions**: Some actions are implemented via best-effort simulation of user behavior (gestures, focus, text entry, scrolling). Depending on platform, custom widgets, overlays, or app-specific gesture handling, results may vary. If a flow is flaky, consider exposing clearer widget keys, simplifying hit targets, or adding custom `MarionetteConfiguration` hooks for your design system. And if you hit something that consistently doesn’t behave as expected, a small repro in an issue helps us improve it.
 
+## Marionette CLI (Multi-Instance)
+
+Marionette CLI lets you control multiple Flutter apps simultaneously from the command line. Each app is registered as a named instance and targeted with the `-i` flag.
+
+### Install from Source
+
+Clone the repo and activate the CLI globally:
+
+```bash
+git clone https://github.com/leancodepl/marionette-mcp.git
+cd marionette-mcp
+dart pub get
+dart pub global activate --source path packages/marionette_cli
+```
+
+This adds `marionette` to your PATH (ensure `~/.pub-cache/bin` is on your PATH).
+
+### Build a Standalone Executable
+
+To compile a self-contained binary with no Dart SDK dependency:
+
+```bash
+cd packages/marionette_cli
+dart compile exe bin/marionette.dart -o marionette
+```
+
+Then copy the `marionette` binary wherever you need it (e.g., `/usr/local/bin/`).
+
+### Run Without Installing
+
+You can also run directly from the repo without installing:
+
+```bash
+dart run packages/marionette_cli/bin/marionette.dart --help
+```
+
+### AI Agent Onboarding
+
+When setting up an AI agent to use the CLI, have it run `help-ai` first. This prints a comprehensive reference covering every command's syntax, arguments, expected outputs, and exit codes — everything an agent needs to start working autonomously:
+
+```bash
+marionette help-ai
+```
+
+Include this as a first step in your agent's system prompt or tool configuration so it can bootstrap itself.
+
+### Usage
+
+```bash
+# Register Flutter app instances (use the VM service URI from flutter run output)
+marionette register my-app ws://127.0.0.1:8181/ws
+marionette register other-app ws://127.0.0.1:9090/ws
+
+# Interact with a specific instance
+marionette -i my-app elements
+marionette -i my-app tap --key submit_button
+marionette -i my-app tap --text "Submit"
+marionette -i my-app enter-text --key email_field --input "test@example.com"
+marionette -i my-app scroll-to --text "Bottom Item"
+marionette -i my-app screenshot --output ./screenshot.png
+marionette -i my-app logs
+marionette -i my-app hot-reload
+
+# Instance management
+marionette list
+marionette unregister my-app
+marionette doctor              # Check connectivity of all instances
+
+# AI agent onboarding — prints full CLI reference with expected inputs/outputs
+marionette help-ai
+
+# Run MCP server (preserves existing single-instance behavior)
+marionette mcp
+marionette mcp --sse-port 3000
+```
+
+### Verify Installation
+
+```bash
+# Should print all available commands
+marionette --help
+
+# Quick round-trip test (no running app needed)
+marionette register test ws://127.0.0.1:0/ws
+marionette list
+marionette unregister test
+```
+
 ## Troubleshooting
 
 - **"Not connected to any app"**: Ensure the AI agent has called `connect` with the valid VM Service URI before using other tools.
