@@ -30,7 +30,11 @@ class MarionetteExtensionSuccess extends MarionetteExtensionResult {
 
 /// Error result mapped to [ServiceExtensionResponse.error] with a custom code.
 class MarionetteExtensionError extends MarionetteExtensionResult {
-  const MarionetteExtensionError(this.code, this.detail);
+  const MarionetteExtensionError(this.code, this.detail)
+      : assert(
+          code >= 0 && code <= 16,
+          'Error code ($code) must be in the range 0..16 (maps to error codes -32016..-32000).',
+        );
 
   /// Offset from [ServiceExtensionResponse.extensionErrorMin] (-32016).
   /// Valid range: 0..16 (maps to error codes -32016..-32000).
