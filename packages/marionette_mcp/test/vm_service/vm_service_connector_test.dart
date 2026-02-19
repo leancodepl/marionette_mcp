@@ -32,25 +32,25 @@ void main() {
       },
     );
 
-    test('throws NotConnectedException when not connected', () {
-      expect(
-        () => connector.callCustomExtension('myExtension'),
+    test('throws NotConnectedException when not connected', () async {
+      await expectLater(
+        connector.callCustomExtension('myExtension'),
         throwsA(isA<NotConnectedException>()),
       );
     });
 
-    test('accepts valid extension name with default empty args', () {
+    test('accepts valid extension name with default empty args', () async {
       // Should throw NotConnectedException (not ArgumentError),
       // meaning validation passed.
-      expect(
-        () => connector.callCustomExtension('deckNavigation.goToSlide'),
+      await expectLater(
+        connector.callCustomExtension('deckNavigation.goToSlide'),
         throwsA(isA<NotConnectedException>()),
       );
     });
 
-    test('accepts valid extension name with custom args', () {
-      expect(
-        () => connector.callCustomExtension('deckNavigation.goToSlide', {
+    test('accepts valid extension name with custom args', () async {
+      await expectLater(
+        connector.callCustomExtension('deckNavigation.goToSlide', {
           'slideNumber': '3',
         }),
         throwsA(isA<NotConnectedException>()),
