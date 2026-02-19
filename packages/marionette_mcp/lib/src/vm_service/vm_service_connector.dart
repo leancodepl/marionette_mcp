@@ -238,10 +238,8 @@ class VmServiceConnector {
 
   /// Gets the list of custom extensions registered by the Flutter app.
   ///
-  /// Returns extensions registered via [registerMarionetteExtension] that
-  /// are not built-in marionette extensions (i.e., not prefixed with
-  /// `marionette.`). Each extension includes its name and optional
-  /// description.
+  /// Returns extensions registered via `registerMarionetteExtension` in the
+  /// Flutter app. Each extension includes its name and optional description.
   ///
   /// Throws [NotConnectedException] if not connected.
   Future<Map<String, dynamic>> listExtensions() {
