@@ -60,11 +60,12 @@ void registerInternalMarionetteExtension({
 
       switch (result) {
         case MarionetteExtensionSuccess(:final data):
-          data['type'] = '_extensionType';
-          data['method'] = method;
-          data['status'] = 'Success';
+          final responseData = Map<String, Object?>.from(data);
+          responseData['type'] = '_extensionType';
+          responseData['method'] = method;
+          responseData['status'] = 'Success';
           return developer.ServiceExtensionResponse.result(
-            json.encode(data),
+            json.encode(responseData),
           );
         case MarionetteExtensionError(:final code, :final detail):
           return developer.ServiceExtensionResponse.error(
