@@ -5,13 +5,25 @@ import 'package:marionette_flutter/src/binding/register_extension_internal.dart'
 typedef MarionetteExtensionCallback = Future<MarionetteExtensionResult>
     Function(Map<String, String> params);
 
-final List<Map<String, String>> _customExtensionRegistry = [];
+/// Details about a registered custom extension.
+class ExtensionDetails {
+  /// Creates extension details with the given [name] and optional [description].
+  const ExtensionDetails({required this.name, this.description});
+
+  /// The name of the extension (without the `ext.flutter.` prefix).
+  final String name;
+
+  /// An optional description of what the extension does.
+  final String? description;
+}
+
+final List<ExtensionDetails> _customExtensionRegistry = [];
 
 /// Unmodifiable view of custom (non-built-in) extensions with their metadata.
 ///
 /// Only extensions registered via [registerMarionetteExtension] are tracked
 /// here. Internal extensions registered by [MarionetteBinding] are excluded.
-List<Map<String, String>> get customExtensionRegistry =>
+List<ExtensionDetails> get customExtensionRegistry =>
     List.unmodifiable(_customExtensionRegistry);
 
 /// Registers a custom app-specific service extension.
@@ -26,15 +38,28 @@ List<Map<String, String>> get customExtensionRegistry =>
 /// so that MCP clients can discover available custom extensions.
 ///
 /// The `ext.flutter.` prefix is added automatically to [name].
+///
+/// Throws [ArgumentError] if [name] is empty or already contains the
+/// `ext.flutter.` prefix.
 void registerMarionetteExtension({
   required String name,
   String? description,
   required MarionetteExtensionCallback callback,
 }) {
-  _customExtensionRegistry.add({
-    'name': name,
-    if (description != null) 'description': description,
-  });
+  if (name.isEmpty) {
+    throw ArgumentError.value(name, 'name', 'must not be empty');
+  }
+  if (name.startsWith('ext.flutter.')) {
+    throw ArgumentError.value(
+      name,
+      'name',
+      'must not include the "ext.flutter." prefix, it is added automatically',
+    );
+  }
+
+  _customExtensionRegistry.add(
+    ExtensionDetails(name: name, description: description),
+  );
 
   registerInternalMarionetteExtension(name: name, callback: callback);
 }

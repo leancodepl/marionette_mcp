@@ -200,7 +200,13 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
       name: 'marionette.listExtensions',
       callback: (params) async {
         return MarionetteExtensionResult.success({
-          'extensions': customExtensionRegistry,
+          'extensions': [
+            for (final ext in customExtensionRegistry)
+              {
+                'name': ext.name,
+                if (ext.description != null) 'description': ext.description,
+              },
+          ],
         });
       },
     );
