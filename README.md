@@ -85,6 +85,29 @@ void main() {
 }
 ```
 
+> [!IMPORTANT]
+> **`MarionetteBinding` must be the only binding initialized in the process.**
+> Flutter allows only one `WidgetsBinding` per app. If another binding (e.g. `AutomatedTestWidgetsFlutterBinding` from `flutter test`, or `IntegrationTestWidgetsFlutterBinding`) is already initialized, calling `MarionetteBinding.ensureInitialized()` will throw a binding assertion error.
+>
+> This commonly happens when your test calls `main()` and `kDebugMode` is `true` during tests. You can work around it in several ways:
+>
+> **Option A – Check the `FLUTTER_TEST` environment variable**
+>
+> ```dart
+> import 'dart:io' show Platform;
+>
+> final bool isFlutterTest = Platform.environment.containsKey('FLUTTER_TEST');
+> if (kDebugMode && !isFlutterTest) {
+>   MarionetteBinding.ensureInitialized();
+> } else {
+>   WidgetsFlutterBinding.ensureInitialized();
+> }
+> ```
+>
+> **Option B – Use a separate entrypoint for tests**
+>
+> Keep `MarionetteBinding` in your production `main()` (`lib/main.dart`) and create a different entrypoint for tests (e.g. `lib/main_test.dart` or `test/app_test.dart`) that does **not** initialize `MarionetteBinding`.
+
 ### Log Collection (`get_logs`)
 
 Marionette supports flexible log collection through the `LogCollector` interface. You can choose from several options depending on your logging setup:
