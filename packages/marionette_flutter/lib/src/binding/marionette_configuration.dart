@@ -45,14 +45,15 @@ class MarionetteConfiguration {
   /// Example:
   /// ```dart
   /// MarionetteConfiguration(
-  ///   extractText: (widget) {
+  ///   extractText: (element) {
+  ///     final widget = element.widget;
   ///     if (widget is MyCustomLabel) return widget.labelText;
   ///     if (widget is MyCustomInput) return widget.controller.text;
   ///     return null;
   ///   },
   /// )
   /// ```
-  final String? Function(Widget widget)? extractText;
+  final String? Function(Element element)? extractText;
 
   /// Maximum size for screenshots in physical pixels.
   ///
@@ -116,9 +117,9 @@ class MarionetteConfiguration {
   }
 
   /// Extracts text from a widget (built-in + custom).
-  String? extractTextFromWidget(Widget widget) {
-    final builtInText = _extractBuiltInText(widget);
-    return builtInText ?? extractText?.call(widget);
+  String? extractTextFromWidget(Element element) {
+    final builtInText = _extractBuiltInText(element.widget);
+    return builtInText ?? extractText?.call(element);
   }
 
   // Built-in Flutter widget support

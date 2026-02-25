@@ -5,8 +5,8 @@ import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 sealed class WidgetMatcher {
   const WidgetMatcher();
 
-  /// Checks if the given [widget] matches this matcher's criteria.
-  bool matches(Widget widget, MarionetteConfiguration configuration);
+  /// Checks if the given [element] matches this matcher's criteria.
+  bool matches(Element element, MarionetteConfiguration configuration);
 
   /// Creates a matcher from a JSON map.
   /// If multiple fields are present, precedence is:
@@ -42,7 +42,7 @@ class FocusedElementMatcher extends WidgetMatcher {
   const FocusedElementMatcher();
 
   @override
-  bool matches(Widget widget, MarionetteConfiguration configuration) {
+  bool matches(Element element, MarionetteConfiguration configuration) {
     return false;
   }
 
@@ -71,7 +71,7 @@ class CoordinatesMatcher extends WidgetMatcher {
   Offset get offset => Offset(x, y);
 
   @override
-  bool matches(Widget widget, MarionetteConfiguration configuration) {
+  bool matches(Element element, MarionetteConfiguration configuration) {
     // CoordinatesMatcher doesn't match widgets - it's handled specially
     // in GestureDispatcher.tap() as a fast path.
     return false;
@@ -94,8 +94,8 @@ class KeyMatcher extends WidgetMatcher {
   final String keyValue;
 
   @override
-  bool matches(Widget widget, MarionetteConfiguration configuration) {
-    final key = widget.key;
+  bool matches(Element element, MarionetteConfiguration configuration) {
+    final key = element.widget.key;
     if (key is ValueKey<String>) {
       return key.value == keyValue;
     }
@@ -119,8 +119,8 @@ class TextMatcher extends WidgetMatcher {
   final String text;
 
   @override
-  bool matches(Widget widget, MarionetteConfiguration configuration) {
-    final extractedText = configuration.extractTextFromWidget(widget);
+  bool matches(Element element, MarionetteConfiguration configuration) {
+    final extractedText = configuration.extractTextFromWidget(element);
     return extractedText == text;
   }
 
@@ -137,8 +137,8 @@ class TypeMatcher extends WidgetMatcher {
   final Type type;
 
   @override
-  bool matches(Widget widget, MarionetteConfiguration configuration) {
-    return widget.runtimeType == type;
+  bool matches(Element element, MarionetteConfiguration configuration) {
+    return element.widget.runtimeType == type;
   }
 
   @override
@@ -158,8 +158,8 @@ class TypeStringMatcher extends WidgetMatcher {
   final String typeName;
 
   @override
-  bool matches(Widget widget, MarionetteConfiguration configuration) {
-    return widget.runtimeType.toString() == typeName;
+  bool matches(Element element, MarionetteConfiguration configuration) {
+    return element.widget.runtimeType.toString() == typeName;
   }
 
   @override
