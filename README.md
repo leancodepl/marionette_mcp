@@ -217,7 +217,7 @@ By default, Marionette recognizes standard Flutter widgets like `ElevatedButton`
 
 2. **Text-based matching**: The `tap`, `scroll_to`, and other interaction tools can match elements by their text content using the `text` parameter (e.g., `tap(text: "Submit")`).
 
-By default, Marionette extracts text from standard Flutter widgets (`Text`, `RichText`, `EditableText`, `TextField`, `TextFormField`). Use `extractText` to add support for your custom text widgets.
+By default, Marionette extracts text from standard Flutter widgets (`Text`, `RichText`, `EditableText`, `TextField`, `TextFormField`). Use `extractText` to add support for your custom text widgets. The callback receives the `Element` (access the widget via `element.widget`).
 
 ```dart
 import 'package:flutter/foundation.dart';
@@ -237,7 +237,8 @@ void main() {
             type == MyCheckbox,
 
         // Extract text from your custom widgets
-        extractText: (widget) {
+        extractText: (element) {
+          final widget = element.widget;
           if (widget is MyText) return widget.data;
           if (widget is MyTextField) return widget.controller?.text;
           return null;

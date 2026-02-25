@@ -1,3 +1,8 @@
+# Unreleased
+
+- Add `text` parameter to `enter_text` tool for matching text fields by their visible text content
+- Pass `Element` instead of `Widget` to the `extractText` configuration callback, giving access to the full element context
+
 # 0.4.0
 
 - Add `marionette_cli` package with multi-instance CLI support

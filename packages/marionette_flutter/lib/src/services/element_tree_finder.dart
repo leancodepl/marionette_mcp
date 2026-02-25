@@ -49,7 +49,7 @@ class ElementTreeFinder {
     final isInteractive = configuration.isInteractiveWidgetType(
       widget.runtimeType,
     );
-    final text = configuration.extractTextFromWidget(widget);
+    final text = configuration.extractTextFromWidget(element);
     final keyValue = _extractKeyValue(widget.key);
 
     if (!isInteractive && text == null && keyValue == null) {
