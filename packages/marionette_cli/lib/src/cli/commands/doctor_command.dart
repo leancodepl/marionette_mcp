@@ -55,7 +55,7 @@ class DoctorCommand extends Command<int> {
     } else {
       stdout.writeln(
         'Some instances are unreachable. '
-        'Use "marionette unregister <name>" to remove stale entries.',
+        'Use "marionette unregister --stale" to remove them.',
       );
     }
 
