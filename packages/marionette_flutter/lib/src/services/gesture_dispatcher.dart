@@ -9,6 +9,8 @@ class GestureDispatcher {
   static const kMaxDelta = 40.0;
   static const kDelay = Duration(milliseconds: 10);
 
+  static const _kDeviceId = 1;
+
   int _nextPointerId = 1;
 
   /// Simulates a tap on an element that matches the given [matcher].
@@ -60,11 +62,16 @@ class GestureDispatcher {
     final records = [
       // Pointer down immediately
       [
-        PointerAddedEvent(position: globalPosition),
-        PointerDownEvent(pointer: pointerId, position: globalPosition),
+        PointerAddedEvent(position: globalPosition, device: _kDeviceId),
+        PointerDownEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
       ],
-      // Pointer up after a short delay
-      [PointerUpEvent(pointer: pointerId, position: globalPosition)],
+      // Pointer up after a short delay, then remove the device
+      [
+        PointerUpEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+        PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
+      ],
     ];
 
     await _handlePointerEventRecord(records);
@@ -92,17 +99,22 @@ class GestureDispatcher {
           pointer: pointerId,
           position: position,
           delta: stepDelta,
+          device: _kDeviceId,
         ),
       ]);
     }
 
     final records = [
       [
-        PointerAddedEvent(position: from),
-        PointerDownEvent(pointer: pointerId, position: from),
+        PointerAddedEvent(position: from, device: _kDeviceId),
+        PointerDownEvent(
+            pointer: pointerId, position: from, device: _kDeviceId),
       ],
       ...moveRecords,
-      [PointerUpEvent(pointer: pointerId, position: to)],
+      [
+        PointerUpEvent(pointer: pointerId, position: to, device: _kDeviceId),
+        PointerRemovedEvent(position: to, device: _kDeviceId),
+      ],
     ];
 
     await _handlePointerEventRecord(records);
