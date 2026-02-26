@@ -1,8 +1,7 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-
-import '../../instance_registry.dart';
+import 'package:marionette_cli/src/instance_registry.dart';
 
 class RegisterCommand extends Command<int> {
   RegisterCommand(this._registry);

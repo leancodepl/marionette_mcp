@@ -1,10 +1,9 @@
 import 'dart:io';
 
-import 'package:marionette_mcp/marionette_mcp.dart';
-
-import '../../instance_registry.dart';
-import '../instance_command.dart';
-import '../matcher_builder.dart';
+import 'package:marionette_cli/src/cli/instance_command.dart';
+import 'package:marionette_cli/src/cli/matcher_builder.dart';
+import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class TapCommand extends InstanceCommand {
   TapCommand(this._registry) {
@@ -25,7 +24,8 @@ class TapCommand extends InstanceCommand {
   String get name => 'tap';
 
   @override
-  String get description => 'Tap an element by key, text, type, or coordinates.';
+  String get description =>
+      'Tap an element by key, text, type, or coordinates.';
 
   @override
   Future<int> execute(VmServiceConnector connector) async {

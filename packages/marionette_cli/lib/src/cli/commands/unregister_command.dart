@@ -1,9 +1,8 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:marionette_mcp/marionette_mcp.dart';
-
-import '../../instance_registry.dart';
+import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class UnregisterCommand extends Command<int> {
   UnregisterCommand(this._registry) {
@@ -38,7 +37,8 @@ class UnregisterCommand extends Command<int> {
     final rest = argResults!.rest;
 
     // Validate mutually exclusive options.
-    final modeCount = (all ? 1 : 0) + (stale ? 1 : 0) + (rest.isNotEmpty ? 1 : 0);
+    final modeCount =
+        (all ? 1 : 0) + (stale ? 1 : 0) + (rest.isNotEmpty ? 1 : 0);
     if (modeCount == 0) {
       usageException('Expected <name>, --all, or --stale.');
     }
@@ -78,8 +78,9 @@ class UnregisterCommand extends Command<int> {
       return 0;
     }
 
-    final timeoutSeconds =
-        int.parse(globalResults?['timeout'] as String? ?? '5');
+    final timeoutSeconds = int.parse(
+      globalResults?['timeout'] as String? ?? '5',
+    );
     var removed = 0;
 
     stdout.writeln('Checking ${instances.length} instance(s)...\n');
@@ -89,9 +90,9 @@ class UnregisterCommand extends Command<int> {
       final connector = VmServiceConnector();
 
       try {
-        await connector.connect(info.uri).timeout(
-              Duration(seconds: timeoutSeconds),
-            );
+        await connector
+            .connect(info.uri)
+            .timeout(Duration(seconds: timeoutSeconds));
         stdout.writeln('OK');
       } catch (_) {
         _registry.unregister(info.name);

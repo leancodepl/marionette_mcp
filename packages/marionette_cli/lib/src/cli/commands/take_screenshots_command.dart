@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:marionette_mcp/marionette_mcp.dart';
+import 'package:marionette_cli/src/cli/instance_command.dart';
+import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:path/path.dart' as p;
-
-import '../../instance_registry.dart';
-import '../instance_command.dart';
 
 class ScreenshotCommand extends InstanceCommand {
   ScreenshotCommand(this._registry) {
