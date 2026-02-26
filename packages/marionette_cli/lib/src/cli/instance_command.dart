@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
@@ -88,12 +89,4 @@ abstract class InstanceCommand extends Command<int> {
       await connector.disconnect();
     }
   }
-}
-
-class TimeoutException implements Exception {
-  TimeoutException(this.message);
-  final String message;
-
-  @override
-  String toString() => message;
 }
