@@ -40,12 +40,15 @@ class DoctorCommand extends Command<int> {
         await connector
             .connect(info.uri)
             .timeout(Duration(seconds: timeoutSeconds));
-        await connector.disconnect();
         stdout.writeln('OK');
       } catch (e) {
         stdout.writeln('FAILED');
         stderr.writeln('    $e');
         allHealthy = false;
+      } finally {
+        try {
+          await connector.disconnect();
+        } catch (_) {}
       }
     }
 
