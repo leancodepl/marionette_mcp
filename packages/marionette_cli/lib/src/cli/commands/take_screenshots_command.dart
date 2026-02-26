@@ -29,7 +29,7 @@ class ScreenshotCommand extends InstanceCommand {
   InstanceRegistry get registry => _registry;
 
   @override
-  String get name => 'screenshot';
+  String get name => 'take-screenshots';
 
   @override
   String get description => 'Take a screenshot and save to file.';
@@ -40,8 +40,8 @@ class ScreenshotCommand extends InstanceCommand {
     final shouldOpen = argResults!['open'] as bool;
 
     final response = await connector.takeScreenshots();
-    final screenshots =
-        (response['screenshots'] as List<dynamic>).cast<String>();
+    final screenshots = (response['screenshots'] as List<dynamic>)
+        .cast<String>();
 
     if (screenshots.isEmpty) {
       stderr.writeln('No screenshots captured.');
@@ -79,7 +79,7 @@ class ScreenshotCommand extends InstanceCommand {
   }
 
   /// Returns a numbered variant of a file path for multi-view screenshots.
-  /// e.g., output.png → output_1.png
+  /// e.g., output.png -> output_1.png
   String _numberedPath(String path, int index) {
     if (index == 0) return path;
     final ext = p.extension(path);

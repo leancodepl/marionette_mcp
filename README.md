@@ -336,17 +336,17 @@ Add to your `mcp.json`:
 
 Once connected, the AI agent has access to these tools:
 
-| Tool | Description |
-|------|-------------|
-| `connect` | Connect to a Flutter app via its VM service URI (e.g., `ws://127.0.0.1:54321/ws`). |
-| `disconnect` | Disconnect from the currently connected app. |
-| `get_interactive_elements` | Returns a list of all interactive UI elements (buttons, inputs, etc.) visible on screen. |
-| `tap` | Taps an element matching a specific key or visible text. |
-| `enter_text` | Enters text into a text field matching a key. |
-| `scroll_to` | Scrolls the view until an element matching a key or text becomes visible. |
-| `get_logs` | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
-| `take_screenshots` | Captures screenshots of all active views and returns them as base64 images. |
-| `hot_reload` | Performs a hot reload of the Flutter app, applying code changes without losing state. |
+| Tool                       | Description                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `connect`                  | Connect to a Flutter app via its VM service URI (e.g., `ws://127.0.0.1:54321/ws`).                                        |
+| `disconnect`               | Disconnect from the currently connected app.                                                                              |
+| `get_interactive_elements` | Returns a list of all interactive UI elements (buttons, inputs, etc.) visible on screen.                                  |
+| `tap`                      | Taps an element matching a specific key or visible text.                                                                  |
+| `enter_text`               | Enters text into a text field matching a key.                                                                             |
+| `scroll_to`                | Scrolls the view until an element matching a key or text becomes visible.                                                 |
+| `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
+| `take_screenshots`         | Captures screenshots of all active views and returns them as base64 images.                                               |
+| `hot_reload`               | Performs a hot reload of the Flutter app, applying code changes without losing state.                                     |
 
 ## Example Scenarios
 
@@ -356,18 +356,21 @@ Marionette MCP shines when used by coding agents to verify their work or explore
 
 **Context:** You just asked the agent to implement a "Forgot Password" flow.
 **Prompt:**
+
 > "Now that you've implemented the Forgot Password screen, let's verify it. Connect to the app, navigate to the login screen, tap 'Forgot Password', enter a valid email, and submit. Check the logs to ensure the API call was made successfully."
 
 ### 2. Post-Refactor Smoke Test
 
 **Context:** You performed a large refactor on the navigation logic.
 **Prompt:**
+
 > "I've refactored the routing. Please run a quick smoke test: connect to the app, cycle through all tabs in the bottom navigation bar, and verify that each screen loads without throwing exceptions in the logs."
 
 ### 3. Debugging UI Issues
 
 **Context:** Users reported a button is unresponsive on the Settings page.
 **Prompt:**
+
 > "Investigate the 'Clear Cache' button on the Settings page. Connect to the app, navigate there, find the button using `get_interactive_elements`, tap it, and analyze the logs to see if an error is occurring or if the tap is being ignored."
 
 ## How It Works
@@ -437,9 +440,9 @@ Pass the VM service URI directly with `--uri` — no registration, no cleanup, n
 
 ```bash
 # Interact directly using the VM service URI from flutter run output
-marionette --uri ws://127.0.0.1:8181/ws elements
+marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
-marionette --uri ws://127.0.0.1:8181/ws screenshot --output ./screenshot.png
+marionette --uri ws://127.0.0.1:8181/ws take-screenshots --output ./screenshot.png
 ```
 
 `--uri` and `--instance` are mutually exclusive. Use `--uri` for one-off interactions and `--instance` when targeting the same app repeatedly.
@@ -452,13 +455,13 @@ marionette register my-app ws://127.0.0.1:8181/ws
 marionette register other-app ws://127.0.0.1:9090/ws
 
 # Interact with a specific instance
-marionette -i my-app elements
+marionette -i my-app get-interactive-elements
 marionette -i my-app tap --key submit_button
 marionette -i my-app tap --text "Submit"
 marionette -i my-app enter-text --key email_field --input "test@example.com"
 marionette -i my-app scroll-to --text "Bottom Item"
-marionette -i my-app screenshot --output ./screenshot.png
-marionette -i my-app logs
+marionette -i my-app take-screenshots --output ./screenshot.png
+marionette -i my-app get-logs
 marionette -i my-app hot-reload
 
 # Instance management
@@ -520,10 +523,10 @@ We are **top-tier experts** focused on Flutter Enterprise solutions.
 <div align="center">
   <br />
 
-  **Need help with your Flutter project?**
+**Need help with your Flutter project?**
 
-  [**👉 Hire our team**](https://leancode.co/get-estimate?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)
-  &nbsp;&nbsp;•&nbsp;&nbsp;
-  [Check our other packages](https://pub.dev/packages?q=publisher%3Aleancode.co&sort=downloads)
+[**👉 Hire our team**](https://leancode.co/get-estimate?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)
+&nbsp;&nbsp;•&nbsp;&nbsp;
+[Check our other packages](https://pub.dev/packages?q=publisher%3Aleancode.co&sort=downloads)
 
 </div>

@@ -109,15 +109,15 @@ List all registered instances.
 
 ---
 
-### elements
+### get-interactive-elements
 
 List interactive UI elements in the app's widget tree.
 
   Requires: -i <instance> or --uri <ws-uri>
 
   Examples:
-    marionette -i my-app elements
-    marionette --uri ws://127.0.0.1:8181/ws elements
+    marionette -i my-app get-interactive-elements
+    marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 
   Output (stdout), one line per element:
     Found 3 interactive element(s):
@@ -192,7 +192,7 @@ Scroll until an element becomes visible.
 
 ---
 
-### screenshot
+### take-screenshots
 
 Capture screenshots and save to PNG files.
 
@@ -203,7 +203,7 @@ Capture screenshots and save to PNG files.
     --open                Open the file after saving
 
   Example:
-    marionette -i my-app screenshot --output ./screenshot.png
+    marionette -i my-app take-screenshots --output ./screenshot.png
 
   Output (stdout):
     Saved screenshot: ./screenshot.png
@@ -214,14 +214,14 @@ Capture screenshots and save to PNG files.
 
 ---
 
-### logs
+### get-logs
 
 Retrieve collected application logs.
 
   Requires: -i <instance> or --uri <ws-uri>
 
   Example:
-    marionette -i my-app logs
+    marionette -i my-app get-logs
 
   Output (stdout):
     Collected 5 log entries:
@@ -306,7 +306,7 @@ If a command fails with a connection error, the app may have stopped.
 - Prefer --uri for one-off interactions (no setup/cleanup overhead)
 - Prefer --instance for repeated interactions with the same app (shorter commands)
 - Prefer --key over --text for matching elements (keys are stable, text may change)
-- Run `elements` first to discover what's on screen before interacting
+- Run `get-interactive-elements` first to discover what's on screen before interacting
 - Instance names are alphanumeric with hyphens/underscores: [a-zA-Z0-9_-]+
 - Commands are stateless — each opens a fresh connection, so no session management needed
 ''';

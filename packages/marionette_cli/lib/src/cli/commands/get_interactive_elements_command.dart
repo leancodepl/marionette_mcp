@@ -14,7 +14,7 @@ class ElementsCommand extends InstanceCommand {
   InstanceRegistry get registry => _registry;
 
   @override
-  String get name => 'elements';
+  String get name => 'get-interactive-elements';
 
   @override
   String get description =>

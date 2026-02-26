@@ -14,7 +14,7 @@ class LogsCommand extends InstanceCommand {
   InstanceRegistry get registry => _registry;
 
   @override
-  String get name => 'logs';
+  String get name => 'get-logs';
 
   @override
   String get description => 'Retrieve application logs from the Flutter app.';

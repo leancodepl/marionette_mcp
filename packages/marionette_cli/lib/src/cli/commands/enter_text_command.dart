@@ -11,7 +11,11 @@ class EnterTextCommand extends InstanceCommand {
     argParser
       ..addOption('key', help: 'Element key (ValueKey<String>).')
       ..addOption('text', help: 'Visible text of the text field.')
-      ..addOption('input', help: 'Text to enter into the field.', mandatory: true);
+      ..addOption(
+        'input',
+        help: 'Text to enter into the field.',
+        mandatory: true,
+      );
   }
 
   final InstanceRegistry _registry;
