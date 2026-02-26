@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/version.g.dart' as v;

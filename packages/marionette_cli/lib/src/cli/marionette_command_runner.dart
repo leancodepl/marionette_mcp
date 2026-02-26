@@ -2,21 +2,20 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
-
-import '../instance_registry.dart';
-import 'commands/doctor_command.dart';
-import 'commands/get_interactive_elements_command.dart';
-import 'commands/help_ai_command.dart';
-import 'commands/enter_text_command.dart';
-import 'commands/hot_reload_command.dart';
-import 'commands/list_command.dart';
-import 'commands/get_logs_command.dart';
-import 'commands/mcp_command.dart';
-import 'commands/register_command.dart';
-import 'commands/take_screenshots_command.dart';
-import 'commands/scroll_to_command.dart';
-import 'commands/tap_command.dart';
-import 'commands/unregister_command.dart';
+import 'package:marionette_cli/src/cli/commands/doctor_command.dart';
+import 'package:marionette_cli/src/cli/commands/enter_text_command.dart';
+import 'package:marionette_cli/src/cli/commands/get_interactive_elements_command.dart';
+import 'package:marionette_cli/src/cli/commands/get_logs_command.dart';
+import 'package:marionette_cli/src/cli/commands/help_ai_command.dart';
+import 'package:marionette_cli/src/cli/commands/hot_reload_command.dart';
+import 'package:marionette_cli/src/cli/commands/list_command.dart';
+import 'package:marionette_cli/src/cli/commands/mcp_command.dart';
+import 'package:marionette_cli/src/cli/commands/register_command.dart';
+import 'package:marionette_cli/src/cli/commands/scroll_to_command.dart';
+import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
+import 'package:marionette_cli/src/cli/commands/tap_command.dart';
+import 'package:marionette_cli/src/cli/commands/unregister_command.dart';
+import 'package:marionette_cli/src/instance_registry.dart';
 
 class MarionetteCommandRunner extends CommandRunner<int> {
   MarionetteCommandRunner()

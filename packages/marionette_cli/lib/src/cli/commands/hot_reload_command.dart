@@ -1,9 +1,8 @@
 import 'dart:io';
 
-import 'package:marionette_mcp/marionette_mcp.dart';
-
-import '../../instance_registry.dart';
-import '../instance_command.dart';
+import 'package:marionette_cli/src/cli/instance_command.dart';
+import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class HotReloadCommand extends InstanceCommand {
   HotReloadCommand(this._registry);

@@ -1,9 +1,8 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:marionette_mcp/marionette_mcp.dart';
-
-import '../../instance_registry.dart';
+import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class DoctorCommand extends Command<int> {
   DoctorCommand(this._registry);
@@ -26,8 +25,9 @@ class DoctorCommand extends Command<int> {
       return 0;
     }
 
-    final timeoutSeconds =
-        int.parse(globalResults?['timeout'] as String? ?? '5');
+    final timeoutSeconds = int.parse(
+      globalResults?['timeout'] as String? ?? '5',
+    );
     var allHealthy = true;
 
     stdout.writeln('Checking ${instances.length} instance(s)...\n');
@@ -37,9 +37,9 @@ class DoctorCommand extends Command<int> {
       final connector = VmServiceConnector();
 
       try {
-        await connector.connect(info.uri).timeout(
-              Duration(seconds: timeoutSeconds),
-            );
+        await connector
+            .connect(info.uri)
+            .timeout(Duration(seconds: timeoutSeconds));
         await connector.disconnect();
         stdout.writeln('OK');
       } catch (e) {

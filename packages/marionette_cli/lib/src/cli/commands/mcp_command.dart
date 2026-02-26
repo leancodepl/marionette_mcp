@@ -15,8 +15,7 @@ class McpCommand extends Command<int> {
         'log-level',
         abbr: 'l',
         defaultsTo: 'INFO',
-        help:
-            'Log level (FINEST, FINER, FINE, CONFIG, INFO, WARNING, SEVERE).',
+        help: 'Log level (FINEST, FINER, FINE, CONFIG, INFO, WARNING, SEVERE).',
       )
       ..addOption(
         'log-file',
@@ -37,8 +36,8 @@ class McpCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final logLevelName =
-        (argResults!.option('log-level') ?? 'INFO').toUpperCase();
+    final logLevelName = (argResults!.option('log-level') ?? 'INFO')
+        .toUpperCase();
     final logFile = argResults!.option('log-file');
     final ssePortStr = argResults!.option('sse-port');
     final ssePort = ssePortStr != null ? int.tryParse(ssePortStr) : null;
