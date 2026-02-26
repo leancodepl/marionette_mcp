@@ -39,6 +39,11 @@ jobs:
           cd packages/marionette_mcp
           dart pub get
 
+      - name: Install dependencies for marionette_cli
+        run: |
+          cd packages/marionette_cli
+          dart pub get
+
       - name: Install dependencies for marionette_flutter
         run: |
           cd packages/marionette_flutter
@@ -67,6 +72,11 @@ jobs:
           cd packages/marionette_mcp
           dart analyze --fatal-infos lib bin
 
+      - name: Analyze marionette_cli
+        run: |
+          cd packages/marionette_cli
+          dart analyze --fatal-infos lib bin
+
       - name: Analyze marionette_flutter
         run: |
           cd packages/marionette_flutter
@@ -85,6 +95,11 @@ jobs:
       - name: Check formatting for marionette_mcp
         run: |
           cd packages/marionette_mcp
+          dart format --set-exit-if-changed lib bin
+
+      - name: Check formatting for marionette_cli
+        run: |
+          cd packages/marionette_cli
           dart format --set-exit-if-changed lib bin
 
       - name: Check formatting for marionette_flutter
