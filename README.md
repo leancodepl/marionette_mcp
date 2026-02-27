@@ -388,58 +388,43 @@ Marionette MCP shines when used by coding agents to verify their work or explore
 
 - **“Your mileage may vary” interactions**: Some actions are implemented via best-effort simulation of user behavior (gestures, focus, text entry, scrolling). Depending on platform, custom widgets, overlays, or app-specific gesture handling, results may vary. If a flow is flaky, consider exposing clearer widget keys, simplifying hit targets, or adding custom `MarionetteConfiguration` hooks for your design system. And if you hit something that consistently doesn’t behave as expected, a small repro in an issue helps us improve it.
 
-## Marionette CLI (Multi-Instance)
+## Marionette CLI
 
-Marionette CLI lets you control multiple Flutter apps simultaneously from the command line. Each app is registered as a named instance and targeted with the `-i` flag.
+### Why a CLI?
 
-### Install from Source
+The MCP server works great with tools that support MCP natively (Cursor, Claude Code, etc.), but many enterprise environments have restrictions on which AI models can be used and which protocols are allowed. Not every team can run an MCP server.
 
-Clone the repo and activate the CLI globally:
+The CLI bridges this gap. Any AI agent that can execute shell commands — even smaller, less capable models — can drive a Flutter app through Marionette if given a clear reference document. A well-structured `.md` file describing each command's syntax, expected outputs, and exit codes is often all a constrained agent needs to work autonomously. This makes the CLI the most portable and universally compatible way to integrate Marionette into AI workflows.
 
-```bash
-git clone https://github.com/leancodepl/marionette-mcp.git
-cd marionette-mcp
-dart pub get
-dart pub global activate --source path packages/marionette_cli
-```
+### Installation
 
-This adds `marionette` to your PATH (ensure `~/.pub-cache/bin` is on your PATH).
-
-### Build a Standalone Executable
-
-To compile a self-contained binary with no Dart SDK dependency:
+Install the CLI globally from [pub.dev](https://pub.dev/packages/marionette_cli):
 
 ```bash
-cd packages/marionette_cli
-dart compile exe bin/marionette.dart -o marionette
+dart pub global activate marionette_cli
 ```
 
-Then copy the `marionette` binary wherever you need it (e.g., `/usr/local/bin/`).
+This adds the `marionette` executable to your PATH (ensure `~/.pub-cache/bin` is on your PATH).
 
-### Run Without Installing
+### Teaching AI Agents to Use the CLI
 
-You can also run directly from the repo without installing:
-
-```bash
-dart run packages/marionette_cli/bin/marionette.dart --help
-```
-
-### AI Agent Onboarding
-
-When setting up an AI agent to use the CLI, have it run `help-ai` first. This prints a comprehensive reference covering every command's syntax, arguments, expected outputs, and exit codes — everything an agent needs to start working autonomously:
+For an AI agent to use the CLI effectively, it needs a reference describing every command, its arguments, expected outputs, and exit codes. The `help-ai` command prints exactly that — a comprehensive, machine-readable reference designed for AI consumption:
 
 ```bash
 marionette help-ai
 ```
 
-Include this as a first step in your agent's system prompt or tool configuration so it can bootstrap itself.
+Have the agent run this once at the start of a session, capture the output, and use it as a guide for all subsequent interactions. You can also pipe it to a file and include it in your project as a Cursor rule or system prompt:
+
+```bash
+marionette help-ai > .cursor/rules/marionette-cli.md
+```
 
 ### Direct URI Mode (Stateless)
 
 Pass the VM service URI directly with `--uri` — no registration, no cleanup, no files on disk:
 
 ```bash
-# Interact directly using the VM service URI from flutter run output
 marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
 marionette --uri ws://127.0.0.1:8181/ws take-screenshots --output ./screenshot.png
@@ -448,6 +433,8 @@ marionette --uri ws://127.0.0.1:8181/ws take-screenshots --output ./screenshot.p
 `--uri` and `--instance` are mutually exclusive. Use `--uri` for one-off interactions and `--instance` when targeting the same app repeatedly.
 
 ### Named Instance Mode (Stateful)
+
+For repeated interactions with the same app, register it as a named instance to avoid passing the URI every time:
 
 ```bash
 # Register Flutter app instances (use the VM service URI from flutter run output)
@@ -468,29 +455,6 @@ marionette -i my-app hot-reload
 marionette list
 marionette unregister my-app
 marionette doctor              # Check connectivity of all instances
-```
-
-### Other Commands
-
-```bash
-# AI agent onboarding — prints full CLI reference with expected inputs/outputs
-marionette help-ai
-
-# Run MCP server (preserves existing single-instance behavior)
-marionette mcp
-marionette mcp --sse-port 3000
-```
-
-### Verify Installation
-
-```bash
-# Should print all available commands
-marionette --help
-
-# Quick round-trip test (no running app needed)
-marionette register test ws://127.0.0.1:0/ws
-marionette list
-marionette unregister test
 ```
 
 ## Troubleshooting
