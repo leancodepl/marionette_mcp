@@ -29,13 +29,19 @@ class TextInputSimulator {
     );
 
     if (editableTextElement != null) {
-      final editableText = editableTextElement.widget as EditableText;
+      final editableTextState =
+          (editableTextElement as StatefulElement).state as EditableTextState;
 
-      // Update the controller directly
-      editableText.controller
-        ..text = text
-        // Move cursor to end
-        ..selection = TextSelection.collapsed(offset: text.length);
+      editableTextState.requestKeyboard();
+
+      // Route changes through EditableTextState so TextField/TextFormField
+      // callbacks (for example onChanged) run like real keyboard input.
+      editableTextState.updateEditingValue(
+        TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        ),
+      );
 
       // Schedule a frame to ensure the UI updates
       WidgetsBinding.instance.scheduleFrame();
