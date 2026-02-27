@@ -32,8 +32,6 @@ class TextInputSimulator {
       final editableTextState =
           (editableTextElement as StatefulElement).state as EditableTextState;
 
-      editableTextState.requestKeyboard();
-
       // Route changes through EditableTextState so TextField/TextFormField
       // callbacks (for example onChanged) run like real keyboard input.
       editableTextState.updateEditingValue(
