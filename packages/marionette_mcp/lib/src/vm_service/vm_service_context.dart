@@ -153,7 +153,7 @@ final class VmServiceContext {
       ..registerTool(
         'tap',
         description:
-            'Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>), by their text content (but not accessibility!), by their widget type, or by screen coordinates. Only one matching method should be used: either key, text, type, or coordinates. Prefer using the key if available, as it is more reliable. Limit yourself to elements from get_interactive_elements only if you can. Requires an active connection established via connect.',
+            'Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>), by their text content (but not accessibility!), by their widget type, or by screen coordinates. Only one matching method should be used: either key, text, type, or coordinates. Prefer using the key if available, as it is more reliable. Limit yourself to elements from get_interactive_elements only if you can. Tapping a text field gives it focus, after which you can use enter_text with focused_element to type into it. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(title: 'Tap Element'),
         inputSchema: ToolInputSchema(
           properties: {
@@ -209,7 +209,7 @@ final class VmServiceContext {
       ..registerTool(
         'enter_text',
         description:
-            'Enters text into a text field in the Flutter app that matches the given criteria. This simulates typing text into the field. Requires an active connection established via connect.',
+            'Enters text into a text field in the Flutter app. You can target the field in two ways: 1. By key: provide the key parameter with the ValueKey<String> of the field. You can discover available keys by calling get_interactive_elements. 2. By focused element: first tap a text field to give it focus, then call enter_text with focused_element set to true. This is useful when the field does not have a ValueKey assigned. Important: a text field must be focused before calling this (for example by using the tap tool), otherwise it will fail with an error. Exactly one of key or focused_element must be provided. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(title: 'Enter Text'),
         inputSchema: ToolInputSchema(
           properties: {
@@ -220,11 +220,31 @@ final class VmServiceContext {
               description:
                   'The key of the text field. You can get the key of an element by calling get_interactive_elements.',
             ),
+            'focused_element': JsonSchema.boolean(
+              description:
+                  'If true, enters text into the currently focused text field. '
+                  'A text field must be focused first (for example by using tap), otherwise this will fail.',
+            ),
           },
-          required: ['input', 'key'],
+          required: ['input'],
         ),
         callback: (args, extra) async {
           final input = args['input'] as String;
+          final hasKey = args['key'] != null;
+          final hasFocusedElement = args['focused_element'] == true;
+
+          if (hasKey == hasFocusedElement) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(
+                  text:
+                      'enter_text requires exactly one selector: provide either key or focused_element=true.',
+                ),
+              ],
+            );
+          }
+
           final matcher = _buildMatcher(args);
           _logger.info('Entering text into element with matcher: $matcher');
 
@@ -541,6 +561,9 @@ final class VmServiceContext {
   /// Builds a widget matcher map from tool arguments.
   Map<String, dynamic> _buildMatcher(Map<String, dynamic> args) {
     final matcher = <String, dynamic>{};
+    if (args['focused_element'] == true) {
+      matcher['focused'] = 'true';
+    }
     // Flatten coordinates for VM service (which only supports string->string)
     if (args['coordinates'] case final Map<String, dynamic> coordinates) {
       matcher['x'] = coordinates['x'];
