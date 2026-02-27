@@ -336,17 +336,17 @@ Add to your `mcp.json`:
 
 Once connected, the AI agent has access to these tools:
 
-| Tool | Description |
-|------|-------------|
-| `connect` | Connect to a Flutter app via its VM service URI (e.g., `ws://127.0.0.1:54321/ws`). |
-| `disconnect` | Disconnect from the currently connected app. |
-| `get_interactive_elements` | Returns a list of all interactive UI elements (buttons, inputs, etc.) visible on screen. |
-| `tap` | Taps an element matching a specific key or visible text. |
-| `enter_text` | Enters text into a text field matching a key. |
-| `scroll_to` | Scrolls the view until an element matching a key or text becomes visible. |
-| `get_logs` | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
-| `take_screenshots` | Captures screenshots of all active views and returns them as base64 images. |
-| `hot_reload` | Performs a hot reload of the Flutter app, applying code changes without losing state. |
+| Tool                       | Description                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `connect`                  | Connect to a Flutter app via its VM service URI (e.g., `ws://127.0.0.1:54321/ws`).                                        |
+| `disconnect`               | Disconnect from the currently connected app.                                                                              |
+| `get_interactive_elements` | Returns a list of all interactive UI elements (buttons, inputs, etc.) visible on screen.                                  |
+| `tap`                      | Taps an element matching a specific key or visible text.                                                                  |
+| `enter_text`               | Enters text into a text field matching a key.                                                                             |
+| `scroll_to`                | Scrolls the view until an element matching a key or text becomes visible.                                                 |
+| `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
+| `take_screenshots`         | Captures screenshots of all active views and returns them as base64 images.                                               |
+| `hot_reload`               | Performs a hot reload of the Flutter app, applying code changes without losing state.                                     |
 
 ## Example Scenarios
 
@@ -356,18 +356,21 @@ Marionette MCP shines when used by coding agents to verify their work or explore
 
 **Context:** You just asked the agent to implement a "Forgot Password" flow.
 **Prompt:**
+
 > "Now that you've implemented the Forgot Password screen, let's verify it. Connect to the app, navigate to the login screen, tap 'Forgot Password', enter a valid email, and submit. Check the logs to ensure the API call was made successfully."
 
 ### 2. Post-Refactor Smoke Test
 
 **Context:** You performed a large refactor on the navigation logic.
 **Prompt:**
+
 > "I've refactored the routing. Please run a quick smoke test: connect to the app, cycle through all tabs in the bottom navigation bar, and verify that each screen loads without throwing exceptions in the logs."
 
 ### 3. Debugging UI Issues
 
 **Context:** Users reported a button is unresponsive on the Settings page.
 **Prompt:**
+
 > "Investigate the 'Clear Cache' button on the Settings page. Connect to the app, navigate there, find the button using `get_interactive_elements`, tap it, and analyze the logs to see if an error is occurring or if the tap is being ignored."
 
 ## How It Works
@@ -384,6 +387,75 @@ Marionette MCP shines when used by coding agents to verify their work or explore
 - **The agent may not know your app**: Marionette can “see” the widget tree and interact with UI elements, but it doesn’t automatically understand your product’s flows, naming conventions, or edge cases. If you want reliable navigation and assertions, provide extra context in the prompt (what screen to reach, expected labels/keys, preconditions, and the goal of the interaction).
 
 - **“Your mileage may vary” interactions**: Some actions are implemented via best-effort simulation of user behavior (gestures, focus, text entry, scrolling). Depending on platform, custom widgets, overlays, or app-specific gesture handling, results may vary. If a flow is flaky, consider exposing clearer widget keys, simplifying hit targets, or adding custom `MarionetteConfiguration` hooks for your design system. And if you hit something that consistently doesn’t behave as expected, a small repro in an issue helps us improve it.
+
+## Marionette CLI
+
+### Why a CLI?
+
+The MCP server works great with tools that support MCP natively (Cursor, Claude Code, etc.), but many enterprise environments have restrictions on which AI models can be used and which protocols are allowed. Not every team can run an MCP server.
+
+The CLI bridges this gap. Any AI agent that can execute shell commands — even smaller, less capable models — can drive a Flutter app through Marionette if given a clear reference document. A well-structured `.md` file describing each command's syntax, expected outputs, and exit codes is often all a constrained agent needs to work autonomously. This makes the CLI the most portable and universally compatible way to integrate Marionette into AI workflows.
+
+### Installation
+
+Install the CLI globally from [pub.dev](https://pub.dev/packages/marionette_cli):
+
+```bash
+dart pub global activate marionette_cli
+```
+
+This adds the `marionette` executable to your PATH (ensure `~/.pub-cache/bin` is on your PATH).
+
+### Teaching AI Agents to Use the CLI
+
+For an AI agent to use the CLI effectively, it needs a reference describing every command, its arguments, expected outputs, and exit codes. The `help-ai` command prints exactly that — a comprehensive, machine-readable reference designed for AI consumption:
+
+```bash
+marionette help-ai
+```
+
+Have the agent run this once at the start of a session, capture the output, and use it as a guide for all subsequent interactions. You can also pipe it to a file and include it in your project as a Cursor rule or system prompt:
+
+```bash
+marionette help-ai > .cursor/rules/marionette-cli.md
+```
+
+### Direct URI Mode (Stateless)
+
+Pass the VM service URI directly with `--uri` — no registration, no cleanup, no files on disk:
+
+```bash
+marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
+marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
+marionette --uri ws://127.0.0.1:8181/ws take-screenshots --output ./screenshot.png
+```
+
+`--uri` and `--instance` are mutually exclusive. Use `--uri` for one-off interactions and `--instance` when targeting the same app repeatedly.
+
+### Named Instance Mode (Stateful)
+
+For repeated interactions with the same app, register it as a named instance to avoid passing the URI every time:
+
+```bash
+# Register Flutter app instances (use the VM service URI from flutter run output)
+marionette register my-app ws://127.0.0.1:8181/ws
+marionette register other-app ws://127.0.0.1:9090/ws
+
+# Interact with a specific instance
+marionette -i my-app get-interactive-elements
+marionette -i my-app tap --key submit_button
+marionette -i my-app tap --text "Submit"
+marionette -i my-app enter-text --key email_field --input "test@example.com"
+marionette -i my-app scroll-to --text "Bottom Item"
+marionette -i my-app take-screenshots --output ./screenshot.png
+marionette -i my-app get-logs
+marionette -i my-app hot-reload
+
+# Instance management
+marionette list
+marionette unregister my-app
+marionette doctor              # Check connectivity of all instances
+```
 
 ## Troubleshooting
 
@@ -415,10 +487,10 @@ We are **top-tier experts** focused on Flutter Enterprise solutions.
 <div align="center">
   <br />
 
-  **Need help with your Flutter project?**
+**Need help with your Flutter project?**
 
-  [**👉 Hire our team**](https://leancode.co/get-estimate?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)
-  &nbsp;&nbsp;•&nbsp;&nbsp;
-  [Check our other packages](https://pub.dev/packages?q=publisher%3Aleancode.co&sort=downloads)
+[**👉 Hire our team**](https://leancode.co/get-estimate?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)
+&nbsp;&nbsp;•&nbsp;&nbsp;
+[Check our other packages](https://pub.dev/packages?q=publisher%3Aleancode.co&sort=downloads)
 
 </div>

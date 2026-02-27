@@ -62,3 +62,7 @@ jobs:
         uses: leancodepl/mobile-tools/.github/actions/pub-release@pub-release-v1
         with:
           path: packages/marionette_mcp
+
+      - name: Publish marionette_cli to pub.dev
+        run: dart pub publish --force
+        working-directory: packages/marionette_cli

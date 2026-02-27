@@ -13,3 +13,5 @@ build/
 
 # Logs
 *.log
+
+tool/marionette

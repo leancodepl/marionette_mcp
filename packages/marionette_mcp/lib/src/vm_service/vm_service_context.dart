@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -134,7 +135,7 @@ final class VmServiceContext {
               ..writeln('Found ${elements.length} interactive element(s):\n');
 
             for (final element in elements) {
-              buffer.writeln(_formatElement(element as Map<String, dynamic>));
+              buffer.writeln(formatElement(element as Map<String, dynamic>));
             }
 
             return CallToolResult(
@@ -186,7 +187,7 @@ final class VmServiceContext {
           },
         ),
         callback: (args, extra) async {
-          final matcher = _buildMatcher(args);
+          final matcher = buildMatcher(args);
           _logger.info('Tapping with matcher: $matcher');
 
           try {
@@ -225,7 +226,7 @@ final class VmServiceContext {
         ),
         callback: (args, extra) async {
           final input = args['input'] as String;
-          final matcher = _buildMatcher(args);
+          final matcher = buildMatcher(args);
           _logger.info('Entering text into element with matcher: $matcher');
 
           try {
@@ -265,7 +266,7 @@ final class VmServiceContext {
           },
         ),
         callback: (args, extra) async {
-          final matcher = _buildMatcher(args);
+          final matcher = buildMatcher(args);
           _logger.info('Scrolling to element with matcher: $matcher');
 
           try {
@@ -536,70 +537,5 @@ final class VmServiceContext {
           }
         },
       );
-  }
-
-  /// Builds a widget matcher map from tool arguments.
-  Map<String, dynamic> _buildMatcher(Map<String, dynamic> args) {
-    final matcher = <String, dynamic>{};
-    // Flatten coordinates for VM service (which only supports string->string)
-    if (args['coordinates'] case final Map<String, dynamic> coordinates) {
-      matcher['x'] = coordinates['x'];
-      matcher['y'] = coordinates['y'];
-    }
-    if (args.containsKey('key')) {
-      matcher['key'] = args['key'];
-    }
-    if (args.containsKey('text')) {
-      matcher['text'] = args['text'];
-    }
-    if (args.containsKey('type')) {
-      matcher['type'] = args['type'];
-    }
-    return matcher;
-  }
-
-  /// Formats an element for display.
-  String _formatElement(Map<String, dynamic> element) {
-    final buffer = StringBuffer();
-
-    // Element type
-    if (element['type'] != null) {
-      buffer.write('Type: ${element['type']}');
-    }
-
-    // Key
-    if (element['key'] != null) {
-      buffer.write(', Key: "${element['key']}"');
-    }
-
-    // Text content
-    if (element['text'] != null && element['text'] != '') {
-      buffer.write(', Text: "${element['text']}"');
-    }
-
-    // Additional properties
-    final additionalProps = <String>[];
-    element.forEach((key, value) {
-      if (key != 'type' && key != 'key' && key != 'text' && value != null) {
-        additionalProps.add('$key: ${_formatValue(value)}');
-      }
-    });
-
-    if (additionalProps.isNotEmpty) {
-      buffer.write(', ${additionalProps.join(', ')}');
-    }
-
-    return buffer.toString();
-  }
-
-  /// Formats a value for display.
-  String _formatValue(dynamic value) {
-    if (value is String) {
-      return '"$value"';
-    }
-    if (value is Map || value is List) {
-      return jsonEncode(value);
-    }
-    return value.toString();
   }
 }
