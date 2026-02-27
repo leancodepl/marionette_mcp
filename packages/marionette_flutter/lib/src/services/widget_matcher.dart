@@ -10,10 +10,12 @@ sealed class WidgetMatcher {
 
   /// Creates a matcher from a JSON map.
   /// If multiple fields are present, precedence is:
-  /// coordinates (x & y) > 'key' > 'text' > 'type'.
+  /// 'focused' > coordinates (x & y) > 'key' > 'text' > 'type'.
   static WidgetMatcher fromJson(Map<String, dynamic> json) {
-    // Coordinates have highest precedence (fast path, no widget search)
-    if (json.containsKey('x') && json.containsKey('y')) {
+    // Focused matcher has highest precedence because it bypasses tree search.
+    if (json.containsKey('focused')) {
+      return const FocusedElementMatcher();
+    } else if (json.containsKey('x') && json.containsKey('y')) {
       return CoordinatesMatcher.fromJson(json);
     } else if (json.containsKey('key')) {
       return KeyMatcher.fromJson(json);
@@ -23,13 +25,31 @@ sealed class WidgetMatcher {
       return TypeStringMatcher.fromJson(json);
     } else {
       throw ArgumentError(
-        'Matcher JSON must contain "x" & "y", "key", "text", or "type" field',
+        'Matcher JSON must contain "focused", "x" & "y", "key", "text", or "type" field',
       );
     }
   }
 
   /// Converts this matcher to a JSON-serializable map.
   Map<String, dynamic> toJson();
+}
+
+/// Matches the currently focused element.
+///
+/// This matcher is not used for widget tree traversal and is handled as a
+/// special case by [TextInputSimulator].
+class FocusedElementMatcher extends WidgetMatcher {
+  const FocusedElementMatcher();
+
+  @override
+  bool matches(Widget widget, MarionetteConfiguration configuration) {
+    return false;
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{'focused': true};
+  }
 }
 
 /// Matches by screen coordinates. This is a special matcher that doesn't
