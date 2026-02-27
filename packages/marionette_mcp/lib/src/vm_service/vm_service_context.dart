@@ -562,7 +562,7 @@ final class VmServiceContext {
   Map<String, dynamic> _buildMatcher(Map<String, dynamic> args) {
     final matcher = <String, dynamic>{};
     if (args['focused_element'] == true) {
-      matcher['focused'] = 'true';
+      matcher['focused'] = true;
     }
     // Flatten coordinates for VM service (which only supports string->string)
     if (args['coordinates'] case final Map<String, dynamic> coordinates) {
