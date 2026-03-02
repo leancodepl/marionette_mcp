@@ -8,6 +8,7 @@ Map<String, dynamic> buildMatcherFromArgs({
   String? type,
   num? x,
   num? y,
+  bool focused = false,
 }) {
   final matcher = <String, dynamic>{};
   if (key != null) matcher['key'] = key;
@@ -15,5 +16,6 @@ Map<String, dynamic> buildMatcherFromArgs({
   if (type != null) matcher['type'] = type;
   if (x != null) matcher['x'] = x;
   if (y != null) matcher['y'] = y;
+  if (focused) matcher['focused'] = true;
   return matcher;
 }
