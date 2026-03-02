@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'screens/home_screen.dart';
+import 'screens/items_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
@@ -12,6 +13,7 @@ const availablePages = <String, String>{
   'profile': '/profile',
   'settings': '/settings',
   'notifications': '/settings/notifications',
+  'items': '/settings/items',
 };
 
 final router = GoRouter(
@@ -29,6 +31,10 @@ final router = GoRouter(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
           routes: [
+            GoRoute(
+              path: 'items',
+              builder: (context, state) => const ItemsScreen(),
+            ),
             GoRoute(
               path: 'notifications',
               builder: (context, state) => const NotificationsScreen(),
