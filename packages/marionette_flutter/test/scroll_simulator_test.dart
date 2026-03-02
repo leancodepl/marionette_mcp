@@ -52,7 +52,7 @@ void main() {
     );
 
     testWidgets(
-      'fails with a 50-attempt cap for very deep targets',
+      'uses adaptive attempts and reaches targets beyond 50 when needed',
       timeout: _timeout,
       (WidgetTester tester) async {
         final controller = ScrollController();
@@ -71,19 +71,14 @@ void main() {
           WidgetFinder(),
         );
 
-        Object? error;
-        try {
-          await simulator.scrollUntilVisible(
-            const KeyMatcher('item_90'),
-            _configuration,
-          );
-        } catch (err) {
-          error = err;
-        }
+        await simulator.scrollUntilVisible(
+          const KeyMatcher('item_90'),
+          _configuration,
+        );
+        await tester.pump();
 
-        expect(error, isNotNull);
-        expect(error, isA<StateError>());
-        expect(error.toString(), contains('50 scroll attempts'));
+        expect(find.byKey(const ValueKey('item_90')), findsOneWidget);
+        expect(controller.offset, greaterThan(50 * 64.0));
       },
     );
   });
