@@ -414,7 +414,7 @@ For an AI agent to use the CLI effectively, it needs a reference describing ever
 marionette help-ai
 ```
 
-Have the agent run this once at the start of a session, capture the output, and use it as a guide for all subsequent interactions. You can also pipe it to a file and include it in your project as a Cursor rule or system prompt:
+Have the agent run this once at the start of a session, capture the output, and use it as a guide for all subsequent interactions. You can also pipe it to a file and include it in your project as a Cursor rule, Agent Skill (`SKILL.md`) or system prompt:
 
 ```bash
 marionette help-ai > .cursor/rules/marionette-cli.md
