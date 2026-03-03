@@ -115,7 +115,6 @@ void main() {
         expect(dispatcher.dragCount, 200);
       },
     );
-
   });
 }
 

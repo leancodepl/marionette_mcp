@@ -122,13 +122,19 @@ void main() {
       await registry.register('m-app', 'ws://127.0.0.1:3333/ws');
 
       final instances = registry.listAll();
-      expect(instances.map((i) => i.name).toList(), ['a-app', 'm-app', 'z-app']);
+      expect(instances.map((i) => i.name).toList(), [
+        'a-app',
+        'm-app',
+        'z-app',
+      ]);
     });
 
     test('skips corrupted JSON files', () async {
       await registry.register('good-app', 'ws://127.0.0.1:8181/ws');
 
-      File('${tempDir.path}/bad-app.json').writeAsStringSync('not valid json{{{');
+      File(
+        '${tempDir.path}/bad-app.json',
+      ).writeAsStringSync('not valid json{{{');
 
       final instances = registry.listAll();
       expect(instances, hasLength(1));

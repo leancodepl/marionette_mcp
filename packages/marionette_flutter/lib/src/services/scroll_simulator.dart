@@ -236,7 +236,8 @@ class ScrollSimulator {
     final scrollExtent =
         (position.maxScrollExtent - position.minScrollExtent).abs();
     if (!scrollExtent.isFinite) {
-      return _fallbackMaxScrollAttempts.clamp(1, _defaultMaxScrollAttemptsCap)
+      return _fallbackMaxScrollAttempts
+          .clamp(1, _defaultMaxScrollAttemptsCap)
           .toInt();
     }
 
