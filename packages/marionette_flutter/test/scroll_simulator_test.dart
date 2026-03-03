@@ -81,6 +81,41 @@ void main() {
         expect(controller.offset, greaterThan(50 * 64.0));
       },
     );
+
+    testWidgets(
+      'applies a hard default cap for very large scroll extents',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          _buildItemsApp(
+            controller: controller,
+            itemCount: 10000,
+            itemExtent: 80,
+          ),
+        );
+
+        final dispatcher = _WidgetTesterGestureDispatcher(
+          tester,
+          find.byType(Scrollable).first,
+        );
+        final simulator = ScrollSimulator(dispatcher, WidgetFinder());
+
+        await expectLater(
+          () => simulator.scrollUntilVisible(
+            const KeyMatcher('missing_item'),
+            _configuration,
+          ),
+          throwsA(isA<StateError>()),
+        );
+        await tester.pump();
+
+        expect(dispatcher.dragCount, 200);
+      },
+    );
+
   });
 }
 
@@ -114,9 +149,11 @@ class _WidgetTesterGestureDispatcher extends GestureDispatcher {
 
   final WidgetTester _tester;
   final Finder _scrollableFinder;
+  int dragCount = 0;
 
   @override
   Future<void> drag(Offset from, Offset to) async {
+    dragCount++;
     await _tester.drag(_scrollableFinder, to - from);
     await _tester.pump();
   }

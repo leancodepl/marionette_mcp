@@ -14,6 +14,7 @@ class ScrollSimulator {
 
   static const _delta = 64.0;
   static const _fallbackMaxScrollAttempts = 50;
+  static const _defaultMaxScrollAttemptsCap = 200;
   static const _attemptPadding = 20;
   static const _positionEpsilon = 0.5;
   static const _stallAttemptsBeforeReverse = 2;
@@ -235,7 +236,8 @@ class ScrollSimulator {
     final scrollExtent =
         (position.maxScrollExtent - position.minScrollExtent).abs();
     if (!scrollExtent.isFinite) {
-      return _fallbackMaxScrollAttempts;
+      return _fallbackMaxScrollAttempts.clamp(1, _defaultMaxScrollAttemptsCap)
+          .toInt();
     }
 
     final oneWayAttempts = (scrollExtent / _delta).ceil();
@@ -243,7 +245,7 @@ class ScrollSimulator {
     // Allow one full pass in one direction and another after reverse,
     // with a small buffer for viewport alignment near edges.
     final adaptiveAttempts = oneWayAttempts * 2 + _attemptPadding;
-    return adaptiveAttempts.clamp(1, double.infinity).toInt();
+    return adaptiveAttempts.clamp(1, _defaultMaxScrollAttemptsCap).toInt();
   }
 
   /// Checks if the element is hittable (i.e., can receive pointer events).
