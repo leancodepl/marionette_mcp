@@ -14,6 +14,14 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         children: [
           ListTile(
+            leading: const Icon(Icons.view_list_outlined),
+            title: const Text('Items'),
+            subtitle: const Text('Browse the scrollable items list'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/items'),
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.notifications_outlined),
             title: const Text('Notifications'),
             subtitle: const Text('Manage notification preferences'),

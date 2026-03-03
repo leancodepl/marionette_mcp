@@ -13,26 +13,26 @@ class ScrollSimulator {
   final WidgetFinder _widgetFinder;
 
   static const _delta = 64.0;
-  static const _maxScrolls = 50;
+  static const _fallbackMaxScrollAttempts = 50;
+  static const _defaultMaxScrollAttemptsCap = 200;
+  static const _attemptPadding = 20;
+  static const _positionEpsilon = 0.5;
+  static const _stallAttemptsBeforeReverse = 2;
 
   /// Scrolls until the widget matching [matcher] is visible.
   ///
   /// Finds the first [Scrollable] in the tree and scrolls it until the target
-  /// widget becomes visible or [_maxScrolls] attempts are exhausted.
+  /// widget becomes visible or max attempts are exhausted.
   ///
   /// Throws an [Exception] if:
   /// - The target widget is not found
   /// - No [Scrollable] widget is found in the tree
-  /// - The target widget is not visible after [_maxScrolls] scroll attempts
+  /// - The target widget is not visible after all attempts are exhausted
   Future<void> scrollUntilVisible(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
   ) async {
-    // Find the first Scrollable in the tree
-    final scrollable = _widgetFinder.findElement(
-      const TypeMatcher(Scrollable),
-      configuration,
-    );
+    final scrollable = _findScrollableElement(matcher, configuration);
     if (scrollable == null) {
       throw Exception('No Scrollable widget found in the tree');
     }
@@ -40,32 +40,115 @@ class ScrollSimulator {
     // Get the scroll direction
     final scrollableWidget = scrollable.widget as Scrollable;
     final direction = scrollableWidget.axisDirection;
+    final position = _resolveScrollPosition(scrollable);
 
     // Calculate move step based on direction
-    final moveStep = switch (direction) {
+    final initialMoveStep = switch (direction) {
       AxisDirection.up => const Offset(0, _delta),
       AxisDirection.down => const Offset(0, -_delta),
       AxisDirection.left => const Offset(_delta, 0),
       AxisDirection.right => const Offset(-_delta, 0),
     };
+    final maxScrollAttempts = _calculateMaxScrollAttempts(position);
 
     // Scroll until visible
-    await _dragUntilVisible(matcher, scrollable, moveStep, configuration);
+    await _dragUntilVisible(
+      matcher,
+      scrollable,
+      position,
+      initialMoveStep,
+      maxScrollAttempts,
+      configuration,
+    );
+  }
+
+  Element? _findScrollableElement(
+    WidgetMatcher matcher,
+    MarionetteConfiguration configuration,
+  ) {
+    final initialTarget = _widgetFinder.findElement(matcher, configuration);
+    if (initialTarget != null) {
+      final ancestorScrollable = _findScrollableAncestor(initialTarget);
+      if (ancestorScrollable != null) {
+        return ancestorScrollable;
+      }
+    }
+
+    final root = WidgetsBinding.instance.rootElement;
+    if (root == null) {
+      return null;
+    }
+
+    Element? fallbackScrollable;
+    Element? scrollableWithRange;
+
+    void visit(Element element) {
+      if (scrollableWithRange != null) {
+        return;
+      }
+
+      if (element.widget is Scrollable) {
+        fallbackScrollable ??= element;
+        final position = _tryResolveScrollPosition(element);
+        if (position != null && _hasScrollableRange(position)) {
+          scrollableWithRange = element;
+          return;
+        }
+      }
+
+      element.visitChildren(visit);
+    }
+
+    visit(root);
+    return scrollableWithRange ?? fallbackScrollable;
+  }
+
+  Element? _findScrollableAncestor(Element element) {
+    Element? scrollableAncestor;
+    element.visitAncestorElements((Element ancestor) {
+      if (ancestor.widget is Scrollable) {
+        scrollableAncestor = ancestor;
+        return false;
+      }
+      return true;
+    });
+    return scrollableAncestor;
   }
 
   /// Repeatedly drags the scrollable until the target is visible.
   Future<void> _dragUntilVisible(
     WidgetMatcher targetMatcher,
     Element scrollable,
-    Offset moveStep,
+    ScrollPosition position,
+    Offset initialMoveStep,
+    int maxScrollAttempts,
     MarionetteConfiguration configuration,
   ) async {
-    for (var i = 0; i < _maxScrolls; i++) {
+    var moveStep = initialMoveStep;
+    var searchingTowardEnd = true;
+    var hasReversedDirection = false;
+    var stalledAttempts = 0;
+
+    for (var i = 0; i < maxScrollAttempts; i++) {
       // Find the target element
       final target = _widgetFinder.findElement(targetMatcher, configuration);
       // Check if target is visible
       if (target != null && _isHittable(target)) {
         return;
+      }
+
+      final atCurrentEdgeBeforeDrag = searchingTowardEnd
+          ? position.extentAfter <= _positionEpsilon
+          : position.extentBefore <= _positionEpsilon;
+      if (atCurrentEdgeBeforeDrag) {
+        if (!hasReversedDirection) {
+          hasReversedDirection = true;
+          searchingTowardEnd = false;
+          moveStep = -moveStep;
+          stalledAttempts = 0;
+          continue;
+        }
+        break;
       }
 
       final renderObject = scrollable.renderObject;
@@ -77,11 +160,93 @@ class ScrollSimulator {
       final globalPosition = renderObject.localToGlobal(center);
 
       final to = globalPosition + moveStep;
+      final beforePosition = position.pixels;
       await _gestureDispatcher.drag(globalPosition, to);
+
+      final afterPosition = position.pixels;
+      final moved = (afterPosition - beforePosition).abs() > _positionEpsilon;
+      final atCurrentEdgeAfterDrag = searchingTowardEnd
+          ? position.extentAfter <= _positionEpsilon
+          : position.extentBefore <= _positionEpsilon;
+
+      if (atCurrentEdgeAfterDrag) {
+        if (!hasReversedDirection) {
+          hasReversedDirection = true;
+          searchingTowardEnd = false;
+          moveStep = -moveStep;
+          stalledAttempts = 0;
+          continue;
+        }
+        break;
+      }
+
+      if (moved) {
+        stalledAttempts = 0;
+        continue;
+      }
+
+      stalledAttempts++;
+      if (stalledAttempts < _stallAttemptsBeforeReverse) {
+        continue;
+      }
+
+      if (!hasReversedDirection) {
+        // We likely hit the edge in the current direction. Reverse once and
+        // scan the opposite side of the list.
+        hasReversedDirection = true;
+        moveStep = -moveStep;
+        stalledAttempts = 0;
+        continue;
+      }
+
+      break;
     }
 
     // Target still not visible after max scrolls
-    throw StateError('Widget not found after $_maxScrolls scroll attempts');
+    throw StateError(
+      'Widget not found after $maxScrollAttempts scroll attempts',
+    );
+  }
+
+  ScrollPosition _resolveScrollPosition(Element scrollable) {
+    final position = _tryResolveScrollPosition(scrollable);
+    if (position == null) {
+      throw Exception('Scrollable element does not expose ScrollableState');
+    }
+    return position;
+  }
+
+  ScrollPosition? _tryResolveScrollPosition(Element scrollable) {
+    if (scrollable is! StatefulElement) {
+      return null;
+    }
+    final state = scrollable.state;
+    if (state is! ScrollableState) {
+      return null;
+    }
+    return state.position;
+  }
+
+  bool _hasScrollableRange(ScrollPosition position) {
+    return (position.maxScrollExtent - position.minScrollExtent).abs() >
+        _positionEpsilon;
+  }
+
+  int _calculateMaxScrollAttempts(ScrollPosition position) {
+    final scrollExtent =
+        (position.maxScrollExtent - position.minScrollExtent).abs();
+    if (!scrollExtent.isFinite) {
+      return _fallbackMaxScrollAttempts
+          .clamp(1, _defaultMaxScrollAttemptsCap)
+          .toInt();
+    }
+
+    final oneWayAttempts = (scrollExtent / _delta).ceil();
+
+    // Allow one full pass in one direction and another after reverse,
+    // with a small buffer for viewport alignment near edges.
+    final adaptiveAttempts = oneWayAttempts * 2 + _attemptPadding;
+    return adaptiveAttempts.clamp(1, _defaultMaxScrollAttemptsCap).toInt();
   }
 
   /// Checks if the element is hittable (i.e., can receive pointer events).
@@ -98,12 +263,15 @@ class ScrollSimulator {
       return false;
     }
 
-    // Get the view ID from the ancestor View widget
+    // Get the view ID from the ancestor View widget when available.
+    // In test environments there may be no explicit View widget in the tree,
+    // so we fallback to the implicit view from the platform dispatcher.
     final view = element.findAncestorWidgetOfExactType<View>();
-    if (view == null) {
+    final viewId = view?.view.viewId ??
+        WidgetsBinding.instance.platformDispatcher.implicitView?.viewId;
+    if (viewId == null) {
       return false;
     }
-    final viewId = view.view.viewId;
 
     // Calculate the center position of the element
     final center = renderObject.size.center(Offset.zero);
