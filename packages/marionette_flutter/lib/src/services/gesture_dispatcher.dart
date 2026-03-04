@@ -28,7 +28,7 @@ class GestureDispatcher {
       return;
     }
 
-    final element = widgetFinder.findElement(matcher, configuration);
+    final element = widgetFinder.findHittableElement(matcher, configuration);
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');

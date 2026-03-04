@@ -57,7 +57,7 @@ class TextInputSimulator {
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
   ) {
-    final element = _widgetFinder.findElement(matcher, configuration);
+    final element = _widgetFinder.findHittableElement(matcher, configuration);
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');

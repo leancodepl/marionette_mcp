@@ -1,4 +1,3 @@
-import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
@@ -133,7 +132,7 @@ class ScrollSimulator {
       // Find the target element
       final target = _widgetFinder.findElement(targetMatcher, configuration);
       // Check if target is visible
-      if (target != null && _isHittable(target)) {
+      if (target != null && WidgetFinder.isHittable(target)) {
         return;
       }
 
@@ -249,45 +248,4 @@ class ScrollSimulator {
     return adaptiveAttempts.clamp(1, _defaultMaxScrollAttemptsCap).toInt();
   }
 
-  /// Checks if the element is hittable (i.e., can receive pointer events).
-  ///
-  /// Performs a hit test at the center of the element to determine if it's
-  /// actually interactive, not just within viewport bounds.
-  bool _isHittable(Element element) {
-    final renderObject = element.renderObject;
-    if (renderObject is! RenderBox) {
-      return false;
-    }
-
-    if (!renderObject.hasSize) {
-      return false;
-    }
-
-    // Get the view ID from the ancestor View widget when available.
-    // In test environments there may be no explicit View widget in the tree,
-    // so we fallback to the implicit view from the platform dispatcher.
-    final view = element.findAncestorWidgetOfExactType<View>();
-    final viewId = view?.view.viewId ??
-        WidgetsBinding.instance.platformDispatcher.implicitView?.viewId;
-    if (viewId == null) {
-      return false;
-    }
-
-    // Calculate the center position of the element
-    final center = renderObject.size.center(Offset.zero);
-    final absoluteOffset = renderObject.localToGlobal(center);
-
-    // Perform hit test at the center of the element
-    final hitResult = HitTestResult();
-    WidgetsBinding.instance.hitTestInView(hitResult, absoluteOffset, viewId);
-
-    // Check if the element's render object is in the hit test path
-    for (final entry in hitResult.path) {
-      if (entry.target == renderObject) {
-        return true;
-      }
-    }
-
-    return false;
-  }
 }
