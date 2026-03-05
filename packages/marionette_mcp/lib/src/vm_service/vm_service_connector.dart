@@ -278,6 +278,18 @@ class VmServiceConnector {
     return _callExtension('marionette.enterText', args);
   }
 
+  /// Simulates a swipe gesture.
+  ///
+  /// Supports two modes:
+  /// - Coordinate-based: [args] should contain 'startX', 'startY', 'endX', 'endY'
+  /// - Element-based: [args] should contain a matcher ('key' or 'text'),
+  ///   'direction' ('left', 'right', 'up', 'down'), and optional 'distance'
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> swipe(Map<String, dynamic> args) {
+    return _callExtension('marionette.swipe', args);
+  }
+
   /// Scrolls until an element matching the given criteria is visible.
   ///
   /// [matcher] should contain either 'key' or 'text' field.
