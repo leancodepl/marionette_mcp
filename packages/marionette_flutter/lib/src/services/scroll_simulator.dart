@@ -21,8 +21,10 @@ class ScrollSimulator {
 
   /// Scrolls until the widget matching [matcher] is visible.
   ///
-  /// Finds the first [Scrollable] in the tree and scrolls it until the target
-  /// widget becomes visible or max attempts are exhausted.
+  /// Picks the [Scrollable] the user can currently reach rather than the first
+  /// one in the tree — a covered layer stays built and comes earlier — and
+  /// drags it until the target becomes reachable or max attempts are
+  /// exhausted.
   ///
   /// Throws an [Exception] if:
   /// - The target widget is not found
@@ -66,33 +68,48 @@ class ScrollSimulator {
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
   ) {
-    final initialTarget = _widgetFinder.findElement(matcher, configuration);
-    if (initialTarget != null) {
-      final ancestorScrollable = _findScrollableAncestor(initialTarget);
-      if (ancestorScrollable != null) {
-        return ancestorScrollable;
-      }
-    }
-
     final root = WidgetsBinding.instance.rootElement;
     if (root == null) {
       return null;
     }
 
+    final targetScrollable = _findScrollableOwningAMatch(
+      matcher,
+      root,
+      configuration,
+    );
+    if (targetScrollable != null) {
+      return targetScrollable;
+    }
+
+    // The target is not in the tree yet, which is normal for lazily built
+    // lists. Fall back to picking a Scrollable, preferring ones the user can
+    // currently reach so a covered layer does not win just by being first.
     Element? fallbackScrollable;
     Element? scrollableWithRange;
+    Element? reachableFallback;
+    Element? reachableWithRange;
 
     void visit(Element element) {
-      if (scrollableWithRange != null) {
+      if (reachableWithRange != null) {
         return;
       }
 
       if (element.widget is Scrollable) {
-        fallbackScrollable ??= element;
         final position = _tryResolveScrollPosition(element);
-        if (position != null && _hasScrollableRange(position)) {
-          scrollableWithRange = element;
-          return;
+        final hasRange = position != null && _hasScrollableRange(position);
+
+        fallbackScrollable ??= element;
+        if (hasRange) {
+          scrollableWithRange ??= element;
+        }
+
+        if (isElementHittable(element)) {
+          reachableFallback ??= element;
+          if (hasRange) {
+            reachableWithRange ??= element;
+            return;
+          }
         }
       }
 
@@ -100,7 +117,53 @@ class ScrollSimulator {
     }
 
     visit(root);
-    return scrollableWithRange ?? fallbackScrollable;
+
+    // Most to least preferred. Reachability outranks scroll range because the
+    // drag starts at the centre of the chosen Scrollable, the exact point
+    // hittability is measured at: one that fails the check cannot be dragged
+    // at all, range or no range. The last two tiers keep the previous
+    // behaviour for trees where hittability is never established.
+    return reachableWithRange ??
+        reachableFallback ??
+        scrollableWithRange ??
+        fallbackScrollable;
+  }
+
+  /// Returns the [Scrollable] containing a match that the user can reach.
+  ///
+  /// Every match is considered, not just the first, because a covered layer
+  /// sits earlier in the element tree than the one on top. The match itself
+  /// does not need to be hittable — it may still be scrolled out of view — so
+  /// reachability is judged on the [Scrollable] that would move it.
+  Element? _findScrollableOwningAMatch(
+    WidgetMatcher matcher,
+    Element root,
+    MarionetteConfiguration configuration,
+  ) {
+    Element? firstScrollable;
+    Element? reachableScrollable;
+
+    void visit(Element element) {
+      if (reachableScrollable != null) {
+        return;
+      }
+
+      if (matcher.matches(element, configuration)) {
+        final scrollable = _findScrollableAncestor(element);
+        if (scrollable != null) {
+          firstScrollable ??= scrollable;
+          if (isElementHittable(scrollable)) {
+            reachableScrollable = scrollable;
+            return;
+          }
+        }
+      }
+
+      element.visitChildren(visit);
+    }
+
+    visit(root);
+    return reachableScrollable ?? firstScrollable;
   }
 
   Element? _findScrollableAncestor(Element element) {
@@ -130,10 +193,14 @@ class ScrollSimulator {
     var stalledAttempts = 0;
 
     for (var i = 0; i < maxScrollAttempts; i++) {
-      // Find the target element
-      final target = _widgetFinder.findElement(targetMatcher, configuration);
-      // Check if target is visible
-      if (target != null && isElementHittable(target)) {
+      // Look for a match that can actually receive pointer events. Matching on
+      // the first hit alone is not enough: a covered layer is earlier in the
+      // tree, so a widget the user cannot reach would mask the one they can.
+      final target = _widgetFinder.findHittableElement(
+        targetMatcher,
+        configuration,
+      );
+      if (target != null) {
         return;
       }
 
