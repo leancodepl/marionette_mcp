@@ -124,6 +124,70 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Swipe on element
+    registerInternalMarionetteExtension(
+      name: 'marionette.swipe',
+      callback: (params) async {
+        if (params.containsKey('startX')) {
+          // Coordinate-based swipe — validate all 4 coordinates
+          final startXStr = params['startX'];
+          final startYStr = params['startY'];
+          final endXStr = params['endX'];
+          final endYStr = params['endY'];
+
+          if (startXStr == null ||
+              startYStr == null ||
+              endXStr == null ||
+              endYStr == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Coordinate-based swipe requires all of: '
+              'startX, startY, endX, endY',
+            );
+          }
+
+          final startX = double.parse(startXStr);
+          final startY = double.parse(startYStr);
+          final endX = double.parse(endXStr);
+          final endY = double.parse(endYStr);
+
+          await _gestureDispatcher.drag(
+            Offset(startX, startY),
+            Offset(endX, endY),
+          );
+
+          return MarionetteExtensionResult.success({
+            'message': 'Swiped from ($startX, $startY) to ($endX, $endY)',
+          });
+        }
+
+        // Element + direction swipe
+        final matcher = WidgetMatcher.fromJson(params);
+        final direction = params['direction'];
+        if (direction == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Missing required parameter: direction '
+            '(must be one of: left, right, up, down)',
+          );
+        }
+
+        final distance =
+            double.tryParse(params['distance'] ?? '') ?? 200.0;
+
+        await _gestureDispatcher.swipe(
+          matcher,
+          _widgetFinder,
+          configuration,
+          direction: direction,
+          distance: distance,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message':
+              'Swiped $direction on element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
     // Extension: Scroll until widget is visible
     registerInternalMarionetteExtension(
       name: 'marionette.scrollTo',
