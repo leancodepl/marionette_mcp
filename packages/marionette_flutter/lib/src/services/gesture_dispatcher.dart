@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/services/element_resolver.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
@@ -28,7 +29,8 @@ class GestureDispatcher {
       return;
     }
 
-    final element = widgetFinder.findElement(matcher, configuration);
+    final resolver = ElementResolver(widgetFinder);
+    final element = resolver.findHittableElement(matcher, configuration);
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');

@@ -195,4 +195,63 @@ void main() {
       },
     );
   });
+
+  group('GestureDispatcher matcher resolution', () {
+    testWidgets(
+      'tap(text) targets the visible route when duplicate text exists behind a pushed route',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final navKey = GlobalKey<NavigatorState>();
+
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: navKey,
+            home: Scaffold(body: Center(child: Text('Hello'))),
+          ),
+        );
+
+        navKey.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const _RouteTapTargetScreen(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.tap(
+            const TextMatcher('Hello'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Tapped'), findsOneWidget);
+      },
+    );
+  });
+}
+
+class _RouteTapTargetScreen extends StatefulWidget {
+  const _RouteTapTargetScreen();
+
+  @override
+  State<_RouteTapTargetScreen> createState() => _RouteTapTargetScreenState();
+}
+
+class _RouteTapTargetScreenState extends State<_RouteTapTargetScreen> {
+  var _tapped = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: TextButton(
+          onPressed: () => setState(() => _tapped = true),
+          child: Text(_tapped ? 'Tapped' : 'Hello'),
+        ),
+      ),
+    );
+  }
 }

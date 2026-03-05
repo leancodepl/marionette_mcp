@@ -1,6 +1,6 @@
-import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/services/element_resolver.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
@@ -11,6 +11,7 @@ class ScrollSimulator {
 
   final GestureDispatcher _gestureDispatcher;
   final WidgetFinder _widgetFinder;
+  ElementResolver get _elementResolver => ElementResolver(_widgetFinder);
 
   static const _delta = 64.0;
   static const _fallbackMaxScrollAttempts = 50;
@@ -66,12 +67,15 @@ class ScrollSimulator {
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
   ) {
-    final initialTarget = _widgetFinder.findElement(matcher, configuration);
-    if (initialTarget != null) {
-      final ancestorScrollable = _findScrollableAncestor(initialTarget);
-      if (ancestorScrollable != null) {
-        return ancestorScrollable;
-      }
+    // First preference: a candidate whose owning scrollable layer is
+    // currently hittable. Avoids selecting widgets hidden
+    // underneath modal barriers while still allowing offscreen targets.
+    final candidate = _elementResolver.findCandidateInHittableScrollable(
+      matcher,
+      configuration,
+    );
+    if (candidate != null) {
+      return candidate.scrollableAncestor;
     }
 
     final root = WidgetsBinding.instance.rootElement;
@@ -81,18 +85,31 @@ class ScrollSimulator {
 
     Element? fallbackScrollable;
     Element? scrollableWithRange;
+    Element? hittableFallbackScrollable;
+    Element? hittableScrollableWithRange;
 
     void visit(Element element) {
-      if (scrollableWithRange != null) {
+      // Once we found both "best possible" options, stop looking.
+      if (scrollableWithRange != null && hittableScrollableWithRange != null) {
         return;
       }
 
       if (element.widget is Scrollable) {
+        // Plain fallbacks keep legacy behavior if hittability cannot be
+        // determined (for example unusual test setups).
         fallbackScrollable ??= element;
         final position = _tryResolveScrollPosition(element);
         if (position != null && _hasScrollableRange(position)) {
           scrollableWithRange = element;
-          return;
+        }
+
+        // Preferred fallbacks are scrollables that can currently receive
+        // pointer events. This filters out blocked/background layers.
+        if (ElementResolver.isHittable(element)) {
+          hittableFallbackScrollable ??= element;
+          if (position != null && _hasScrollableRange(position)) {
+            hittableScrollableWithRange = element;
+          }
         }
       }
 
@@ -100,19 +117,15 @@ class ScrollSimulator {
     }
 
     visit(root);
-    return scrollableWithRange ?? fallbackScrollable;
-  }
-
-  Element? _findScrollableAncestor(Element element) {
-    Element? scrollableAncestor;
-    element.visitAncestorElements((Element ancestor) {
-      if (ancestor.widget is Scrollable) {
-        scrollableAncestor = ancestor;
-        return false;
-      }
-      return true;
-    });
-    return scrollableAncestor;
+    // Return order encodes preference:
+    // 1) hittable + has range
+    // 2) hittable
+    // 3) any + has range
+    // 4) any
+    return hittableScrollableWithRange ??
+        hittableFallbackScrollable ??
+        scrollableWithRange ??
+        fallbackScrollable;
   }
 
   /// Repeatedly drags the scrollable until the target is visible.
@@ -130,10 +143,13 @@ class ScrollSimulator {
     var stalledAttempts = 0;
 
     for (var i = 0; i < maxScrollAttempts; i++) {
-      // Find the target element
-      final target = _widgetFinder.findElement(targetMatcher, configuration);
-      // Check if target is visible
-      if (target != null && _isHittable(target)) {
+      // Stop condition: matcher resolves to a currently hittable element.
+      // This ensures the final match is on the interactive layer.
+      final target = _elementResolver.findHittableElement(
+        targetMatcher,
+        configuration,
+      );
+      if (target != null) {
         return;
       }
 
@@ -156,6 +172,8 @@ class ScrollSimulator {
         throw Exception('Scrollable does not have a RenderBox');
       }
 
+      // Drag from the scrollable's center. This remains stable even when the
+      // scroll view is inset within other layouts.
       final center = renderObject.size.center(Offset.zero);
       final globalPosition = renderObject.localToGlobal(center);
 
@@ -247,47 +265,5 @@ class ScrollSimulator {
     // with a small buffer for viewport alignment near edges.
     final adaptiveAttempts = oneWayAttempts * 2 + _attemptPadding;
     return adaptiveAttempts.clamp(1, _defaultMaxScrollAttemptsCap).toInt();
-  }
-
-  /// Checks if the element is hittable (i.e., can receive pointer events).
-  ///
-  /// Performs a hit test at the center of the element to determine if it's
-  /// actually interactive, not just within viewport bounds.
-  bool _isHittable(Element element) {
-    final renderObject = element.renderObject;
-    if (renderObject is! RenderBox) {
-      return false;
-    }
-
-    if (!renderObject.hasSize) {
-      return false;
-    }
-
-    // Get the view ID from the ancestor View widget when available.
-    // In test environments there may be no explicit View widget in the tree,
-    // so we fallback to the implicit view from the platform dispatcher.
-    final view = element.findAncestorWidgetOfExactType<View>();
-    final viewId = view?.view.viewId ??
-        WidgetsBinding.instance.platformDispatcher.implicitView?.viewId;
-    if (viewId == null) {
-      return false;
-    }
-
-    // Calculate the center position of the element
-    final center = renderObject.size.center(Offset.zero);
-    final absoluteOffset = renderObject.localToGlobal(center);
-
-    // Perform hit test at the center of the element
-    final hitResult = HitTestResult();
-    WidgetsBinding.instance.hitTestInView(hitResult, absoluteOffset, viewId);
-
-    // Check if the element's render object is in the hit test path
-    for (final entry in hitResult.path) {
-      if (entry.target == renderObject) {
-        return true;
-      }
-    }
-
-    return false;
   }
 }
