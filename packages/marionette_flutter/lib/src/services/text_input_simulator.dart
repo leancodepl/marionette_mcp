@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/services/element_resolver.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
@@ -8,6 +9,7 @@ class TextInputSimulator {
   const TextInputSimulator(this._widgetFinder);
 
   final WidgetFinder _widgetFinder;
+  ElementResolver get _elementResolver => ElementResolver(_widgetFinder);
 
   /// Enters text into a text field identified by the given matcher.
   Future<void> enterText(
@@ -57,7 +59,13 @@ class TextInputSimulator {
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
   ) {
-    final element = _widgetFinder.findHittableElement(matcher, configuration);
+    // Same resolution rule as tap(): only accept a matcher hit if that element
+    // can currently receive pointer input. This avoids typing into hidden
+    // duplicates behind dialogs/routes.
+    final element = _elementResolver.findHittableElement(
+      matcher,
+      configuration,
+    );
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');

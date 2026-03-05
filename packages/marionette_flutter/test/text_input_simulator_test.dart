@@ -191,6 +191,66 @@ void main() {
       expect(controller.text, 'Matched by text');
     });
 
+    testWidgets(
+      'prefers the hittable modal field when duplicate key exists behind a dialog',
+      (WidgetTester tester) async {
+        final backgroundController = TextEditingController(text: 'bg');
+        final dialogController = TextEditingController(text: 'dialog');
+
+        addTearDown(() {
+          backgroundController.dispose();
+          dialogController.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  return Column(
+                    children: [
+                      TextField(
+                        key: const ValueKey('shared_field'),
+                        controller: backgroundController,
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showDialog<void>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              content: TextField(
+                                key: const ValueKey('shared_field'),
+                                controller: dialogController,
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text('open'),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        final simulator = TextInputSimulator(WidgetFinder());
+        await simulator.enterText(
+          const KeyMatcher('shared_field'),
+          'typed in dialog',
+          configuration,
+        );
+        await tester.pump();
+
+        expect(dialogController.text, 'typed in dialog');
+        expect(backgroundController.text, 'bg');
+      },
+    );
+
     group('FocusedElementMatcher', () {
       testWidgets('enters text into focused TextField',
           (WidgetTester tester) async {

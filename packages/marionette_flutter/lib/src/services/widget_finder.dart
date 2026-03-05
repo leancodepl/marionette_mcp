@@ -1,4 +1,3 @@
-import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
@@ -31,109 +30,48 @@ class WidgetFinder {
     Element? startElement,
     MarionetteConfiguration configuration,
   ) {
-    if (startElement == null) {
-      return null;
-    }
-
-    Element? found;
-
-    void visitor(Element element) {
-      if (found != null) {
-        return;
-      } else if (matcher.matches(element.widget, configuration)) {
-        found = element;
-      } else {
-        element.visitChildren(visitor);
-      }
-    }
-
-    visitor(startElement);
-    return found;
+    // Keep this convenience API for existing callers, but delegate to the
+    // "find all" traversal so there is a single matching implementation.
+    final elements = findElementsFrom(matcher, startElement, configuration);
+    return elements.isEmpty ? null : elements.first;
   }
 
-  /// Finds the first element that matches the given [matcher] and is hittable
-  /// (i.e. can receive pointer events and is not behind a modal barrier).
-  ///
-  /// This should be used by tools that dispatch gestures (tap, enter_text)
-  /// where matching a non-hittable widget would result in a silent failure.
-  /// Tools that need to find offscreen elements (e.g. scroll_to) should use
-  /// [findElement] instead.
-  Element? findHittableElement(
-    WidgetMatcher matcher,
-    MarionetteConfiguration configuration,
-  ) {
-    return _findHittableElementFrom(
-      matcher,
-      WidgetsBinding.instance.rootElement,
-      configuration,
-    );
-  }
-
-  Element? _findHittableElementFrom(
+  /// Finds all elements that match [matcher] within [startElement]'s subtree.
+  List<Element> findElementsFrom(
     WidgetMatcher matcher,
     Element? startElement,
     MarionetteConfiguration configuration,
   ) {
     if (startElement == null) {
-      return null;
+      return const [];
     }
 
-    Element? found;
+    final found = <Element>[];
 
     void visitor(Element element) {
-      if (found != null) {
-        return;
-      } else if (matcher.matches(element.widget, configuration) &&
-          isHittable(element)) {
-        found = element;
-      } else {
-        element.visitChildren(visitor);
+      // DFS order is important: it preserves historical "first match wins"
+      // semantics for callers that still consume only the first match.
+      if (matcher.matches(element.widget, configuration)) {
+        found.add(element);
       }
+      // Even if this element matches, continue traversing. Some workflows need
+      // all candidates to apply additional runtime filters.
+      element.visitChildren(visitor);
     }
 
     visitor(startElement);
     return found;
   }
 
-  /// Checks if the element can receive pointer events.
-  ///
-  /// Performs a hit test at the center of the element and checks whether its
-  /// render object appears in the hit test path. Elements behind modal
-  /// barriers, [AbsorbPointer], [IgnorePointer], or offscreen will return
-  /// false.
-  static bool isHittable(Element element) {
-    final renderObject = element.renderObject;
-    if (renderObject is! RenderBox || !renderObject.hasSize) {
-      return false;
-    }
-
-    if (!renderObject.attached) {
-      return false;
-    }
-
-    final view = element.findAncestorWidgetOfExactType<View>();
-    final viewId = view?.view.viewId ??
-        WidgetsBinding.instance.platformDispatcher.implicitView?.viewId;
-    if (viewId == null) {
-      return false;
-    }
-
-    try {
-      final center = renderObject.size.center(Offset.zero);
-      final absoluteOffset = renderObject.localToGlobal(center);
-
-      final result = HitTestResult();
-      WidgetsBinding.instance.hitTestInView(result, absoluteOffset, viewId);
-
-      for (final entry in result.path) {
-        if (entry.target == renderObject) {
-          return true;
-        }
-      }
-
-      return false;
-    } catch (_) {
-      return false;
-    }
+  /// Finds all matching elements in DFS order from the root tree.
+  List<Element> findElements(
+    WidgetMatcher matcher,
+    MarionetteConfiguration configuration,
+  ) {
+    return findElementsFrom(
+      matcher,
+      WidgetsBinding.instance.rootElement,
+      configuration,
+    );
   }
 }

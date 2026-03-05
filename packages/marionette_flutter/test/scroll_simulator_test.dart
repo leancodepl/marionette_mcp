@@ -26,7 +26,7 @@ void main() {
         );
 
         final simulator = ScrollSimulator(
-          _WidgetTesterGestureDispatcher(tester, find.byType(Scrollable).first),
+          _WidgetTesterGestureDispatcher(tester),
           WidgetFinder(),
         );
 
@@ -67,7 +67,7 @@ void main() {
         );
 
         final simulator = ScrollSimulator(
-          _WidgetTesterGestureDispatcher(tester, find.byType(Scrollable).first),
+          _WidgetTesterGestureDispatcher(tester),
           WidgetFinder(),
         );
 
@@ -97,10 +97,7 @@ void main() {
           ),
         );
 
-        final dispatcher = _WidgetTesterGestureDispatcher(
-          tester,
-          find.byType(Scrollable).first,
-        );
+        final dispatcher = _WidgetTesterGestureDispatcher(tester);
         final simulator = ScrollSimulator(dispatcher, WidgetFinder());
 
         await expectLater(
@@ -113,6 +110,86 @@ void main() {
         await tester.pump();
 
         expect(dispatcher.dragCount, 200);
+      },
+    );
+
+    testWidgets(
+      'chooses the hittable modal scroll layer when duplicate key exists behind a barrier',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final backgroundController = ScrollController();
+        final modalController = ScrollController();
+
+        addTearDown(() {
+          backgroundController.dispose();
+          modalController.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) {
+                return Scaffold(
+                  body: Column(
+                    children: [
+                      Expanded(
+                        child: ListView.builder(
+                          controller: backgroundController,
+                          itemCount: 100,
+                          itemBuilder: (context, index) {
+                            return ListTile(
+                              key: ValueKey('shared_target_$index'),
+                              title: Text('Background $index'),
+                            );
+                          },
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showModalBottomSheet<void>(
+                            context: context,
+                            builder: (_) {
+                              return SizedBox(
+                                height: 320,
+                                child: ListView.builder(
+                                  controller: modalController,
+                                  itemCount: 100,
+                                  itemBuilder: (context, index) {
+                                    return ListTile(
+                                      key: ValueKey('shared_target_$index'),
+                                      title: Text('Modal $index'),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        child: const Text('open modal'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('open modal'));
+        await tester.pumpAndSettle();
+
+        final simulator = ScrollSimulator(
+          _WidgetTesterGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+        await simulator.scrollUntilVisible(
+          const KeyMatcher('shared_target_90'),
+          _configuration,
+        );
+        await tester.pumpAndSettle();
+
+        expect(modalController.offset, greaterThan(0));
+        expect(backgroundController.offset, 0);
       },
     );
   });
@@ -144,16 +221,15 @@ Widget _buildItemsApp({
 }
 
 class _WidgetTesterGestureDispatcher extends GestureDispatcher {
-  _WidgetTesterGestureDispatcher(this._tester, this._scrollableFinder);
+  _WidgetTesterGestureDispatcher(this._tester);
 
   final WidgetTester _tester;
-  final Finder _scrollableFinder;
   int dragCount = 0;
 
   @override
   Future<void> drag(Offset from, Offset to) async {
     dragCount++;
-    await _tester.drag(_scrollableFinder, to - from);
+    await _tester.dragFrom(from, to - from);
     await _tester.pump();
   }
 }
