@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route
+
 # 0.6.0
 
 - Promote schema-bearing custom extensions to first-class MCP tools via the new `ExtensionInputSchema`/`ExtensionParam` DSL
