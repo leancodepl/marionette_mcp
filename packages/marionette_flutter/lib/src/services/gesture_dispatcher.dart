@@ -9,9 +9,20 @@ class GestureDispatcher {
   static const kMaxDelta = 40.0;
   static const kDelay = Duration(milliseconds: 10);
 
-  static const _kDeviceId = 1;
-
   int _nextPointerId = 1;
+
+  /// Synthetic device IDs start high to avoid colliding with real hardware
+  /// devices (real mouse is device 0). MouseTracker tracks by device ID,
+  /// so each synthetic tap sequence needs its own unique device to prevent
+  /// the assertion: (event is PointerAddedEvent) == (lastEvent is PointerRemovedEvent).
+  int _nextDeviceId = 100000;
+
+  /// Gets the viewId of the first (primary) Flutter view.
+  /// On macOS/Linux/Windows desktop, this may not be 0 — using the wrong
+  /// viewId causes hitTestInView to miss all render objects, making taps
+  /// silently fail.
+  int get _viewId =>
+      WidgetsBinding.instance.platformDispatcher.views.first.viewId;
 
   /// Simulates a tap on an element that matches the given [matcher].
   ///
@@ -57,20 +68,50 @@ class GestureDispatcher {
 
   Future<void> _dispatchTapAtPosition(Offset globalPosition) async {
     final pointerId = _nextPointerId++;
+    final deviceId = _nextDeviceId++;
+    final viewId = _viewId;
 
-    // Build the event records
+    // Build the event records.
+    // pointer ID must match across Added→Down→Up→Removed so Flutter's
+    // gesture arena can track the full sequence and fire onTap callbacks.
+    // device ID must be unique per sequence and different from real hardware
+    // (real mouse = device 0) to avoid MouseTracker assertion failures.
+    // viewId must match the actual Flutter view so hitTestInView finds the
+    // correct render tree (on desktop, viewId is often non-zero).
     final records = [
-      // Pointer down immediately
+      // Pointer added + down
       [
-        PointerAddedEvent(position: globalPosition, device: _kDeviceId),
+        PointerAddedEvent(
+          pointer: pointerId,
+          device: deviceId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
         PointerDownEvent(
-            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+          pointer: pointerId,
+          device: deviceId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
       ],
-      // Pointer up after a short delay, then remove the device
+      // Pointer up + removed after a short delay
       [
         PointerUpEvent(
-            pointer: pointerId, position: globalPosition, device: _kDeviceId),
-        PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
+          pointer: pointerId,
+          device: deviceId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
+        PointerRemovedEvent(
+          pointer: pointerId,
+          device: deviceId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
       ],
     ];
 
@@ -80,6 +121,8 @@ class GestureDispatcher {
   /// Simulates a drag gesture from [from] to [to].
   Future<void> drag(Offset from, Offset to) async {
     final pointerId = _nextPointerId++;
+    final deviceId = _nextDeviceId++;
+    final viewId = _viewId;
 
     final delta = to - from;
     final distance = delta.distance;
@@ -97,23 +140,47 @@ class GestureDispatcher {
       moveRecords.add([
         PointerMoveEvent(
           pointer: pointerId,
+          device: deviceId,
           position: position,
           delta: stepDelta,
-          device: _kDeviceId,
+          viewId: viewId,
         ),
       ]);
     }
 
     final records = [
       [
-        PointerAddedEvent(position: from, device: _kDeviceId),
+        PointerAddedEvent(
+          pointer: pointerId,
+          device: deviceId,
+          position: from,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
         PointerDownEvent(
-            pointer: pointerId, position: from, device: _kDeviceId),
+          pointer: pointerId,
+          device: deviceId,
+          position: from,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
       ],
       ...moveRecords,
       [
-        PointerUpEvent(pointer: pointerId, position: to, device: _kDeviceId),
-        PointerRemovedEvent(position: to, device: _kDeviceId),
+        PointerUpEvent(
+          pointer: pointerId,
+          device: deviceId,
+          position: to,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
+        PointerRemovedEvent(
+          pointer: pointerId,
+          device: deviceId,
+          position: to,
+          kind: PointerDeviceKind.mouse,
+          viewId: viewId,
+        ),
       ],
     ];
 
