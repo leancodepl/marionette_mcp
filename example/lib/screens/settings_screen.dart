@@ -36,11 +36,12 @@ class SettingsScreen extends StatelessWidget {
             trailing: Icon(Icons.chevron_right),
           ),
           const Divider(),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('About'),
-            subtitle: Text('App version and info'),
-            trailing: Icon(Icons.chevron_right),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('About'),
+            subtitle: const Text('App version and info'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/settings/about'),
           ),
         ],
       ),

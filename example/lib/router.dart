@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'screens/about_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/items_screen.dart';
 import 'screens/notifications_screen.dart';
@@ -14,6 +15,7 @@ const availablePages = <String, String>{
   'settings': '/settings',
   'notifications': '/settings/notifications',
   'items': '/settings/items',
+  'about': '/settings/about',
 };
 
 final router = GoRouter(
@@ -42,6 +44,11 @@ final router = GoRouter(
           ],
         ),
       ],
+    ),
+    GoRoute(
+      path: '/settings/about',
+      pageBuilder: (context, state) =>
+          const MaterialPage(fullscreenDialog: true, child: AboutScreen()),
     ),
   ],
 );
