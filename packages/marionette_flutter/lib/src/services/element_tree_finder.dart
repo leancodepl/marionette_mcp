@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 
 /// Finds and extracts interactive elements from the Flutter widget tree.
 class ElementTreeFinder {
@@ -57,7 +57,7 @@ class ElementTreeFinder {
     }
 
     // Only return widgets that can be hit
-    if (!_canBeHit(renderObject)) {
+    if (!isElementHittable(element)) {
       return null;
     }
 
@@ -148,40 +148,5 @@ class ElementTreeFinder {
     }
 
     return true;
-  }
-
-  /// Checks if the render object can be hit (receives pointer events).
-  bool _canBeHit(RenderObject renderObject) {
-    if (renderObject is! RenderBox || !renderObject.hasSize) {
-      return false;
-    }
-
-    if (!renderObject.attached) {
-      return false;
-    }
-
-    try {
-      final hitPoint = renderObject.localToGlobal(
-        renderObject.size.center(Offset.zero),
-      );
-
-      final result = HitTestResult();
-      WidgetsBinding.instance.hitTestInView(
-        result,
-        hitPoint,
-        WidgetsBinding.instance.platformDispatcher.views.first.viewId,
-      );
-
-      // Check if this render object is in the hit test path
-      for (final entry in result.path) {
-        if (entry.target == renderObject) {
-          return true;
-        }
-      }
-
-      return false;
-    } catch (_) {
-      return false;
-    }
   }
 }

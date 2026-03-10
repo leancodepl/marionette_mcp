@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
+import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
@@ -132,7 +133,7 @@ class ScrollSimulator {
       // Find the target element
       final target = _widgetFinder.findElement(targetMatcher, configuration);
       // Check if target is visible
-      if (target != null && WidgetFinder.isHittable(target)) {
+      if (target != null && isElementHittable(target)) {
         return;
       }
 
