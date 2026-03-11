@@ -35,7 +35,7 @@ class ScreenshotCommand extends InstanceCommand {
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
-    final outputPath = argResults!['output'] as String;
+    final outputPath = p.normalize(p.absolute(argResults!['output'] as String));
     final shouldOpen = argResults!['open'] as bool;
 
     final response = await connector.takeScreenshots();
