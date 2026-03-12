@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/cli/commands/doctor_command.dart';
+import 'package:marionette_cli/src/cli/commands/double_tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/enter_text_command.dart';
 import 'package:marionette_cli/src/cli/commands/get_interactive_elements_command.dart';
 import 'package:marionette_cli/src/cli/commands/get_logs_command.dart';
@@ -47,6 +48,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(ListCommand(_registry));
     addCommand(ElementsCommand(_registry));
     addCommand(TapCommand(_registry));
+    addCommand(DoubleTapCommand(_registry));
     addCommand(EnterTextCommand(_registry));
     addCommand(ScrollToCommand(_registry));
     addCommand(ScreenshotCommand(_registry));

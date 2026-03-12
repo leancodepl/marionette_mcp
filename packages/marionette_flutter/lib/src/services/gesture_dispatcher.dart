@@ -77,6 +77,69 @@ class GestureDispatcher {
     await _handlePointerEventRecord(records);
   }
 
+  /// Simulates a double tap on an element that matches the given [matcher].
+  ///
+  /// Two taps are dispatched with [delay] between them.
+  /// Defaults to 100ms, which is within Flutter's double-tap recognition
+  /// window (kDoubleTapMinTime 40ms — kDoubleTapTimeout 300ms).
+  Future<void> doubleTap(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    Duration delay = const Duration(milliseconds: 100),
+  }) async {
+    if (delay.isNegative || delay == Duration.zero) {
+      throw ArgumentError('delay must be positive');
+    }
+
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchDoubleTapAtPosition(matcher.offset, delay);
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    } else {
+      await _dispatchDoubleTapAtElement(element, delay);
+    }
+  }
+
+  Future<void> _dispatchDoubleTapAtElement(
+    Element element,
+    Duration delay,
+  ) async {
+    final renderObject = element.renderObject;
+
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final globalPosition = renderObject.localToGlobal(center);
+
+    await _dispatchDoubleTapAtPosition(globalPosition, delay);
+  }
+
+  Future<void> _dispatchDoubleTapAtPosition(
+    Offset globalPosition,
+    Duration delay,
+  ) async {
+    // First tap
+    await _dispatchTapAtPosition(globalPosition);
+
+    // Wait between taps for double-tap recognition
+    await Future<void>.delayed(delay);
+
+    // Second tap
+    await _dispatchTapAtPosition(globalPosition);
+  }
+
   /// Simulates a drag gesture from [from] to [to].
   Future<void> drag(Offset from, Offset to) async {
     final pointerId = _nextPointerId++;

@@ -58,6 +58,35 @@ void main() {
     });
   });
 
+  group('VmServiceConnector.doubleTap', () {
+    late VmServiceConnector connector;
+
+    setUp(() {
+      connector = VmServiceConnector();
+    });
+
+    test('throws NotConnectedException with default delay', () async {
+      await expectLater(
+        connector.doubleTap({'key': 'my_button'}),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with custom delay', () async {
+      await expectLater(
+        connector.doubleTap({'key': 'my_button'}, delayMs: 200),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with coordinate matcher', () async {
+      await expectLater(
+        connector.doubleTap({'x': 100, 'y': 200}),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+  });
+
   group('VmServiceConnector.enterText', () {
     late VmServiceConnector connector;
 
