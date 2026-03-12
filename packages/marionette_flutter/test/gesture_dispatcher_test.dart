@@ -241,6 +241,52 @@ void main() {
     );
 
     testWidgets(
+      'doubleTap should dispatch two complete tap sequences',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.doubleTap(
+              const CoordinatesMatcher(100, 100),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        // Two taps = 2x (Added, Down, Up, Removed)
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
+
+        expect(downEvents, hasLength(2),
+            reason: 'Double tap should have 2 PointerDownEvents');
+        expect(upEvents, hasLength(2),
+            reason: 'Double tap should have 2 PointerUpEvents');
+        expect(removedEvents, hasLength(2),
+            reason: 'Double tap should have 2 PointerRemovedEvents');
+
+        // Each tap should use a different pointer ID
+        expect(downEvents[0].pointer, isNot(equals(downEvents[1].pointer)),
+            reason: 'Each tap should use a unique pointer ID');
+
+        // All events should use non-zero device ID
+        for (final event in events) {
+          expect(event.device, isNot(equals(0)));
+        }
+      },
+    );
+
+    testWidgets(
       'MouseTracker asserts when duplicate PointerAddedEvent(mouse, device:0) is dispatched',
       timeout: _timeout,
       (WidgetTester tester) async {

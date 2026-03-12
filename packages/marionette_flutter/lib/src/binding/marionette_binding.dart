@@ -103,6 +103,39 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Double tap element by matcher
+    registerInternalMarionetteExtension(
+      name: 'marionette.doubleTap',
+      callback: (params) async {
+        final matcher = WidgetMatcher.fromJson(params);
+        final rawDelay = params['delay'];
+        Duration delay;
+        if (rawDelay != null) {
+          final ms = int.tryParse(rawDelay.toString());
+          if (ms == null || ms <= 0) {
+            return MarionetteExtensionResult.invalidParams(
+              'Parameter "delay" must be a positive number (milliseconds), '
+              'got "$rawDelay"',
+            );
+          }
+          delay = Duration(milliseconds: ms);
+        } else {
+          delay = const Duration(milliseconds: 100);
+        }
+
+        await _gestureDispatcher.doubleTap(
+          matcher,
+          _widgetFinder,
+          configuration,
+          delay: delay,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Double tapped element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
     // Extension: Long press element by matcher
     registerInternalMarionetteExtension(
       name: 'marionette.longPress',
