@@ -103,6 +103,39 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Long press element by matcher
+    registerInternalMarionetteExtension(
+      name: 'marionette.longPress',
+      callback: (params) async {
+        final matcher = WidgetMatcher.fromJson(params);
+        final rawDuration = params['duration'];
+        Duration duration;
+        if (rawDuration != null) {
+          final ms = int.tryParse(rawDuration.toString());
+          if (ms == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Parameter "duration" must be a number (milliseconds), '
+              'got "$rawDuration"',
+            );
+          }
+          duration = Duration(milliseconds: ms);
+        } else {
+          duration = const Duration(milliseconds: 600);
+        }
+
+        await _gestureDispatcher.longPress(
+          matcher,
+          _widgetFinder,
+          configuration,
+          duration: duration,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Long pressed element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
     // Extension: Enter text into a text field
     registerInternalMarionetteExtension(
       name: 'marionette.enterText',

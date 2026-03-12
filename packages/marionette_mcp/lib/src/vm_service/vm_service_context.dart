@@ -206,6 +206,71 @@ final class VmServiceContext {
           }
         },
       )
+      // Long press interaction
+      ..registerTool(
+        'long_press',
+        description:
+            'Simulates a long press gesture on an element in the Flutter app. This is useful for triggering context menus, reorderable lists, or any widget that responds to long press. You can match elements by their key, text, type, or coordinates. An optional duration parameter controls how long the press is held (default: 600ms). Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Long Press Element'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description:
+                  'The key of the element to long press. You can get the key of an element by calling get_interactive_elements.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to long press.',
+            ),
+            'type': JsonSchema.string(
+              description:
+                  'The widget type name of the element to long press (e.g., "ListTile", "Card").',
+            ),
+            'coordinates': JsonSchema.object(
+              description: 'Screen coordinates to long press at.',
+              properties: {
+                'x': JsonSchema.number(
+                  description:
+                      'The x coordinate (horizontal position from left).',
+                ),
+                'y': JsonSchema.number(
+                  description: 'The y coordinate (vertical position from top).',
+                ),
+              },
+              required: ['x', 'y'],
+            ),
+            'duration': JsonSchema.number(
+              description:
+                  'How long to hold the press in milliseconds. Defaults to 600ms which matches Flutter\'s long press behavior.',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          final duration = (args['duration'] as num?)?.toInt();
+          final matcher = buildMatcher(args);
+          _logger.info('Long pressing with matcher: $matcher');
+
+          try {
+            final response = await connector.longPress(
+              matcher,
+              durationMs: duration,
+            );
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(text: message ?? 'Successfully long pressed'),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to long press', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Text input
       ..registerTool(
         'enter_text',
