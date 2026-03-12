@@ -8,6 +8,90 @@ import 'package:marionette_flutter/src/services/widget_finder.dart';
 const _timeout = Timeout(Duration(seconds: 10));
 
 void main() {
+  group('GestureDispatcher.longPress', () {
+    testWidgets(
+      'should dispatch PointerDown, wait, then PointerUp with unique device id',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.longPress(
+              const CoordinatesMatcher(100, 100),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              duration: const Duration(milliseconds: 50),
+            ));
+        await tester.pump();
+
+        expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+        // Verify correct event sequence: Added, Down, Up, Removed
+        final addedEvents = events.whereType<PointerAddedEvent>().toList();
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
+
+        expect(addedEvents, hasLength(1));
+        expect(downEvents, hasLength(1));
+        expect(upEvents, hasLength(1));
+        expect(removedEvents, hasLength(1));
+
+        for (final event in events) {
+          expect(
+            event.device,
+            isNot(equals(0)),
+            reason: '${event.runtimeType} should use a unique device id',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'should send PointerRemovedEvent after long press to clean up pointer state',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.longPress(
+              const CoordinatesMatcher(100, 100),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              duration: const Duration(milliseconds: 50),
+            ));
+        await tester.pump();
+
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
+
+        expect(
+          removedEvents,
+          hasLength(1),
+          reason: 'Long press should send exactly one PointerRemovedEvent to '
+              'properly clean up pointer state',
+        );
+      },
+    );
+  });
+
   group('GestureDispatcher - Bug B5: macOS pointer device collision', () {
     testWidgets(
       'should use a unique device id (not 0) to avoid colliding with the real mouse',
