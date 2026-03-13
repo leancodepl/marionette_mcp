@@ -267,6 +267,47 @@ final class VmServiceContext {
           }
         },
       )
+      // Press back button
+      ..registerTool(
+        'press_back_button',
+        description:
+            'Simulates a system back button press in the Flutter app. '
+            'This triggers the same mechanism as the Android back button or '
+            'iOS swipe-back gesture. If the app has a route to pop, it will '
+            'be popped. If the app is on the root route, the system may '
+            'minimize or close the app (same as real back button behavior). '
+            'Works with Navigator, GoRouter, and other routing solutions. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Press Back Button'),
+        inputSchema: const ToolInputSchema(properties: {}),
+        callback: (args, extra) async {
+          _logger.info('Pressing back button');
+
+          try {
+            final response = await connector.pressBackButton();
+            final message = response['message'] as String?;
+            final didPop = response['didPop'];
+
+            return CallToolResult(
+              content: [
+                TextContent(
+                  text:
+                      message ??
+                      (didPop == true
+                          ? 'Back button pressed, route was popped'
+                          : 'Back button pressed, no route to pop'),
+                ),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to press back button', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Scroll to element
       ..registerTool(
         'scroll_to',
