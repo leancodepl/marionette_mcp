@@ -29,6 +29,7 @@ void main() {
         'get-interactive-elements',
         'tap',
         'enter-text',
+        'press-back-button',
         'scroll-to',
         'take-screenshots',
         'get-logs',
