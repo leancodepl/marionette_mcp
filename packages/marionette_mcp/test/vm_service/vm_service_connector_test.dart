@@ -75,4 +75,33 @@ void main() {
       },
     );
   });
+
+  group('VmServiceConnector.pinchZoom', () {
+    late VmServiceConnector connector;
+
+    setUp(() {
+      connector = VmServiceConnector();
+    });
+
+    test('throws NotConnectedException when not connected', () async {
+      await expectLater(
+        connector.pinchZoom({'key': 'map'}, scale: 2.0),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test(
+      'throws NotConnectedException with coordinates and custom distance',
+      () async {
+        await expectLater(
+          connector.pinchZoom(
+            {'x': 100, 'y': 200},
+            scale: 0.5,
+            startDistance: 300,
+          ),
+          throwsA(isA<NotConnectedException>()),
+        );
+      },
+    );
+  });
 }

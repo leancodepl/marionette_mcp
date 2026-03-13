@@ -267,6 +267,98 @@ final class VmServiceContext {
           }
         },
       )
+      // Pinch zoom gesture
+      ..registerTool(
+        'pinch_zoom',
+        description:
+            'Simulates a pinch zoom gesture on an element in the Flutter app. '
+            'Use scale > 1.0 to zoom in (fingers move apart) and scale < 1.0 '
+            'to zoom out (fingers move together). You can target the element by '
+            'key, text, type, or coordinates. Useful for maps, images, PDFs, '
+            'and other zoomable content. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Pinch Zoom'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description: 'The key of the element to pinch zoom on.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to pinch zoom on.',
+            ),
+            'type': JsonSchema.string(
+              description:
+                  'The widget type name of the element to pinch zoom on.',
+            ),
+            'coordinates': JsonSchema.object(
+              description: 'Screen coordinates to pinch zoom at.',
+              properties: {
+                'x': JsonSchema.number(description: 'The x coordinate.'),
+                'y': JsonSchema.number(description: 'The y coordinate.'),
+              },
+              required: ['x', 'y'],
+            ),
+            'scale': JsonSchema.number(
+              description:
+                  'Zoom scale factor. Values > 1.0 zoom in, values < 1.0 '
+                  'zoom out. For example, 2.0 doubles the zoom level.',
+            ),
+            'start_distance': JsonSchema.number(
+              description:
+                  'Initial distance between the two fingers in pixels '
+                  '(default: 200).',
+            ),
+          },
+          required: ['scale'],
+        ),
+        callback: (args, extra) async {
+          final matcher = buildMatcher(args);
+          final scale = (args['scale'] as num).toDouble();
+          if (scale <= 0) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(text: 'scale must be a positive number.'),
+              ],
+            );
+          }
+          final startDistance = (args['start_distance'] as num?)?.toDouble();
+          if (startDistance != null && startDistance <= 0) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(
+                  text: 'start_distance must be a positive number.',
+                ),
+              ],
+            );
+          }
+
+          _logger.info('Pinch zooming with matcher: $matcher, scale: $scale');
+
+          try {
+            final response = await connector.pinchZoom(
+              matcher,
+              scale: scale,
+              startDistance: startDistance,
+            );
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(text: message ?? 'Successfully pinch zoomed'),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to pinch zoom', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Scroll to element
       ..registerTool(
         'scroll_to',

@@ -10,6 +10,7 @@ class GestureDispatcher {
   static const kDelay = Duration(milliseconds: 10);
 
   static const _kDeviceId = 1;
+  static const _kSecondDeviceId = 2;
 
   int _nextPointerId = 1;
 
@@ -73,6 +74,145 @@ class GestureDispatcher {
         PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
       ],
     ];
+
+    await _handlePointerEventRecord(records);
+  }
+
+  /// Simulates a pinch zoom gesture centered on an element matching [matcher].
+  ///
+  /// [scale] controls the zoom:
+  /// - scale > 1.0: zoom in (fingers move apart)
+  /// - scale < 1.0: zoom out (fingers move together)
+  ///
+  /// [startDistance] is the initial distance between the two fingers in pixels.
+  Future<void> pinchZoom(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    required double scale,
+    double startDistance = 200.0,
+  }) async {
+    if (scale <= 0) {
+      throw ArgumentError('scale must be positive');
+    }
+    if (startDistance <= 0) {
+      throw ArgumentError('startDistance must be positive');
+    }
+
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchPinchZoomAtPosition(
+        matcher.offset,
+        scale: scale,
+        startDistance: startDistance,
+      );
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    }
+
+    final renderObject = element.renderObject;
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final globalCenter = renderObject.localToGlobal(center);
+
+    await _dispatchPinchZoomAtPosition(
+      globalCenter,
+      scale: scale,
+      startDistance: startDistance,
+    );
+  }
+
+  Future<void> _dispatchPinchZoomAtPosition(
+    Offset center, {
+    required double scale,
+    required double startDistance,
+  }) async {
+    final pointer1Id = _nextPointerId++;
+    final pointer2Id = _nextPointerId++;
+    final endDistance = startDistance * scale;
+
+    const stepCount = 10;
+
+    // Finger positions: horizontally offset from center
+    Offset finger1(double distance) => center - Offset(distance / 2, 0);
+    Offset finger2(double distance) => center + Offset(distance / 2, 0);
+
+    final start1 = finger1(startDistance);
+    final start2 = finger2(startDistance);
+
+    // Phase 1: Both fingers down
+    final records = <List<PointerEvent>>[
+      [
+        PointerAddedEvent(position: start1, device: _kDeviceId),
+        PointerDownEvent(
+          pointer: pointer1Id,
+          position: start1,
+          device: _kDeviceId,
+        ),
+      ],
+      [
+        PointerAddedEvent(position: start2, device: _kSecondDeviceId),
+        PointerDownEvent(
+          pointer: pointer2Id,
+          position: start2,
+          device: _kSecondDeviceId,
+        ),
+      ],
+    ];
+
+    // Phase 2: Move fingers apart (zoom in) or together (zoom out)
+    for (var i = 1; i <= stepCount; i++) {
+      final t = i / stepCount;
+      final currentDistance = startDistance + (endDistance - startDistance) * t;
+      final pos1 = finger1(currentDistance);
+      final pos2 = finger2(currentDistance);
+
+      records.add([
+        PointerMoveEvent(
+          pointer: pointer1Id,
+          position: pos1,
+          device: _kDeviceId,
+        ),
+        PointerMoveEvent(
+          pointer: pointer2Id,
+          position: pos2,
+          device: _kSecondDeviceId,
+        ),
+      ]);
+    }
+
+    // Phase 3: Both fingers up
+    final end1 = finger1(endDistance);
+    final end2 = finger2(endDistance);
+
+    records.addAll([
+      [
+        PointerUpEvent(
+          pointer: pointer1Id,
+          position: end1,
+          device: _kDeviceId,
+        ),
+        PointerUpEvent(
+          pointer: pointer2Id,
+          position: end2,
+          device: _kSecondDeviceId,
+        ),
+      ],
+      [
+        PointerRemovedEvent(position: end1, device: _kDeviceId),
+        PointerRemovedEvent(position: end2, device: _kSecondDeviceId),
+      ],
+    ]);
 
     await _handlePointerEventRecord(records);
   }
