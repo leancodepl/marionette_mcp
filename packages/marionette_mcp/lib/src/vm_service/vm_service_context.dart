@@ -291,9 +291,11 @@ final class VmServiceContext {
             return CallToolResult(
               content: [
                 TextContent(
-                  text: message ?? (didPop == true
-                      ? 'Back button pressed, route was popped'
-                      : 'Back button pressed, no route to pop'),
+                  text:
+                      message ??
+                      (didPop == true
+                          ? 'Back button pressed, route was popped'
+                          : 'Back button pressed, no route to pop'),
                 ),
               ],
             );
