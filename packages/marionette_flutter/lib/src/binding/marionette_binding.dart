@@ -145,10 +145,20 @@ class MarionetteBinding extends WidgetsFlutterBinding {
             );
           }
 
-          final startX = double.parse(startXStr);
-          final startY = double.parse(startYStr);
-          final endX = double.parse(endXStr);
-          final endY = double.parse(endYStr);
+          final startX = double.tryParse(startXStr);
+          final startY = double.tryParse(startYStr);
+          final endX = double.tryParse(endXStr);
+          final endY = double.tryParse(endYStr);
+
+          if (startX == null ||
+              startY == null ||
+              endX == null ||
+              endY == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Invalid coordinate values. '
+              'startX, startY, endX, endY must be valid numbers.',
+            );
+          }
 
           await _gestureDispatcher.drag(
             Offset(startX, startY),
@@ -170,8 +180,20 @@ class MarionetteBinding extends WidgetsFlutterBinding {
           );
         }
 
-        final distance =
-            double.tryParse(params['distance'] ?? '') ?? 200.0;
+        final distanceStr = params['distance'];
+        final double distance;
+        if (distanceStr != null) {
+          final parsed = double.tryParse(distanceStr);
+          if (parsed == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Invalid distance value: "$distanceStr". '
+              'Must be a valid number.',
+            );
+          }
+          distance = parsed;
+        } else {
+          distance = 200.0;
+        }
 
         await _gestureDispatcher.swipe(
           matcher,
