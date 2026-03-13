@@ -1,8 +1,8 @@
 name: marionette_logger
 description: Log collector for Marionette that integrates with the logger package.
-version: 0.3.0
-repository: https://github.com/leancodepl/marionette-mcp
-issue_tracker: https://github.com/leancodepl/marionette-mcp/issues
+version: 0.4.0
+repository: https://github.com/leancodepl/marionette_mcp
+issue_tracker: https://github.com/leancodepl/marionette_mcp/issues
 resolution: workspace
 
 environment:
@@ -13,7 +13,7 @@ dependencies:
   flutter:
     sdk: flutter
   logger: ^2.0.0
-  marionette_flutter: ^0.3.0
+  marionette_flutter: ^0.4.0
 
 dev_dependencies:
   flutter_test:
