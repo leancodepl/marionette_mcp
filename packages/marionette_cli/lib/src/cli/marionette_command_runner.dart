@@ -11,6 +11,7 @@ import 'package:marionette_cli/src/cli/commands/hot_reload_command.dart';
 import 'package:marionette_cli/src/cli/commands/long_press_command.dart';
 import 'package:marionette_cli/src/cli/commands/list_command.dart';
 import 'package:marionette_cli/src/cli/commands/mcp_command.dart';
+import 'package:marionette_cli/src/cli/commands/press_back_button_command.dart';
 import 'package:marionette_cli/src/cli/commands/register_command.dart';
 import 'package:marionette_cli/src/cli/commands/scroll_to_command.dart';
 import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
@@ -49,6 +50,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(TapCommand(_registry));
     addCommand(LongPressCommand(_registry));
     addCommand(EnterTextCommand(_registry));
+    addCommand(PressBackButtonCommand(_registry));
     addCommand(ScrollToCommand(_registry));
     addCommand(ScreenshotCommand(_registry));
     addCommand(LogsCommand(_registry));

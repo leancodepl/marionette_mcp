@@ -30,6 +30,7 @@ void main() {
         'tap',
         'long-press',
         'enter-text',
+        'press-back-button',
         'scroll-to',
         'take-screenshots',
         'get-logs',
