@@ -44,7 +44,7 @@ class _DismissibleScreenState extends State<DismissibleScreen> {
                         key: ValueKey('dismissible_$item'),
                         direction: DismissDirection.endToStart,
                         onDismissed: (_) {
-                          setState(() => _items.removeAt(index));
+                          setState(() => _items.remove(item));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('$item dismissed')),
                           );
