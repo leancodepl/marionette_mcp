@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'screens/about_screen.dart';
+import 'screens/dismissible_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/items_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/page_view_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -16,6 +18,8 @@ const availablePages = <String, String>{
   'notifications': '/settings/notifications',
   'items': '/settings/items',
   'about': '/settings/about',
+  'page_view': '/settings/page-view',
+  'dismissible': '/settings/dismissible',
 };
 
 final router = GoRouter(
@@ -40,6 +44,14 @@ final router = GoRouter(
             GoRoute(
               path: 'notifications',
               builder: (context, state) => const NotificationsScreen(),
+            ),
+            GoRoute(
+              path: 'page-view',
+              builder: (context, state) => const PageViewScreen(),
+            ),
+            GoRoute(
+              path: 'dismissible',
+              builder: (context, state) => const DismissibleScreen(),
             ),
           ],
         ),
