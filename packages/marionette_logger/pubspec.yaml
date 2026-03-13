@@ -1,8 +1,14 @@
 name: marionette_logger
-description: Log collector for Marionette that integrates with the logger package.
+description: Flutter extensions for AI agent interaction via MCP — lets Claude, Copilot, and Cursor tap, scroll, type, and screenshot your app.
 version: 0.3.0
 repository: https://github.com/leancodepl/marionette-mcp
 issue_tracker: https://github.com/leancodepl/marionette-mcp/issues
+topics:
+  - mcp
+  - ai
+  - claude
+  - agent
+  - copilot
 resolution: workspace
 
 environment:

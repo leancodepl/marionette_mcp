@@ -1,8 +1,14 @@
 name: marionette_cli
-description: CLI for multi-instance Flutter app interaction via Marionette.
+description: CLI that lets AI agents (Claude, Copilot, Cursor) inspect and interact with running Flutter apps — tap, scroll, type, and screenshot.
 version: 0.3.0
 repository: https://github.com/leancodepl/marionette-mcp
 issue_tracker: https://github.com/leancodepl/marionette-mcp/issues
+topics:
+  - mcp
+  - ai
+  - claude
+  - agent
+  - copilot
 resolution: workspace
 
 executables:
