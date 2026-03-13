@@ -23,8 +23,7 @@ class PressBackButtonCommand extends InstanceCommand {
   Future<int> execute(VmServiceConnector connector) async {
     final response = await connector.pressBackButton();
 
-    final message =
-        response['message'] as String? ?? 'Back button pressed';
+    final message = response['message'] as String? ?? 'Back button pressed';
     stdout.writeln(message);
     return 0;
   }
