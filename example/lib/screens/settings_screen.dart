@@ -29,6 +29,22 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/notifications'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.swipe_outlined),
+            title: const Text('Page View'),
+            subtitle: const Text('Horizontal swipe between pages'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/page-view'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.delete_sweep_outlined),
+            title: const Text('Dismissible List'),
+            subtitle: const Text('Swipe to dismiss list items'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/dismissible'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),
