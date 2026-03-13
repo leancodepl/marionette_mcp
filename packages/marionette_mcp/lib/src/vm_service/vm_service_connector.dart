@@ -93,6 +93,9 @@ class VmServiceConnector {
       _isolateId = await _findIsolateWithMarionetteExtensions();
       _logger.info('Connected to isolate: $_isolateId');
     } catch (err) {
+      await _serviceEventSubscription?.cancel();
+      _serviceEventSubscription = null;
+      await _service?.dispose();
       _service = null;
       _isolateId = null;
       _logger.severe('Failed to connect to VM service', err);

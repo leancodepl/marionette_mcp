@@ -56,9 +56,12 @@ abstract class InstanceCommand extends Command<int> {
       displayName = instanceName;
     }
 
-    final timeoutSeconds = int.parse(
-      globalResults?['timeout'] as String? ?? '5',
-    );
+    final rawTimeout = globalResults?['timeout'] as String? ?? '5';
+    final timeoutSeconds = int.tryParse(rawTimeout);
+    if (timeoutSeconds == null) {
+      stderr.writeln('Invalid timeout value: "$rawTimeout"');
+      return 64;
+    }
     final connector = VmServiceConnector();
 
     try {

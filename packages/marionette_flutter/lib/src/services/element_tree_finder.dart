@@ -130,11 +130,14 @@ class ElementTreeFinder {
       }
 
       try {
+        final views = WidgetsBinding.instance.platformDispatcher.views;
+        if (views.isEmpty) {
+          return true;
+        }
+
         final offset = renderObject.localToGlobal(Offset.zero);
-        final screenSize = WidgetsBinding
-                .instance.platformDispatcher.views.first.physicalSize /
-            WidgetsBinding
-                .instance.platformDispatcher.views.first.devicePixelRatio;
+        final screenSize =
+            views.first.physicalSize / views.first.devicePixelRatio;
 
         final isOnScreen = offset.dx + size.width >= 0 &&
             offset.dy + size.height >= 0 &&
