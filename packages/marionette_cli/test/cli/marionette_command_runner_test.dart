@@ -28,6 +28,7 @@ void main() {
         'list',
         'get-interactive-elements',
         'tap',
+        'pinch-zoom',
         'enter-text',
         'scroll-to',
         'take-screenshots',

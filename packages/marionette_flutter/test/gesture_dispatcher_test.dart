@@ -195,4 +195,165 @@ void main() {
       },
     );
   });
+
+  group('GestureDispatcher - pinchZoom', () {
+    testWidgets(
+      'pinch zoom dispatches two pointer sequences with unique device IDs',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.pinchZoom(
+            const CoordinatesMatcher(200, 200),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            scale: 2.0,
+          ),
+        );
+        await tester.pump();
+
+        expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+        // Should have exactly 2 PointerDownEvent (two fingers)
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        expect(downEvents, hasLength(2), reason: 'Two fingers should touch');
+
+        // The two fingers should have different pointer IDs
+        expect(
+          downEvents[0].pointer,
+          isNot(equals(downEvents[1].pointer)),
+          reason: 'Each finger should have a unique pointer ID',
+        );
+
+        // Should have PointerMoveEvent for the zoom motion
+        final moveEvents = events.whereType<PointerMoveEvent>().toList();
+        expect(
+          moveEvents.length,
+          greaterThanOrEqualTo(2),
+          reason: 'Should have move events for both fingers',
+        );
+
+        // Should have exactly 2 PointerUpEvent
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+        expect(upEvents, hasLength(2), reason: 'Two fingers should lift');
+
+        // Should clean up with PointerRemovedEvent
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
+        expect(
+          removedEvents,
+          hasLength(2),
+          reason: 'Each device should send PointerRemovedEvent',
+        );
+      },
+    );
+
+    testWidgets(
+      'pinch zoom in moves fingers apart from center',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.pinchZoom(
+            const CoordinatesMatcher(200, 200),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            scale: 2.0,
+            startDistance: 100.0,
+          ),
+        );
+        await tester.pump();
+
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+
+        // Start distance between fingers = 100
+        final startDist =
+            (downEvents[1].position.dx - downEvents[0].position.dx).abs();
+        // End distance should be 200 (scale 2.0)
+        final endDist =
+            (upEvents[1].position.dx - upEvents[0].position.dx).abs();
+
+        expect(
+          startDist.round(),
+          equals(100),
+          reason: 'Initial finger distance should be 100px',
+        );
+        expect(
+          endDist.round(),
+          equals(200),
+          reason: 'Final finger distance should be 200px (2x zoom)',
+        );
+      },
+    );
+
+    testWidgets(
+      'pinch zoom out moves fingers closer together',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.pinchZoom(
+            const CoordinatesMatcher(200, 200),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            scale: 0.5,
+            startDistance: 200.0,
+          ),
+        );
+        await tester.pump();
+
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+
+        final startDist =
+            (downEvents[1].position.dx - downEvents[0].position.dx).abs();
+        final endDist =
+            (upEvents[1].position.dx - upEvents[0].position.dx).abs();
+
+        expect(
+          startDist.round(),
+          equals(200),
+          reason: 'Initial finger distance should be 200px',
+        );
+        expect(
+          endDist.round(),
+          equals(100),
+          reason: 'Final finger distance should be 100px (0.5x zoom)',
+        );
+      },
+    );
+  });
 }
