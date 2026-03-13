@@ -9,7 +9,7 @@
 
 **"Playwright MCP/Cursor Browser, but for Flutter apps"**
 
-Marionette MCP enables AI agents (like Cursor, Claude Code, etc.) to inspect and interact with running Flutter applications. It connects your agent directly to a running app, so it can see the widget tree, tap elements, enter text, scroll, and capture screenshots for automated smoke testing and interaction.
+Marionette MCP enables AI agents (Claude Code, Copilot, Cursor, Gemini CLI, and more) to inspect and interact with running Flutter applications. It connects your AI agent directly to a running app via the Model Context Protocol (MCP), so it can see the widget tree, tap elements, enter text, scroll, and capture screenshots for automated AI-driven smoke testing and interaction.
 
 Marionette MCP keeps the surface area intentionally small. It exposes only a handful of high-signal actions and returns the minimum actionable data, which helps keep prompts focused and context sizes under control.
 
@@ -25,9 +25,9 @@ The official [Dart & Flutter MCP server](https://docs.flutter.dev/ai/mcp-server)
 
 1. **Prepare your Flutter app** - Add the `marionette_flutter` package and initialize `MarionetteBinding` in your `main.dart`.
 2. **Install the MCP server** - Add `marionette_mcp` to your projects `dev_dependencies`.
-3. **Configure your AI tool** - Add the MCP server command (`dart run marionette_mcp`) to your tool's configuration (Cursor, Claude, etc.).
+3. **Configure your AI tool** - Add the MCP server command (`dart run marionette_mcp`) to your tool's configuration (Claude Code, Copilot, Cursor, Gemini CLI).
 4. **Run your app in debug mode** - Look for the VM service URI in the console (e.g., `ws://127.0.0.1:12345/ws`).
-5. **Connect and interact** - Ask the AI agent to connect to your app using the URI and start interacting.
+5. **Connect and interact** - Ask your AI agent (Claude, Copilot, or any MCP-compatible assistant) to connect to your app using the URI and start interacting.
 
 ## Installation
 
