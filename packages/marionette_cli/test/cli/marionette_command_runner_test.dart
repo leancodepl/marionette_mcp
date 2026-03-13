@@ -29,6 +29,7 @@ void main() {
         'get-interactive-elements',
         'tap',
         'enter-text',
+        'set-device-config',
         'scroll-to',
         'take-screenshots',
         'get-logs',

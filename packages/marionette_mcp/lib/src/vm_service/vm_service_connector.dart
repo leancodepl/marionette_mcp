@@ -279,6 +279,27 @@ class VmServiceConnector {
     return _callExtension('marionette.enterText', args);
   }
 
+  /// Sets device configuration overrides (textScaleFactor, boldText).
+  ///
+  /// Pass [reset] as `true` to clear all overrides.
+  /// Individual fields can be reset by passing `'reset'` as their value.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> setDeviceConfig({
+    double? textScaleFactor,
+    bool? boldText,
+    bool reset = false,
+  }) {
+    final args = <String, dynamic>{};
+    if (reset) {
+      args['reset'] = true;
+    } else {
+      if (textScaleFactor != null) args['textScaleFactor'] = textScaleFactor;
+      if (boldText != null) args['boldText'] = boldText;
+    }
+    return _callExtension('marionette.setDeviceConfig', args);
+  }
+
   /// Scrolls until an element matching the given criteria is visible.
   ///
   /// [matcher] should contain either 'key' or 'text' field.
