@@ -1,8 +1,8 @@
 name: marionette_flutter
 description: Flutter extensions enabling AI agents to inspect and interact with running Flutter apps via Marionette MCP.
 version: 0.4.0
-repository: https://github.com/leancodepl/marionette-mcp
-issue_tracker: https://github.com/leancodepl/marionette-mcp/issues
+repository: https://github.com/leancodepl/marionette_mcp
+issue_tracker: https://github.com/leancodepl/marionette_mcp/issues
 resolution: workspace
 
 environment:
