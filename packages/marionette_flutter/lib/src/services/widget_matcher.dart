@@ -59,10 +59,15 @@ class CoordinatesMatcher extends WidgetMatcher {
   const CoordinatesMatcher(this.x, this.y);
 
   factory CoordinatesMatcher.fromJson(Map<String, dynamic> json) {
-    return CoordinatesMatcher(
-      double.parse(json['x'] as String),
-      double.parse(json['y'] as String),
-    );
+    final x = double.tryParse(json['x'].toString());
+    final y = double.tryParse(json['y'].toString());
+    if (x == null || y == null) {
+      throw ArgumentError(
+        'Coordinates "x" and "y" must be valid numbers, '
+        'got x=${json['x']}, y=${json['y']}',
+      );
+    }
+    return CoordinatesMatcher(x, y);
   }
 
   final double x;
