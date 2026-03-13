@@ -311,6 +311,26 @@ class VmServiceConnector {
     return _callExtension('marionette.swipe', args);
   }
 
+  /// Simulates a pinch zoom gesture on an element matching the given criteria.
+  ///
+  /// [matcher] should contain a matching field (key, text, type, or x/y).
+  /// [scale] controls zoom: > 1.0 zooms in, < 1.0 zooms out.
+  /// [startDistance] is the initial finger distance in pixels.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> pinchZoom(
+    Map<String, dynamic> matcher, {
+    required double scale,
+    double? startDistance,
+  }) {
+    final args = Map<String, dynamic>.from(matcher);
+    args['scale'] = scale;
+    if (startDistance != null) {
+      args['startDistance'] = startDistance;
+    }
+    return _callExtension('marionette.pinchZoom', args);
+  }
+
   /// Scrolls until an element matching the given criteria is visible.
   ///
   /// [matcher] should contain either 'key' or 'text' field.
