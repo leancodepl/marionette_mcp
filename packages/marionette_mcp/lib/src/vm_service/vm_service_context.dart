@@ -267,6 +267,116 @@ final class VmServiceContext {
           }
         },
       )
+      // Swipe gesture
+      ..registerTool(
+        'swipe',
+        description:
+            'Simulates a swipe/drag gesture on the Flutter app. Supports two modes: '
+            '1. Element-based: provide key or text to identify the element, plus a direction (left, right, up, down) and optional distance in pixels (default 200). '
+            '2. Coordinate-based: provide startX, startY, endX, endY for precise control. '
+            'Useful for interacting with PageView, Dismissible, Drawer, Slider, and other swipe-based widgets. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Swipe'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description:
+                  'The key of the element to swipe on. Use with direction.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to swipe on. Use with direction.',
+            ),
+            'direction': JsonSchema.string(
+              description:
+                  'Swipe direction when using element-based mode: left, right, up, or down.',
+            ),
+            'distance': JsonSchema.number(
+              description:
+                  'Swipe distance in pixels for element-based mode (default: 200).',
+            ),
+            'startX': JsonSchema.number(
+              description:
+                  'Start X coordinate for coordinate-based swipe.',
+            ),
+            'startY': JsonSchema.number(
+              description:
+                  'Start Y coordinate for coordinate-based swipe.',
+            ),
+            'endX': JsonSchema.number(
+              description:
+                  'End X coordinate for coordinate-based swipe.',
+            ),
+            'endY': JsonSchema.number(
+              description:
+                  'End Y coordinate for coordinate-based swipe.',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          _logger.info('Swiping with args: $args');
+
+          try {
+            final swipeArgs = <String, dynamic>{};
+
+            if (args.containsKey('startX')) {
+              // Coordinate-based swipe — validate all 4 coordinates
+              if (!args.containsKey('startY') ||
+                  !args.containsKey('endX') ||
+                  !args.containsKey('endY')) {
+                return CallToolResult(
+                  isError: true,
+                  content: [
+                    const TextContent(
+                      text:
+                          'Coordinate-based swipe requires all of: '
+                          'startX, startY, endX, endY',
+                    ),
+                  ],
+                );
+              }
+              swipeArgs['startX'] = args['startX'].toString();
+              swipeArgs['startY'] = args['startY'].toString();
+              swipeArgs['endX'] = args['endX'].toString();
+              swipeArgs['endY'] = args['endY'].toString();
+            } else {
+              // Element + direction swipe — direction is required
+              if (!args.containsKey('direction')) {
+                return CallToolResult(
+                  isError: true,
+                  content: [
+                    const TextContent(
+                      text:
+                          'Element-based swipe requires a direction '
+                          '(left, right, up, or down).',
+                    ),
+                  ],
+                );
+              }
+              swipeArgs.addAll(buildMatcher(args));
+              swipeArgs['direction'] = args['direction'] as String;
+              if (args.containsKey('distance')) {
+                swipeArgs['distance'] = args['distance'].toString();
+              }
+            }
+
+            final response = await connector.swipe(swipeArgs);
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(text: message ?? 'Successfully swiped'),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to swipe', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Scroll to element
       ..registerTool(
         'scroll_to',

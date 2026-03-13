@@ -77,6 +77,48 @@ class GestureDispatcher {
     await _handlePointerEventRecord(records);
   }
 
+  /// Simulates a swipe gesture on an element matching [matcher] in the given
+  /// [direction] for [distance] pixels.
+  ///
+  /// The swipe starts from the center of the matched element and moves in the
+  /// specified direction.
+  Future<void> swipe(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    required String direction,
+    double distance = 200.0,
+  }) async {
+    final element = widgetFinder.findElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    }
+
+    final renderObject = element.renderObject;
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final start = renderObject.localToGlobal(center);
+
+    final end = switch (direction) {
+      'left' => start + Offset(-distance, 0),
+      'right' => start + Offset(distance, 0),
+      'up' => start + Offset(0, -distance),
+      'down' => start + Offset(0, distance),
+      _ => throw ArgumentError('Invalid direction: $direction. '
+          'Must be one of: left, right, up, down'),
+    };
+
+    await drag(start, end);
+  }
+
   /// Simulates a drag gesture from [from] to [to].
   Future<void> drag(Offset from, Offset to) async {
     final pointerId = _nextPointerId++;
