@@ -267,6 +267,97 @@ final class VmServiceContext {
           }
         },
       )
+      // Set device config overrides
+      ..registerTool(
+        'set_device_config',
+        description:
+            'Overrides device configuration for accessibility and responsive '
+            'testing. Supports textScaleFactor (controls text size, useful for '
+            'testing large-font accessibility) and boldText (simulates the '
+            'system bold-text accessibility setting). Set reset to true to '
+            'revert all overrides to platform defaults. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Set Device Config'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'text_scale_factor': JsonSchema.number(
+              description:
+                  'Text scale factor override. Must be > 0. '
+                  'For example, 1.0 is default, 1.5 is large text, '
+                  '2.0 is very large text.',
+            ),
+            'bold_text': JsonSchema.boolean(
+              description: 'Whether to enable bold text accessibility setting.',
+            ),
+            'reset': JsonSchema.boolean(
+              description:
+                  'Set to true to clear all overrides and revert to '
+                  'platform defaults.',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          final reset = args['reset'] == true;
+          final rawTextScale = args['text_scale_factor'] as num?;
+          final boldText = args['bold_text'] as bool?;
+
+          if (!reset && rawTextScale == null && boldText == null) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(
+                  text:
+                      'At least one parameter is required: '
+                      'text_scale_factor, bold_text, or reset.',
+                ),
+              ],
+            );
+          }
+
+          double? textScaleFactor;
+          if (rawTextScale != null) {
+            textScaleFactor = rawTextScale.toDouble();
+            if (textScaleFactor <= 0) {
+              return CallToolResult(
+                isError: true,
+                content: [
+                  const TextContent(
+                    text: 'text_scale_factor must be a positive number.',
+                  ),
+                ],
+              );
+            }
+          }
+
+          _logger.info(
+            'Setting device config: textScaleFactor=$textScaleFactor, '
+            'boldText=$boldText, reset=$reset',
+          );
+
+          try {
+            final response = await connector.setDeviceConfig(
+              textScaleFactor: textScaleFactor,
+              boldText: boldText,
+              reset: reset,
+            );
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(
+                  text: message ?? 'Device config updated successfully',
+                ),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to set device config', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Scroll to element
       ..registerTool(
         'scroll_to',

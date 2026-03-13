@@ -75,4 +75,33 @@ void main() {
       },
     );
   });
+
+  group('VmServiceConnector.setDeviceConfig', () {
+    late VmServiceConnector connector;
+
+    setUp(() {
+      connector = VmServiceConnector();
+    });
+
+    test('throws NotConnectedException when not connected', () async {
+      await expectLater(
+        connector.setDeviceConfig(textScaleFactor: 2.0),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with reset flag', () async {
+      await expectLater(
+        connector.setDeviceConfig(reset: true),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with boldText', () async {
+      await expectLater(
+        connector.setDeviceConfig(boldText: true),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+  });
 }

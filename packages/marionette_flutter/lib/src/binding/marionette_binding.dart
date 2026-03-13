@@ -4,6 +4,7 @@ import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
+import 'package:marionette_flutter/src/services/device_config_service.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/log_store.dart';
@@ -39,6 +40,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   final MarionetteConfiguration configuration;
 
   // Service instances
+  late final DeviceConfigService _deviceConfigService;
   late final ElementTreeFinder _elementTreeFinder;
   late final GestureDispatcher _gestureDispatcher;
   LogStore? _logStore;
@@ -53,6 +55,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     _instance = this;
 
     // Initialize services
+    _deviceConfigService = DeviceConfigService();
     _widgetFinder = WidgetFinder();
     _elementTreeFinder = ElementTreeFinder(configuration);
     _gestureDispatcher = GestureDispatcher();
@@ -195,6 +198,82 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
       },
     );
 
+    // Extension: Set device configuration overrides
+    registerInternalMarionetteExtension(
+      name: 'marionette.setDeviceConfig',
+      callback: (params) async {
+        final rawTextScale = params['textScaleFactor'];
+        final rawBoldText = params['boldText'];
+        final rawReset = params['reset'];
+
+        if (rawTextScale == null && rawBoldText == null && rawReset == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'At least one parameter is required: '
+            'textScaleFactor, boldText, or reset',
+          );
+        }
+
+        // Reset all overrides
+        if (rawReset == 'true' || rawReset == true) {
+          _deviceConfigService.setOverrides(
+            resetTextScaleFactor: true,
+            resetBoldText: true,
+          );
+          return MarionetteExtensionResult.success({
+            'message': 'Device config reset to platform defaults',
+            'overrides': _deviceConfigService.current.toJson(),
+          });
+        }
+
+        // Validate textScaleFactor
+        double? textScaleFactor;
+        bool resetTextScale = false;
+        if (rawTextScale != null) {
+          if (rawTextScale == 'reset') {
+            resetTextScale = true;
+          } else {
+            final parsed = double.tryParse(rawTextScale.toString());
+            if (parsed == null || parsed <= 0) {
+              return MarionetteExtensionResult.invalidParams(
+                'Parameter "textScaleFactor" must be a positive number, '
+                'got "$rawTextScale"',
+              );
+            }
+            textScaleFactor = parsed;
+          }
+        }
+
+        // Validate boldText
+        bool? boldText;
+        bool resetBold = false;
+        if (rawBoldText != null) {
+          if (rawBoldText == 'reset') {
+            resetBold = true;
+          } else if (rawBoldText == 'true' || rawBoldText == true) {
+            boldText = true;
+          } else if (rawBoldText == 'false' || rawBoldText == false) {
+            boldText = false;
+          } else {
+            return MarionetteExtensionResult.invalidParams(
+              'Parameter "boldText" must be a boolean, got "$rawBoldText"',
+            );
+          }
+        }
+
+        final result = _deviceConfigService.setOverrides(
+          textScaleFactor: textScaleFactor,
+          boldText: boldText,
+          resetTextScaleFactor: resetTextScale,
+          resetBoldText: resetBold,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Device config updated',
+          'overrides': result.toJson(),
+        });
+      },
+    );
+
     // Extension: List custom extensions
     registerInternalMarionetteExtension(
       name: 'marionette.listExtensions',
@@ -209,6 +288,16 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
           ],
         });
       },
+    );
+  }
+
+  @override
+  Widget wrapWithDefaultView(Widget rootWidget) {
+    return super.wrapWithDefaultView(
+      DeviceConfigWrapper(
+        overrides: _deviceConfigService.overrides,
+        child: rootWidget,
+      ),
     );
   }
 
