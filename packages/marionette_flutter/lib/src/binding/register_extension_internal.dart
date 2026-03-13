@@ -52,6 +52,7 @@ void registerInternalMarionetteExtension({
           developer.ServiceExtensionResponse.extensionError,
           json.encode(<String, String>{
             'exception': exception.toString(),
+            'stack': stack.toString(),
             'method': method,
           }),
         );
