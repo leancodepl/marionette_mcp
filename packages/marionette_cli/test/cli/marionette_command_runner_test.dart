@@ -32,6 +32,7 @@ void main() {
         'long-press',
         'pinch-zoom',
         'enter-text',
+        'press-back-button',
         'scroll-to',
         'take-screenshots',
         'record-video',
