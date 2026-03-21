@@ -223,23 +223,27 @@ By default, Marionette extracts text from standard Flutter widgets (`Text`, `Ric
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:my_app/design_system/text.dart';
+import 'package:my_app/design_system/input_decorator.dart';
+import 'package:my_app/design_system/text_field.dart';
 
 void main() {
   if (kDebugMode) {
     MarionetteBinding.ensureInitialized(
       MarionetteConfiguration(
+        // Identify your custom interactive widgets
         isInteractiveWidget: (type) =>
-            type == ShadButton || type == ShadInput,
+            type == MyPrimaryButton || type == MyTextField,
 
-        // Extract text from Shadcn widgets.
-        // ShadInput's label and placeholder are Widgets, not Strings,
-        // so we need Element access to walk the tree and find the
-        // rendered text.
+        // Extract text from your custom widgets.
+        // MyText.data is a String, so we can read it directly.
+        // MyTextField.label is a Widget, so we need Element access
+        // to walk the tree and find the rendered text.
         extractText: (element) {
           final widget = element.widget;
-          if (widget is ShadInput) {
-            return _extractShadInputText(element, widget);
+          if (widget is MyText) return widget.data;
+          if (widget is MyTextField) {
+            return _extractMyTextFieldText(element, widget);
           }
           return null;
         },
@@ -252,24 +256,19 @@ void main() {
   runApp(const MyApp());
 }
 
-/// Extracts label or placeholder text from a ShadInput by walking
-/// the element tree. Returns label if present, otherwise placeholder,
-/// otherwise the current input value.
-String? _extractShadInputText(Element element, ShadInput widget) {
-  // Try to find label text via a ShadInputDecorator descendant
-  final decorator = _findElementOfType<ShadInputDecorator>(element);
+/// Extracts label text from a MyTextField by walking the element tree.
+/// The label lives inside a MyInputDecorator child widget, so we first
+/// find the decorator by type, then extract the rendered text from its
+/// label widget.
+String? _extractMyTextFieldText(Element element, MyTextField widget) {
+  // Find the MyInputDecorator descendant that holds the label
+  final decorator = _findElementOfType<MyInputDecorator>(element);
   if (decorator != null) {
-    final decoratorWidget = decorator.widget as ShadInputDecorator;
+    final decoratorWidget = decorator.widget as MyInputDecorator;
     if (decoratorWidget.label != null) {
       final label = _findTextInWidgetSlot(decorator, decoratorWidget.label!);
       if (label != null) return label;
     }
-  }
-
-  // Fall back to placeholder
-  if (widget.placeholder != null) {
-    final placeholder = _findTextInWidgetSlot(element, widget.placeholder!);
-    if (placeholder != null) return placeholder;
   }
 
   // Fall back to current value
