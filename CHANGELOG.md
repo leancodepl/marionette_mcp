@@ -1,7 +1,7 @@
 # Unreleased
 
 - Add `text` parameter to `enter_text` tool for matching text fields by their visible text content
-- Pass `Element` instead of `Widget` to the `extractText` configuration callback, giving access to the full element context
+- **Breaking:** Pass `Element` instead of `Widget` to the `extractText` configuration callback, giving access to the full element context. Migration: change `(widget)` to `(element)` and use `element.widget` to access the widget.
 
 # 0.4.0
 
