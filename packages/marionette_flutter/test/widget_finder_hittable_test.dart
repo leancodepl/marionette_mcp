@@ -278,7 +278,7 @@ void main() {
             home: Scaffold(
               body: TextField(
                 key: const ValueKey('email_field'),
-                decoration: InputDecoration(label: Text('Email')),
+                decoration: InputDecoration(label: const Text('Email')),
               ),
             ),
           ),
