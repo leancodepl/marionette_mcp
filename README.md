@@ -256,7 +256,7 @@ void main() {
 /// the element tree. Returns label if present, otherwise placeholder,
 /// otherwise the current input value.
 String? _extractShadInputText(Element element, ShadInput widget) {
-  // Try to find label text from parent ShadInputDecorator
+  // Try to find label text via a ShadInputDecorator descendant
   final decorator = _findElementOfType<ShadInputDecorator>(element);
   if (decorator != null) {
     final decoratorWidget = decorator.widget as ShadInputDecorator;
