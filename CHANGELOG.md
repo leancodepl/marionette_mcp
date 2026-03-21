@@ -1,4 +1,4 @@
-# 0.5.0
+# Unreleased
 - **Breaking:** Pass `Element` instead of `Widget` to the `extractText` configuration callback, giving access to the full element context. Migration: change `(widget)` to `(element)` and use `element.widget` to access the widget.
 
 # 0.4.0
