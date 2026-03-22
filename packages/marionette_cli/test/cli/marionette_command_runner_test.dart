@@ -31,6 +31,7 @@ void main() {
         'enter-text',
         'scroll-to',
         'take-screenshots',
+        'record-video',
         'get-logs',
         'hot-reload',
         'doctor',

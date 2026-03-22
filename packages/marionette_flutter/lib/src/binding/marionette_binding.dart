@@ -4,9 +4,12 @@ import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
+import 'package:marionette_flutter/src/services/create_screencast_server.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/log_store.dart';
+import 'package:marionette_flutter/src/services/screencast_server.dart';
+import 'package:marionette_flutter/src/services/screencast_service.dart';
 import 'package:marionette_flutter/src/services/screenshot_service.dart';
 import 'package:marionette_flutter/src/services/scroll_simulator.dart';
 import 'package:marionette_flutter/src/services/text_input_simulator.dart';
@@ -45,6 +48,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   late final ScreenshotService _screenshotService;
   late final ScrollSimulator _scrollSimulator;
   late final TextInputSimulator _textInputSimulator;
+  late final ScreencastServer _screencastServer;
   late final WidgetFinder _widgetFinder;
 
   @override
@@ -58,6 +62,14 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     _gestureDispatcher = GestureDispatcher();
     _screenshotService = ScreenshotService(
       maxScreenshotSize: configuration.maxScreenshotSize,
+    );
+    _screencastServer = createScreencastServer(
+      screencastServiceFactory: ({Size? maxSize}) =>
+          ScreencastService(maxSize: maxSize),
+      viewportSizeProvider: () {
+        final renderView = renderViews.firstOrNull;
+        return renderView?.flutterView.physicalSize ?? Size.zero;
+      },
     );
     _scrollSimulator = ScrollSimulator(_gestureDispatcher, _widgetFinder);
     _textInputSimulator = TextInputSimulator(_widgetFinder);
@@ -195,6 +207,38 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
       },
     );
 
+    // Extension: Start screencast
+    registerInternalMarionetteExtension(
+      name: 'marionette.startScreencast',
+      callback: (params) async {
+        try {
+          final maxWidth = int.tryParse(params['maxWidth'] ?? '');
+          final maxHeight = int.tryParse(params['maxHeight'] ?? '');
+          final wsPort = int.tryParse(params['wsPort'] ?? '');
+
+          final result = await _screencastServer.startScreencast(
+            maxWidth: maxWidth,
+            maxHeight: maxHeight,
+            wsPort: wsPort,
+          );
+          return MarionetteExtensionResult.success(result);
+        } on StateError catch (e) {
+          return MarionetteExtensionResult.error(0, e.message);
+        }
+      },
+    );
+
+    // Extension: Stop screencast
+    registerInternalMarionetteExtension(
+      name: 'marionette.stopScreencast',
+      callback: (params) async {
+        await _screencastServer.stopScreencast();
+        return MarionetteExtensionResult.success({
+          'message': 'Screencast stopped',
+        });
+      },
+    );
+
     // Extension: List custom extensions
     registerInternalMarionetteExtension(
       name: 'marionette.listExtensions',
@@ -213,8 +257,9 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
   }
 
   @override
-  Future<void> reassembleApplication() {
+  Future<void> reassembleApplication() async {
     _logStore?.clear();
+    await _screencastServer.stopScreencast();
     return super.reassembleApplication();
   }
 }

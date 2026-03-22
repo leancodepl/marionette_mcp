@@ -302,6 +302,32 @@ class VmServiceConnector {
     return _callExtension('marionette.takeScreenshots', {});
   }
 
+  /// Starts the screencast on the connected Flutter app.
+  ///
+  /// Returns viewport dimensions that can be used to configure video encoding.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> startScreencast({
+    int? maxWidth,
+    int? maxHeight,
+    int? wsPort,
+  }) {
+    return _callExtension('marionette.startScreencast', {
+      if (maxWidth != null) 'maxWidth': maxWidth.toString(),
+      if (maxHeight != null) 'maxHeight': maxHeight.toString(),
+      if (wsPort != null) 'wsPort': wsPort.toString(),
+    });
+  }
+
+  /// Stops the screencast on the connected Flutter app.
+  ///
+  /// Idempotent — safe to call even if screencast is not running.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> stopScreencast() {
+    return _callExtension('marionette.stopScreencast', {});
+  }
+
   /// Performs a hot reload of the Flutter app.
   ///
   /// Returns information about the reload result.
