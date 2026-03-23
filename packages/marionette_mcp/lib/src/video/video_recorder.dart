@@ -64,6 +64,9 @@ class VideoRecorder {
   void _writeFrameInternal(Uint8List frameData, double timestamp) {
     final frameNumber = _timestampToFrameNumber(timestamp);
 
+    // Ignore non-monotonic timestamps to avoid corrupting internal state.
+    if (_lastFrameData != null && frameNumber < _lastFrameNumber) return;
+
     if (_lastFrameData != null) {
       final repeatCount = frameNumber - _lastFrameNumber;
       for (var i = 0; i < repeatCount; i++) {

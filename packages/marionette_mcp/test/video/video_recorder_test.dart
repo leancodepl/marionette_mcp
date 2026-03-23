@@ -198,6 +198,37 @@ void main() {
 
         expect(mockSink.writtenFrames, isEmpty);
       });
+
+      test(
+        'When backwards timestamp followed by forward timestamp, '
+        'Then forward timestamp produces correct repeat count',
+        () async {
+          final frame2 = Uint8List.fromList([4, 5, 6]);
+          final frame3 = Uint8List.fromList([7, 8, 9]);
+
+          // At 25fps: t=0.0 → frame 0, t=0.2 → frame 5
+          recorder.writeFrame(frame1, 0.0);
+          recorder.writeFrame(frame2, 0.2);
+          // 5 frames of frame1 written (gap 0→5)
+          expect(mockSink.writtenFrames, hasLength(5));
+
+          // Backward timestamp: t=0.1 → frame 2, which is < 5
+          final frame2b = Uint8List.fromList([10, 11, 12]);
+          recorder.writeFrame(frame2b, 0.1);
+          // Should not write anything (backwards)
+          expect(mockSink.writtenFrames, hasLength(5));
+
+          // Forward again: t=0.4 → frame 10
+          // Should write 5 frames of frame2 (gap 5→10), NOT a huge number
+          recorder.writeFrame(frame3, 0.4);
+          expect(mockSink.writtenFrames, hasLength(10));
+          // Frames 5-9 should be frame2 (the last valid frame before the
+          // backward one, since the backward frame should not corrupt state)
+          for (var i = 5; i < 10; i++) {
+            expect(mockSink.writtenFrames[i], equals(frame2));
+          }
+        },
+      );
     });
 
     group('Given createWhiteRgba', () {

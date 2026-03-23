@@ -38,8 +38,11 @@ typedef WsRecordingSessionFactory =
 /// Signature for binding a [WebSocketFrameServer] on an OS-assigned port.
 typedef WsFrameServerFactory = Future<WebSocketFrameServer> Function();
 
+/// The executable and any prefix arguments for a platform's file-open command.
+typedef OpenCommand = ({String executable, List<String> args});
+
 /// Signature for resolving the platform's file-open command.
-typedef OpenCommandResolver = String? Function();
+typedef OpenCommandResolver = OpenCommand? Function();
 
 /// Signature for creating an [AdbHelper] instance.
 typedef AdbHelperFactory = AdbHelper Function();
@@ -469,9 +472,9 @@ class RecordVideoCommand extends InstanceCommand {
       }
 
       if (shouldOpen) {
-        final opener = _openCommandResolver();
-        if (opener != null) {
-          await Process.run(opener, [outputPath]);
+        final command = _openCommandResolver();
+        if (command != null) {
+          await Process.run(command.executable, [...command.args, outputPath]);
         } else {
           stderr.writeln('Warning: --open is not supported on this platform.');
         }
@@ -645,10 +648,12 @@ class RecordVideoCommand extends InstanceCommand {
     );
   }
 
-  static String? _defaultOpenCommand() {
-    if (Platform.isLinux) return 'xdg-open';
-    if (Platform.isMacOS) return 'open';
-    if (Platform.isWindows) return 'start';
+  static OpenCommand? _defaultOpenCommand() {
+    if (Platform.isLinux) return (executable: 'xdg-open', args: <String>[]);
+    if (Platform.isMacOS) return (executable: 'open', args: <String>[]);
+    if (Platform.isWindows) {
+      return (executable: 'cmd', args: ['/c', 'start', '']);
+    }
     return null;
   }
 }
