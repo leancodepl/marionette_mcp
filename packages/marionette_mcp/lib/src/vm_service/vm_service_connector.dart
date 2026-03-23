@@ -266,6 +266,23 @@ class VmServiceConnector {
     return _callExtension('marionette.tap', matcher);
   }
 
+  /// Drags from one screen position to another.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> drag(
+    double fromX,
+    double fromY,
+    double toX,
+    double toY,
+  ) {
+    return _callExtension('marionette.drag', {
+      'fromX': fromX.toString(),
+      'fromY': fromY.toString(),
+      'toX': toX.toString(),
+      'toY': toY.toString(),
+    });
+  }
+
   /// Enters text into a text field matching the given criteria.
   ///
   /// [matcher] should contain either 'key' or 'text' field.

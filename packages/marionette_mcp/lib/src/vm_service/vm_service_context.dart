@@ -206,6 +206,61 @@ final class VmServiceContext {
           }
         },
       )
+      // Drag interaction
+      ..registerTool(
+        'drag',
+        description:
+            'Simulates a drag gesture from one screen position to another. '
+            'Provide the start and end coordinates. Use get_interactive_elements '
+            'to find element positions, then drag from the center of the source '
+            'element to the center of the target. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Drag'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'from': JsonSchema.object(
+              description: 'Starting screen coordinates of the drag.',
+              properties: {
+                'x': JsonSchema.number(description: 'x coordinate'),
+                'y': JsonSchema.number(description: 'y coordinate'),
+              },
+              required: ['x', 'y'],
+            ),
+            'to': JsonSchema.object(
+              description: 'Ending screen coordinates of the drag.',
+              properties: {
+                'x': JsonSchema.number(description: 'x coordinate'),
+                'y': JsonSchema.number(description: 'y coordinate'),
+              },
+              required: ['x', 'y'],
+            ),
+          },
+          required: ['from', 'to'],
+        ),
+        callback: (args, extra) async {
+          final from = args['from'] as Map<String, dynamic>;
+          final to = args['to'] as Map<String, dynamic>;
+
+          try {
+            final response = await connector.drag(
+              (from['x'] as num).toDouble(),
+              (from['y'] as num).toDouble(),
+              (to['x'] as num).toDouble(),
+              (to['y'] as num).toDouble(),
+            );
+            final message = response['message'] as String?;
+            return CallToolResult(
+              content: [TextContent(text: message ?? 'Drag completed')],
+            );
+          } catch (err) {
+            _logger.warning('Failed to drag', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Text input
       ..registerTool(
         'enter_text',

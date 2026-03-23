@@ -103,6 +103,32 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Drag from one position to another
+    registerInternalMarionetteExtension(
+      name: 'marionette.drag',
+      callback: (params) async {
+        final fromX = double.tryParse(params['fromX'] ?? '');
+        final fromY = double.tryParse(params['fromY'] ?? '');
+        final toX = double.tryParse(params['toX'] ?? '');
+        final toY = double.tryParse(params['toY'] ?? '');
+
+        if (fromX == null || fromY == null || toX == null || toY == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Required: fromX, fromY, toX, toY (doubles)',
+          );
+        }
+
+        await _gestureDispatcher.drag(
+          Offset(fromX, fromY),
+          Offset(toX, toY),
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Dragged from ($fromX, $fromY) to ($toX, $toY)',
+        });
+      },
+    );
+
     // Extension: Enter text into a text field
     registerInternalMarionetteExtension(
       name: 'marionette.enterText',
