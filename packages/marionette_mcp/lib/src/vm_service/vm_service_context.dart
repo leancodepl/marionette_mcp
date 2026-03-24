@@ -6,6 +6,18 @@ import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
+/// Simple offset class for position calculations
+class Offset {
+  final double dx;
+  final double dy;
+
+  const Offset(this.dx, this.dy);
+
+  static Offset lerp(Offset a, Offset b, double t) {
+    return Offset(a.dx + (b.dx - a.dx) * t, a.dy + (b.dy - a.dy) * t);
+  }
+}
+
 /// Context for managing VM service connection and registering MCP tools.
 final class VmServiceContext {
   VmServiceContext()
@@ -154,7 +166,7 @@ final class VmServiceContext {
       ..registerTool(
         'tap',
         description:
-            'Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>), by their text content (but not accessibility!), by their widget type, or by screen coordinates. Only one matching method should be used: either key, text, type, or coordinates. Prefer using the key if available, as it is more reliable. Limit yourself to elements from get_interactive_elements only if you can. Tapping a text field gives it focus, after which you can use enter_text with focused_element to type into it. Requires an active connection established via connect.',
+            'Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>), by their text content (but not accessibility!), by their widget type, or by screen coordinates. Only one matching method should be used: either key, text, type, or coordinates. Prefer using the key if available, as it is more reliable. Limit yourself to elements from get_interactive_elements only if you can. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(title: 'Tap Element'),
         inputSchema: ToolInputSchema(
           properties: {
@@ -187,7 +199,7 @@ final class VmServiceContext {
           },
         ),
         callback: (args, extra) async {
-          final matcher = buildMatcher(args);
+          final matcher = _buildMatcher(args);
           _logger.info('Tapping with matcher: $matcher');
 
           try {
@@ -206,11 +218,196 @@ final class VmServiceContext {
           }
         },
       )
-      // Text input
+      // Drag interaction
+      ..registerTool(
+        'drag',
+        description:
+            'Simulates a drag gesture from one position to another on the Flutter app. This performs a hold-and-drag motion from the start coordinates to the end coordinates. Supports both absolute coordinates and element-based positioning for dynamic UI interactions. Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Drag Gesture'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            // Absolute coordinates
+            'fromX': JsonSchema.number(
+              description: 'The x coordinate of the starting position.',
+            ),
+            'fromY': JsonSchema.number(
+              description: 'The y coordinate of the starting position.',
+            ),
+            'toX': JsonSchema.number(
+              description: 'The x coordinate of the ending position.',
+            ),
+            'toY': JsonSchema.number(
+              description: 'The y coordinate of the ending position.',
+            ),
+            // Element-based start position
+            'fromElement': JsonSchema.object(
+              description: 'Start position based on UI element matching.',
+              properties: {
+                'key': JsonSchema.string(
+                  description: 'The key of the starting element.',
+                ),
+                'text': JsonSchema.string(
+                  description:
+                      'The visible text content of the starting element.',
+                ),
+                'type': JsonSchema.string(
+                  description: 'The widget type name of the starting element.',
+                ),
+              },
+            ),
+            // Element-based end position
+            'toElement': JsonSchema.object(
+              description: 'End position based on UI element matching.',
+              properties: {
+                'key': JsonSchema.string(
+                  description: 'The key of the ending element.',
+                ),
+                'text': JsonSchema.string(
+                  description:
+                      'The visible text content of the ending element.',
+                ),
+                'type': JsonSchema.string(
+                  description: 'The widget type name of the ending element.',
+                ),
+              },
+            ),
+            // Relative offsets
+            'offsetX': JsonSchema.number(
+              description: 'Relative horizontal offset from start position.',
+            ),
+            'offsetY': JsonSchema.number(
+              description: 'Relative vertical offset from start position.',
+            ),
+            // Common swipe directions
+            'direction': JsonSchema.string(
+              description: 'Common swipe direction (left, right, up, down).',
+              enumValues: ['left', 'right', 'up', 'down'],
+            ),
+            'distance': JsonSchema.number(
+              description: 'Distance for directional swipes (default: 200).',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          final direction = args['direction'] as String?;
+          final distance = (args['distance'] as num?)?.toDouble() ?? 200.0;
+          final offsetX = (args['offsetX'] as num?)?.toDouble();
+          final offsetY = (args['offsetY'] as num?)?.toDouble();
+
+          // Calculate start position
+          Offset startPosition;
+          if (args['fromElement'] != null) {
+            // Element-based start position
+            final matcher = _buildMatcher(
+              args['fromElement'] as Map<String, dynamic>,
+            );
+            _logger.info('Finding start element with matcher: $matcher');
+            final elementResponse = await connector.getInteractiveElements();
+            final elements = elementResponse['elements'] as List<dynamic>;
+
+            // Find matching element and get its center
+            final element = _findMatchingElement(elements, matcher);
+            if (element == null) {
+              return CallToolResult(
+                isError: true,
+                content: [TextContent(text: 'Start element not found')],
+              );
+            }
+            startPosition = _getElementCenter(element);
+          } else if (args.containsKey('fromX') && args.containsKey('fromY')) {
+            // Absolute coordinates
+            startPosition = Offset(
+              (args['fromX'] as num).toDouble(),
+              (args['fromY'] as num).toDouble(),
+            );
+          } else {
+            return CallToolResult(
+              isError: true,
+              content: [
+                TextContent(
+                  text: 'Must specify either fromElement or fromX/fromY',
+                ),
+              ],
+            );
+          }
+
+          // Calculate end position
+          Offset endPosition;
+          if (direction != null) {
+            // Directional swipe
+            endPosition = _calculateDirectionalPosition(
+              startPosition,
+              direction,
+              distance,
+            );
+          } else if (offsetX != null || offsetY != null) {
+            // Relative offset
+            endPosition = Offset(
+              startPosition.dx + (offsetX ?? 0),
+              startPosition.dy + (offsetY ?? 0),
+            );
+          } else if (args['toElement'] != null) {
+            // Element-based end position
+            final matcher = _buildMatcher(
+              args['toElement'] as Map<String, dynamic>,
+            );
+            _logger.info('Finding end element with matcher: $matcher');
+            final elementResponse = await connector.getInteractiveElements();
+            final elements = elementResponse['elements'] as List<dynamic>;
+
+            final element = _findMatchingElement(elements, matcher);
+            if (element == null) {
+              return CallToolResult(
+                isError: true,
+                content: [TextContent(text: 'End element not found')],
+              );
+            }
+            endPosition = _getElementCenter(element);
+          } else if (args.containsKey('toX') && args.containsKey('toY')) {
+            // Absolute coordinates
+            endPosition = Offset(
+              (args['toX'] as num).toDouble(),
+              (args['toY'] as num).toDouble(),
+            );
+          } else {
+            return CallToolResult(
+              isError: true,
+              content: [
+                TextContent(
+                  text:
+                      'Must specify direction, offsets, toElement, or toX/toY',
+                ),
+              ],
+            );
+          }
+
+          _logger.info('Dragging from ($startPosition) to ($endPosition)');
+
+          try {
+            final response = await connector.drag(
+              startPosition.dx,
+              startPosition.dy,
+              endPosition.dx,
+              endPosition.dy,
+            );
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [TextContent(text: message ?? 'Successfully dragged')],
+            );
+          } catch (err) {
+            _logger.warning('Failed to drag', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       ..registerTool(
         'enter_text',
         description:
-            'Enters text into a text field in the Flutter app. You can target the field in two ways: 1. By key: provide the key parameter with the ValueKey<String> of the field. You can discover available keys by calling get_interactive_elements. 2. By focused element: first tap a text field to give it focus, then call enter_text with focused_element set to true. This is useful when the field does not have a ValueKey assigned. Important: a text field must be focused before calling this (for example by using the tap tool), otherwise it will fail with an error. Exactly one of key or focused_element must be provided. Requires an active connection established via connect.',
+            'Enters text into a text field in the Flutter app that matches the given criteria. This simulates typing text into the field. Requires an active connection established via connect.',
         annotations: const ToolAnnotations(title: 'Enter Text'),
         inputSchema: ToolInputSchema(
           properties: {
@@ -221,32 +418,12 @@ final class VmServiceContext {
               description:
                   'The key of the text field. You can get the key of an element by calling get_interactive_elements.',
             ),
-            'focused_element': JsonSchema.boolean(
-              description:
-                  'If true, enters text into the currently focused text field. '
-                  'A text field must be focused first (for example by using tap), otherwise this will fail.',
-            ),
           },
-          required: ['input'],
+          required: ['input', 'key'],
         ),
         callback: (args, extra) async {
           final input = args['input'] as String;
-          final hasKey = args['key'] != null;
-          final hasFocusedElement = args['focused_element'] == true;
-
-          if (hasKey == hasFocusedElement) {
-            return CallToolResult(
-              isError: true,
-              content: [
-                const TextContent(
-                  text:
-                      'enter_text requires exactly one selector: provide either key or focused_element=true.',
-                ),
-              ],
-            );
-          }
-
-          final matcher = buildMatcher(args);
+          final matcher = _buildMatcher(args);
           _logger.info('Entering text into element with matcher: $matcher');
 
           try {
@@ -286,7 +463,7 @@ final class VmServiceContext {
           },
         ),
         callback: (args, extra) async {
-          final matcher = buildMatcher(args);
+          final matcher = _buildMatcher(args);
           _logger.info('Scrolling to element with matcher: $matcher');
 
           try {
@@ -557,5 +734,119 @@ final class VmServiceContext {
           }
         },
       );
+  }
+
+  /// Builds a widget matcher map from tool arguments.
+  Map<String, dynamic> _buildMatcher(Map<String, dynamic> args) {
+    final matcher = <String, dynamic>{};
+    // Flatten coordinates for VM service (which only supports string->string)
+    if (args['coordinates'] case final Map<String, dynamic> coordinates) {
+      matcher['x'] = coordinates['x'];
+      matcher['y'] = coordinates['y'];
+    }
+    if (args.containsKey('key')) {
+      matcher['key'] = args['key'];
+    }
+    if (args.containsKey('text')) {
+      matcher['text'] = args['text'];
+    }
+    if (args.containsKey('type')) {
+      matcher['type'] = args['type'];
+    }
+    return matcher;
+  }
+
+  /// Finds a matching element from the interactive elements list.
+  Map<String, dynamic>? _findMatchingElement(
+    List<dynamic> elements,
+    Map<String, dynamic> matcher,
+  ) {
+    for (final element in elements) {
+      final el = element as Map<String, dynamic>;
+      bool matches = true;
+
+      // Check each matcher criterion
+      for (final entry in matcher.entries) {
+        final key = entry.key;
+        final expectedValue = entry.value;
+
+        if (key == 'x' || key == 'y') {
+          // For coordinates, check bounds
+          final bounds = el['bounds'] as Map<String, dynamic>?;
+          if (bounds == null) {
+            matches = false;
+            break;
+          }
+
+          final x = bounds['x'] as num?;
+          final y = bounds['y'] as num?;
+          final width = bounds['width'] as num?;
+          final height = bounds['height'] as num?;
+
+          if (x == null || y == null || width == null || height == null) {
+            matches = false;
+            break;
+          }
+
+          if (key == 'x') {
+            if (expectedValue < x || expectedValue > (x + width)) {
+              matches = false;
+              break;
+            }
+          } else if (key == 'y') {
+            if (expectedValue < y || expectedValue > (y + height)) {
+              matches = false;
+              break;
+            }
+          }
+        } else {
+          // For other properties, direct comparison
+          final actualValue = el[key];
+          if (actualValue != expectedValue) {
+            matches = false;
+            break;
+          }
+        }
+      }
+
+      if (matches) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  /// Gets the center position of an element.
+  Offset _getElementCenter(Map<String, dynamic> element) {
+    final bounds = element['bounds'] as Map<String, dynamic>;
+    final x = bounds['x'] as num;
+    final y = bounds['y'] as num;
+    final width = bounds['width'] as num;
+    final height = bounds['height'] as num;
+
+    return Offset(
+      x.toDouble() + (width.toDouble() / 2),
+      y.toDouble() + (height.toDouble() / 2),
+    );
+  }
+
+  /// Calculates end position for directional swipes.
+  Offset _calculateDirectionalPosition(
+    Offset start,
+    String direction,
+    double distance,
+  ) {
+    switch (direction) {
+      case 'left':
+        return Offset(start.dx - distance, start.dy);
+      case 'right':
+        return Offset(start.dx + distance, start.dy);
+      case 'up':
+        return Offset(start.dx, start.dy - distance);
+      case 'down':
+        return Offset(start.dx, start.dy + distance);
+      default:
+        return start;
+    }
   }
 }

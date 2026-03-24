@@ -1,36 +1,5 @@
 import 'dart:convert';
 
-/// Builds a widget matcher map from tool/CLI arguments.
-///
-/// Supports matching by key, text, type, and coordinates.
-Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
-  final matcher = <String, dynamic>{};
-  if (args['focused_element'] == true) {
-    matcher['focused'] = true;
-  }
-  // Flatten coordinates for VM service (which only supports string->string)
-  if (args['coordinates'] case final Map<String, dynamic> coordinates) {
-    matcher['x'] = coordinates['x'];
-    matcher['y'] = coordinates['y'];
-  }
-  if (args.containsKey('key')) {
-    matcher['key'] = args['key'];
-  }
-  if (args.containsKey('text')) {
-    matcher['text'] = args['text'];
-  }
-  if (args.containsKey('type')) {
-    matcher['type'] = args['type'];
-  }
-  if (args.containsKey('x')) {
-    matcher['x'] = args['x'];
-  }
-  if (args.containsKey('y')) {
-    matcher['y'] = args['y'];
-  }
-  return matcher;
-}
-
 /// Formats an element map for human-readable display.
 String formatElement(Map<String, dynamic> element) {
   final buffer = StringBuffer();
@@ -54,7 +23,7 @@ String formatElement(Map<String, dynamic> element) {
   final additionalProps = <String>[];
   element.forEach((key, value) {
     if (key != 'type' && key != 'key' && key != 'text' && value != null) {
-      additionalProps.add('$key: ${formatValue(value)}');
+      additionalProps.add('$key: ${_formatValue(value)}');
     }
   });
 
@@ -65,8 +34,8 @@ String formatElement(Map<String, dynamic> element) {
   return buffer.toString();
 }
 
-/// Formats a value for human-readable display.
-String formatValue(dynamic value) {
+/// Formats a value for display.
+String _formatValue(dynamic value) {
   if (value is String) {
     return '"$value"';
   }

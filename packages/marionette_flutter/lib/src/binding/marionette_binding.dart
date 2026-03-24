@@ -77,7 +77,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     registerInternalMarionetteExtension(
       name: 'marionette.getVersion',
       callback: (params) async {
-        return MarionetteExtensionResult.success({'version': v.version});
+        return const MarionetteExtensionResult.success({'version': v.version});
       },
     );
 
@@ -103,6 +103,32 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Drag from one position to another
+    registerInternalMarionetteExtension(
+      name: 'marionette.drag',
+      callback: (params) async {
+        final fromX = double.tryParse(params['fromX'] ?? '0');
+        final fromY = double.tryParse(params['fromY'] ?? '0');
+        final toX = double.tryParse(params['toX'] ?? '0');
+        final toY = double.tryParse(params['toY'] ?? '0');
+
+        if (fromX == null || fromY == null || toX == null || toY == null) {
+          return const MarionetteExtensionResult.invalidParams(
+            'Missing required parameters: fromX, fromY, toX, toY',
+          );
+        }
+
+        final from = Offset(fromX, fromY);
+        final to = Offset(toX, toY);
+
+        await _gestureDispatcher.drag(from, to);
+
+        return MarionetteExtensionResult.success({
+          'message': 'Dragged from ($fromX, $fromY) to ($toX, $toY)',
+        });
+      },
+    );
+
     // Extension: Enter text into a text field
     registerInternalMarionetteExtension(
       name: 'marionette.enterText',
@@ -111,7 +137,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
         final input = params['input'];
 
         if (input == null) {
-          return MarionetteExtensionResult.invalidParams(
+          return const MarionetteExtensionResult.invalidParams(
             'Missing required parameter: input',
           );
         }
@@ -143,9 +169,10 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       name: 'marionette.getLogs',
       callback: (params) async {
         if (_logStore == null) {
-          return MarionetteExtensionResult.error(
+          return const MarionetteExtensionResult.error(
             0,
-            '''Log collection is not configured.
+            '''
+Log collection is not configured.
 
 To enable log collection, provide a LogCollector via MarionetteConfiguration:
 
@@ -189,9 +216,7 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
       callback: (params) async {
         final screenshots = await _screenshotService.takeScreenshots();
 
-        return MarionetteExtensionResult.success({
-          'screenshots': screenshots,
-        });
+        return MarionetteExtensionResult.success({'screenshots': screenshots});
       },
     );
 

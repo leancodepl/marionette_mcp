@@ -57,22 +57,4 @@ void main() {
       );
     });
   });
-
-  group('VmServiceConnector.enterText', () {
-    late VmServiceConnector connector;
-
-    setUp(() {
-      connector = VmServiceConnector();
-    });
-
-    test(
-      'accepts focused matcher and falls through to connection validation',
-      () async {
-        await expectLater(
-          connector.enterText({'focused': true}, 'Hello'),
-          throwsA(isA<NotConnectedException>()),
-        );
-      },
-    );
-  });
 }

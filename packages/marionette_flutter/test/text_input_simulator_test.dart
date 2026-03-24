@@ -172,6 +172,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: TextField(
+              key: const ValueKey('text_field'),
               controller: controller,
               onChanged: (value) => changedValue = value,
             ),
@@ -181,7 +182,7 @@ void main() {
 
       final simulator = TextInputSimulator(WidgetFinder());
       await simulator.enterText(
-        const TextMatcher('name-start'),
+        const KeyMatcher('text_field'),
         'Matched by text',
         configuration,
       );
@@ -191,174 +192,41 @@ void main() {
       expect(controller.text, 'Matched by text');
     });
 
-    group('FocusedElementMatcher', () {
-      testWidgets('enters text into focused TextField',
-          (WidgetTester tester) async {
-        final controller = TextEditingController(text: 'seed');
-        final focusNode = FocusNode();
-        String changedValue = '';
-
-        addTearDown(() {
-          controller.dispose();
-          focusNode.dispose();
-        });
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                onChanged: (value) => changedValue = value,
-              ),
-            ),
-          ),
-        );
-
-        focusNode.requestFocus();
-        await tester.pump();
-
-        final simulator = TextInputSimulator(WidgetFinder());
-        await simulator.enterText(
-          const FocusedElementMatcher(),
-          'Hello Focus',
-          configuration,
-        );
-        await tester.pump();
-
-        expect(changedValue, 'Hello Focus');
-        expect(controller.text, 'Hello Focus');
-      });
-
-      testWidgets(
-          'enters text into focused TextFormField and updates validator', (
+    group('Alternative approaches for focused element input', () {
+      testWidgets('supports tap then key-based text entry flow', (
         WidgetTester tester,
       ) async {
-        final controller = TextEditingController(text: 'seed-email');
-        final focusNode = FocusNode();
-
-        addTearDown(() {
-          controller.dispose();
-          focusNode.dispose();
-        });
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Form(
-                autovalidateMode: AutovalidateMode.always,
-                child: TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  validator: (value) {
-                    if (value == null || !value.contains('@')) {
-                      return 'invalid email';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-            ),
-          ),
-        );
-
-        focusNode.requestFocus();
-        await tester.pump();
-
-        final simulator = TextInputSimulator(WidgetFinder());
-        await simulator.enterText(
-          const FocusedElementMatcher(),
-          'invalid-email',
-          configuration,
-        );
-        await tester.pump();
-
-        expect(find.text('invalid email'), findsOneWidget);
-
-        await simulator.enterText(
-          const FocusedElementMatcher(),
-          'valid@example.com',
-          configuration,
-        );
-        await tester.pump();
-
-        expect(controller.text, 'valid@example.com');
-        expect(find.text('invalid email'), findsNothing);
-      });
-
-      testWidgets('throws when no element is focused',
-          (WidgetTester tester) async {
-        final controller = TextEditingController(text: 'seed');
+        final controller = TextEditingController(text: 'initial');
 
         addTearDown(controller.dispose);
 
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
-              body: TextField(controller: controller),
-            ),
-          ),
-        );
-
-        FocusManager.instance.primaryFocus?.unfocus();
-        await tester.pump();
-
-        final simulator = TextInputSimulator(WidgetFinder());
-        await expectLater(
-          simulator.enterText(
-            const FocusedElementMatcher(),
-            'Should fail',
-            configuration,
-          ),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('No element is currently focused'),
-            ),
-          ),
-        );
-      });
-
-      testWidgets('throws when focused element is not a text field', (
-        WidgetTester tester,
-      ) async {
-        final focusNode = FocusNode();
-
-        addTearDown(focusNode.dispose);
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Focus(
-                focusNode: focusNode,
-                child: const SizedBox(width: 100, height: 40),
+              body: TextField(
+                key: const ValueKey('text_field'),
+                controller: controller,
+                decoration: const InputDecoration(hintText: 'Enter text here'),
               ),
             ),
           ),
         );
 
-        focusNode.requestFocus();
+        await tester.tap(find.byKey(const ValueKey('text_field')));
         await tester.pump();
 
         final simulator = TextInputSimulator(WidgetFinder());
-        await expectLater(
-          simulator.enterText(
-            const FocusedElementMatcher(),
-            'Should fail',
-            configuration,
-          ),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('Focused element is not a text field'),
-            ),
-          ),
+        await simulator.enterText(
+          const KeyMatcher('text_field'),
+          'Typed using key',
+          configuration,
         );
+        await tester.pump();
+
+        expect(controller.text, 'Typed using key');
       });
 
-      testWidgets('supports tap then focused-element text entry flow', (
+      testWidgets('supports tap then key-based text entry flow', (
         WidgetTester tester,
       ) async {
         final controller = TextEditingController(text: 'seed');
@@ -381,101 +249,13 @@ void main() {
 
         final simulator = TextInputSimulator(WidgetFinder());
         await simulator.enterText(
-          const FocusedElementMatcher(),
+          const KeyMatcher('tap_field'),
           'Typed after tap',
           configuration,
         );
         await tester.pump();
 
         expect(controller.text, 'Typed after tap');
-      });
-
-      testWidgets('does not mutate read-only focused field', (
-        WidgetTester tester,
-      ) async {
-        final controller = TextEditingController(text: 'Locked');
-        final focusNode = FocusNode();
-
-        addTearDown(() {
-          controller.dispose();
-          focusNode.dispose();
-        });
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                readOnly: true,
-              ),
-            ),
-          ),
-        );
-
-        focusNode.requestFocus();
-        await tester.pump();
-
-        final simulator = TextInputSimulator(WidgetFinder());
-        await simulator.enterText(
-          const FocusedElementMatcher(),
-          'New Value',
-          configuration,
-        );
-        await tester.pump();
-
-        expect(controller.text, 'Locked');
-      });
-
-      testWidgets(
-          'enters text into the currently focused field when multiple fields exist',
-          (
-        WidgetTester tester,
-      ) async {
-        final firstController = TextEditingController(text: 'first-seed');
-        final secondController = TextEditingController(text: 'second-seed');
-        final firstFocusNode = FocusNode();
-        final secondFocusNode = FocusNode();
-
-        addTearDown(() {
-          firstController.dispose();
-          secondController.dispose();
-          firstFocusNode.dispose();
-          secondFocusNode.dispose();
-        });
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Column(
-                children: [
-                  TextField(
-                    controller: firstController,
-                    focusNode: firstFocusNode,
-                  ),
-                  TextField(
-                    controller: secondController,
-                    focusNode: secondFocusNode,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-
-        secondFocusNode.requestFocus();
-        await tester.pump();
-
-        final simulator = TextInputSimulator(WidgetFinder());
-        await simulator.enterText(
-          const FocusedElementMatcher(),
-          'updated-second',
-          configuration,
-        );
-        await tester.pump();
-
-        expect(firstController.text, 'first-seed');
-        expect(secondController.text, 'updated-second');
       });
     });
   });

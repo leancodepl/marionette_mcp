@@ -15,42 +15,9 @@ class TextInputSimulator {
     String text,
     MarionetteConfiguration configuration,
   ) async {
-    final editableTextState = switch (matcher) {
-      FocusedElementMatcher() => _findEditableTextStateFromFocusedElement(),
-      _ => _findEditableTextStateFromMatcher(matcher, configuration),
-    };
+    final editableTextState = _findEditableTextStateFromMatcher(matcher, configuration);
 
     _applyText(editableTextState, text);
-  }
-
-  EditableTextState _findEditableTextStateFromFocusedElement() {
-    final focusNode = FocusManager.instance.primaryFocus;
-
-    if (focusNode == null ||
-        focusNode == FocusManager.instance.rootScope ||
-        focusNode is FocusScopeNode) {
-      throw Exception('No element is currently focused');
-    }
-
-    final context = focusNode.context;
-    if (context == null) {
-      throw Exception('No element is currently focused');
-    }
-
-    EditableTextState? editableTextState;
-    context.visitAncestorElements((element) {
-      if (element is StatefulElement && element.state is EditableTextState) {
-        editableTextState = element.state as EditableTextState;
-        return false;
-      }
-      return true;
-    });
-
-    if (editableTextState == null) {
-      throw Exception('Focused element is not a text field');
-    }
-
-    return editableTextState!;
   }
 
   EditableTextState _findEditableTextStateFromMatcher(

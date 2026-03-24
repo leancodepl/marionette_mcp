@@ -331,6 +331,26 @@ class VmServiceConnector {
     }
   }
 
+  /// Drags from one position to another.
+  ///
+  /// [fromX], [fromY] are the starting coordinates.
+  /// [toX], [toY] are the ending coordinates.
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> drag(
+    double fromX,
+    double fromY,
+    double toX,
+    double toY,
+  ) {
+    final args = {
+      'fromX': fromX.toString(),
+      'fromY': fromY.toString(),
+      'toX': toX.toString(),
+      'toY': toY.toString(),
+    };
+    return _callExtension('marionette.drag', args);
+  }
+
   /// Finds the first isolate that has the marionette extensions.
   ///
   /// Throws an exception if no suitable isolate is found.

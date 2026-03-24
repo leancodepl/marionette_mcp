@@ -14,7 +14,7 @@ void main() {
       timeout: _timeout,
       (WidgetTester tester) async {
         await tester.pumpWidget(
-          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+          const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
         );
 
         final events = <PointerEvent>[];
@@ -51,7 +51,7 @@ void main() {
       timeout: _timeout,
       (WidgetTester tester) async {
         await tester.pumpWidget(
-          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+          const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
         );
 
         final events = <PointerEvent>[];
@@ -95,7 +95,7 @@ void main() {
       timeout: _timeout,
       (WidgetTester tester) async {
         await tester.pumpWidget(
-          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+          const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
         );
 
         final events = <PointerEvent>[];
@@ -129,7 +129,7 @@ void main() {
       timeout: _timeout,
       (WidgetTester tester) async {
         await tester.pumpWidget(
-          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+          const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
         );
 
         final events = <PointerEvent>[];
@@ -161,7 +161,7 @@ void main() {
       timeout: _timeout,
       (WidgetTester tester) async {
         await tester.pumpWidget(
-          MaterialApp(
+          const MaterialApp(
             home: Scaffold(body: Center(child: Text('Hello'))),
           ),
         );
@@ -194,5 +194,181 @@ void main() {
         );
       },
     );
+  });
+
+  group('GestureDispatcher.drag - Enhanced functionality', () {
+    testWidgets('drag with small distance for controlled scrolling', timeout: _timeout,
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+      );
+
+      final events = <PointerEvent>[];
+      GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+      addTearDown(
+        () => GestureBinding.instance.pointerRouter
+            .removeGlobalRoute(events.add),
+      );
+
+      final dispatcher = GestureDispatcher();
+      await tester.runAsync(
+        () => dispatcher.drag(const Offset(100, 100), const Offset(100, 200)),
+      );
+      await tester.pump();
+
+      expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+      final moveEvents = events.whereType<PointerMoveEvent>().toList();
+      expect(moveEvents, isNotEmpty, reason: 'Should have move events');
+      
+      // Verify small distance drag (100px with step-based movement)
+      final firstMove = moveEvents.first;
+      final lastMove = moveEvents.last;
+      final totalDistance = (lastMove.position - firstMove.position).distance;
+      expect(totalDistance, closeTo(100.0, 50.0)); // Allow tolerance for step-based movement
+      
+      // Verify X coordinate stays constant (vertical drag)
+      expect(firstMove.position.dx, closeTo(100.0, 1.0));
+      expect(lastMove.position.dx, closeTo(100.0, 1.0));
+    });
+
+    testWidgets('drag with direction-based movement', timeout: _timeout,
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+      );
+
+      final events = <PointerEvent>[];
+      GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+      addTearDown(
+        () => GestureBinding.instance.pointerRouter
+            .removeGlobalRoute(events.add),
+      );
+
+      final dispatcher = GestureDispatcher();
+      
+      // Test upward drag
+      await tester.runAsync(
+        () => dispatcher.drag(const Offset(100, 300), const Offset(100, 200)),
+      );
+      await tester.pump();
+
+      expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+      final moveEvents = events.whereType<PointerMoveEvent>().toList();
+      expect(moveEvents, isNotEmpty, reason: 'Should have move events');
+      
+      // Verify upward movement (negative Y direction)
+      final firstMove = moveEvents.first;
+      final lastMove = moveEvents.last;
+      final deltaY = lastMove.position.dy - firstMove.position.dy;
+      expect(deltaY, closeTo(-100.0, 50.0)); // Allow tolerance for step-based movement
+    });
+
+    testWidgets('drag with incremental small steps', timeout: _timeout,
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+      );
+
+      final events = <PointerEvent>[];
+      GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+      addTearDown(
+        () => GestureBinding.instance.pointerRouter
+            .removeGlobalRoute(events.add),
+      );
+
+      final dispatcher = GestureDispatcher();
+      
+      // Test very small drag for incremental scrolling
+      await tester.runAsync(
+        () => dispatcher.drag(const Offset(100, 300), const Offset(100, 200)),
+      );
+      await tester.pump();
+
+      expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+      final moveEvents = events.whereType<PointerMoveEvent>().toList();
+      expect(moveEvents, isNotEmpty, reason: 'Should have move events');
+      
+      // Verify small incremental movement
+      final firstMove = moveEvents.first;
+      final lastMove = moveEvents.last;
+      final totalDistance = (lastMove.position - firstMove.position).distance;
+      expect(totalDistance, closeTo(100.0, 50.0)); // Allow tolerance for step-based movement
+      
+      // Verify X coordinate stays constant (vertical drag)
+      expect(firstMove.position.dx, closeTo(100.0, 1.0));
+      expect(lastMove.position.dx, closeTo(100.0, 1.0));
+    });
+
+    testWidgets('drag handles different distances correctly', timeout: _timeout,
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+      );
+
+      final events = <PointerEvent>[];
+      GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+      addTearDown(
+        () => GestureBinding.instance.pointerRouter
+            .removeGlobalRoute(events.add),
+      );
+
+      final dispatcher = GestureDispatcher();
+      
+      // Test longer drag
+      await tester.runAsync(
+        () => dispatcher.drag(const Offset(100, 100), const Offset(300, 400)),
+      );
+      await tester.pump();
+
+      expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+      final moveEvents = events.whereType<PointerMoveEvent>().toList();
+      expect(moveEvents, isNotEmpty, reason: 'Should have move events');
+      
+      // Verify longer distance is handled correctly
+      final firstMove = moveEvents.first;
+      final lastMove = moveEvents.last;
+      final totalDistance = (lastMove.position - firstMove.position).distance;
+      expect(totalDistance, closeTo(360.6, 50.0)); // sqrt(200^2 + 300^2) with tolerance
+      
+      // Verify proper step count for longer distances
+      expect(moveEvents.length, greaterThan(1), reason: 'Should have multiple steps for longer drag');
+    });
+
+    testWidgets('drag maintains proper timing between steps', timeout: _timeout,
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+      );
+
+      final events = <PointerEvent>[];
+      GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+      addTearDown(
+        () => GestureBinding.instance.pointerRouter
+            .removeGlobalRoute(events.add),
+      );
+
+      final dispatcher = GestureDispatcher();
+      
+      await tester.runAsync(
+        () => dispatcher.drag(const Offset(100, 100), const Offset(100, 300)),
+      );
+      await tester.pump();
+
+      expect(events, isNotEmpty, reason: 'Should have dispatched events');
+      
+      // Verify proper event sequence (Added, Down, Move events, Up)
+      expect(events.whereType<PointerAddedEvent>(), isNotEmpty);
+      expect(events.whereType<PointerDownEvent>(), isNotEmpty);
+      expect(events.whereType<PointerMoveEvent>(), isNotEmpty);
+      expect(events.whereType<PointerUpEvent>(), isNotEmpty);
+      
+      // Verify multiple move events for step-based movement
+      final moveEvents = events.whereType<PointerMoveEvent>().toList();
+      expect(moveEvents.length, greaterThan(1), reason: 'Should have multiple move events for drag');
+    });
   });
 }
