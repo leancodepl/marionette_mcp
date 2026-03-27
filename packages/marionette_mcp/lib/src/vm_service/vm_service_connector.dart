@@ -93,9 +93,8 @@ class VmServiceConnector {
       _isolateId = await _findIsolateWithMarionetteExtensions();
       _logger.info('Connected to isolate: $_isolateId');
     } catch (err) {
-      _service = null;
-      _isolateId = null;
       _logger.severe('Failed to connect to VM service', err);
+      await disconnect();
       rethrow;
     }
   }
@@ -298,6 +297,18 @@ class VmServiceConnector {
   ) {
     final args = Map<String, dynamic>.from(matcher)..['input'] = input;
     return _callExtension('marionette.enterText', args);
+  }
+
+  /// Simulates a swipe gesture.
+  ///
+  /// Supports two modes:
+  /// - Coordinate-based: [args] should contain 'startX', 'startY', 'endX', 'endY'
+  /// - Element-based: [args] should contain a matcher ('key' or 'text'),
+  ///   'direction' ('left', 'right', 'up', 'down'), and optional 'distance'
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> swipe(Map<String, dynamic> args) {
+    return _callExtension('marionette.swipe', args);
   }
 
   /// Scrolls until an element matching the given criteria is visible.

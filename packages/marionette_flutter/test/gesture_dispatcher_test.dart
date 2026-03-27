@@ -279,4 +279,276 @@ void main() {
       },
     );
   });
+
+  group('GestureDispatcher - swipe', () {
+    testWidgets(
+      'swipe left computes correct end offset',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  key: const ValueKey('target'),
+                  width: 200,
+                  height: 200,
+                  child: const Text('Swipe me'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.swipe(
+            const KeyMatcher('target'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            direction: 'left',
+            distance: 100.0,
+          ),
+        );
+        await tester.pump();
+
+        expect(events, isNotEmpty);
+        final downEvent = events.whereType<PointerDownEvent>().first;
+        final upEvent = events.whereType<PointerUpEvent>().first;
+
+        // Swipe left means end.dx < start.dx, dy stays the same
+        expect(upEvent.position.dx, lessThan(downEvent.position.dx));
+        expect(
+          (downEvent.position.dx - upEvent.position.dx).round(),
+          equals(100),
+        );
+        expect(upEvent.position.dy, closeTo(downEvent.position.dy, 0.1));
+      },
+    );
+
+    testWidgets(
+      'swipe right computes correct end offset',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  key: const ValueKey('target'),
+                  width: 200,
+                  height: 200,
+                  child: const Text('Swipe me'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.swipe(
+            const KeyMatcher('target'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            direction: 'right',
+            distance: 150.0,
+          ),
+        );
+        await tester.pump();
+
+        expect(events, isNotEmpty);
+        final downEvent = events.whereType<PointerDownEvent>().first;
+        final upEvent = events.whereType<PointerUpEvent>().first;
+
+        expect(upEvent.position.dx, greaterThan(downEvent.position.dx));
+        expect(
+          (upEvent.position.dx - downEvent.position.dx).round(),
+          equals(150),
+        );
+        expect(upEvent.position.dy, closeTo(downEvent.position.dy, 0.1));
+      },
+    );
+
+    testWidgets(
+      'swipe up computes correct end offset',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  key: const ValueKey('target'),
+                  width: 200,
+                  height: 200,
+                  child: const Text('Swipe me'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.swipe(
+            const KeyMatcher('target'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            direction: 'up',
+            distance: 100.0,
+          ),
+        );
+        await tester.pump();
+
+        expect(events, isNotEmpty);
+        final downEvent = events.whereType<PointerDownEvent>().first;
+        final upEvent = events.whereType<PointerUpEvent>().first;
+
+        expect(upEvent.position.dy, lessThan(downEvent.position.dy));
+        expect(
+          (downEvent.position.dy - upEvent.position.dy).round(),
+          equals(100),
+        );
+        expect(upEvent.position.dx, closeTo(downEvent.position.dx, 0.1));
+      },
+    );
+
+    testWidgets(
+      'swipe down computes correct end offset',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  key: const ValueKey('target'),
+                  width: 200,
+                  height: 200,
+                  child: const Text('Swipe me'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.swipe(
+            const KeyMatcher('target'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            direction: 'down',
+            distance: 100.0,
+          ),
+        );
+        await tester.pump();
+
+        expect(events, isNotEmpty);
+        final downEvent = events.whereType<PointerDownEvent>().first;
+        final upEvent = events.whereType<PointerUpEvent>().first;
+
+        expect(upEvent.position.dy, greaterThan(downEvent.position.dy));
+        expect(
+          (upEvent.position.dy - downEvent.position.dy).round(),
+          equals(100),
+        );
+        expect(upEvent.position.dx, closeTo(downEvent.position.dx, 0.1));
+      },
+    );
+
+    testWidgets(
+      'swipe with invalid direction throws ArgumentError',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  key: const ValueKey('target'),
+                  width: 200,
+                  height: 200,
+                  child: const Text('Swipe me'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        Object? caughtError;
+        await tester.runAsync(() async {
+          try {
+            await dispatcher.swipe(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              direction: 'diagonal',
+            );
+          } catch (e) {
+            caughtError = e;
+          }
+        });
+        expect(caughtError, isA<ArgumentError>());
+      },
+    );
+
+    testWidgets(
+      'swipe with non-existent element throws Exception',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(body: Center(child: Text('Hello'))),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        Object? caughtError;
+        await tester.runAsync(() async {
+          try {
+            await dispatcher.swipe(
+              const KeyMatcher('nonexistent'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              direction: 'left',
+            );
+          } catch (e) {
+            caughtError = e;
+          }
+        });
+        expect(caughtError, isA<Exception>());
+      },
+    );
+  });
 }

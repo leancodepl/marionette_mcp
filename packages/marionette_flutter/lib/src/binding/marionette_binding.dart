@@ -157,6 +157,92 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Swipe on element
+    registerInternalMarionetteExtension(
+      name: 'marionette.swipe',
+      callback: (params) async {
+        if (params.containsKey('startX')) {
+          // Coordinate-based swipe — validate all 4 coordinates
+          final startXStr = params['startX'];
+          final startYStr = params['startY'];
+          final endXStr = params['endX'];
+          final endYStr = params['endY'];
+
+          if (startXStr == null ||
+              startYStr == null ||
+              endXStr == null ||
+              endYStr == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Coordinate-based swipe requires all of: '
+              'startX, startY, endX, endY',
+            );
+          }
+
+          final startX = double.tryParse(startXStr);
+          final startY = double.tryParse(startYStr);
+          final endX = double.tryParse(endXStr);
+          final endY = double.tryParse(endYStr);
+
+          if (startX == null ||
+              startY == null ||
+              endX == null ||
+              endY == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Invalid coordinate values. '
+              'startX, startY, endX, endY must be valid numbers.',
+            );
+          }
+
+          await _gestureDispatcher.drag(
+            Offset(startX, startY),
+            Offset(endX, endY),
+          );
+
+          return MarionetteExtensionResult.success({
+            'message': 'Swiped from ($startX, $startY) to ($endX, $endY)',
+          });
+        }
+
+        // Element + direction swipe
+        final matcher = WidgetMatcher.fromJson(params);
+        final direction = params['direction'];
+        if (direction == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Missing required parameter: direction '
+            '(must be one of: left, right, up, down)',
+          );
+        }
+
+        final distanceStr = params['distance'];
+        final double distance;
+        if (distanceStr != null) {
+          final parsed = double.tryParse(distanceStr);
+          if (parsed == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Invalid distance value: "$distanceStr". '
+              'Must be a valid number.',
+            );
+          }
+          distance = parsed;
+        } else {
+          distance = 200.0;
+        }
+
+        await _gestureDispatcher.swipe(
+          matcher,
+          _widgetFinder,
+          configuration,
+          direction: direction,
+          distance: distance,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message':
+              'Swiped $direction on element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
     // Extension: Scroll until widget is visible
     registerInternalMarionetteExtension(
       name: 'marionette.scrollTo',

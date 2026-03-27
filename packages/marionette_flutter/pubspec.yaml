@@ -1,8 +1,14 @@
 name: marionette_flutter
-description: Flutter extensions enabling AI agents to inspect and interact with running Flutter apps via Marionette MCP.
-version: 0.3.0
-repository: https://github.com/leancodepl/marionette-mcp
-issue_tracker: https://github.com/leancodepl/marionette-mcp/issues
+description: Flutter extensions for AI agent interaction via MCP — lets Claude, Copilot, and Cursor tap, scroll, type, and screenshot your app.
+version: 0.4.0
+repository: https://github.com/leancodepl/marionette_mcp
+issue_tracker: https://github.com/leancodepl/marionette_mcp/issues
+topics:
+  - mcp
+  - ai
+  - claude
+  - agent
+  - copilot
 resolution: workspace
 
 environment:
@@ -16,6 +22,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  test: ^1.26.3
 
 flutter:
   uses-material-design: false
