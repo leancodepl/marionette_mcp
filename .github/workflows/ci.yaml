@@ -154,7 +154,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: packages/marionette_flutter/pubspec.yaml
+          flutter-version: '3.27.0'
           cache: true
 
       - name: Install dependencies for marionette_mcp

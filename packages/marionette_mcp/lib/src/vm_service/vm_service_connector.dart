@@ -380,8 +380,7 @@ class VmServiceConnector {
 
       try {
         final isolate = await _service!.getIsolate(isolateRef.id!);
-        final hasExtension =
-            isolate.extensionRPCs?.any(
+        final hasExtension = isolate.extensionRPCs?.any(
               (ext) => ext == 'ext.flutter.marionette.getLogs',
             ) ??
             false;
