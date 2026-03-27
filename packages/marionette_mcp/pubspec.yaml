@@ -15,7 +15,7 @@ executables:
   marionette_mcp: marionette_mcp
 
 environment:
-  sdk: ^3.10.0
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   args: ^2.7.0

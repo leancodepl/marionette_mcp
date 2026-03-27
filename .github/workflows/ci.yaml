@@ -28,7 +28,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version-file: .fvmrc
           cache: true
 
       - name: Install dependencies for tool
@@ -138,3 +138,144 @@ jobs:
         run: |
           cd packages/marionette_flutter
           flutter test --no-pub
+
+  analyze-min-version:
+    name: Analyze (min supported Flutter/Dart)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: packages/marionette_flutter/pubspec.yaml
+          cache: true
+
+      - name: Install dependencies for marionette_mcp
+        run: |
+          cd packages/marionette_mcp
+          dart pub get
+
+      - name: Install dependencies for marionette_cli
+        run: |
+          cd packages/marionette_cli
+          dart pub get
+
+      - name: Install dependencies for marionette_flutter
+        run: |
+          cd packages/marionette_flutter
+          flutter pub get
+
+      - name: Install dependencies for marionette_logger
+        run: |
+          cd packages/marionette_logger
+          flutter pub get
+
+      - name: Install dependencies for marionette_logging
+        run: |
+          cd packages/marionette_logging
+          flutter pub get
+
+      - name: Analyze marionette_mcp
+        run: |
+          cd packages/marionette_mcp
+          dart analyze --fatal-infos lib bin
+
+      - name: Analyze marionette_cli
+        run: |
+          cd packages/marionette_cli
+          dart analyze --fatal-infos lib bin
+
+      - name: Analyze marionette_flutter
+        run: |
+          cd packages/marionette_flutter
+          flutter analyze --fatal-infos lib
+
+      - name: Analyze marionette_logger
+        run: |
+          cd packages/marionette_logger
+          flutter analyze --fatal-infos lib
+
+      - name: Analyze marionette_logging
+        run: |
+          cd packages/marionette_logging
+          flutter analyze --fatal-infos lib
+
+      - name: Run tests for marionette_mcp
+        run: |
+          cd packages/marionette_mcp
+          dart test
+
+      - name: Run tests for marionette_cli
+        run: |
+          cd packages/marionette_cli
+          dart test
+
+      - name: Run tests for marionette_flutter
+        run: |
+          cd packages/marionette_flutter
+          flutter test --no-pub
+
+  publish:
+    name: Publish packages
+    needs: analyze
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install tool dependencies
+        run: dart pub get
+        working-directory: tool
+
+      - name: Validate version.g.dart
+        run: |
+          dart tool/generate_version.dart
+          if ! git diff --exit-code packages/marionette_mcp/lib/src/version.g.dart; then
+            echo "ERROR: version.g.dart is out of sync. Please run 'dart tool/generate_version.dart' and commit the changes."
+            exit 1
+          fi
+
+      - name: Publish marionette_flutter to pub.dev
+        run: flutter pub publish --force
+        working-directory: packages/marionette_flutter
+
+      - name: Publish marionette_logger to pub.dev
+        run: flutter pub publish --force
+        working-directory: packages/marionette_logger
+
+      - name: Publish marionette_logging to pub.dev
+        run: flutter pub publish --force
+        working-directory: packages/marionette_logging
+
+      - name: Publish marionette_mcp to pub.dev
+        uses: leancodepl/mobile-tools/.github/actions/pub-release@pub-release-v1
+        with:
+          path: packages/marionette_mcp
+
+      - name: Publish marionette_cli to pub.dev
+        run: dart pub publish --force
+        working-directory: packages/marionette_cli
