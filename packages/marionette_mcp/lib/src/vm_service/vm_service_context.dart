@@ -296,20 +296,16 @@ final class VmServiceContext {
                   'Swipe distance in pixels for element-based mode (default: 200).',
             ),
             'startX': JsonSchema.number(
-              description:
-                  'Start X coordinate for coordinate-based swipe.',
+              description: 'Start X coordinate for coordinate-based swipe.',
             ),
             'startY': JsonSchema.number(
-              description:
-                  'Start Y coordinate for coordinate-based swipe.',
+              description: 'Start Y coordinate for coordinate-based swipe.',
             ),
             'endX': JsonSchema.number(
-              description:
-                  'End X coordinate for coordinate-based swipe.',
+              description: 'End X coordinate for coordinate-based swipe.',
             ),
             'endY': JsonSchema.number(
-              description:
-                  'End Y coordinate for coordinate-based swipe.',
+              description: 'End Y coordinate for coordinate-based swipe.',
             ),
           },
         ),
@@ -364,9 +360,7 @@ final class VmServiceContext {
             final message = response['message'] as String?;
 
             return CallToolResult(
-              content: [
-                TextContent(text: message ?? 'Successfully swiped'),
-              ],
+              content: [TextContent(text: message ?? 'Successfully swiped')],
             );
           } catch (err) {
             _logger.warning('Failed to swipe', err);
