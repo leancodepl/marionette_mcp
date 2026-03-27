@@ -77,6 +77,85 @@ class GestureDispatcher {
     await _handlePointerEventRecord(records);
   }
 
+  /// Simulates a long press on an element that matches the given [matcher].
+  ///
+  /// The pointer is held down for [duration] before being released.
+  /// Defaults to 600ms (kLongPressTimeout + kPressTimeout), matching
+  /// Flutter's [WidgetTester.longPress] behavior.
+  Future<void> longPress(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    Duration duration = const Duration(milliseconds: 600),
+  }) async {
+    if (duration.isNegative || duration == Duration.zero) {
+      throw ArgumentError('duration must be positive');
+    }
+
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchLongPressAtPosition(matcher.offset, duration);
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    } else {
+      await _dispatchLongPressAtElement(element, duration);
+    }
+  }
+
+  Future<void> _dispatchLongPressAtElement(
+    Element element,
+    Duration duration,
+  ) async {
+    final renderObject = element.renderObject;
+
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final globalPosition = renderObject.localToGlobal(center);
+
+    await _dispatchLongPressAtPosition(globalPosition, duration);
+  }
+
+  Future<void> _dispatchLongPressAtPosition(
+    Offset globalPosition,
+    Duration duration,
+  ) async {
+    final pointerId = _nextPointerId++;
+
+    final records = [
+      [
+        PointerAddedEvent(position: globalPosition, device: _kDeviceId),
+        PointerDownEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+      ],
+    ];
+
+    // Dispatch pointer down
+    await _handlePointerEventRecord(records);
+
+    // Hold for the specified duration to trigger long press recognition
+    await Future<void>.delayed(duration);
+
+    // Release
+    await _handlePointerEventRecord([
+      [
+        PointerUpEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+        PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
+      ],
+    ]);
+  }
+
   /// Simulates a swipe gesture on an element matching [matcher] in the given
   /// [direction] for [distance] pixels.
   ///

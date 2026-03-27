@@ -8,6 +8,7 @@ import 'package:marionette_cli/src/cli/commands/get_interactive_elements_command
 import 'package:marionette_cli/src/cli/commands/get_logs_command.dart';
 import 'package:marionette_cli/src/cli/commands/help_ai_command.dart';
 import 'package:marionette_cli/src/cli/commands/hot_reload_command.dart';
+import 'package:marionette_cli/src/cli/commands/long_press_command.dart';
 import 'package:marionette_cli/src/cli/commands/list_command.dart';
 import 'package:marionette_cli/src/cli/commands/mcp_command.dart';
 import 'package:marionette_cli/src/cli/commands/register_command.dart';
@@ -19,11 +20,11 @@ import 'package:marionette_cli/src/instance_registry.dart';
 
 class MarionetteCommandRunner extends CommandRunner<int> {
   MarionetteCommandRunner()
-    : _registry = InstanceRegistry(),
-      super(
-        'marionette',
-        'CLI for multi-instance Flutter app interaction via Marionette.',
-      ) {
+      : _registry = InstanceRegistry(),
+        super(
+          'marionette',
+          'CLI for multi-instance Flutter app interaction via Marionette.',
+        ) {
     argParser
       ..addOption(
         'instance',
@@ -32,8 +33,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
       )
       ..addOption(
         'uri',
-        help:
-            'VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws). '
+        help: 'VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws). '
             'Bypasses the instance registry. Mutually exclusive with --instance.',
       )
       ..addOption(
@@ -47,6 +47,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(ListCommand(_registry));
     addCommand(ElementsCommand(_registry));
     addCommand(TapCommand(_registry));
+    addCommand(LongPressCommand(_registry));
     addCommand(EnterTextCommand(_registry));
     addCommand(ScrollToCommand(_registry));
     addCommand(ScreenshotCommand(_registry));

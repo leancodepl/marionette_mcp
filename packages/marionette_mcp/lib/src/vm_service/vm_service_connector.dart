@@ -265,6 +265,27 @@ class VmServiceConnector {
     return _callExtension('marionette.tap', matcher);
   }
 
+  /// Long presses an element matching the given criteria.
+  ///
+  /// [matcher] should contain one of:
+  /// - 'key': matches by `ValueKey<String>`
+  /// - 'text': matches by visible text content
+  /// - 'type': matches by widget type name
+  /// - 'x' and 'y': screen coordinates
+  ///
+  /// [durationMs] is the hold duration in milliseconds (default: 600).
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> longPress(
+    Map<String, dynamic> matcher, {
+    int? durationMs,
+  }) {
+    final args = Map<String, dynamic>.from(matcher);
+    if (durationMs != null) {
+      args['duration'] = durationMs;
+    }
+    return _callExtension('marionette.longPress', args);
+  }
+
   /// Enters text into a text field matching the given criteria.
   ///
   /// [matcher] should contain either 'key' or 'text' field.

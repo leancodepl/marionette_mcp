@@ -53,16 +53,12 @@ class _DismissibleScreenState extends State<DismissibleScreen> {
                           color: Colors.red,
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 24),
-                          child: const Icon(
-                            Icons.delete,
-                            color: Colors.white,
-                          ),
+                          child: const Icon(Icons.delete, color: Colors.white),
                         ),
                         child: ListTile(
                           leading: CircleAvatar(child: Text('${index + 1}')),
                           title: Text(item),
-                          subtitle:
-                              const Text('Swipe left to dismiss'),
+                          subtitle: const Text('Swipe left to dismiss'),
                         ),
                       );
                     },
