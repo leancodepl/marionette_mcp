@@ -224,7 +224,7 @@ jobs:
 
   publish:
     name: Publish packages
-    needs: analyze
+    needs: [analyze, analyze-min-version]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
