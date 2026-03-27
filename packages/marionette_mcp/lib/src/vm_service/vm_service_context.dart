@@ -9,8 +9,8 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// Context for managing VM service connection and registering MCP tools.
 final class VmServiceContext {
   VmServiceContext()
-    : connector = VmServiceConnector(),
-      _logger = logging.Logger('VmServiceContext');
+      : connector = VmServiceConnector(),
+        _logger = logging.Logger('VmServiceContext');
 
   final VmServiceConnector connector;
   final logging.Logger _logger;
@@ -49,8 +49,7 @@ final class VmServiceContext {
                   isError: true,
                   content: [
                     TextContent(
-                      text:
-                          'Version mismatch: marionette_mcp is ${v.version}, '
+                      text: 'Version mismatch: marionette_mcp is ${v.version}, '
                           'but marionette_flutter binding is $bindingVersion. '
                           'Please ensure both packages are the same version.',
                     ),
@@ -389,8 +388,7 @@ final class VmServiceContext {
                   isError: true,
                   content: [
                     const TextContent(
-                      text:
-                          'Coordinate-based swipe requires all of: '
+                      text: 'Coordinate-based swipe requires all of: '
                           'startX, startY, endX, endY',
                     ),
                   ],
@@ -407,8 +405,7 @@ final class VmServiceContext {
                   isError: true,
                   content: [
                     const TextContent(
-                      text:
-                          'Element-based swipe requires a direction '
+                      text: 'Element-based swipe requires a direction '
                           '(left, right, up, or down).',
                     ),
                   ],
@@ -545,8 +542,8 @@ final class VmServiceContext {
 
           try {
             final response = await connector.takeScreenshots();
-            final screenshots = (response['screenshots'] as List<dynamic>)
-                .cast<String>();
+            final screenshots =
+                (response['screenshots'] as List<dynamic>).cast<String>();
 
             if (screenshots.isEmpty) {
               return CallToolResult(
@@ -655,8 +652,7 @@ final class VmServiceContext {
                   '(e.g., "deckNavigation.goToSlide").',
             ),
             'args': JsonSchema.object(
-              description:
-                  'Optional key-value pairs to pass as arguments. '
+              description: 'Optional key-value pairs to pass as arguments. '
                   'Values are passed as-is to the VM service extension.',
               properties: {},
             ),
