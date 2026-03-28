@@ -243,6 +243,61 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Pinch zoom on element
+    registerInternalMarionetteExtension(
+      name: 'marionette.pinchZoom',
+      callback: (params) async {
+        final rawScale = params['scale'];
+        if (rawScale == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Missing required parameter: scale',
+          );
+        }
+        final scale = double.tryParse(rawScale.toString());
+        if (scale == null || scale <= 0) {
+          return MarionetteExtensionResult.invalidParams(
+            'Parameter "scale" must be a positive number, got "$rawScale"',
+          );
+        }
+
+        final rawDistance = params['startDistance'];
+        double startDistance = 200.0;
+        if (rawDistance != null) {
+          final parsed = double.tryParse(rawDistance.toString());
+          if (parsed == null || parsed <= 0) {
+            return MarionetteExtensionResult.invalidParams(
+              'Parameter "startDistance" must be a positive number, '
+              'got "$rawDistance"',
+            );
+          }
+          startDistance = parsed;
+        }
+
+        final WidgetMatcher matcher;
+        try {
+          matcher = WidgetMatcher.fromJson(params);
+        } on ArgumentError {
+          return MarionetteExtensionResult.invalidParams(
+            'Missing required selector: provide "key", "text", "type", '
+            'or "x" & "y" coordinates.',
+          );
+        }
+
+        await _gestureDispatcher.pinchZoom(
+          matcher,
+          _widgetFinder,
+          configuration,
+          scale: scale,
+          startDistance: startDistance,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Pinch zoomed (scale: $scale) on element matching: '
+              '${matcher.toJson()}',
+        });
+      },
+    );
+
     // Extension: Scroll until widget is visible
     registerInternalMarionetteExtension(
       name: 'marionette.scrollTo',
