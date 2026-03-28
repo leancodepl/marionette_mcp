@@ -45,6 +45,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/dismissible'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.zoom_in_outlined),
+            title: const Text('Pinch Zoom'),
+            subtitle: const Text('Test pinch zoom gesture'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/pinch-zoom'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),

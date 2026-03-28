@@ -485,7 +485,8 @@ final class VmServiceContext {
               isError: true,
               content: [
                 const TextContent(
-                  text: 'Missing required selector: provide "key", "text", '
+                  text:
+                      'Missing required selector: provide "key", "text", '
                       '"type", or "coordinates".',
                 ),
               ],
