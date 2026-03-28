@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/cli/commands/doctor_command.dart';
+import 'package:marionette_cli/src/cli/commands/double_tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/enter_text_command.dart';
 import 'package:marionette_cli/src/cli/commands/get_interactive_elements_command.dart';
 import 'package:marionette_cli/src/cli/commands/get_logs_command.dart';
@@ -20,11 +21,11 @@ import 'package:marionette_cli/src/instance_registry.dart';
 
 class MarionetteCommandRunner extends CommandRunner<int> {
   MarionetteCommandRunner()
-      : _registry = InstanceRegistry(),
-        super(
-          'marionette',
-          'CLI for multi-instance Flutter app interaction via Marionette.',
-        ) {
+    : _registry = InstanceRegistry(),
+      super(
+        'marionette',
+        'CLI for multi-instance Flutter app interaction via Marionette.',
+      ) {
     argParser
       ..addOption(
         'instance',
@@ -33,7 +34,8 @@ class MarionetteCommandRunner extends CommandRunner<int> {
       )
       ..addOption(
         'uri',
-        help: 'VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws). '
+        help:
+            'VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws). '
             'Bypasses the instance registry. Mutually exclusive with --instance.',
       )
       ..addOption(
@@ -47,6 +49,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(ListCommand(_registry));
     addCommand(ElementsCommand(_registry));
     addCommand(TapCommand(_registry));
+    addCommand(DoubleTapCommand(_registry));
     addCommand(LongPressCommand(_registry));
     addCommand(EnterTextCommand(_registry));
     addCommand(ScrollToCommand(_registry));

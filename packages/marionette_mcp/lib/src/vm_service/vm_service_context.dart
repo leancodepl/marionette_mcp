@@ -206,6 +206,78 @@ final class VmServiceContext {
           }
         },
       )
+      // Double tap interaction
+      ..registerTool(
+        'double_tap',
+        description:
+            'Simulates a double tap gesture on an element in the Flutter app. This is useful for triggering text selection, zoom, or any widget that responds to double tap. You can match elements by their key, text, type, or coordinates. An optional delay parameter controls the time between the two taps (default: 100ms). Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Double Tap Element'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description:
+                  'The key of the element to double tap. You can get the key of an element by calling get_interactive_elements.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to double tap.',
+            ),
+            'type': JsonSchema.string(
+              description:
+                  'The widget type name of the element to double tap (e.g., "ListTile", "Card").',
+            ),
+            'coordinates': JsonSchema.object(
+              description: 'Screen coordinates to double tap at.',
+              properties: {
+                'x': JsonSchema.number(
+                  description:
+                      'The x coordinate (horizontal position from left).',
+                ),
+                'y': JsonSchema.number(
+                  description: 'The y coordinate (vertical position from top).',
+                ),
+              },
+              required: ['x', 'y'],
+            ),
+            'delay': JsonSchema.number(
+              description:
+                  'Time between the two taps in milliseconds. Defaults to 100ms which is within Flutter\'s double-tap recognition window (40ms-300ms).',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          final delay = (args['delay'] as num?)?.toInt();
+          if (delay != null && delay <= 0) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(
+                  text: 'Parameter "delay" must be a positive integer.',
+                ),
+              ],
+            );
+          }
+          final matcher = buildMatcher(args);
+          _logger.info('Double tapping with matcher: $matcher');
+
+          try {
+            final response = await connector.doubleTap(matcher, delayMs: delay);
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(text: message ?? 'Successfully double tapped'),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to double tap', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Long press interaction
       ..registerTool(
         'long_press',

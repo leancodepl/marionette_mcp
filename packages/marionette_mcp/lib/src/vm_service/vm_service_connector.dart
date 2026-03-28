@@ -265,6 +265,27 @@ class VmServiceConnector {
     return _callExtension('marionette.tap', matcher);
   }
 
+  /// Double taps an element matching the given criteria.
+  ///
+  /// [matcher] should contain one of:
+  /// - 'key': matches by `ValueKey<String>`
+  /// - 'text': matches by visible text content
+  /// - 'type': matches by widget type name
+  /// - 'x' and 'y': screen coordinates
+  ///
+  /// [delayMs] is the delay between taps in milliseconds (default: 100).
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> doubleTap(
+    Map<String, dynamic> matcher, {
+    int? delayMs,
+  }) {
+    final args = Map<String, dynamic>.from(matcher);
+    if (delayMs != null) {
+      args['delay'] = delayMs;
+    }
+    return _callExtension('marionette.doubleTap', args);
+  }
+
   /// Long presses an element matching the given criteria.
   ///
   /// [matcher] should contain one of:
