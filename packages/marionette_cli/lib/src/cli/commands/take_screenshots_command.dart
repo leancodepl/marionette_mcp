@@ -39,8 +39,8 @@ class ScreenshotCommand extends InstanceCommand {
     final shouldOpen = argResults!['open'] as bool;
 
     final response = await connector.takeScreenshots();
-    final screenshots =
-        (response['screenshots'] as List<dynamic>).cast<String>();
+    final screenshots = (response['screenshots'] as List<dynamic>)
+        .cast<String>();
 
     if (screenshots.isEmpty) {
       stderr.writeln('No screenshots captured.');
@@ -50,8 +50,9 @@ class ScreenshotCommand extends InstanceCommand {
     final savedPaths = <String>[];
 
     for (var i = 0; i < screenshots.length; i++) {
-      final path =
-          screenshots.length == 1 ? outputPath : _numberedPath(outputPath, i);
+      final path = screenshots.length == 1
+          ? outputPath
+          : _numberedPath(outputPath, i);
 
       final bytes = base64Decode(screenshots[i]);
       File(path)
