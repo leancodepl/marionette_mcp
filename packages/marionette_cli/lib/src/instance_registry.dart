@@ -24,10 +24,10 @@ class InstanceInfo {
   final DateTime registeredAt;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'uri': uri,
-        'registeredAt': registeredAt.toUtc().toIso8601String(),
-      };
+    'name': name,
+    'uri': uri,
+    'registeredAt': registeredAt.toUtc().toIso8601String(),
+  };
 }
 
 /// File-based registry for named Flutter app instances.
@@ -35,14 +35,15 @@ class InstanceInfo {
 /// Stores instance metadata in `~/.marionette/instances/<name>.json`.
 class InstanceRegistry {
   InstanceRegistry({String? baseDir})
-      : _baseDir = baseDir ??
-            p.join(
-              Platform.environment['HOME'] ??
-                  Platform.environment['USERPROFILE'] ??
-                  '.',
-              '.marionette',
-              'instances',
-            );
+    : _baseDir =
+          baseDir ??
+          p.join(
+            Platform.environment['HOME'] ??
+                Platform.environment['USERPROFILE'] ??
+                '.',
+            '.marionette',
+            'instances',
+          );
 
   final String _baseDir;
 
