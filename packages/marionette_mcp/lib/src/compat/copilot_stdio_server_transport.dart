@@ -17,9 +17,9 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// `JsonRpcMessage.fromJson`, keeping behavior backward compatible.
 final class CopilotCompatStdioServerTransport implements Transport {
   CopilotCompatStdioServerTransport({io.Stdin? stdin, io.IOSink? stdout})
-    : _stdin = stdin ?? io.stdin,
-      _stdout = stdout ?? io.stdout,
-      _logger = logging.Logger('CopilotCompatStdioServerTransport');
+      : _stdin = stdin ?? io.stdin,
+        _stdout = stdout ?? io.stdout,
+        _logger = logging.Logger('CopilotCompatStdioServerTransport');
 
   final io.Stdin _stdin;
   final io.IOSink _stdout;
@@ -47,15 +47,13 @@ final class CopilotCompatStdioServerTransport implements Transport {
     }
     _started = true;
 
-    _linesSubscription = _stdin
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(
-          _onLine,
-          onError: _onErrorCallback,
-          onDone: _onStdinDone,
-          cancelOnError: false,
-        );
+    _linesSubscription =
+        _stdin.transform(utf8.decoder).transform(const LineSplitter()).listen(
+              _onLine,
+              onError: _onErrorCallback,
+              onDone: _onStdinDone,
+              cancelOnError: false,
+            );
   }
 
   void _onLine(String line) {
@@ -74,9 +72,8 @@ final class CopilotCompatStdioServerTransport implements Transport {
       final message = JsonRpcMessage.fromJson(messageMap);
       onmessage?.call(message);
     } catch (e, st) {
-      final err = (e is Error)
-          ? e
-          : StateError('Message parsing error: $e\n$st');
+      final err =
+          (e is Error) ? e : StateError('Message parsing error: $e\n$st');
       try {
         onerror?.call(err);
       } catch (handlerErr) {
@@ -135,9 +132,8 @@ final class CopilotCompatStdioServerTransport implements Transport {
       _stdout.write('${jsonEncode(message.toJson())}\n');
       return Future.value();
     } catch (e) {
-      final Error dartError = e is Error
-          ? e
-          : StateError('Failed to send message: $e');
+      final Error dartError =
+          e is Error ? e : StateError('Failed to send message: $e');
       try {
         onerror?.call(dartError);
       } catch (handlerErr) {

@@ -141,8 +141,8 @@ class ExitSignal {
   ExitSignal() {
     if (!Platform.isWindows) {
       _sigtermSubscription = ProcessSignal.sigterm.watch().listen(
-        _handleSignal,
-      );
+            _handleSignal,
+          );
     }
     _sigintSubscription = ProcessSignal.sigint.watch().listen(_handleSignal);
   }
