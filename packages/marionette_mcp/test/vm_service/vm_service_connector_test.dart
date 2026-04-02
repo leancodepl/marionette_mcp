@@ -58,6 +58,64 @@ void main() {
     });
   });
 
+  group('VmServiceConnector.doubleTap', () {
+    late VmServiceConnector connector;
+
+    setUp(() {
+      connector = VmServiceConnector();
+    });
+
+    test('throws NotConnectedException with default delay', () async {
+      await expectLater(
+        connector.doubleTap({'key': 'my_button'}),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with custom delay', () async {
+      await expectLater(
+        connector.doubleTap({'key': 'my_button'}, delayMs: 200),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with coordinate matcher', () async {
+      await expectLater(
+        connector.doubleTap({'x': 100, 'y': 200}),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+  });
+
+  group('VmServiceConnector.longPress', () {
+    late VmServiceConnector connector;
+
+    setUp(() {
+      connector = VmServiceConnector();
+    });
+
+    test('throws NotConnectedException with default duration', () async {
+      await expectLater(
+        connector.longPress({'key': 'my_button'}),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with custom duration', () async {
+      await expectLater(
+        connector.longPress({'key': 'my_button'}, durationMs: 300),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test('throws NotConnectedException with coordinate matcher', () async {
+      await expectLater(
+        connector.longPress({'x': 100, 'y': 200}),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+  });
+
   group('VmServiceConnector.enterText', () {
     late VmServiceConnector connector;
 
@@ -70,6 +128,35 @@ void main() {
       () async {
         await expectLater(
           connector.enterText({'focused': true}, 'Hello'),
+          throwsA(isA<NotConnectedException>()),
+        );
+      },
+    );
+  });
+
+  group('VmServiceConnector.pinchZoom', () {
+    late VmServiceConnector connector;
+
+    setUp(() {
+      connector = VmServiceConnector();
+    });
+
+    test('throws NotConnectedException when not connected', () async {
+      await expectLater(
+        connector.pinchZoom({'key': 'map'}, scale: 2.0),
+        throwsA(isA<NotConnectedException>()),
+      );
+    });
+
+    test(
+      'throws NotConnectedException with coordinates and custom distance',
+      () async {
+        await expectLater(
+          connector.pinchZoom(
+            {'x': 100, 'y': 200},
+            scale: 0.5,
+            startDistance: 300,
+          ),
           throwsA(isA<NotConnectedException>()),
         );
       },

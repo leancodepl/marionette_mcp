@@ -10,6 +10,7 @@ class GestureDispatcher {
   static const kDelay = Duration(milliseconds: 10);
 
   static const _kDeviceId = 1;
+  static const _kSecondDeviceId = 2;
 
   int _nextPointerId = 1;
 
@@ -73,6 +74,330 @@ class GestureDispatcher {
         PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
       ],
     ];
+
+    await _handlePointerEventRecord(records);
+  }
+
+  /// Simulates a double tap on an element that matches the given [matcher].
+  ///
+  /// Two taps are dispatched with [delay] between them.
+  /// Defaults to 100ms, which is within Flutter's double-tap recognition
+  /// window (kDoubleTapMinTime 40ms — kDoubleTapTimeout 300ms).
+  Future<void> doubleTap(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    Duration delay = const Duration(milliseconds: 100),
+  }) async {
+    if (delay.isNegative || delay == Duration.zero) {
+      throw ArgumentError('delay must be positive');
+    }
+
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchDoubleTapAtPosition(matcher.offset, delay);
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    } else {
+      await _dispatchDoubleTapAtElement(element, delay);
+    }
+  }
+
+  Future<void> _dispatchDoubleTapAtElement(
+    Element element,
+    Duration delay,
+  ) async {
+    final renderObject = element.renderObject;
+
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final globalPosition = renderObject.localToGlobal(center);
+
+    await _dispatchDoubleTapAtPosition(globalPosition, delay);
+  }
+
+  Future<void> _dispatchDoubleTapAtPosition(
+    Offset globalPosition,
+    Duration delay,
+  ) async {
+    // First tap
+    await _dispatchTapAtPosition(globalPosition);
+
+    // Wait between taps for double-tap recognition
+    await Future<void>.delayed(delay);
+
+    // Second tap
+    await _dispatchTapAtPosition(globalPosition);
+  }
+
+  /// Simulates a long press on an element that matches the given [matcher].
+  ///
+  /// The pointer is held down for [duration] before being released.
+  /// Defaults to 600ms (kLongPressTimeout + kPressTimeout), matching
+  /// Flutter's [WidgetTester.longPress] behavior.
+  Future<void> longPress(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    Duration duration = const Duration(milliseconds: 600),
+  }) async {
+    if (duration.isNegative || duration == Duration.zero) {
+      throw ArgumentError('duration must be positive');
+    }
+
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchLongPressAtPosition(matcher.offset, duration);
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    } else {
+      await _dispatchLongPressAtElement(element, duration);
+    }
+  }
+
+  Future<void> _dispatchLongPressAtElement(
+    Element element,
+    Duration duration,
+  ) async {
+    final renderObject = element.renderObject;
+
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final globalPosition = renderObject.localToGlobal(center);
+
+    await _dispatchLongPressAtPosition(globalPosition, duration);
+  }
+
+  Future<void> _dispatchLongPressAtPosition(
+    Offset globalPosition,
+    Duration duration,
+  ) async {
+    final pointerId = _nextPointerId++;
+
+    final records = [
+      [
+        PointerAddedEvent(position: globalPosition, device: _kDeviceId),
+        PointerDownEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+      ],
+    ];
+
+    // Dispatch pointer down
+    await _handlePointerEventRecord(records);
+
+    // Hold for the specified duration to trigger long press recognition
+    await Future<void>.delayed(duration);
+
+    // Release
+    await _handlePointerEventRecord([
+      [
+        PointerUpEvent(
+            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+        PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
+      ],
+    ]);
+  }
+
+  /// Simulates a swipe gesture on an element matching [matcher] in the given
+  /// [direction] for [distance] pixels.
+  ///
+  /// The swipe starts from the center of the matched element and moves in the
+  /// specified direction.
+  Future<void> swipe(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    required String direction,
+    double distance = 200.0,
+  }) async {
+    final element = widgetFinder.findElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    }
+
+    final renderObject = element.renderObject;
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final start = renderObject.localToGlobal(center);
+
+    final end = switch (direction) {
+      'left' => start + Offset(-distance, 0),
+      'right' => start + Offset(distance, 0),
+      'up' => start + Offset(0, -distance),
+      'down' => start + Offset(0, distance),
+      _ => throw ArgumentError('Invalid direction: $direction. '
+          'Must be one of: left, right, up, down'),
+    };
+
+    await drag(start, end);
+  }
+
+  /// Simulates a pinch zoom gesture centered on an element matching [matcher].
+  ///
+  /// [scale] controls the zoom:
+  /// - scale > 1.0: zoom in (fingers move apart)
+  /// - scale < 1.0: zoom out (fingers move together)
+  ///
+  /// [startDistance] is the initial distance between the two fingers in pixels.
+  Future<void> pinchZoom(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    required double scale,
+    double startDistance = 200.0,
+  }) async {
+    if (scale <= 0) {
+      throw ArgumentError('scale must be positive');
+    }
+    if (startDistance <= 0) {
+      throw ArgumentError('startDistance must be positive');
+    }
+
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchPinchZoomAtPosition(
+        matcher.offset,
+        scale: scale,
+        startDistance: startDistance,
+      );
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    }
+
+    final renderObject = element.renderObject;
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final globalCenter = renderObject.localToGlobal(center);
+
+    await _dispatchPinchZoomAtPosition(
+      globalCenter,
+      scale: scale,
+      startDistance: startDistance,
+    );
+  }
+
+  Future<void> _dispatchPinchZoomAtPosition(
+    Offset center, {
+    required double scale,
+    required double startDistance,
+  }) async {
+    final pointer1Id = _nextPointerId++;
+    final pointer2Id = _nextPointerId++;
+    final endDistance = startDistance * scale;
+
+    const stepCount = 10;
+
+    // Finger positions: horizontally offset from center
+    Offset finger1(double distance) => center - Offset(distance / 2, 0);
+    Offset finger2(double distance) => center + Offset(distance / 2, 0);
+
+    final start1 = finger1(startDistance);
+    final start2 = finger2(startDistance);
+
+    // Phase 1: Both fingers down
+    final records = <List<PointerEvent>>[
+      [
+        PointerAddedEvent(position: start1, device: _kDeviceId),
+        PointerDownEvent(
+          pointer: pointer1Id,
+          position: start1,
+          device: _kDeviceId,
+        ),
+      ],
+      [
+        PointerAddedEvent(position: start2, device: _kSecondDeviceId),
+        PointerDownEvent(
+          pointer: pointer2Id,
+          position: start2,
+          device: _kSecondDeviceId,
+        ),
+      ],
+    ];
+
+    // Phase 2: Move fingers apart (zoom in) or together (zoom out)
+    for (var i = 1; i <= stepCount; i++) {
+      final t = i / stepCount;
+      final currentDistance = startDistance + (endDistance - startDistance) * t;
+      final pos1 = finger1(currentDistance);
+      final pos2 = finger2(currentDistance);
+
+      records.add([
+        PointerMoveEvent(
+          pointer: pointer1Id,
+          position: pos1,
+          device: _kDeviceId,
+        ),
+        PointerMoveEvent(
+          pointer: pointer2Id,
+          position: pos2,
+          device: _kSecondDeviceId,
+        ),
+      ]);
+    }
+
+    // Phase 3: Both fingers up
+    final end1 = finger1(endDistance);
+    final end2 = finger2(endDistance);
+
+    records.addAll([
+      [
+        PointerUpEvent(
+          pointer: pointer1Id,
+          position: end1,
+          device: _kDeviceId,
+        ),
+        PointerUpEvent(
+          pointer: pointer2Id,
+          position: end2,
+          device: _kSecondDeviceId,
+        ),
+      ],
+      [
+        PointerRemovedEvent(position: end1, device: _kDeviceId),
+        PointerRemovedEvent(position: end2, device: _kSecondDeviceId),
+      ],
+    ]);
 
     await _handlePointerEventRecord(records);
   }

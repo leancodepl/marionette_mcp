@@ -9,8 +9,8 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// Context for managing VM service connection and registering MCP tools.
 final class VmServiceContext {
   VmServiceContext()
-    : connector = VmServiceConnector(),
-      _logger = logging.Logger('VmServiceContext');
+      : connector = VmServiceConnector(),
+        _logger = logging.Logger('VmServiceContext');
 
   final VmServiceConnector connector;
   final logging.Logger _logger;
@@ -49,8 +49,7 @@ final class VmServiceContext {
                   isError: true,
                   content: [
                     TextContent(
-                      text:
-                          'Version mismatch: marionette_mcp is ${v.version}, '
+                      text: 'Version mismatch: marionette_mcp is ${v.version}, '
                           'but marionette_flutter binding is $bindingVersion. '
                           'Please ensure both packages are the same version.',
                     ),
@@ -206,6 +205,143 @@ final class VmServiceContext {
           }
         },
       )
+      // Double tap interaction
+      ..registerTool(
+        'double_tap',
+        description:
+            'Simulates a double tap gesture on an element in the Flutter app. This is useful for triggering text selection, zoom, or any widget that responds to double tap. You can match elements by their key, text, type, or coordinates. An optional delay parameter controls the time between the two taps (default: 100ms). Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Double Tap Element'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description:
+                  'The key of the element to double tap. You can get the key of an element by calling get_interactive_elements.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to double tap.',
+            ),
+            'type': JsonSchema.string(
+              description:
+                  'The widget type name of the element to double tap (e.g., "ListTile", "Card").',
+            ),
+            'coordinates': JsonSchema.object(
+              description: 'Screen coordinates to double tap at.',
+              properties: {
+                'x': JsonSchema.number(
+                  description:
+                      'The x coordinate (horizontal position from left).',
+                ),
+                'y': JsonSchema.number(
+                  description: 'The y coordinate (vertical position from top).',
+                ),
+              },
+              required: ['x', 'y'],
+            ),
+            'delay': JsonSchema.number(
+              description:
+                  'Time between the two taps in milliseconds. Defaults to 100ms which is within Flutter\'s double-tap recognition window (40ms-300ms).',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          final delay = (args['delay'] as num?)?.toInt();
+          if (delay != null && delay <= 0) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(
+                  text: 'Parameter "delay" must be a positive integer.',
+                ),
+              ],
+            );
+          }
+          final matcher = buildMatcher(args);
+          _logger.info('Double tapping with matcher: $matcher');
+
+          try {
+            final response = await connector.doubleTap(matcher, delayMs: delay);
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(text: message ?? 'Successfully double tapped'),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to double tap', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
+      // Long press interaction
+      ..registerTool(
+        'long_press',
+        description:
+            'Simulates a long press gesture on an element in the Flutter app. This is useful for triggering context menus, reorderable lists, or any widget that responds to long press. You can match elements by their key, text, type, or coordinates. An optional duration parameter controls how long the press is held (default: 600ms). Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Long Press Element'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description:
+                  'The key of the element to long press. You can get the key of an element by calling get_interactive_elements.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to long press.',
+            ),
+            'type': JsonSchema.string(
+              description:
+                  'The widget type name of the element to long press (e.g., "ListTile", "Card").',
+            ),
+            'coordinates': JsonSchema.object(
+              description: 'Screen coordinates to long press at.',
+              properties: {
+                'x': JsonSchema.number(
+                  description:
+                      'The x coordinate (horizontal position from left).',
+                ),
+                'y': JsonSchema.number(
+                  description: 'The y coordinate (vertical position from top).',
+                ),
+              },
+              required: ['x', 'y'],
+            ),
+            'duration': JsonSchema.number(
+              description:
+                  'How long to hold the press in milliseconds. Defaults to 600ms which matches Flutter\'s long press behavior.',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          final duration = (args['duration'] as num?)?.toInt();
+          final matcher = buildMatcher(args);
+          _logger.info('Long pressing with matcher: $matcher');
+
+          try {
+            final response = await connector.longPress(
+              matcher,
+              durationMs: duration,
+            );
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(text: message ?? 'Successfully long pressed'),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to long press', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
       // Text input
       ..registerTool(
         'enter_text',
@@ -260,6 +396,210 @@ final class VmServiceContext {
             );
           } catch (err) {
             _logger.warning('Failed to enter text', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
+      // Swipe gesture
+      ..registerTool(
+        'swipe',
+        description:
+            'Simulates a swipe/drag gesture on the Flutter app. Supports two modes: '
+            '1. Element-based: provide key or text to identify the element, plus a direction (left, right, up, down) and optional distance in pixels (default 200). '
+            '2. Coordinate-based: provide startX, startY, endX, endY for precise control. '
+            'Useful for interacting with PageView, Dismissible, Drawer, Slider, and other swipe-based widgets. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Swipe'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description:
+                  'The key of the element to swipe on. Use with direction.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to swipe on. Use with direction.',
+            ),
+            'direction': JsonSchema.string(
+              description:
+                  'Swipe direction when using element-based mode: left, right, up, or down.',
+            ),
+            'distance': JsonSchema.number(
+              description:
+                  'Swipe distance in pixels for element-based mode (default: 200).',
+            ),
+            'startX': JsonSchema.number(
+              description: 'Start X coordinate for coordinate-based swipe.',
+            ),
+            'startY': JsonSchema.number(
+              description: 'Start Y coordinate for coordinate-based swipe.',
+            ),
+            'endX': JsonSchema.number(
+              description: 'End X coordinate for coordinate-based swipe.',
+            ),
+            'endY': JsonSchema.number(
+              description: 'End Y coordinate for coordinate-based swipe.',
+            ),
+          },
+        ),
+        callback: (args, extra) async {
+          _logger.info('Swiping with args: $args');
+
+          try {
+            final swipeArgs = <String, dynamic>{};
+
+            if (args.containsKey('startX')) {
+              // Coordinate-based swipe — validate all 4 coordinates
+              if (!args.containsKey('startY') ||
+                  !args.containsKey('endX') ||
+                  !args.containsKey('endY')) {
+                return CallToolResult(
+                  isError: true,
+                  content: [
+                    const TextContent(
+                      text: 'Coordinate-based swipe requires all of: '
+                          'startX, startY, endX, endY',
+                    ),
+                  ],
+                );
+              }
+              swipeArgs['startX'] = args['startX'].toString();
+              swipeArgs['startY'] = args['startY'].toString();
+              swipeArgs['endX'] = args['endX'].toString();
+              swipeArgs['endY'] = args['endY'].toString();
+            } else {
+              // Element + direction swipe — direction is required
+              if (!args.containsKey('direction')) {
+                return CallToolResult(
+                  isError: true,
+                  content: [
+                    const TextContent(
+                      text: 'Element-based swipe requires a direction '
+                          '(left, right, up, or down).',
+                    ),
+                  ],
+                );
+              }
+              swipeArgs.addAll(buildMatcher(args));
+              swipeArgs['direction'] = args['direction'] as String;
+              if (args.containsKey('distance')) {
+                swipeArgs['distance'] = args['distance'].toString();
+              }
+            }
+
+            final response = await connector.swipe(swipeArgs);
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [TextContent(text: message ?? 'Successfully swiped')],
+            );
+          } catch (err) {
+            _logger.warning('Failed to swipe', err);
+            return CallToolResult(
+              isError: true,
+              content: [TextContent(text: err.toString())],
+            );
+          }
+        },
+      )
+      // Pinch zoom gesture
+      ..registerTool(
+        'pinch_zoom',
+        description:
+            'Simulates a pinch zoom gesture on an element in the Flutter app. '
+            'Use scale > 1.0 to zoom in (fingers move apart) and scale < 1.0 '
+            'to zoom out (fingers move together). You can target the element by '
+            'key, text, type, or coordinates. Useful for maps, images, PDFs, '
+            'and other zoomable content. '
+            'Requires an active connection established via connect.',
+        annotations: const ToolAnnotations(title: 'Pinch Zoom'),
+        inputSchema: ToolInputSchema(
+          properties: {
+            'key': JsonSchema.string(
+              description: 'The key of the element to pinch zoom on.',
+            ),
+            'text': JsonSchema.string(
+              description:
+                  'The visible text content of the element to pinch zoom on.',
+            ),
+            'type': JsonSchema.string(
+              description:
+                  'The widget type name of the element to pinch zoom on.',
+            ),
+            'coordinates': JsonSchema.object(
+              description: 'Screen coordinates to pinch zoom at.',
+              properties: {
+                'x': JsonSchema.number(description: 'The x coordinate.'),
+                'y': JsonSchema.number(description: 'The y coordinate.'),
+              },
+              required: ['x', 'y'],
+            ),
+            'scale': JsonSchema.number(
+              description:
+                  'Zoom scale factor. Values > 1.0 zoom in, values < 1.0 '
+                  'zoom out. For example, 2.0 doubles the zoom level.',
+            ),
+            'start_distance': JsonSchema.number(
+              description: 'Initial distance between the two fingers in pixels '
+                  '(default: 200).',
+            ),
+          },
+          required: ['scale'],
+        ),
+        callback: (args, extra) async {
+          final matcher = buildMatcher(args);
+          if (matcher.isEmpty) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(
+                  text: 'Missing required selector: provide "key", "text", '
+                      '"type", or "coordinates".',
+                ),
+              ],
+            );
+          }
+          final scale = (args['scale'] as num).toDouble();
+          if (scale <= 0) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(text: 'scale must be a positive number.'),
+              ],
+            );
+          }
+          final startDistance = (args['start_distance'] as num?)?.toDouble();
+          if (startDistance != null && startDistance <= 0) {
+            return CallToolResult(
+              isError: true,
+              content: [
+                const TextContent(
+                  text: 'start_distance must be a positive number.',
+                ),
+              ],
+            );
+          }
+
+          _logger.info('Pinch zooming with matcher: $matcher, scale: $scale');
+
+          try {
+            final response = await connector.pinchZoom(
+              matcher,
+              scale: scale,
+              startDistance: startDistance,
+            );
+            final message = response['message'] as String?;
+
+            return CallToolResult(
+              content: [
+                TextContent(text: message ?? 'Successfully pinch zoomed'),
+              ],
+            );
+          } catch (err) {
+            _logger.warning('Failed to pinch zoom', err);
             return CallToolResult(
               isError: true,
               content: [TextContent(text: err.toString())],
@@ -376,8 +716,8 @@ final class VmServiceContext {
 
           try {
             final response = await connector.takeScreenshots();
-            final screenshots = (response['screenshots'] as List<dynamic>)
-                .cast<String>();
+            final screenshots =
+                (response['screenshots'] as List<dynamic>).cast<String>();
 
             if (screenshots.isEmpty) {
               return CallToolResult(
@@ -486,8 +826,7 @@ final class VmServiceContext {
                   '(e.g., "deckNavigation.goToSlide").',
             ),
             'args': JsonSchema.object(
-              description:
-                  'Optional key-value pairs to pass as arguments. '
+              description: 'Optional key-value pairs to pass as arguments. '
                   'Values are passed as-is to the VM service extension.',
               properties: {},
             ),

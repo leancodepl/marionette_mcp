@@ -55,7 +55,8 @@ void main() {
         const KeyMatcher('ignored_btn'),
         _configuration,
       );
-      expect(hittable, isNull, reason: 'should not find element behind IgnorePointer');
+      expect(hittable, isNull,
+          reason: 'should not find element behind IgnorePointer');
 
       final plain = finder.findElement(
         const KeyMatcher('ignored_btn'),
@@ -87,7 +88,8 @@ void main() {
         const KeyMatcher('absorbed_btn'),
         _configuration,
       );
-      expect(hittable, isNull, reason: 'should not find element behind AbsorbPointer');
+      expect(hittable, isNull,
+          reason: 'should not find element behind AbsorbPointer');
 
       final plain = finder.findElement(
         const KeyMatcher('absorbed_btn'),
@@ -127,7 +129,8 @@ void main() {
         const KeyMatcher('behind_modal'),
         _configuration,
       );
-      expect(hittable, isNull, reason: 'should not find element behind modal barrier');
+      expect(hittable, isNull,
+          reason: 'should not find element behind modal barrier');
 
       final plain = finder.findElement(
         const KeyMatcher('behind_modal'),
@@ -241,6 +244,55 @@ void main() {
           isNull,
           reason: 'tap tool should not silently target a blocked element',
         );
+      },
+    );
+  });
+
+  group('extractText with Element access', () {
+    testWidgets(
+      'custom extractText can walk element tree to find TextField label',
+      (tester) async {
+        final configuration = MarionetteConfiguration(
+          extractText: (element) {
+            final widget = element.widget;
+            if (widget is! TextField) return null;
+
+            // Walk the element subtree to find rendered label text
+            String? labelText;
+            void visitor(Element child) {
+              if (labelText != null) return;
+              if (child.widget is Text) {
+                labelText = (child.widget as Text).data;
+              } else {
+                child.visitChildren(visitor);
+              }
+            }
+
+            element.visitChildren(visitor);
+            return labelText;
+          },
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: TextField(
+                key: const ValueKey('email_field'),
+                decoration: InputDecoration(label: const Text('Email')),
+              ),
+            ),
+          ),
+        );
+
+        final finder = WidgetFinder();
+        final element = finder.findElement(
+          const TextMatcher('Email'),
+          configuration,
+        );
+
+        expect(element, isNotNull);
+        expect(element!.widget, isA<TextField>());
+        expect(element.widget.key, const ValueKey('email_field'));
       },
     );
   });

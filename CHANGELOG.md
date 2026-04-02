@@ -1,3 +1,21 @@
+# Unreleased
+- **Breaking:** Pass `Element` instead of `Widget` to the `extractText` configuration callback, giving access to the full element context. Migration: change `(widget)` to `(element)` and use `element.widget` to access the widget.
+
+# 0.4.0
+
+- Add `marionette_cli` package with multi-instance CLI support
+- Add `call_custom_extension` tool for arbitrary VM service extensions
+- Add custom extension registry with `registerMarionetteExtension`
+- Add focused selector to `enter_text`
+- Add version compatibility check on connect
+- Decouple logging from `marionette_flutter` into `marionette_logger` and `marionette_logging`
+- Improve `ScrollSimulator` with reverse scrolling direction and configurable max scroll attempts
+- Fix tap matching widgets behind modal route barriers
+- Fix `onChanged` not being called on `enter_text`
+- Fix pointer device collision with macOS mouse cursor
+- Fix extracted text not being exposed in interactive elements
+- Ensure correct status code range in `MarionetteExtensionError`
+
 # 0.3.0
 
 - Add screenshot resizing configuration

@@ -93,9 +93,8 @@ class VmServiceConnector {
       _isolateId = await _findIsolateWithMarionetteExtensions();
       _logger.info('Connected to isolate: $_isolateId');
     } catch (err) {
-      _service = null;
-      _isolateId = null;
       _logger.severe('Failed to connect to VM service', err);
+      await disconnect();
       rethrow;
     }
   }
@@ -266,6 +265,48 @@ class VmServiceConnector {
     return _callExtension('marionette.tap', matcher);
   }
 
+  /// Double taps an element matching the given criteria.
+  ///
+  /// [matcher] should contain one of:
+  /// - 'key': matches by `ValueKey<String>`
+  /// - 'text': matches by visible text content
+  /// - 'type': matches by widget type name
+  /// - 'x' and 'y': screen coordinates
+  ///
+  /// [delayMs] is the delay between taps in milliseconds (default: 100).
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> doubleTap(
+    Map<String, dynamic> matcher, {
+    int? delayMs,
+  }) {
+    final args = Map<String, dynamic>.from(matcher);
+    if (delayMs != null) {
+      args['delay'] = delayMs;
+    }
+    return _callExtension('marionette.doubleTap', args);
+  }
+
+  /// Long presses an element matching the given criteria.
+  ///
+  /// [matcher] should contain one of:
+  /// - 'key': matches by `ValueKey<String>`
+  /// - 'text': matches by visible text content
+  /// - 'type': matches by widget type name
+  /// - 'x' and 'y': screen coordinates
+  ///
+  /// [durationMs] is the hold duration in milliseconds (default: 600).
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> longPress(
+    Map<String, dynamic> matcher, {
+    int? durationMs,
+  }) {
+    final args = Map<String, dynamic>.from(matcher);
+    if (durationMs != null) {
+      args['duration'] = durationMs;
+    }
+    return _callExtension('marionette.longPress', args);
+  }
+
   /// Enters text into a text field matching the given criteria.
   ///
   /// [matcher] should contain either 'key' or 'text' field.
@@ -277,6 +318,38 @@ class VmServiceConnector {
   ) {
     final args = Map<String, dynamic>.from(matcher)..['input'] = input;
     return _callExtension('marionette.enterText', args);
+  }
+
+  /// Simulates a swipe gesture.
+  ///
+  /// Supports two modes:
+  /// - Coordinate-based: [args] should contain 'startX', 'startY', 'endX', 'endY'
+  /// - Element-based: [args] should contain a matcher ('key' or 'text'),
+  ///   'direction' ('left', 'right', 'up', 'down'), and optional 'distance'
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> swipe(Map<String, dynamic> args) {
+    return _callExtension('marionette.swipe', args);
+  }
+
+  /// Simulates a pinch zoom gesture on an element matching the given criteria.
+  ///
+  /// [matcher] should contain a matching field (key, text, type, or x/y).
+  /// [scale] controls zoom: > 1.0 zooms in, < 1.0 zooms out.
+  /// [startDistance] is the initial finger distance in pixels.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> pinchZoom(
+    Map<String, dynamic> matcher, {
+    required double scale,
+    double? startDistance,
+  }) {
+    final args = Map<String, dynamic>.from(matcher);
+    args['scale'] = scale;
+    if (startDistance != null) {
+      args['startDistance'] = startDistance;
+    }
+    return _callExtension('marionette.pinchZoom', args);
   }
 
   /// Scrolls until an element matching the given criteria is visible.
@@ -374,8 +447,7 @@ class VmServiceConnector {
 
       try {
         final isolate = await _service!.getIsolate(isolateRef.id!);
-        final hasExtension =
-            isolate.extensionRPCs?.any(
+        final hasExtension = isolate.extensionRPCs?.any(
               (ext) => ext == 'ext.flutter.marionette.getLogs',
             ) ??
             false;

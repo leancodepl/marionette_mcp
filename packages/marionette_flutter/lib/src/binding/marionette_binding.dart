@@ -115,6 +115,72 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       },
     );
 
+    // Extension: Double tap element by matcher
+    registerInternalMarionetteExtension(
+      name: 'marionette.doubleTap',
+      callback: (params) async {
+        final matcher = WidgetMatcher.fromJson(params);
+        final rawDelay = params['delay'];
+        Duration delay;
+        if (rawDelay != null) {
+          final ms = int.tryParse(rawDelay.toString());
+          if (ms == null || ms <= 0) {
+            return MarionetteExtensionResult.invalidParams(
+              'Parameter "delay" must be a positive number (milliseconds), '
+              'got "$rawDelay"',
+            );
+          }
+          delay = Duration(milliseconds: ms);
+        } else {
+          delay = const Duration(milliseconds: 100);
+        }
+
+        await _gestureDispatcher.doubleTap(
+          matcher,
+          _widgetFinder,
+          configuration,
+          delay: delay,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Double tapped element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
+    // Extension: Long press element by matcher
+    registerInternalMarionetteExtension(
+      name: 'marionette.longPress',
+      callback: (params) async {
+        final matcher = WidgetMatcher.fromJson(params);
+        final rawDuration = params['duration'];
+        Duration duration;
+        if (rawDuration != null) {
+          final ms = int.tryParse(rawDuration.toString());
+          if (ms == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Parameter "duration" must be a number (milliseconds), '
+              'got "$rawDuration"',
+            );
+          }
+          duration = Duration(milliseconds: ms);
+        } else {
+          duration = const Duration(milliseconds: 600);
+        }
+
+        await _gestureDispatcher.longPress(
+          matcher,
+          _widgetFinder,
+          configuration,
+          duration: duration,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Long pressed element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
     // Extension: Enter text into a text field
     registerInternalMarionetteExtension(
       name: 'marionette.enterText',
@@ -132,6 +198,147 @@ class MarionetteBinding extends WidgetsFlutterBinding {
 
         return MarionetteExtensionResult.success({
           'message': 'Entered text into element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
+    // Extension: Swipe on element
+    registerInternalMarionetteExtension(
+      name: 'marionette.swipe',
+      callback: (params) async {
+        if (params.containsKey('startX')) {
+          // Coordinate-based swipe — validate all 4 coordinates
+          final startXStr = params['startX'];
+          final startYStr = params['startY'];
+          final endXStr = params['endX'];
+          final endYStr = params['endY'];
+
+          if (startXStr == null ||
+              startYStr == null ||
+              endXStr == null ||
+              endYStr == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Coordinate-based swipe requires all of: '
+              'startX, startY, endX, endY',
+            );
+          }
+
+          final startX = double.tryParse(startXStr);
+          final startY = double.tryParse(startYStr);
+          final endX = double.tryParse(endXStr);
+          final endY = double.tryParse(endYStr);
+
+          if (startX == null ||
+              startY == null ||
+              endX == null ||
+              endY == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Invalid coordinate values. '
+              'startX, startY, endX, endY must be valid numbers.',
+            );
+          }
+
+          await _gestureDispatcher.drag(
+            Offset(startX, startY),
+            Offset(endX, endY),
+          );
+
+          return MarionetteExtensionResult.success({
+            'message': 'Swiped from ($startX, $startY) to ($endX, $endY)',
+          });
+        }
+
+        // Element + direction swipe
+        final matcher = WidgetMatcher.fromJson(params);
+        final direction = params['direction'];
+        if (direction == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Missing required parameter: direction '
+            '(must be one of: left, right, up, down)',
+          );
+        }
+
+        final distanceStr = params['distance'];
+        final double distance;
+        if (distanceStr != null) {
+          final parsed = double.tryParse(distanceStr);
+          if (parsed == null) {
+            return MarionetteExtensionResult.invalidParams(
+              'Invalid distance value: "$distanceStr". '
+              'Must be a valid number.',
+            );
+          }
+          distance = parsed;
+        } else {
+          distance = 200.0;
+        }
+
+        await _gestureDispatcher.swipe(
+          matcher,
+          _widgetFinder,
+          configuration,
+          direction: direction,
+          distance: distance,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message':
+              'Swiped $direction on element matching: ${matcher.toJson()}',
+        });
+      },
+    );
+
+    // Extension: Pinch zoom on element
+    registerInternalMarionetteExtension(
+      name: 'marionette.pinchZoom',
+      callback: (params) async {
+        final rawScale = params['scale'];
+        if (rawScale == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Missing required parameter: scale',
+          );
+        }
+        final scale = double.tryParse(rawScale.toString());
+        if (scale == null || scale <= 0) {
+          return MarionetteExtensionResult.invalidParams(
+            'Parameter "scale" must be a positive number, got "$rawScale"',
+          );
+        }
+
+        final rawDistance = params['startDistance'];
+        double startDistance = 200.0;
+        if (rawDistance != null) {
+          final parsed = double.tryParse(rawDistance.toString());
+          if (parsed == null || parsed <= 0) {
+            return MarionetteExtensionResult.invalidParams(
+              'Parameter "startDistance" must be a positive number, '
+              'got "$rawDistance"',
+            );
+          }
+          startDistance = parsed;
+        }
+
+        final WidgetMatcher matcher;
+        try {
+          matcher = WidgetMatcher.fromJson(params);
+        } on ArgumentError {
+          return MarionetteExtensionResult.invalidParams(
+            'Missing required selector: provide "key", "text", "type", '
+            'or "x" & "y" coordinates.',
+          );
+        }
+
+        await _gestureDispatcher.pinchZoom(
+          matcher,
+          _widgetFinder,
+          configuration,
+          scale: scale,
+          startDistance: startDistance,
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Pinch zoomed (scale: $scale) on element matching: '
+              '${matcher.toJson()}',
         });
       },
     );
