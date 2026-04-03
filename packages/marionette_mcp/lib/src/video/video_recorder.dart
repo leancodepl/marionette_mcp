@@ -28,7 +28,8 @@ class VideoRecorderOptions {
 ///
 /// Port of Playwright's VideoRecorder class.
 class VideoRecorder {
-  VideoRecorder(this._options, this._ffmpegSink);
+  VideoRecorder(this._options, this._ffmpegSink, {Stopwatch? stopwatch})
+      : _lastWriteStopwatch = stopwatch ?? Stopwatch();
 
   final VideoRecorderOptions _options;
   final FfmpegSink _ffmpegSink;
@@ -38,7 +39,7 @@ class VideoRecorder {
   Uint8List? _lastFrameData;
   bool _isStopped = false;
   bool _hasFailed = false;
-  final Stopwatch _lastWriteStopwatch = Stopwatch();
+  final Stopwatch _lastWriteStopwatch;
 
   int _timestampToFrameNumber(double timestamp) {
     _firstTimestamp ??= timestamp;

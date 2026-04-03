@@ -52,13 +52,17 @@ class TcpFrameReader implements FrameSource {
 
   void _onData(List<int> data) {
     _assembler.addData(data);
-    for (final frame in _assembler.drain()) {
-      _controller.add(
-        SourceFrame(
-          rgbaBytes: frame.rgbaBytes,
-          timestampMs: frame.header.timestampMs,
-        ),
-      );
+    try {
+      for (final frame in _assembler.drain()) {
+        _controller.add(
+          SourceFrame(
+            rgbaBytes: frame.rgbaBytes,
+            timestampMs: frame.header.timestampMs,
+          ),
+        );
+      }
+    } on FormatException catch (e) {
+      _onError(e);
     }
   }
 

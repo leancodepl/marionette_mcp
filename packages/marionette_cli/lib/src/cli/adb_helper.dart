@@ -1,8 +1,8 @@
 import 'dart:io';
 
 /// Signature for running a process — injectable for testing.
-typedef ProcessRunner =
-    Future<ProcessResult> Function(String executable, List<String> arguments);
+typedef ProcessRunner = Future<ProcessResult> Function(
+    String executable, List<String> arguments);
 
 /// Result of an ADB operation.
 class AdbResult {
@@ -14,7 +14,7 @@ class AdbResult {
 /// Manages ADB reverse tunnel setup and teardown.
 class AdbHelper {
   AdbHelper({ProcessRunner? processRunner})
-    : _run = processRunner ?? Process.run;
+      : _run = processRunner ?? Process.run;
 
   final ProcessRunner _run;
 

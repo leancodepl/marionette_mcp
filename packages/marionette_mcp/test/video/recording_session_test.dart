@@ -206,9 +206,9 @@ void main() {
           );
 
           final result = await session.stop().timeout(
-            const Duration(seconds: 1),
-            onTimeout: () => throw StateError('stop() hung'),
-          );
+                const Duration(seconds: 1),
+                onTimeout: () => throw StateError('stop() hung'),
+              );
 
           expect(result.frameCount, equals(0));
         },
@@ -353,9 +353,9 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
 
         final result = await session.stop().timeout(
-          const Duration(seconds: 2),
-          onTimeout: () => throw StateError('stop() hung'),
-        );
+              const Duration(seconds: 2),
+              onTimeout: () => throw StateError('stop() hung'),
+            );
 
         expect(recorder.hasFailed, isTrue);
         expect(result.frameCount, greaterThanOrEqualTo(1));

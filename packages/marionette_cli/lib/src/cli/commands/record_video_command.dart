@@ -16,24 +16,22 @@ import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 typedef FfmpegAvailabilityChecker = Future<bool> Function({String ffmpegPath});
 
 /// Signature for creating a RecordingSession with its full pipeline.
-typedef RecordingSessionFactory =
-    Future<RecordingSession> Function({
-      required int frameServerPort,
-      required String outputFile,
-      required int width,
-      required int height,
-      required String ffmpegPath,
-    });
+typedef RecordingSessionFactory = Future<RecordingSession> Function({
+  required int frameServerPort,
+  required String outputFile,
+  required int width,
+  required int height,
+  required String ffmpegPath,
+});
 
 /// Signature for creating a RecordingSession using a WebSocket frame source.
-typedef WsRecordingSessionFactory =
-    Future<RecordingSession> Function({
-      required FrameSource frameSource,
-      required String outputFile,
-      required int width,
-      required int height,
-      required String ffmpegPath,
-    });
+typedef WsRecordingSessionFactory = Future<RecordingSession> Function({
+  required FrameSource frameSource,
+  required String outputFile,
+  required int width,
+  required int height,
+  required String ffmpegPath,
+});
 
 /// Signature for binding a [WebSocketFrameServer] on an OS-assigned port.
 typedef WsFrameServerFactory = Future<WebSocketFrameServer> Function();
@@ -57,13 +55,13 @@ class RecordVideoCommand extends InstanceCommand {
     WsFrameServerFactory? wsFrameServerFactory,
     OpenCommandResolver? openCommandResolver,
     AdbHelperFactory? adbHelperFactory,
-  }) : _ffmpegChecker = ffmpegChecker ?? FfmpegProcess.isAvailable,
-       _sessionFactory = sessionFactory ?? _defaultSessionFactory,
-       _wsSessionFactory = wsSessionFactory ?? _defaultWsSessionFactory,
-       _wsFrameServerFactory =
-           wsFrameServerFactory ?? WebSocketFrameServer.bind,
-       _openCommandResolver = openCommandResolver ?? _defaultOpenCommand,
-       _adbHelperFactory = adbHelperFactory ?? AdbHelper.new {
+  })  : _ffmpegChecker = ffmpegChecker ?? FfmpegProcess.isAvailable,
+        _sessionFactory = sessionFactory ?? _defaultSessionFactory,
+        _wsSessionFactory = wsSessionFactory ?? _defaultWsSessionFactory,
+        _wsFrameServerFactory =
+            wsFrameServerFactory ?? WebSocketFrameServer.bind,
+        _openCommandResolver = openCommandResolver ?? _defaultOpenCommand,
+        _adbHelperFactory = adbHelperFactory ?? AdbHelper.new {
     argParser
       ..addOption(
         'output',
@@ -83,14 +81,12 @@ class RecordVideoCommand extends InstanceCommand {
       )
       ..addOption(
         'width',
-        help:
-            'Video width in pixels. Must not exceed the viewport width.\n'
+        help: 'Video width in pixels. Must not exceed the viewport width.\n'
             'Default: native viewport (native) or 1280 (web).',
       )
       ..addOption(
         'height',
-        help:
-            'Video height in pixels. Must not exceed the viewport height.\n'
+        help: 'Video height in pixels. Must not exceed the viewport height.\n'
             'Default: native viewport (native) or 720 (web).',
       )
       ..addOption(
@@ -106,8 +102,7 @@ class RecordVideoCommand extends InstanceCommand {
       )
       ..addOption(
         'transport',
-        help:
-            'Frame transport mode.\n'
+        help: 'Frame transport mode.\n'
             '  auto: try TCP, fall back to reverse-WS via adb (default)\n'
             '  tcp:  force TCP (fail if unreachable)\n'
             '  ws:   force reverse-WS (requires adb)',
@@ -116,8 +111,7 @@ class RecordVideoCommand extends InstanceCommand {
       )
       ..addOption(
         'frame-port',
-        help:
-            'Use a specific TCP port for frame streaming instead of\n'
+        help: 'Use a specific TCP port for frame streaming instead of\n'
             'auto-negotiation. Useful when adb reverse is unavailable.\n'
             'Example: adb forward tcp:9999 tcp:<flutter-port>',
       );
@@ -251,8 +245,7 @@ class RecordVideoCommand extends InstanceCommand {
     // For web auto mode, apply a safe default cap. Flutter's CPU-only web
     // renderer hangs on toImage above ~1.3M pixels. 1280x720 (0.92M) is
     // well within the safe range.
-    final effectiveSize =
-        explicitSize ??
+    final effectiveSize = explicitSize ??
         (deviceTransport == 'ws'
             ? (width: webDefaultMaxWidth, height: webDefaultMaxHeight)
             : null);

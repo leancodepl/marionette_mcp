@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:marionette_mcp/src/video/recording_session.dart';
 import 'package:marionette_mcp/src/video/ws_frame_server.dart';
@@ -16,7 +17,8 @@ void main() {
         await server.close();
       });
 
-      test('When a WebSocket client connects and sends an MRNT frame, '
+      test(
+          'When a WebSocket client connects and sends an MRNT frame, '
           'Then frames stream emits a SourceFrame', () async {
         final server = await WebSocketFrameServer.bind();
         final ws = await WebSocket.connect('ws://localhost:${server.port}');
@@ -34,7 +36,8 @@ void main() {
         await server.close();
       });
 
-      test('When multiple frames are sent, '
+      test(
+          'When multiple frames are sent, '
           'Then all are emitted in order', () async {
         final server = await WebSocketFrameServer.bind();
         final ws = await WebSocket.connect('ws://localhost:${server.port}');
@@ -51,7 +54,8 @@ void main() {
         await server.close();
       });
 
-      test('When the WebSocket client disconnects, '
+      test(
+          'When the WebSocket client disconnects, '
           'Then the frames stream closes', () async {
         final server = await WebSocketFrameServer.bind();
         final ws = await WebSocket.connect('ws://localhost:${server.port}');
@@ -70,6 +74,43 @@ void main() {
         expect(frames, hasLength(1));
         expect(frames.first.timestampMs, equals(100));
 
+        await server.close();
+      });
+    });
+
+    group('Given malformed data', () {
+      test(
+          'When client sends invalid magic bytes, '
+          'Then frames stream emits FormatException and closes', () async {
+        final server = await WebSocketFrameServer.bind();
+        final ws = await WebSocket.connect('ws://localhost:${server.port}');
+
+        // Send 20 bytes with an invalid magic number.
+        final badHeader = Uint8List(20);
+        final view = ByteData.sublistView(badHeader);
+        view.setUint32(0, 0xDEADBEEF, Endian.little); // wrong magic
+        view.setUint32(4, 16, Endian.little);
+        view.setUint32(8, 2, Endian.little);
+        view.setUint32(12, 2, Endian.little);
+        view.setUint32(16, 100, Endian.little);
+
+        final errors = <Object>[];
+        final frames = <SourceFrame>[];
+        final done = Completer<void>();
+        server.frames.listen(
+          frames.add,
+          onError: errors.add,
+          onDone: done.complete,
+        );
+
+        ws.add(badHeader);
+        await done.future;
+
+        expect(errors, hasLength(1));
+        expect(errors[0], isA<FormatException>());
+        expect(frames, isEmpty);
+
+        await ws.close();
         await server.close();
       });
     });

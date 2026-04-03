@@ -54,9 +54,9 @@ class RecordingSession {
     required VideoRecorder videoRecorder,
     required FfmpegCloseable ffmpegCloseable,
     required this.outputFile,
-  }) : _frameSource = frameSource,
-       _videoRecorder = videoRecorder,
-       _ffmpegCloseable = ffmpegCloseable;
+  })  : _frameSource = frameSource,
+        _videoRecorder = videoRecorder,
+        _ffmpegCloseable = ffmpegCloseable;
 
   final FrameSource _frameSource;
   final VideoRecorder _videoRecorder;

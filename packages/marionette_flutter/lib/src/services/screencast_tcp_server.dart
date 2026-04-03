@@ -46,14 +46,28 @@ class ScreencastTcpServer implements ScreencastServer {
         ? Size(maxWidth.toDouble(), maxHeight.toDouble())
         : null;
 
-    _service = _screencastServiceFactory(maxSize: maxSize);
-    _isActive = true;
+    final service = _screencastServiceFactory(maxSize: maxSize);
+    ServerSocket? serverSocket;
 
-    // Bind TCP server on localhost with an OS-assigned port.
-    _serverSocket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
-    _serverSocket!.listen(_onClientConnected);
+    try {
+      // Bind TCP server on localhost with an OS-assigned port.
+      serverSocket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      serverSocket.listen(_onClientConnected);
 
-    _service!.start(onFrame: _onFrame);
+      service.start(onFrame: _onFrame);
+
+      _service = service;
+      _serverSocket = serverSocket;
+      _isActive = true;
+    } catch (_) {
+      try {
+        await serverSocket?.close();
+      } catch (_) {}
+      try {
+        await service.stop();
+      } catch (_) {}
+      rethrow;
+    }
 
     final size = _viewportSizeProvider();
     final nativeW = size.width.round();

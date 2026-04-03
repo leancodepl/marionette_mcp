@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:marionette_mcp/src/video/frame_protocol.dart';
 import 'package:marionette_mcp/src/video/recording_session.dart';
@@ -104,6 +105,39 @@ void main() {
 
       final frames = await reader.frames.toList();
 
+      expect(frames, isEmpty);
+    });
+
+    test('emits error and closes stream on malformed frame data', () async {
+      // Send 20 bytes with an invalid magic number.
+      final badHeader = Uint8List(20);
+      final view = ByteData.sublistView(badHeader);
+      view.setUint32(0, 0xDEADBEEF, Endian.little); // wrong magic
+      view.setUint32(4, 16, Endian.little); // frameLength
+      view.setUint32(8, 2, Endian.little); // width
+      view.setUint32(12, 2, Endian.little); // height
+      view.setUint32(16, 100, Endian.little); // timestampMs
+
+      server.listen((socket) {
+        socket.add(badHeader);
+        socket.close();
+      });
+
+      final reader = TcpFrameReader(host: 'localhost', port: port);
+      await reader.connect();
+
+      final errors = <Object>[];
+      final frames = <SourceFrame>[];
+      final done = Completer<void>();
+      reader.frames.listen(
+        frames.add,
+        onError: errors.add,
+        onDone: done.complete,
+      );
+      await done.future;
+
+      expect(errors, hasLength(1));
+      expect(errors[0], isA<FormatException>());
       expect(frames, isEmpty);
     });
 

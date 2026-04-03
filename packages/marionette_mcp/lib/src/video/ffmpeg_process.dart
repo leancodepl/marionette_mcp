@@ -66,9 +66,9 @@ class FfmpegProcess implements FfmpegSink, FfmpegCloseable {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((line) {
-          stderrBuffer.writeln(line);
-          _logger.fine('ffmpeg: $line');
-        });
+      stderrBuffer.writeln(line);
+      _logger.fine('ffmpeg: $line');
+    });
 
     return FfmpegProcess._(process, stderrBuffer);
   }

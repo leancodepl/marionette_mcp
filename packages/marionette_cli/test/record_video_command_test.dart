@@ -147,14 +147,14 @@ class TestableRecordVideoCommand extends RecordVideoCommand {
     OpenCommandResolver? openCommandResolver,
     AdbHelperFactory? adbHelperFactory,
   }) : super(
-         InstanceRegistry(),
-         ffmpegChecker: ffmpegChecker,
-         sessionFactory: sessionFactory,
-         wsSessionFactory: wsSessionFactory,
-         wsFrameServerFactory: wsFrameServerFactory,
-         openCommandResolver: openCommandResolver,
-         adbHelperFactory: adbHelperFactory,
-       );
+          InstanceRegistry(),
+          ffmpegChecker: ffmpegChecker,
+          sessionFactory: sessionFactory,
+          wsSessionFactory: wsSessionFactory,
+          wsFrameServerFactory: wsFrameServerFactory,
+          openCommandResolver: openCommandResolver,
+          adbHelperFactory: adbHelperFactory,
+        );
 
   ArgResults? _overriddenArgResults;
 
@@ -178,7 +178,8 @@ RecordingSessionFactory _mockSessionFactory(MockRecordingSession session) {
     required int width,
     required int height,
     required String ffmpegPath,
-  }) async => session;
+  }) async =>
+      session;
 }
 
 void main() {
@@ -436,16 +437,15 @@ void main() {
           final connector = RecordingMockConnector();
           final testCommand = TestableRecordVideoCommand(
             ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
-            sessionFactory:
-                ({
-                  required int frameServerPort,
-                  required String outputFile,
-                  required int width,
-                  required int height,
-                  required String ffmpegPath,
-                }) async {
-                  throw Exception('ffmpeg failed to start');
-                },
+            sessionFactory: ({
+              required int frameServerPort,
+              required String outputFile,
+              required int width,
+              required int height,
+              required String ffmpegPath,
+            }) async {
+              throw Exception('ffmpeg failed to start');
+            },
           );
           // Should throw but also clean up screencast.
           // Use --transport tcp to avoid triggering auto-fallback to WS.
@@ -546,18 +546,17 @@ void main() {
           int? receivedHeight;
           final testCommand = TestableRecordVideoCommand(
             ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
-            sessionFactory:
-                ({
-                  required int frameServerPort,
-                  required String outputFile,
-                  required int width,
-                  required int height,
-                  required String ffmpegPath,
-                }) async {
-                  receivedWidth = width;
-                  receivedHeight = height;
-                  return MockRecordingSession();
-                },
+            sessionFactory: ({
+              required int frameServerPort,
+              required String outputFile,
+              required int width,
+              required int height,
+              required String ffmpegPath,
+            }) async {
+              receivedWidth = width;
+              receivedHeight = height;
+              return MockRecordingSession();
+            },
           );
           await testCommand.executeWithArgs([
             '-o',
@@ -628,18 +627,17 @@ void main() {
           int? receivedHeight;
           final testCommand = TestableRecordVideoCommand(
             ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
-            sessionFactory:
-                ({
-                  required int frameServerPort,
-                  required String outputFile,
-                  required int width,
-                  required int height,
-                  required String ffmpegPath,
-                }) async {
-                  receivedWidth = width;
-                  receivedHeight = height;
-                  return MockRecordingSession();
-                },
+            sessionFactory: ({
+              required int frameServerPort,
+              required String outputFile,
+              required int width,
+              required int height,
+              required String ffmpegPath,
+            }) async {
+              receivedWidth = width;
+              receivedHeight = height;
+              return MockRecordingSession();
+            },
           );
           await testCommand.executeWithArgs([
             '-o',
@@ -663,17 +661,16 @@ void main() {
           int? receivedPort;
           final testCommand = TestableRecordVideoCommand(
             ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
-            sessionFactory:
-                ({
-                  required int frameServerPort,
-                  required String outputFile,
-                  required int width,
-                  required int height,
-                  required String ffmpegPath,
-                }) async {
-                  receivedPort = frameServerPort;
-                  return MockRecordingSession();
-                },
+            sessionFactory: ({
+              required int frameServerPort,
+              required String outputFile,
+              required int width,
+              required int height,
+              required String ffmpegPath,
+            }) async {
+              receivedPort = frameServerPort;
+              return MockRecordingSession();
+            },
           );
           await testCommand.executeWithArgs([
             '-o',
@@ -768,14 +765,14 @@ void main() {
         final connector = RecordingMockConnector();
         final testCommand = TestableRecordVideoCommand(
           ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
-          sessionFactory:
-              ({
-                required int frameServerPort,
-                required String outputFile,
-                required int width,
-                required int height,
-                required String ffmpegPath,
-              }) async => FailingStopSession(),
+          sessionFactory: ({
+            required int frameServerPort,
+            required String outputFile,
+            required int width,
+            required int height,
+            required String ffmpegPath,
+          }) async =>
+              FailingStopSession(),
         );
         final exitCode = await testCommand.executeWithArgs([
           '-o',
@@ -799,14 +796,14 @@ void main() {
           final connector = RecordingMockConnector();
           final testCommand = TestableRecordVideoCommand(
             ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
-            sessionFactory:
-                ({
-                  required int frameServerPort,
-                  required String outputFile,
-                  required int width,
-                  required int height,
-                  required String ffmpegPath,
-                }) async => FailingStopSession(),
+            sessionFactory: ({
+              required int frameServerPort,
+              required String outputFile,
+              required int width,
+              required int height,
+              required String ffmpegPath,
+            }) async =>
+                FailingStopSession(),
           );
           final exitCode = await testCommand.executeWithArgs([
             '-o',
@@ -901,14 +898,14 @@ void main() {
         return TestableRecordVideoCommand(
           ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
           sessionFactory: _mockSessionFactory(s),
-          wsSessionFactory:
-              ({
-                required FrameSource frameSource,
-                required String outputFile,
-                required int width,
-                required int height,
-                required String ffmpegPath,
-              }) async => s,
+          wsSessionFactory: ({
+            required FrameSource frameSource,
+            required String outputFile,
+            required int width,
+            required int height,
+            required String ffmpegPath,
+          }) async =>
+              s,
           wsFrameServerFactory: () async => fakeWsServer,
         );
       }
@@ -1006,7 +1003,8 @@ void main() {
           required int width,
           required int height,
           required String ffmpegPath,
-        }) async => session;
+        }) async =>
+            session;
       }
 
       test(
@@ -1137,17 +1135,16 @@ void main() {
           int? receivedPort;
           final testCommand = TestableRecordVideoCommand(
             ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
-            sessionFactory:
-                ({
-                  required int frameServerPort,
-                  required String outputFile,
-                  required int width,
-                  required int height,
-                  required String ffmpegPath,
-                }) async {
-                  receivedPort = frameServerPort;
-                  return mockSession;
-                },
+            sessionFactory: ({
+              required int frameServerPort,
+              required String outputFile,
+              required int width,
+              required int height,
+              required String ffmpegPath,
+            }) async {
+              receivedPort = frameServerPort;
+              return mockSession;
+            },
             adbHelperFactory: () => adbHelper,
           );
           final exitCode = await testCommand.executeWithArgs([

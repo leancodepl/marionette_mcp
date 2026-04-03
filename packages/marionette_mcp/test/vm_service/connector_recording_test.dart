@@ -42,14 +42,16 @@ void main() {
         connector = RecordingConnector();
       });
 
-      test('When startScreencast is called, '
+      test(
+          'When startScreencast is called, '
           'Then the call is recorded', () async {
         await connector.startScreencast();
 
         expect(connector.startScreencastCalls, hasLength(1));
       });
 
-      test('When startScreencast is called with maxWidth and maxHeight, '
+      test(
+          'When startScreencast is called with maxWidth and maxHeight, '
           'Then they are passed through', () async {
         await connector.startScreencast(maxWidth: 400, maxHeight: 300);
 
@@ -58,7 +60,8 @@ void main() {
         expect(call.maxHeight, 300);
       });
 
-      test('When startScreencast is called with wsPort, '
+      test(
+          'When startScreencast is called with wsPort, '
           'Then wsPort is passed through', () async {
         await connector.startScreencast(wsPort: 9876);
 
@@ -66,7 +69,8 @@ void main() {
         expect(call.wsPort, 9876);
       });
 
-      test('When startScreencast is called without wsPort, '
+      test(
+          'When startScreencast is called without wsPort, '
           'Then wsPort is null', () async {
         await connector.startScreencast();
 
@@ -74,7 +78,8 @@ void main() {
         expect(call.wsPort, isNull);
       });
 
-      test('When stopScreencast is called, '
+      test(
+          'When stopScreencast is called, '
           'Then the call is recorded', () async {
         await connector.stopScreencast();
 
@@ -89,7 +94,8 @@ void main() {
         connector = VmServiceConnector();
       });
 
-      test('When startScreencast is called, '
+      test(
+          'When startScreencast is called, '
           'Then it throws NotConnectedException', () async {
         await expectLater(
           connector.startScreencast(),
@@ -97,7 +103,8 @@ void main() {
         );
       });
 
-      test('When stopScreencast is called, '
+      test(
+          'When stopScreencast is called, '
           'Then it throws NotConnectedException', () async {
         await expectLater(
           connector.stopScreencast(),

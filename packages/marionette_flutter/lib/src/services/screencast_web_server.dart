@@ -95,6 +95,10 @@ class ScreencastWebServer implements ScreencastServer {
       rethrow;
     }
 
+    // Stop capturing if the WebSocket disconnects unexpectedly.
+    _webSocket!.onClose.first.then((_) => stopScreencast());
+    _webSocket!.onError.first.then((_) => stopScreencast());
+
     _service!.start(onFrame: _onFrame);
 
     return {

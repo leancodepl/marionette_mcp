@@ -66,6 +66,9 @@ class ScreencastNativeWsClient implements ScreencastServer {
     _service = _screencastServiceFactory(maxSize: maxSize);
     _isActive = true;
 
+    // Stop capturing if the WebSocket disconnects unexpectedly.
+    unawaited(ws.done.then((_) => stopScreencast()));
+
     _service!.start(onFrame: _onFrame);
 
     return {

@@ -13,6 +13,42 @@ class IoExceptionSink implements FfmpegSink {
   }
 }
 
+/// A fake [Stopwatch] whose elapsed time is set manually.
+class FakeStopwatch implements Stopwatch {
+  Duration _elapsed = Duration.zero;
+  bool _isRunning = false;
+
+  set elapsed(Duration value) => _elapsed = value;
+
+  @override
+  Duration get elapsed => _elapsed;
+
+  @override
+  int get elapsedMicroseconds => _elapsed.inMicroseconds;
+
+  @override
+  int get elapsedMilliseconds => _elapsed.inMilliseconds;
+
+  @override
+  int get elapsedTicks =>
+      (_elapsed.inMicroseconds * frequency / 1000000).round();
+
+  @override
+  int get frequency => 1000000;
+
+  @override
+  bool get isRunning => _isRunning;
+
+  @override
+  void reset() => _elapsed = Duration.zero;
+
+  @override
+  void start() => _isRunning = true;
+
+  @override
+  void stop() => _isRunning = false;
+}
+
 void main() {
   group('VideoRecorder', () {
     late MockFfmpegSink mockSink;
@@ -172,21 +208,27 @@ void main() {
 
       test(
         'When stop after 3-second wall-clock gap, Then padding is ~3 seconds (not fixed 1s)',
-        () async {
+        () {
+          final fakeStopwatch = FakeStopwatch();
+          final rec = VideoRecorder(
+            VideoRecorderOptions(fps: 25),
+            mockSink,
+            stopwatch: fakeStopwatch,
+          );
           final frame2 = Uint8List.fromList([4, 5, 6]);
 
-          recorder.writeFrame(frame1, 0.0);
-          recorder.writeFrame(frame2, 0.04); // 1 frame later
+          rec.writeFrame(frame1, 0.0);
+          rec.writeFrame(frame2, 0.04); // 1 frame later
 
-          // Simulate 3 seconds of wall-clock time passing
-          await Future<void>.delayed(const Duration(seconds: 3));
-          recorder.stop();
+          // Simulate 3 seconds of wall-clock time passing.
+          fakeStopwatch.elapsed = const Duration(seconds: 3);
+          rec.stop();
 
           // 1 frame of frame1 (gap 0→1) + padding of frame2
-          // With wall-clock padding of ~3s: ~75 frames of padding
+          // With wall-clock padding of 3s: 75 frames of padding
           // With fixed 1s padding: only 25 frames
-          // Total should be > 50 (proving it's not the fixed 1s)
-          expect(mockSink.writtenFrames.length, greaterThan(50));
+          // Total should be 76 (1 gap + 75 padding)
+          expect(mockSink.writtenFrames.length, equals(76));
         },
       );
 
@@ -312,8 +354,8 @@ void main() {
           recorder.writeFrame(smallFrame, 0.0);
           recorder.writeFrame(largeFrame, 0.04);
 
-          // At 25fps, timestamps 0.0s and 0.04s both map to frame 0,
-          // so the first frame is repeated 1 time (gap of 1 frame).
+          // At 25fps: 0.0s → frame 0, 0.04s → frame 1 (floor(0.04*25) = 1),
+          // so frame1 (smallFrame) is repeated once (gap from frame 0 to 1).
           expect(mockSink.writtenFrames.length, 1);
           expect(mockSink.writtenFrames.first, equals(smallFrame));
         },
