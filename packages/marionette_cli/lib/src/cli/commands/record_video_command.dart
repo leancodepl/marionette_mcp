@@ -367,6 +367,14 @@ class RecordVideoCommand extends InstanceCommand {
         );
       } else {
         // Auto or forced TCP: try TCP first.
+        //
+        // Keep a reference to the factory future outside the try block so the
+        // catch handler can register an orphan-cleanup callback on it.  Dart
+        // futures cannot be cancelled; if the 2-second timeout fires while
+        // socket.connect() is still in progress, the future continues running
+        // in the background. Without cleanup it could eventually spawn an
+        // ffmpeg process that never receives frames and never terminates.
+        Future<RecordingSession>? pendingSession;
         try {
           // TCP transport: Flutter app hosts the TCP server.
           // When explicit size was given, the probe already started the
@@ -379,14 +387,29 @@ class RecordVideoCommand extends InstanceCommand {
             final tcpResponse = await connector.startScreencast();
             frameServerPort = tcpResponse['port'] as int;
           }
-          session = await _sessionFactory(
+          pendingSession = _sessionFactory(
             frameServerPort: frameServerPort,
             outputFile: outputPath,
             width: videoSize.width,
             height: videoSize.height,
             ffmpegPath: ffmpegPath,
-          ).timeout(const Duration(seconds: 2));
+          );
+          session = await pendingSession.timeout(const Duration(seconds: 2));
         } on Exception {
+          // Register a cleanup on the orphaned future: if it eventually
+          // completes, stop() closes the TcpFrameReader socket and terminates
+          // the ffmpeg process so no resources are leaked.  The immediately-
+          // invoked async absorbs both factory errors and stop() errors so
+          // neither leaks into the zone as an unhandled exception.
+          if (pendingSession != null) {
+            // ignore: discarded_futures
+            () async {
+              try {
+                final s = await pendingSession!;
+                await s.stop();
+              } catch (_) {}
+            }();
+          }
           if (transport == 'tcp') {
             try {
               await connector.stopScreencast();
@@ -439,6 +462,20 @@ class RecordVideoCommand extends InstanceCommand {
       await sigintSub.cancel();
 
       // Stop and report results.
+      //
+      // Order matters: stop the Flutter-side screencast FIRST so that the
+      // ScreencastService timer is cancelled and any in-flight frame
+      // completes before we close the local TCP socket in session.stop().
+      // Without this ordering the Flutter app writes one more frame to our
+      // already-closing socket, triggering an unhandled "Broken pipe"
+      // SocketException in the Flutter isolate.
+      try {
+        await connector.stopScreencast();
+      } catch (_) {
+        // Best-effort — continue to finalize the local recording even if the
+        // VM connection is gone (e.g., the app crashed during recording).
+      }
+
       final RecordingResult result;
       try {
         result = await session.stop();
@@ -447,7 +484,11 @@ class RecordVideoCommand extends InstanceCommand {
         _cleanupOutputFile(outputPath);
         return 1;
       } finally {
-        await connector.stopScreencast();
+        // Second call is a no-op on the Flutter side (isActive is already
+        // false); kept as a safety net in case the early call above failed.
+        try {
+          await connector.stopScreencast();
+        } catch (_) {}
         await _cleanupAdbReverse(adbReversePort);
       }
       stdout.writeln(

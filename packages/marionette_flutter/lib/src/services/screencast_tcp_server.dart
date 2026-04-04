@@ -106,7 +106,21 @@ class ScreencastTcpServer implements ScreencastServer {
 
   void _onClientConnected(Socket client) {
     _clients.add(client);
-    client.done.whenComplete(() => _clients.remove(client));
+    // Listen to the socket's read-side stream so that async write errors
+    // (e.g. "Broken pipe" when the CLI closes the connection while frames
+    // are still being sent) are routed to onError here rather than becoming
+    // unhandled exceptions in the root zone.
+    client.listen(
+      (_) {}, // No incoming data from the frame consumer is expected.
+      onError: (_) {
+        _clients.remove(client);
+        try {
+          client.destroy();
+        } catch (_) {}
+      },
+      onDone: () => _clients.remove(client),
+      cancelOnError: true,
+    );
   }
 
   Future<void> _onFrame(ScreencastFrame frame) async {

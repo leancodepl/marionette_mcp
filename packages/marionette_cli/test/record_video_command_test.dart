@@ -942,7 +942,9 @@ void main() {
           ], connector);
           // Probe (no constraint) + re-probe (1280x720 web cap) + start with wsPort.
           // No stopScreencast between calls — web probes are no-ops.
-          // One stopScreencast at the end of recording to reset state.
+          // Two stopScreencast calls at the end: one early (before session.stop
+          // to prevent Broken-pipe on the Flutter side) and one safety-net in
+          // the finally block (which is a no-op since isActive is already false).
           expect(connector.startScreencastCallCount, equals(3));
           expect(connector.startScreencastCalls[0].maxWidth, isNull);
           expect(connector.startScreencastCalls[0].wsPort, isNull);
@@ -952,7 +954,7 @@ void main() {
           expect(connector.startScreencastCalls[2].maxWidth, equals(1280));
           expect(connector.startScreencastCalls[2].maxHeight, equals(720));
           expect(connector.startScreencastCalls[2].wsPort, equals(54321));
-          expect(connector.stopScreencastCallCount, equals(1));
+          expect(connector.stopScreencastCallCount, equals(2));
         },
       );
 
