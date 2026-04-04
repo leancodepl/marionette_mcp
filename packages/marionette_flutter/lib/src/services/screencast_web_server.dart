@@ -29,6 +29,7 @@ class ScreencastWebServer implements ScreencastServer {
   ScreencastService? _service;
   web.WebSocket? _webSocket;
   bool _isActive = false;
+  bool _isStopping = false;
 
   @override
   bool get isActive => _isActive;
@@ -39,7 +40,7 @@ class ScreencastWebServer implements ScreencastServer {
     int? maxHeight,
     int? wsPort,
   }) async {
-    if (_isActive) {
+    if (_isActive || _isStopping) {
       throw StateError('Screencast already active');
     }
 
@@ -75,24 +76,55 @@ class ScreencastWebServer implements ScreencastServer {
     _webSocket = web.WebSocket('ws://localhost:$wsPort');
     _webSocket!.binaryType = 'arraybuffer';
 
-    _webSocket!.onOpen.first.then((_) {
-      if (!completer.isCompleted) completer.complete();
-    });
-    _webSocket!.onError.first.then((_) {
+    // Use listen() (not .first) for the connect-phase error handler so we can
+    // cancel it explicitly when onOpen fires and prevent a zombie subscription
+    // from outliving the connection-setup phase.  If an error event fires
+    // after onOpen (e.g. mid-session), only the lifecycle handler registered
+    // below (after the guard) would fire — not this stale connect-time one.
+    StreamSubscription<web.Event>? connectErrorSub;
+    connectErrorSub = _webSocket!.onError.listen((_) {
+      connectErrorSub?.cancel();
+      connectErrorSub = null;
       if (!completer.isCompleted) {
         completer.completeError(
           StateError('Failed to connect WebSocket to localhost:$wsPort'),
         );
       }
     });
+    _webSocket!.onOpen.first.then((_) {
+      connectErrorSub?.cancel(); // Kill zombie before lifecycle handlers go up.
+      connectErrorSub = null;
+      if (!completer.isCompleted) completer.complete();
+    });
 
     try {
       await completer.future;
     } catch (_) {
+      connectErrorSub?.cancel();
+      connectErrorSub = null;
       _isActive = false;
       _service = null;
       _webSocket = null;
       rethrow;
+    }
+
+    // Guard against stopScreencast() being called concurrently while the
+    // WebSocket was connecting (e.g., a hot reload triggering
+    // reassembleApplication).
+    //
+    // Two cases to catch:
+    //  • _service == null : stopScreencast() already finished and nulled it.
+    //  • _isStopping     : stopScreencast() is mid-execution (awaiting GPU
+    //    capture in _service.stop()) — the service is not yet nulled but will
+    //    be; we must not start it.
+    if (_service == null || _isStopping) {
+      _isActive = false;
+      _webSocket?.close();
+      _webSocket = null;
+      throw StateError(
+        'Screencast was stopped while the WebSocket connection was being '
+        'established (e.g., hot reload during start)',
+      );
     }
 
     // Stop capturing if the WebSocket disconnects unexpectedly.
@@ -113,12 +145,20 @@ class ScreencastWebServer implements ScreencastServer {
 
   @override
   Future<void> stopScreencast() async {
-    if (_isActive) {
+    // Guard against re-entrant calls (e.g. an onClose / onError handler fires
+    // while a hot-reload-triggered stopScreencast is still awaiting
+    // _service.stop(), which itself awaits an in-flight GPU capture).
+    if (_isStopping) return;
+    if (!_isActive) return;
+    _isStopping = true;
+    try {
       await _service?.stop();
       _service = null;
       _isActive = false;
       _webSocket?.close();
       _webSocket = null;
+    } finally {
+      _isStopping = false;
     }
   }
 
