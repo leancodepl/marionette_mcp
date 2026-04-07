@@ -517,6 +517,7 @@ Pass the VM service URI directly with `--uri` — no registration, no cleanup, n
 marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
 marionette --uri ws://127.0.0.1:8181/ws take-screenshots --output ./screenshot.png
+marionette --uri ws://127.0.0.1:8181/ws record-video --output ./recording.webm
 ```
 
 `--uri` and `--instance` are mutually exclusive. Use `--uri` for one-off interactions and `--instance` when targeting the same app repeatedly.
@@ -537,6 +538,8 @@ marionette -i my-app tap --text "Submit"
 marionette -i my-app enter-text --key email_field --input "test@example.com"
 marionette -i my-app scroll-to --text "Bottom Item"
 marionette -i my-app take-screenshots --output ./screenshot.png
+marionette -i my-app record-video --output ./recording.webm
+marionette -i my-app record-video -o ./demo.webm -d 10
 marionette -i my-app get-logs
 marionette -i my-app hot-reload
 

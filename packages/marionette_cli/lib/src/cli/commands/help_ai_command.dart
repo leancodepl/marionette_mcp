@@ -214,6 +214,50 @@ Capture screenshots and save to PNG files.
 
 ---
 
+### record-video
+
+Record a video of the running Flutter app and save to a WebM file.
+Requires ffmpeg to be installed.
+
+  Requires: -i <instance> or --uri <ws-uri>
+
+  Options:
+    -o, --output <path>       Output file path (mandatory, must end with .webm)
+    -d, --duration <seconds>  Recording duration — records until Ctrl+C if not set
+    --width <pixels>          Video width in pixels
+    --height <pixels>         Video height in pixels
+    --open                    Open the video after recording
+    --ffmpeg-path <path>      Path to ffmpeg binary (default: ffmpeg)
+    -v, --verbose             Print diagnostic details (probe response, frame counts)
+    --transport <mode>        Frame transport: auto (default), tcp, ws
+                              auto: try TCP, fall back to reverse-WS via adb
+                              tcp:  force TCP (fail if unreachable)
+                              ws:   force reverse-WS (requires adb)
+    --frame-port <port>       Use a specific TCP port for frame streaming instead
+                              of auto-negotiation (mutually exclusive with --transport ws)
+
+  Examples:
+    marionette -i my-app record-video --output ./recording.webm
+    marionette -i my-app record-video -o ./demo.webm -d 10
+    marionette --uri ws://127.0.0.1:8181/ws record-video -o ./recording.webm --width 1280 --height 720
+    marionette -i my-app record-video -o ./demo.webm --transport ws
+
+  Output (stdout):
+    Starting screencast...
+    Recording 640x480 video to ./recording.webm...
+    Press Ctrl+C to stop recording.
+    Recording complete: ./recording.webm (10s, 250 frames)
+
+  Prerequisites:
+    ffmpeg must be installed and on PATH (or specify --ffmpeg-path).
+      macOS:   brew install ffmpeg
+      Ubuntu:  sudo apt install ffmpeg
+      Windows: winget install ffmpeg
+
+  Exit codes: 0 success, 1 ffmpeg not found or recording failed, 64 invalid options
+
+---
+
 ### get-logs
 
 Retrieve collected application logs.
