@@ -1,5 +1,13 @@
 # Unreleased
+
+# 0.5.0
+
 - **Breaking:** Pass `Element` instead of `Widget` to the `extractText` configuration callback, giving access to the full element context. Migration: change `(widget)` to `(element)` and use `element.widget` to access the widget.
+- Add gesture support across all layers: `swipe/drag`, `long_press`, `double_tap`, `pinch_zoom`, and `press_back_button`.
+- Add video recording with TCP/WS transport and Android auto-fallback.
+- Improve screencast stability with broken-pipe race handling, concurrent stop safety, and orphaned session cleanup.
+- Improve runtime robustness around input validation, resource cleanup, and non-monotonic timestamp handling.
+- Strengthen release CI with explicit minimum-version compatibility checks and Flutter version sourced from `.fvmrc`.
 
 # 0.4.0
 
