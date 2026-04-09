@@ -446,6 +446,22 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
       },
     );
 
+    // Extension: Simulate system back button press
+    registerInternalMarionetteExtension(
+      name: 'marionette.pressBackButton',
+      callback: (params) async {
+        // This acts like a normal, non-predictive back.
+        // For details, see https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
+        final didPop = await handlePopRoute();
+        return MarionetteExtensionResult.success({
+          'didPop': didPop,
+          'message': didPop
+              ? 'Back button pressed, route was popped'
+              : 'Back button pressed, no route to pop (app may exit)',
+        });
+      },
+    );
+
     // Extension: List custom extensions
     registerInternalMarionetteExtension(
       name: 'marionette.listExtensions',

@@ -174,6 +174,29 @@ Enter text into a text field.
 
 ---
 
+### press-back-button
+
+Simulate a system back button press (Android back / iOS swipe-back).
+
+  Requires: -i <instance> or --uri <ws-uri>
+
+  Example:
+    marionette -i my-app press-back-button
+
+  Output (stdout):
+    Back button pressed, route was popped
+
+  Output if on root route (stdout):
+    Back button pressed, no route to pop (app may exit)
+
+  Notes:
+    - Works with Navigator, GoRouter, and other routing solutions.
+    - If the app is on the root route, the system may minimize or close the
+      app (same as real back button behavior on Android).
+    - Respects PopScope / WillPopScope widgets.
+
+---
+
 ### scroll-to
 
 Scroll until an element becomes visible.

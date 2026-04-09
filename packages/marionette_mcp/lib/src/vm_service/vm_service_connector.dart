@@ -352,6 +352,15 @@ class VmServiceConnector {
     return _callExtension('marionette.pinchZoom', args);
   }
 
+  /// Simulates a system back button press.
+  ///
+  /// Returns the response including whether a route was popped.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> pressBackButton() {
+    return _callExtension('marionette.pressBackButton', {});
+  }
+
   /// Scrolls until an element matching the given criteria is visible.
   ///
   /// [matcher] should contain either 'key' or 'text' field.
