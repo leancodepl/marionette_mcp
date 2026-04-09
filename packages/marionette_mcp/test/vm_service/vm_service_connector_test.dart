@@ -162,20 +162,19 @@ void main() {
       },
     );
 
+    group('VmServiceConnector.pressBackButton', () {
+      late VmServiceConnector connector;
 
-  group('VmServiceConnector.pressBackButton', () {
-    late VmServiceConnector connector;
+      setUp(() {
+        connector = VmServiceConnector();
+      });
 
-    setUp(() {
-      connector = VmServiceConnector();
+      test('throws NotConnectedException when not connected', () async {
+        await expectLater(
+          connector.pressBackButton(),
+          throwsA(isA<NotConnectedException>()),
+        );
+      });
     });
-
-    test('throws NotConnectedException when not connected', () async {
-      await expectLater(
-        connector.pressBackButton(),
-        throwsA(isA<NotConnectedException>()),
-      );
-    });
-  });
   });
 }

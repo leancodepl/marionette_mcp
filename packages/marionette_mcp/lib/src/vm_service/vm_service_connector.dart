@@ -351,7 +351,7 @@ class VmServiceConnector {
     }
     return _callExtension('marionette.pinchZoom', args);
   }
-  
+
   /// Simulates a system back button press.
   ///
   /// Returns the response including whether a route was popped.

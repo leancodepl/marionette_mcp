@@ -442,7 +442,7 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
         await _screencastServer.stopScreencast();
         return MarionetteExtensionResult.success({
           'message': 'Screencast stopped',
-                  });
+        });
       },
     );
 
@@ -450,7 +450,7 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
     registerInternalMarionetteExtension(
       name: 'marionette.pressBackButton',
       callback: (params) async {
-        // This acts like a normal, non-predictive back. 
+        // This acts like a normal, non-predictive back.
         // For details, see https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
         final didPop = await handlePopRoute();
         return MarionetteExtensionResult.success({

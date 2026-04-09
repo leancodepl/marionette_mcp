@@ -607,12 +607,11 @@ final class VmServiceContext {
           }
         },
       )
-      
+
       // Press back button
       ..registerTool(
         'press_back_button',
-        description:
-            'Simulates a system back button press in the Flutter app. '
+        description: 'Simulates a system back button press in the Flutter app. '
             'This triggers the same mechanism as the Android back button or '
             'iOS swipe-back gesture. If the app has a route to pop, it will '
             'be popped. If the app is on the root route, the system may '
@@ -632,8 +631,7 @@ final class VmServiceContext {
             return CallToolResult(
               content: [
                 TextContent(
-                  text:
-                      message ??
+                  text: message ??
                       (didPop == true
                           ? 'Back button pressed, route was popped'
                           : 'Back button pressed, no route to pop'),
