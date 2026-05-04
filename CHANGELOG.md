@@ -1,5 +1,7 @@
 # Unreleased
 
+- Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
+
 # 0.5.0
 
 - **Breaking:** Pass `Element` instead of `Widget` to the `extractText` configuration callback, giving access to the full element context. Migration: change `(widget)` to `(element)` and use `element.widget` to access the widget.
