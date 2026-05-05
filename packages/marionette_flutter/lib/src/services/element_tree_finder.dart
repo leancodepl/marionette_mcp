@@ -50,9 +50,17 @@ class ElementTreeFinder {
       widget.runtimeType,
     );
     final text = configuration.extractTextFromWidget(element);
+    // Discovery-only Semantics fallback: if the standard matcher path yielded
+    // no text, surface explicit accessibility annotations so agents can read
+    // content rendered via inline-span trees, custom painters, or third-party
+    // rich-text packages. Kept separate from extractTextFromWidget so that
+    // TextMatcher (tap/scroll_to/enter_text) is not affected — otherwise a
+    // Semantics(label: 'Save', child: ElevatedButton(...)) wrapper would
+    // shadow the inner button.
+    final discoverableText = text ?? _extractSemanticsText(widget);
     final keyValue = _extractKeyValue(widget.key);
 
-    if (!isInteractive && text == null && keyValue == null) {
+    if (!isInteractive && discoverableText == null && keyValue == null) {
       return null;
     }
 
@@ -80,8 +88,8 @@ class ElementTreeFinder {
       data['key'] = keyValue;
     }
 
-    if (text != null) {
-      data['text'] = text;
+    if (discoverableText != null) {
+      data['text'] = discoverableText;
     }
 
     // Get position and size if available
@@ -110,6 +118,22 @@ class ElementTreeFinder {
     if (key is ValueKey<String>) {
       return key.value;
     }
+    return null;
+  }
+
+  /// Discovery-only fallback: extracts the accessibility annotation from a
+  /// `Semantics` widget. Returns the `label` when present, otherwise the
+  /// `value`, otherwise null.
+  ///
+  /// This is intentionally kept out of [MarionetteConfiguration.extractTextFromWidget]
+  /// so that [TextMatcher] is not affected by Semantics wrappers — see the
+  /// class-level dartdoc on `MarionetteConfiguration` for the rationale.
+  static String? _extractSemanticsText(Widget widget) {
+    if (widget is! Semantics) return null;
+    final label = widget.properties.label;
+    if (label != null && label.isNotEmpty) return label;
+    final value = widget.properties.value;
+    if (value != null && value.isNotEmpty) return value;
     return null;
   }
 
