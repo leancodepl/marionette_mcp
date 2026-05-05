@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:marionette_flutter/src/binding/extensions/gesture_extensions.dart';
+import 'package:marionette_flutter/src/binding/extensions/info_extensions.dart';
+import 'package:marionette_flutter/src/binding/extensions/media_extensions.dart';
+import 'package:marionette_flutter/src/binding/extensions/text_extensions.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
-import 'package:marionette_flutter/src/binding/register_extension.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 import 'package:marionette_flutter/src/services/create_screencast_server.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
@@ -14,8 +17,6 @@ import 'package:marionette_flutter/src/services/screenshot_service.dart';
 import 'package:marionette_flutter/src/services/scroll_simulator.dart';
 import 'package:marionette_flutter/src/services/text_input_simulator.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
-import 'package:marionette_flutter/src/services/widget_matcher.dart';
-import 'package:marionette_flutter/src/version.g.dart' as v;
 
 /// A custom binding that extends Flutter's default binding to provide
 /// integration points for the Marionette MCP.
@@ -56,7 +57,6 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     super.initInstances();
     _instance = this;
 
-    // Initialize services
     _widgetFinder = WidgetFinder();
     _elementTreeFinder = ElementTreeFinder(configuration);
     _gestureDispatcher = GestureDispatcher();
@@ -74,7 +74,6 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     _scrollSimulator = ScrollSimulator(_gestureDispatcher, _widgetFinder);
     _textInputSimulator = TextInputSimulator(_widgetFinder);
 
-    // Initialize log collection if a collector is provided
     if (configuration.logCollector != null) {
       _logStore = LogStore();
       configuration.logCollector!.start(_logStore!.add);
@@ -85,368 +84,27 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   void initServiceExtensions() {
     super.initServiceExtensions();
 
-    // Extension: Get binding version
-    registerInternalMarionetteExtension(
-      name: 'marionette.getVersion',
-      callback: (params) async {
-        return MarionetteExtensionResult.success({'version': v.version});
-      },
+    registerInfoExtensions(
+      elementTreeFinder: _elementTreeFinder,
+      logStoreProvider: () => _logStore,
+    );
+    registerGestureExtensions(
+      gestureDispatcher: _gestureDispatcher,
+      widgetFinder: _widgetFinder,
+      scrollSimulator: _scrollSimulator,
+      configuration: configuration,
+    );
+    registerTextExtensions(
+      textInputSimulator: _textInputSimulator,
+      configuration: configuration,
+    );
+    registerMediaExtensions(
+      screenshotService: _screenshotService,
+      screencastServer: _screencastServer,
     );
 
-    // Extension: Get interactive elements tree
-    registerInternalMarionetteExtension(
-      name: 'marionette.interactiveElements',
-      callback: (params) async {
-        final elements = _elementTreeFinder.findInteractiveElements();
-        return MarionetteExtensionResult.success({'elements': elements});
-      },
-    );
-
-    // Extension: Tap element by matcher
-    registerInternalMarionetteExtension(
-      name: 'marionette.tap',
-      callback: (params) async {
-        final matcher = WidgetMatcher.fromJson(params);
-        await _gestureDispatcher.tap(matcher, _widgetFinder, configuration);
-
-        return MarionetteExtensionResult.success({
-          'message': 'Tapped element matching: ${matcher.toJson()}',
-        });
-      },
-    );
-
-    // Extension: Double tap element by matcher
-    registerInternalMarionetteExtension(
-      name: 'marionette.doubleTap',
-      callback: (params) async {
-        final matcher = WidgetMatcher.fromJson(params);
-        final rawDelay = params['delay'];
-        Duration delay;
-        if (rawDelay != null) {
-          final ms = int.tryParse(rawDelay.toString());
-          if (ms == null || ms <= 0) {
-            return MarionetteExtensionResult.invalidParams(
-              'Parameter "delay" must be a positive number (milliseconds), '
-              'got "$rawDelay"',
-            );
-          }
-          delay = Duration(milliseconds: ms);
-        } else {
-          delay = const Duration(milliseconds: 100);
-        }
-
-        await _gestureDispatcher.doubleTap(
-          matcher,
-          _widgetFinder,
-          configuration,
-          delay: delay,
-        );
-
-        return MarionetteExtensionResult.success({
-          'message': 'Double tapped element matching: ${matcher.toJson()}',
-        });
-      },
-    );
-
-    // Extension: Long press element by matcher
-    registerInternalMarionetteExtension(
-      name: 'marionette.longPress',
-      callback: (params) async {
-        final matcher = WidgetMatcher.fromJson(params);
-        final rawDuration = params['duration'];
-        Duration duration;
-        if (rawDuration != null) {
-          final ms = int.tryParse(rawDuration.toString());
-          if (ms == null) {
-            return MarionetteExtensionResult.invalidParams(
-              'Parameter "duration" must be a number (milliseconds), '
-              'got "$rawDuration"',
-            );
-          }
-          duration = Duration(milliseconds: ms);
-        } else {
-          duration = const Duration(milliseconds: 600);
-        }
-
-        await _gestureDispatcher.longPress(
-          matcher,
-          _widgetFinder,
-          configuration,
-          duration: duration,
-        );
-
-        return MarionetteExtensionResult.success({
-          'message': 'Long pressed element matching: ${matcher.toJson()}',
-        });
-      },
-    );
-
-    // Extension: Enter text into a text field
-    registerInternalMarionetteExtension(
-      name: 'marionette.enterText',
-      callback: (params) async {
-        final matcher = WidgetMatcher.fromJson(params);
-        final input = params['input'];
-
-        if (input == null) {
-          return MarionetteExtensionResult.invalidParams(
-            'Missing required parameter: input',
-          );
-        }
-
-        await _textInputSimulator.enterText(matcher, input, configuration);
-
-        return MarionetteExtensionResult.success({
-          'message': 'Entered text into element matching: ${matcher.toJson()}',
-        });
-      },
-    );
-
-    // Extension: Swipe on element
-    registerInternalMarionetteExtension(
-      name: 'marionette.swipe',
-      callback: (params) async {
-        if (params.containsKey('startX')) {
-          // Coordinate-based swipe — validate all 4 coordinates
-          final startXStr = params['startX'];
-          final startYStr = params['startY'];
-          final endXStr = params['endX'];
-          final endYStr = params['endY'];
-
-          if (startXStr == null ||
-              startYStr == null ||
-              endXStr == null ||
-              endYStr == null) {
-            return MarionetteExtensionResult.invalidParams(
-              'Coordinate-based swipe requires all of: '
-              'startX, startY, endX, endY',
-            );
-          }
-
-          final startX = double.tryParse(startXStr);
-          final startY = double.tryParse(startYStr);
-          final endX = double.tryParse(endXStr);
-          final endY = double.tryParse(endYStr);
-
-          if (startX == null ||
-              startY == null ||
-              endX == null ||
-              endY == null) {
-            return MarionetteExtensionResult.invalidParams(
-              'Invalid coordinate values. '
-              'startX, startY, endX, endY must be valid numbers.',
-            );
-          }
-
-          await _gestureDispatcher.drag(
-            Offset(startX, startY),
-            Offset(endX, endY),
-          );
-
-          return MarionetteExtensionResult.success({
-            'message': 'Swiped from ($startX, $startY) to ($endX, $endY)',
-          });
-        }
-
-        // Element + direction swipe
-        final matcher = WidgetMatcher.fromJson(params);
-        final direction = params['direction'];
-        if (direction == null) {
-          return MarionetteExtensionResult.invalidParams(
-            'Missing required parameter: direction '
-            '(must be one of: left, right, up, down)',
-          );
-        }
-
-        final distanceStr = params['distance'];
-        final double distance;
-        if (distanceStr != null) {
-          final parsed = double.tryParse(distanceStr);
-          if (parsed == null) {
-            return MarionetteExtensionResult.invalidParams(
-              'Invalid distance value: "$distanceStr". '
-              'Must be a valid number.',
-            );
-          }
-          distance = parsed;
-        } else {
-          distance = 200.0;
-        }
-
-        await _gestureDispatcher.swipe(
-          matcher,
-          _widgetFinder,
-          configuration,
-          direction: direction,
-          distance: distance,
-        );
-
-        return MarionetteExtensionResult.success({
-          'message':
-              'Swiped $direction on element matching: ${matcher.toJson()}',
-        });
-      },
-    );
-
-    // Extension: Pinch zoom on element
-    registerInternalMarionetteExtension(
-      name: 'marionette.pinchZoom',
-      callback: (params) async {
-        final rawScale = params['scale'];
-        if (rawScale == null) {
-          return MarionetteExtensionResult.invalidParams(
-            'Missing required parameter: scale',
-          );
-        }
-        final scale = double.tryParse(rawScale.toString());
-        if (scale == null || scale <= 0) {
-          return MarionetteExtensionResult.invalidParams(
-            'Parameter "scale" must be a positive number, got "$rawScale"',
-          );
-        }
-
-        final rawDistance = params['startDistance'];
-        double startDistance = 200.0;
-        if (rawDistance != null) {
-          final parsed = double.tryParse(rawDistance.toString());
-          if (parsed == null || parsed <= 0) {
-            return MarionetteExtensionResult.invalidParams(
-              'Parameter "startDistance" must be a positive number, '
-              'got "$rawDistance"',
-            );
-          }
-          startDistance = parsed;
-        }
-
-        final WidgetMatcher matcher;
-        try {
-          matcher = WidgetMatcher.fromJson(params);
-        } on ArgumentError {
-          return MarionetteExtensionResult.invalidParams(
-            'Missing required selector: provide "key", "text", "type", '
-            'or "x" & "y" coordinates.',
-          );
-        }
-
-        await _gestureDispatcher.pinchZoom(
-          matcher,
-          _widgetFinder,
-          configuration,
-          scale: scale,
-          startDistance: startDistance,
-        );
-
-        return MarionetteExtensionResult.success({
-          'message': 'Pinch zoomed (scale: $scale) on element matching: '
-              '${matcher.toJson()}',
-        });
-      },
-    );
-
-    // Extension: Scroll until widget is visible
-    registerInternalMarionetteExtension(
-      name: 'marionette.scrollTo',
-      callback: (params) async {
-        final matcher = WidgetMatcher.fromJson(params);
-
-        await _scrollSimulator.scrollUntilVisible(matcher, configuration);
-
-        return MarionetteExtensionResult.success({
-          'message': 'Scrolled to element matching: ${matcher.toJson()}',
-        });
-      },
-    );
-
-    // Extension: Get logs
-    registerInternalMarionetteExtension(
-      name: 'marionette.getLogs',
-      callback: (params) async {
-        if (_logStore == null) {
-          return MarionetteExtensionResult.error(
-            0,
-            '''Log collection is not configured.
-
-To enable log collection, provide a LogCollector via MarionetteConfiguration:
-
-Option 1: Using the "logging" package (pub.dev/packages/logging)
-  - Add dependency: flutter pub add marionette_logging
-  - Initialize: MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: LoggingLogCollector()),
-    );
-
-Option 2: Using the "logger" package (pub.dev/packages/logger)
-  - Add dependency: flutter pub add marionette_logger
-  - Initialize: final collector = LoggerLogCollector();
-    MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: collector),
-    );
-    final logger = Logger(output: MultiOutput([ConsoleOutput(), collector]));
-
-Option 3: Using PrintLogCollector for custom logging
-  - Initialize: final collector = PrintLogCollector();
-    MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: collector),
-    );
-  - Call collector.addLog(message) from your logging listener.
-
-See https://pub.dev/packages/marionette_flutter for more details.''',
-          );
-        }
-
-        final logs = _logStore!.getLogs();
-
-        return MarionetteExtensionResult.success({
-          'logs': logs,
-          'count': logs.length,
-        });
-      },
-    );
-
-    // Extension: Take screenshots
-    registerInternalMarionetteExtension(
-      name: 'marionette.takeScreenshots',
-      callback: (params) async {
-        final screenshots = await _screenshotService.takeScreenshots();
-
-        return MarionetteExtensionResult.success({
-          'screenshots': screenshots,
-        });
-      },
-    );
-
-    // Extension: Start screencast
-    registerInternalMarionetteExtension(
-      name: 'marionette.startScreencast',
-      callback: (params) async {
-        try {
-          final maxWidth = int.tryParse(params['maxWidth'] ?? '');
-          final maxHeight = int.tryParse(params['maxHeight'] ?? '');
-          final wsPort = int.tryParse(params['wsPort'] ?? '');
-
-          final result = await _screencastServer.startScreencast(
-            maxWidth: maxWidth,
-            maxHeight: maxHeight,
-            wsPort: wsPort,
-          );
-          return MarionetteExtensionResult.success(result);
-        } on StateError catch (e) {
-          return MarionetteExtensionResult.error(0, e.message);
-        }
-      },
-    );
-
-    // Extension: Stop screencast
-    registerInternalMarionetteExtension(
-      name: 'marionette.stopScreencast',
-      callback: (params) async {
-        await _screencastServer.stopScreencast();
-        return MarionetteExtensionResult.success({
-          'message': 'Screencast stopped',
-        });
-      },
-    );
-
-    // Extension: Simulate system back button press
+    // pressBackButton stays inline because it calls handlePopRoute(), which
+    // is an instance method on the binding itself.
     registerInternalMarionetteExtension(
       name: 'marionette.pressBackButton',
       callback: (params) async {
@@ -458,22 +116,6 @@ See https://pub.dev/packages/marionette_flutter for more details.''',
           'message': didPop
               ? 'Back button pressed, route was popped'
               : 'Back button pressed, no route to pop (app may exit)',
-        });
-      },
-    );
-
-    // Extension: List custom extensions
-    registerInternalMarionetteExtension(
-      name: 'marionette.listExtensions',
-      callback: (params) async {
-        return MarionetteExtensionResult.success({
-          'extensions': [
-            for (final ext in customExtensionRegistry)
-              {
-                'name': ext.name,
-                if (ext.description != null) 'description': ext.description,
-              },
-          ],
         });
       },
     );
