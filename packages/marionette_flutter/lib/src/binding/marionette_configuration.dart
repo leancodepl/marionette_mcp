@@ -5,11 +5,15 @@ import 'package:marionette_flutter/src/services/log_collector.dart';
 ///
 /// Provides support for custom app-specific widgets.
 /// Standard Flutter widgets (TextField, Button, Text, etc.) are supported by
-/// default. Explicit `Semantics(label: ...)` annotations are also surfaced —
-/// see [_extractBuiltInText] for the full list — which lets you make
-/// otherwise-opaque content (composite `Text.rich` trees, custom-painted text,
-/// third-party rich-text renderers) readable to AI agents without altering
-/// rendering, using the same primitive that drives screen readers.
+/// default.
+///
+/// Explicit `Semantics(label: ...)` / `Semantics(value: ...)` annotations are
+/// surfaced in `get_interactive_elements` as a discovery-only fallback (see
+/// `ElementTreeFinder` for the implementation). They are intentionally NOT
+/// consulted by [extractTextFromWidget], which is the matcher path used by
+/// `tap`/`scroll_to`/`enter_text` — otherwise a `Semantics(label: 'Save',
+/// child: ElevatedButton(...))` wrapper would shadow the inner button and
+/// redirect interactions to the wrapper node.
 class MarionetteConfiguration {
   const MarionetteConfiguration({
     this.isInteractiveWidget,
@@ -44,7 +48,7 @@ class MarionetteConfiguration {
   ///    parameter.
   ///
   /// This callback is called only after checking built-in Flutter widgets
-  /// (Text, RichText, EditableText, TextField, TextFormField, Semantics).
+  /// (Text, RichText, EditableText, TextField, TextFormField).
   /// Return the text content of your custom widgets, or null if not applicable.
   ///
   /// Example:
@@ -173,24 +177,6 @@ class MarionetteConfiguration {
     }
     if (widget is TextFormField) {
       return widget.controller?.text;
-    }
-    if (widget is Semantics) {
-      // Surface explicit accessibility labels so agents can read content that
-      // Flutter renders via inline-span trees (Text.rich, RichText with
-      // composite spans, WidgetSpan content), custom-painted text, or
-      // third-party markdown/rich-text packages — cases where toPlainText()
-      // loses structure or returns nothing.
-      //
-      // Wrapping the visual widget in Semantics(label: '...') gives both
-      // screen readers (VoiceOver/TalkBack) AND Marionette a clean string,
-      // without changing rendering. Semantics widgets without an explicit
-      // label or value are NOT reported, so framework-internal annotations
-      // do not pollute the output.
-      final label = widget.properties.label;
-      if (label != null && label.isNotEmpty) return label;
-      final value = widget.properties.value;
-      if (value != null && value.isNotEmpty) return value;
-      return null;
     }
     return null;
   }
