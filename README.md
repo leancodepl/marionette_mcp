@@ -217,7 +217,7 @@ By default, Marionette recognizes standard Flutter widgets like `ElevatedButton`
 
 2. **Text-based matching**: The `tap`, `scroll_to`, and other interaction tools can match elements by their text content using the `text` parameter (e.g., `tap(text: "Submit")`).
 
-By default, Marionette extracts text from standard Flutter widgets (`Text`, `RichText`, `EditableText`, `TextField`, `TextFormField`, and `Semantics`). Use `extractText` to add support for your custom widgets. The callback receives the `Element` (access the widget via `element.widget`), which lets you walk the element subtree — essential when widget properties like labels or placeholders are `Widget` instances rather than plain strings.
+By default, Marionette extracts text from standard Flutter widgets (`Text`, `RichText`, `EditableText`, `TextField`, `TextFormField`) for both purposes above. `Semantics(label:|value:)` annotations are surfaced in `get_interactive_elements` as a **discovery-only** fallback — they are intentionally not consulted by the matcher path, so wrapping a control in `Semantics` will not cause `tap`/`scroll_to`/`enter_text` to redirect to the wrapper instead of the inner widget. Use `extractText` to add support for your custom widgets. The callback receives the `Element` (access the widget via `element.widget`), which lets you walk the element subtree — essential when widget properties like labels or placeholders are `Widget` instances rather than plain strings.
 
 ```dart
 import 'package:flutter/foundation.dart';
@@ -343,19 +343,18 @@ void _collectText(Element element, StringBuffer buffer) {
 
 ### Making complex content readable via `Semantics`
 
-Some widgets are structurally invisible to widget-tree introspection — agents can't read what you can't extract:
+Most rich content is already extracted out of the box — `Text.rich` and `RichText` flatten their span tree via `toPlainText()`, so an agent reads the rendered plaintext without any extra annotation. `Semantics` is the escape hatch for the cases where that plaintext isn't enough or doesn't exist:
 
-- **`Text.rich` with composite spans** — `toPlainText()` joins the characters but loses bold/links/code-span structure, and inline `WidgetSpan` content is lost entirely.
-- **Custom-painted text** — `CustomPaint` and direct `TextPainter` rendering bypass the `Text` widget, leaving nothing extractable.
-- **Third-party markdown / rich-text renderers** — many compose `RichText` with widget spans in ways the default extraction can't reconstruct.
+- **Custom-painted text** — `CustomPaint` and direct `TextPainter` rendering bypass the `Text` widget entirely, so there is nothing for `toPlainText()` to flatten.
+- **Lossy `WidgetSpan` content** — `toPlainText()` cannot reach text rendered inside `WidgetSpan` children, so anything composed that way (badges, inline icons-with-text, embedded widgets) is invisible.
+- **Raw-source preservation** — when you want the agent to see the markdown/markup source you parsed, not the rendered plaintext (e.g. so it can reason about structure), `Semantics(label: rawSource)` carries that through.
 
-The fix is the same primitive screen readers already rely on: wrap the visual widget in `Semantics` and supply an explicit `label` (or `value`). Marionette surfaces these labels in `get_interactive_elements` as `Type: Semantics, text: "<label>"`, giving agents a stable, structured channel that survives complex span trees.
+The fix is the same primitive screen readers already rely on: wrap the visual widget in `Semantics` and supply an explicit `label` (or `value`). Marionette surfaces these annotations in `get_interactive_elements` as `Type: Semantics, text: "<label>"`, giving agents a stable, structured channel alongside whatever `toPlainText()` already produced.
 
 ```dart
-// Any widget that renders rich content via composite spans.
-// Without Semantics, an agent sees only the TextSpan metadata.
-// With Semantics, the agent reads the joined source string and
-// Flutter screen readers get a clean string for VoiceOver/TalkBack.
+// Use Semantics when you want the agent to see the raw source instead of
+// (or in addition to) the rendered plaintext that toPlainText() already
+// surfaces.
 Semantics(
   label: rawSource, // e.g. "Order **#1024** shipped on Friday."
   excludeSemantics: true,
@@ -363,7 +362,7 @@ Semantics(
 )
 ```
 
-This works without any `extractText` configuration — `Semantics` is treated as a built-in extractable widget. `Semantics` widgets without an explicit `label` or `value` (i.e. framework-generated annotations with no user-visible content) are not reported, so the output stays quiet by default.
+This works without any `extractText` configuration. `Semantics` annotations are surfaced as a **discovery-only** fallback in `get_interactive_elements` — they are not consulted by the matcher path used by `tap`/`scroll_to`/`enter_text`, so wrapping a control in `Semantics(label: ...)` will not cause gestures to be redirected to the wrapper. `Semantics` widgets without an explicit `label` or `value` (i.e. framework-generated annotations with no user-visible content) are not reported, so the output stays quiet by default.
 
 The same technique works for tables, lists, charts, badges, and any custom-rendered content where you want to give an agent a single authoritative summary instead of asking it to reconstruct meaning from a flat list of cells.
 
