@@ -122,8 +122,14 @@ class ElementTreeFinder {
   }
 
   /// Discovery-only fallback: extracts the accessibility annotation from a
-  /// `Semantics` widget. Returns the `label` when present, otherwise the
-  /// `value`, otherwise null.
+  /// `Semantics` widget.
+  ///
+  /// Combines `label` and `value` the way screen readers announce them
+  /// (`'label: value'`) so widgets that set both — e.g.
+  /// `Semantics(label: 'Volume', value: '70%')` — keep their dynamic state
+  /// in the discovery output instead of dropping `value` when `label` is
+  /// also present. Falls back to whichever field is non-empty when only one
+  /// is set, and returns null when neither carries content.
   ///
   /// This is intentionally kept out of [MarionetteConfiguration.extractTextFromWidget]
   /// so that [TextMatcher] is not affected by Semantics wrappers — see the
@@ -131,9 +137,12 @@ class ElementTreeFinder {
   static String? _extractSemanticsText(Widget widget) {
     if (widget is! Semantics) return null;
     final label = widget.properties.label;
-    if (label != null && label.isNotEmpty) return label;
     final value = widget.properties.value;
-    if (value != null && value.isNotEmpty) return value;
+    final hasLabel = label != null && label.isNotEmpty;
+    final hasValue = value != null && value.isNotEmpty;
+    if (hasLabel && hasValue) return '$label: $value';
+    if (hasLabel) return label;
+    if (hasValue) return value;
     return null;
   }
 
