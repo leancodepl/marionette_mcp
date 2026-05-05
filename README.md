@@ -352,19 +352,30 @@ Most rich content is already extracted out of the box — `Text.rich` and `RichT
 The fix is the same primitive screen readers already rely on: wrap the visual widget in `Semantics` and supply an explicit `label` (or `value`). Marionette surfaces these annotations in `get_interactive_elements` as `Type: Semantics, text: "<label>"`, giving agents a stable, structured channel alongside whatever `toPlainText()` already produced.
 
 ```dart
-// Use Semantics when you want the agent to see the raw source instead of
-// (or in addition to) the rendered plaintext that toPlainText() already
-// surfaces.
+// Pattern B: structural label + dynamic value. Both the screen reader
+// ("Volume, 70 percent") and the agent (Type: Semantics, text:
+// "Volume: 70%") get clean, human-friendly strings.
 Semantics(
-  label: rawSource, // e.g. "Order **#1024** shipped on Friday."
-  excludeSemantics: true,
-  child: Text.rich(parseMarkdownToSpans(rawSource)),
+  label: 'Volume',
+  value: '70%',
+  child: CustomPaint(painter: _VolumeBarPainter(level: 0.7)),
 )
 ```
+
+When both `label` and `value` are set, Marionette joins them as `'label: value'` in the discovery output, so widgets with dynamic state (sliders, progress bars, gauges) keep their current value visible to agents instead of dropping it.
 
 This works without any `extractText` configuration. `Semantics` annotations are surfaced as a **discovery-only** fallback in `get_interactive_elements` — they are not consulted by the matcher path used by `tap`/`scroll_to`/`enter_text`, so wrapping a control in `Semantics(label: ...)` will not cause gestures to be redirected to the wrapper. `Semantics` widgets without an explicit `label` or `value` (i.e. framework-generated annotations with no user-visible content) are not reported, so the output stays quiet by default.
 
 The same technique works for tables, lists, charts, badges, and any custom-rendered content where you want to give an agent a single authoritative summary instead of asking it to reconstruct meaning from a flat list of cells.
+
+#### Accessibility trade-off: keep `label` human-friendly
+
+Whatever you put in `Semantics.label` is announced verbatim by VoiceOver and TalkBack. Stuffing markup, raw markdown, or machine-readable identifiers into `label` so the agent can read them will degrade the experience for screen-reader users — `**bold**` is read as "star star bold star star", not "bold". Two patterns avoid the trade-off:
+
+- **Pattern A — clean label, render via `Text.rich`.** Keep `label` as the human-friendly string and let `Text.rich.toPlainText()` cover the rendered version. Both the agent and the screen reader get clean text; the agent simply sees two complementary entries (`Type: Semantics` + `Type: Text`).
+- **Pattern B — structural label + dynamic value.** Use `label` for what the control *is* and `value` for its current state. Marionette emits the combined `'label: value'` for agents; screen readers announce the pair the same way they announce a native slider.
+
+If your `label` is genuinely not human-readable (e.g. you really do want the agent to see raw markup), prefer a custom widget with `extractText` so the markup never reaches the accessibility tree.
 
 #### Screenshot sizing
 
