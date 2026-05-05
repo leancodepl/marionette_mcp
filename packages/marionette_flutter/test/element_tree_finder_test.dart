@@ -97,6 +97,33 @@ void main() {
       );
     });
 
+    testWidgets(
+        'Semantics with both label and value joins them as "label: value"',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Semantics(
+              label: 'Volume',
+              value: '70%',
+              child: Container(width: 100, height: 100, color: Colors.blue),
+            ),
+          ),
+        ),
+      );
+
+      final elements = _finder.findInteractiveElements();
+      expect(
+        elements.any(
+          (e) => e['type'] == 'Semantics' && e['text'] == 'Volume: 70%',
+        ),
+        isTrue,
+        reason:
+            'When both label and value are set, the discovery output should '
+            'preserve the dynamic state instead of dropping value',
+      );
+    });
+
     testWidgets('Semantics without label or value is not reported',
         (tester) async {
       await tester.pumpWidget(
