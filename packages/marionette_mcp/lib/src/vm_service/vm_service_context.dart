@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/version.g.dart' as v;
+import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/inspection_tools.dart';
@@ -16,6 +17,10 @@ final class VmServiceContext {
 
   final VmServiceConnector connector;
   final logging.Logger _logger;
+
+  /// Tracks the dynamic tools registered for the currently connected app —
+  /// reset on each connect, disabled on each disconnect.
+  DynamicExtensionTools? _dynamicTools;
 
   /// Registers all VM service related tools with the MCP server.
   ///
@@ -88,6 +93,11 @@ final class VmServiceContext {
               );
             }
 
+            // Promote each schema-bearing custom extension into a first-class
+            // MCP tool. Failures here are logged but don't fail the connect —
+            // the generic call_custom_extension fallback keeps working.
+            await _registerDynamicTools(server);
+
             return CallToolResult(
               content: [
                 TextContent(text: 'Successfully connected to app at $uri'),
@@ -112,6 +122,9 @@ final class VmServiceContext {
           _logger.info('Disconnecting from app');
 
           try {
+            // Retire dynamic tools before tearing down the connection so a
+            // mid-disconnect tools/list reflects only what's still callable.
+            _disableDynamicTools();
             await connector.disconnect();
             return CallToolResult(
               content: [
@@ -127,5 +140,25 @@ final class VmServiceContext {
           }
         },
       );
+  }
+
+  Future<void> _registerDynamicTools(McpServer server) async {
+    // A reconnect without a clean disconnect would leak the previous
+    // batch — disable any leftovers before registering fresh ones.
+    _disableDynamicTools();
+    final dynamicTools = DynamicExtensionTools(
+      server: server,
+      connector: connector,
+      logger: _logger,
+    );
+    _dynamicTools = dynamicTools;
+    await dynamicTools.registerAll();
+  }
+
+  void _disableDynamicTools() {
+    final existing = _dynamicTools;
+    if (existing == null) return;
+    existing.disableAll();
+    _dynamicTools = null;
   }
 }
