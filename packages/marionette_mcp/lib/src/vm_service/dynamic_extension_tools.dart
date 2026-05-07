@@ -8,9 +8,14 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// Registers MCP tools at runtime for each custom extension exposed by the
 /// connected Flutter app via `registerMarionetteExtension`.
 ///
-/// One call corresponds to one connection lifecycle: callers invoke
-/// [registerAll] after `connect` succeeds, then [disableAll] on `disconnect`
-/// to retire the registered tools.
+/// A single instance lives for the lifetime of the MCP server and is reused
+/// across connect/disconnect cycles. Callers invoke [registerAll] after
+/// `connect` succeeds, then [disableAll] on `disconnect` to retire the
+/// registered tools. On a subsequent [registerAll] previously-disabled tools
+/// are revived in place via [RegisteredTool.update] rather than re-registered
+/// — re-registering by name throws in mcp_dart 2.1.0 because [disable]
+/// leaves the entry in the server's tool map (and [RegisteredTool.remove]
+/// is broken — see [disableAll]).
 ///
 /// Only extensions that ship an `inputSchema` get promoted — schema-less
 /// extensions remain reachable through the generic `call_custom_extension`
@@ -27,11 +32,20 @@ class DynamicExtensionTools {
   final McpServer _server;
   final VmServiceConnector _connector;
   final logging.Logger _logger;
-  final List<RegisteredTool> _registered = [];
 
-  /// The tools registered by the most recent [registerAll] call that have
-  /// not yet been disabled. Exposed for tests.
-  List<RegisteredTool> get registeredTools => List.unmodifiable(_registered);
+  /// Every tool we have ever registered with the server, keyed by name.
+  /// Persists across connect/disconnect cycles so we can revive entries via
+  /// [RegisteredTool.update] instead of hitting the duplicate-name guard in
+  /// [McpServer.registerTool].
+  final Map<String, RegisteredTool> _pool = {};
+
+  /// Names that are currently enabled (i.e. promoted in this connect cycle).
+  final Set<String> _active = {};
+
+  /// The tools enabled by the most recent [registerAll] call that have not
+  /// yet been disabled. Exposed for tests.
+  List<RegisteredTool> get registeredTools =>
+      List.unmodifiable(_active.map((name) => _pool[name]!));
 
   /// Reads the connected app's custom extensions and promotes each one
   /// with an `inputSchema` to a first-class MCP tool.
@@ -87,13 +101,13 @@ class DynamicExtensionTools {
         continue;
       }
 
-      final tool = _registerOne(
+      final tool = _promote(
         name: name,
         description: description,
         schemaJson: schemaJson,
       );
       if (tool != null) {
-        _registered.add(tool);
+        _active.add(name);
         registered++;
       }
     }
@@ -105,25 +119,27 @@ class DynamicExtensionTools {
     );
   }
 
-  /// Disables every tool registered by [registerAll] and forgets them.
+  /// Disables every tool currently enabled by [registerAll] but keeps the
+  /// references in the pool so the next [registerAll] can revive them via
+  /// [RegisteredTool.update].
   ///
-  /// Uses [RegisteredTool.disable] rather than [RegisteredTool.remove] —
-  /// the latter is broken in mcp_dart 2.1.0 (`update(name: null)` never
-  /// deletes the entry from the registry). Disabled tools are filtered
-  /// out of `tools/list` and rejected on call, which is the behavior we
-  /// want.
+  /// We can't drop them from the server because [RegisteredTool.remove] is
+  /// broken in mcp_dart 2.1.0 (`update(name: null)` never deletes the entry
+  /// from the registry). Disabled tools are filtered out of `tools/list`
+  /// and rejected on call, which is the behavior we want; the registry
+  /// entry just stays squatting on its name and we re-enable it next time.
   void disableAll() {
-    if (_registered.isEmpty) return;
-    for (final tool in _registered) {
-      tool.disable();
+    if (_active.isEmpty) return;
+    for (final name in _active) {
+      _pool[name]!.disable();
     }
     _logger.info(
-      'Disabled ${_registered.length} dynamic extension tool(s) on disconnect.',
+      'Disabled ${_active.length} dynamic extension tool(s) on disconnect.',
     );
-    _registered.clear();
+    _active.clear();
   }
 
-  RegisteredTool? _registerOne({
+  RegisteredTool? _promote({
     required String name,
     required String? description,
     required Map<String, dynamic> schemaJson,
@@ -147,34 +163,57 @@ class DynamicExtensionTools {
       return null;
     }
 
+    final callback = _buildCallback(name);
+
+    final pooled = _pool[name];
+    if (pooled != null) {
+      // Previously seen — revive in place. Re-registering by name would
+      // throw because mcp_dart's `disable()` leaves the entry in the
+      // server's tool map.
+      pooled.update(
+        description: description,
+        inputSchema: schema,
+        callback: FunctionToolCallback(callback),
+        enabled: true,
+      );
+      return pooled;
+    }
+
     try {
-      return _server.registerTool(
+      final tool = _server.registerTool(
         name,
         description: description,
         inputSchema: schema,
-        callback: (args, extra) async {
-          return runTool(_logger, 'call extension "$name"', () async {
-            final stringArgs = _coerceToStringMap(args);
-            final response = await _connector.callCustomExtension(
-              name,
-              stringArgs,
-            );
-            return CallToolResult(
-              content: [TextContent(text: jsonEncode(response))],
-            );
-          });
-        },
+        callback: callback,
       );
+      _pool[name] = tool;
+      return tool;
     } on ArgumentError catch (err) {
       // mcp_dart throws ArgumentError on duplicate name — most likely a
       // collision with a built-in marionette tool (tap, scroll_to, etc.)
-      // or another already-registered custom extension.
+      // or another already-registered custom extension. We don't pool
+      // colliding names so subsequent reconnects re-emit the warning.
       _logger.warning(
         'Skipping extension "$name": MCP tool name collision. '
         'Rename the extension on the Flutter side. Details: ${err.message}',
       );
       return null;
     }
+  }
+
+  ToolFunction _buildCallback(String name) {
+    return (args, extra) async {
+      return runTool(_logger, 'call extension "$name"', () async {
+        final stringArgs = _coerceToStringMap(args);
+        final response = await _connector.callCustomExtension(
+          name,
+          stringArgs,
+        );
+        return CallToolResult(
+          content: [TextContent(text: jsonEncode(response))],
+        );
+      });
+    };
   }
 }
 

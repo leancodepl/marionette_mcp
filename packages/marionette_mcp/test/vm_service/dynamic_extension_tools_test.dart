@@ -6,12 +6,17 @@ import 'package:test/test.dart';
 
 class _FakeConnector implements VmServiceConnector {
   _FakeConnector({
-    required this.listExtensionsResponse,
+    Map<String, dynamic> listExtensionsResponse = const {},
     this.listExtensionsError,
-  });
+  }) : _listExtensionsResponse = listExtensionsResponse;
 
-  final Map<String, dynamic> listExtensionsResponse;
+  Map<String, dynamic> _listExtensionsResponse;
   final Object? listExtensionsError;
+
+  /// Replace the response that the next [listExtensions] call returns.
+  /// Lets tests model what the app exposes across consecutive connect cycles.
+  set listExtensionsResponse(Map<String, dynamic> value) =>
+      _listExtensionsResponse = value;
 
   /// Records every callCustomExtension(name, args) invocation.
   final List<({String name, Map<String, dynamic> args})> calls = [];
@@ -22,7 +27,7 @@ class _FakeConnector implements VmServiceConnector {
     if (listExtensionsError != null) {
       throw listExtensionsError!;
     }
-    return listExtensionsResponse;
+    return _listExtensionsResponse;
   }
 
   @override
@@ -222,6 +227,209 @@ void main() {
 
       // Must not throw.
       dynamicTools.disableAll();
+      expect(dynamicTools.registeredTools, isEmpty);
+    });
+  });
+
+  group('DynamicExtensionTools reconnect', () {
+    test(
+        're-registers same extension after disable without name collision '
+        'and revives the same RegisteredTool instance', () async {
+      final connector = _FakeConnector(
+        listExtensionsResponse: const {
+          'extensions': [
+            {
+              'name': 'foo',
+              'description': 'first',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              },
+            },
+          ],
+        },
+      );
+
+      final dynamicTools = DynamicExtensionTools(
+        server: _server(),
+        connector: connector,
+        logger: logging.Logger.detached('test'),
+      );
+
+      // Cycle 1.
+      await dynamicTools.registerAll();
+      expect(dynamicTools.registeredTools, hasLength(1));
+      final firstInstance = dynamicTools.registeredTools.single;
+      expect(firstInstance.enabled, isTrue);
+
+      // Disconnect — emulates the disable-on-disconnect path.
+      dynamicTools.disableAll();
+      expect(dynamicTools.registeredTools, isEmpty);
+      expect(firstInstance.enabled, isFalse);
+
+      // Cycle 2 with the same payload — must not throw, must revive in
+      // place.
+      await dynamicTools.registerAll();
+
+      expect(dynamicTools.registeredTools, hasLength(1));
+      final secondInstance = dynamicTools.registeredTools.single;
+      expect(
+        identical(firstInstance, secondInstance),
+        isTrue,
+        reason: 'reconnect should reuse the pooled RegisteredTool',
+      );
+      expect(secondInstance.enabled, isTrue);
+    });
+
+    test('reflects changed description and inputSchema on revival', () async {
+      final connector = _FakeConnector(
+        listExtensionsResponse: const {
+          'extensions': [
+            {
+              'name': 'foo',
+              'description': 'v1',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              },
+            },
+          ],
+        },
+      );
+
+      final dynamicTools = DynamicExtensionTools(
+        server: _server(),
+        connector: connector,
+        logger: logging.Logger.detached('test'),
+      );
+
+      await dynamicTools.registerAll();
+      final tool = dynamicTools.registeredTools.single;
+      expect(tool.description, 'v1');
+      expect(tool.inputSchema?.properties, isEmpty);
+
+      dynamicTools.disableAll();
+
+      connector.listExtensionsResponse = const {
+        'extensions': [
+          {
+            'name': 'foo',
+            'description': 'v2',
+            'inputSchema': {
+              'type': 'object',
+              'properties': {
+                'count': {'type': 'integer'},
+              },
+              'required': ['count'],
+            },
+          },
+        ],
+      };
+      await dynamicTools.registerAll();
+
+      expect(tool.description, 'v2');
+      expect(tool.inputSchema?.properties?.keys, ['count']);
+    });
+
+    test(
+        'extensions that disappear on reconnect stay disabled and leave the '
+        'present ones enabled', () async {
+      final connector = _FakeConnector(
+        listExtensionsResponse: const {
+          'extensions': [
+            {
+              'name': 'foo',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              },
+            },
+            {
+              'name': 'bar',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              },
+            },
+          ],
+        },
+      );
+
+      final dynamicTools = DynamicExtensionTools(
+        server: _server(),
+        connector: connector,
+        logger: logging.Logger.detached('test'),
+      );
+
+      await dynamicTools.registerAll();
+      final byName = {
+        for (final t in dynamicTools.registeredTools) t.name: t,
+      };
+      expect(byName.keys, containsAll(['foo', 'bar']));
+
+      dynamicTools.disableAll();
+
+      // App now exposes only `foo`.
+      connector.listExtensionsResponse = const {
+        'extensions': [
+          {
+            'name': 'foo',
+            'inputSchema': {
+              'type': 'object',
+              'properties': <String, dynamic>{},
+            },
+          },
+        ],
+      };
+      await dynamicTools.registerAll();
+
+      final activeNames =
+          dynamicTools.registeredTools.map((t) => t.name).toSet();
+      expect(activeNames, {'foo'});
+      expect(byName['foo']!.enabled, isTrue);
+      expect(byName['bar']!.enabled, isFalse);
+    });
+
+    test('built-in name collisions are skipped on every cycle', () async {
+      final server = _server()
+        ..registerTool(
+          'tap', // Pretend this is a built-in name.
+          description: 'built-in',
+          inputSchema: const ToolInputSchema(properties: {}),
+          callback: (_, __) async =>
+              CallToolResult(content: const [TextContent(text: 'ok')]),
+        );
+
+      final connector = _FakeConnector(
+        listExtensionsResponse: const {
+          'extensions': [
+            {
+              'name': 'tap',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{},
+              },
+            },
+          ],
+        },
+      );
+
+      final dynamicTools = DynamicExtensionTools(
+        server: server,
+        connector: connector,
+        logger: logging.Logger.detached('test'),
+      );
+
+      await dynamicTools.registerAll();
+      expect(dynamicTools.registeredTools, isEmpty);
+
+      dynamicTools.disableAll();
+
+      // Second cycle with the same colliding extension — still skipped,
+      // and we still don't fall over because the collision name is not
+      // pooled (so we re-attempt registerTool, which throws and is
+      // caught again).
+      await dynamicTools.registerAll();
       expect(dynamicTools.registeredTools, isEmpty);
     });
   });

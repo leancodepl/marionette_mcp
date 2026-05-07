@@ -18,9 +18,10 @@ final class VmServiceContext {
   final VmServiceConnector connector;
   final logging.Logger _logger;
 
-  /// Tracks the dynamic tools registered for the currently connected app —
-  /// reset on each connect, disabled on each disconnect.
-  DynamicExtensionTools? _dynamicTools;
+  /// Owns the registry of dynamic extension tools across the lifetime of
+  /// this context. Reused across connect/disconnect cycles so a previously
+  /// disabled tool can be revived in place — see [DynamicExtensionTools].
+  late final DynamicExtensionTools _dynamicTools;
 
   /// Registers all VM service related tools with the MCP server.
   ///
@@ -29,6 +30,11 @@ final class VmServiceContext {
   /// and don't fit the standard tool error-handling shape. Everything else
   /// is delegated to themed registration functions.
   void registerTools(McpServer server) {
+    _dynamicTools = DynamicExtensionTools(
+      server: server,
+      connector: connector,
+      logger: _logger,
+    );
     _registerConnectionTools(server);
     registerInspectionTools(server, connector, _logger);
     registerGestureTools(server, connector, _logger);
@@ -96,7 +102,7 @@ final class VmServiceContext {
             // Promote each schema-bearing custom extension into a first-class
             // MCP tool. Failures here are logged but don't fail the connect —
             // the generic call_custom_extension fallback keeps working.
-            await _registerDynamicTools(server);
+            await _registerDynamicTools();
 
             return CallToolResult(
               content: [
@@ -142,23 +148,12 @@ final class VmServiceContext {
       );
   }
 
-  Future<void> _registerDynamicTools(McpServer server) async {
+  Future<void> _registerDynamicTools() async {
     // A reconnect without a clean disconnect would leak the previous
     // batch — disable any leftovers before registering fresh ones.
-    _disableDynamicTools();
-    final dynamicTools = DynamicExtensionTools(
-      server: server,
-      connector: connector,
-      logger: _logger,
-    );
-    _dynamicTools = dynamicTools;
-    await dynamicTools.registerAll();
+    _dynamicTools.disableAll();
+    await _dynamicTools.registerAll();
   }
 
-  void _disableDynamicTools() {
-    final existing = _dynamicTools;
-    if (existing == null) return;
-    existing.disableAll();
-    _dynamicTools = null;
-  }
+  void _disableDynamicTools() => _dynamicTools.disableAll();
 }
