@@ -17,6 +17,7 @@ Usage:
 4. Interact with elements using "tap", "enter_text", or "scroll_to" tools.
 5. Use "take_screenshots" to see the current app state and "get_logs" to debug issues.
 6. Use "hot_reload" after making code changes to reload the app without losing state.
+7. If a native OS permission dialog is blocking the app (e.g. location, camera, notifications), use "accept_permission" to dismiss it via adb/xcrun and then retry the original interaction.
 
 Important: Elements are matched by their key (ValueKey<String>) or text content. Keys are more reliable. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 ''';

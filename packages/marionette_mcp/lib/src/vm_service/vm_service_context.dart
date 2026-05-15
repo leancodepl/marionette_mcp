@@ -3,6 +3,7 @@ import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/tools/extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/inspection_tools.dart';
+import 'package:marionette_mcp/src/vm_service/tools/permission_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/system_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/text_tools.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
@@ -30,6 +31,7 @@ final class VmServiceContext {
     registerTextTools(server, connector, _logger);
     registerExtensionTools(server, connector, _logger);
     registerSystemTools(server, connector, _logger);
+    registerPermissionTools(server, _logger);
   }
 
   void _registerConnectionTools(McpServer server) {

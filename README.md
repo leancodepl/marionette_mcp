@@ -472,6 +472,7 @@ Once connected, the AI agent has access to these tools:
 | `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
 | `take_screenshots`         | Captures screenshots of all active views and returns them as base64 images.                                               |
 | `hot_reload`               | Performs a hot reload of the Flutter app, applying code changes without losing state.                                     |
+| `accept_permission`        | Dismisses a native OS permission dialog blocking the app (uses `adb` on Android, `osascript`/`xcrun` on iOS Simulator).   |
 
 ## Example Scenarios
 

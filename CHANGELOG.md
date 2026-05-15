@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add `accept_permission` tool that dismisses native OS permission dialogs blocking the Flutter app. Shells out to `adb shell uiautomator dump` + `input tap` on Android and to `osascript` (Simulator app UI) on iOS Simulator. Auto-detects the target — requires exactly one connected Android device or one booted iOS simulator on the host.
 - Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
 
 # 0.5.0
