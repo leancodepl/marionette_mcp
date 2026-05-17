@@ -7,6 +7,7 @@ import 'screens/home_screen.dart';
 import 'screens/items_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/page_view_screen.dart';
+import 'screens/permission_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
@@ -22,6 +23,7 @@ const availablePages = <String, String>{
   'page_view': '/settings/page-view',
   'dismissible': '/settings/dismissible',
   'pinch_zoom': '/settings/pinch-zoom',
+  'permission': '/settings/permission',
 };
 
 final router = GoRouter(
@@ -58,6 +60,10 @@ final router = GoRouter(
             GoRoute(
               path: 'pinch-zoom',
               builder: (context, state) => const PinchZoomScreen(),
+            ),
+            GoRoute(
+              path: 'permission',
+              builder: (context, state) => const PermissionScreen(),
             ),
           ],
         ),
