@@ -85,8 +85,7 @@ class PermissionAccepter {
     }
     if (total > 1) {
       final parts = <String>[
-        if (androidDevices.isNotEmpty)
-          'Android: ${androidDevices.join(', ')}',
+        if (androidDevices.isNotEmpty) 'Android: ${androidDevices.join(', ')}',
         if (iosSimulators.isNotEmpty) 'iOS: ${iosSimulators.join(', ')}',
       ];
       return PermissionAcceptResult(

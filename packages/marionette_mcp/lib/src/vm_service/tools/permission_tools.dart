@@ -13,8 +13,7 @@ void registerPermissionTools(
 
   server.registerTool(
     'accept_permission',
-    description:
-        'Accepts a native OS permission dialog (location, camera, '
+    description: 'Accepts a native OS permission dialog (location, camera, '
         'notifications, etc.) that is overlaying the Flutter app. Permission '
         'dialogs are rendered by the OS and live outside the Flutter widget '
         'tree, so they cannot be tapped via the regular `tap` tool. Use this '
