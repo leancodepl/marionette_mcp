@@ -53,6 +53,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/pinch-zoom'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.security_outlined),
+            title: const Text('Permission Helper'),
+            subtitle: const Text('Test native permission dialog acceptance'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/permission'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),

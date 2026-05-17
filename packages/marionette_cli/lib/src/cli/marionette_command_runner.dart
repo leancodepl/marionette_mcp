@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
+import 'package:marionette_cli/src/cli/commands/accept_permission_command.dart';
 import 'package:marionette_cli/src/cli/commands/doctor_command.dart';
 import 'package:marionette_cli/src/cli/commands/double_tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/enter_text_command.dart';
@@ -49,6 +50,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(RegisterCommand(_registry));
     addCommand(UnregisterCommand(_registry));
     addCommand(ListCommand(_registry));
+    addCommand(AcceptPermissionCommand());
     addCommand(ElementsCommand(_registry));
     addCommand(TapCommand(_registry));
     addCommand(DoubleTapCommand(_registry));
