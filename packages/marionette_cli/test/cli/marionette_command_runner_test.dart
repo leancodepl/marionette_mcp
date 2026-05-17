@@ -26,6 +26,7 @@ void main() {
         'register',
         'unregister',
         'list',
+        'accept-permission',
         'get-interactive-elements',
         'tap',
         'double-tap',
