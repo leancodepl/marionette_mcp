@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/vm_service/tools/arg_coercion.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -204,7 +205,7 @@ class DynamicExtensionTools {
   ToolFunction _buildCallback(String name) {
     return (args, extra) async {
       return runTool(_logger, 'call extension "$name"', () async {
-        final stringArgs = _coerceToStringMap(args);
+        final stringArgs = coerceToStringMap(args);
         final response = await _connector.callCustomExtension(
           name,
           stringArgs,
@@ -215,35 +216,4 @@ class DynamicExtensionTools {
       });
     };
   }
-}
-
-/// Coerces the typed JSON arguments validated against the extension's
-/// `inputSchema` into the `Map<String, String>` shape that the Dart VM
-/// service expects.
-///
-/// `int 42 → "42"`, `bool true → "true"`, `null → ""`, lists/maps →
-/// `jsonEncode(value)` so callbacks that opt into nested structures can
-/// still parse them. The Flutter callback is responsible for parsing
-/// scalars back into the right Dart type.
-///
-/// Public for testing — internal callers go through the closure inside
-/// [DynamicExtensionTools].
-Map<String, dynamic> coerceToStringMap(Map<String, dynamic> args) =>
-    _coerceToStringMap(args);
-
-Map<String, dynamic> _coerceToStringMap(Map<String, dynamic> args) {
-  final result = <String, dynamic>{};
-  for (final entry in args.entries) {
-    final value = entry.value;
-    if (value == null) {
-      result[entry.key] = '';
-    } else if (value is String) {
-      result[entry.key] = value;
-    } else if (value is num || value is bool) {
-      result[entry.key] = value.toString();
-    } else {
-      result[entry.key] = jsonEncode(value);
-    }
-  }
-  return result;
 }

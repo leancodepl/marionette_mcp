@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/vm_service/tools/arg_coercion.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -89,28 +90,44 @@ void registerExtensionTools(
           ),
           'args': JsonSchema.object(
             description: 'Optional key-value pairs to pass as arguments. '
-                'Values are passed as-is to the VM service extension.',
+                'Scalars are stringified and nested object/array values are '
+                'JSON-encoded before being sent to the VM service extension.',
             properties: {},
           ),
         },
         required: ['extension'],
       ),
-      callback: (args, extra) async {
-        final extensionName = args['extension'] as String;
-        final extensionArgs =
-            (args['args'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-        logger.info(
-          'Calling custom extension: $extensionName with args: $extensionArgs',
-        );
-        return runTool(logger, 'call custom extension', () async {
-          final response = await connector.callCustomExtension(
-            extensionName,
-            extensionArgs,
-          );
-          return CallToolResult(
-            content: [TextContent(text: jsonEncode(response))],
-          );
-        });
-      },
+      callback: (args, extra) => callCustomExtension(connector, logger, args),
     );
+}
+
+/// Handles a `call_custom_extension` invocation: coerces the supplied `args`
+/// into the wire shape, forwards them to [connector], and wraps the response.
+///
+/// Extracted from the tool callback so the coercion contract can be exercised
+/// in isolation. Args go through [coerceToStringMap] — the same path the
+/// dynamically-promoted extension tools use — so both produce identical wire
+/// args: scalars are stringified and nested object/array values become valid
+/// JSON (not Dart's un-parseable `toString()` form).
+Future<CallToolResult> callCustomExtension(
+  VmServiceConnector connector,
+  logging.Logger logger,
+  Map<String, dynamic> args,
+) {
+  final extensionName = args['extension'] as String;
+  final extensionArgs = coerceToStringMap(
+    (args['args'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
+  );
+  logger.info(
+    'Calling custom extension: $extensionName with args: $extensionArgs',
+  );
+  return runTool(logger, 'call custom extension', () async {
+    final response = await connector.callCustomExtension(
+      extensionName,
+      extensionArgs,
+    );
+    return CallToolResult(
+      content: [TextContent(text: jsonEncode(response))],
+    );
+  });
 }
