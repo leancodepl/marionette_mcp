@@ -4,8 +4,8 @@ import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
-/// Registers gesture-based MCP tools: tap, double_tap, long_press, swipe,
-/// pinch_zoom, scroll_to, press_back_button.
+/// Registers gesture-based MCP tools: tap, secondary_tap, tertiary_tap,
+/// double_tap, long_press, swipe, pinch_zoom, scroll_to, press_back_button.
 void registerGestureTools(
   McpServer server,
   VmServiceConnector connector,
@@ -55,6 +55,102 @@ void registerGestureTools(
           final message = response['message'] as String?;
           return CallToolResult(
             content: [TextContent(text: message ?? 'Successfully tapped')],
+          );
+        });
+      },
+    )
+    ..registerTool(
+      'secondary_tap',
+      description:
+          'Simulates a secondary tap (right mouse button click) on an element in the Flutter app. Desktop only — dispatches a mouse pointer with the secondary button pressed, which is what Flutter recognises as onSecondaryTap (e.g. for opening context menus). You can match elements by their key (a ValueKey<String>), by their text content, by their widget type, or by screen coordinates. Only one matching method should be used. Prefer using the key if available, as it is more reliable. Requires an active connection established via connect.',
+      annotations: const ToolAnnotations(title: 'Secondary Tap Element'),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'key': JsonSchema.string(
+            description:
+                'The key of the element to secondary tap. You can get the key of an element by calling get_interactive_elements.',
+          ),
+          'text': JsonSchema.string(
+            description:
+                'The visible text content of the element to secondary tap.',
+          ),
+          'type': JsonSchema.string(
+            description:
+                'The widget type name of the element to secondary tap (e.g., "ElevatedButton", "ListTile").',
+          ),
+          'coordinates': JsonSchema.object(
+            description: 'Screen coordinates to secondary tap at.',
+            properties: {
+              'x': JsonSchema.number(
+                description:
+                    'The x coordinate (horizontal position from left).',
+              ),
+              'y': JsonSchema.number(
+                description: 'The y coordinate (vertical position from top).',
+              ),
+            },
+            required: ['x', 'y'],
+          ),
+        },
+      ),
+      callback: (args, extra) async {
+        final matcher = buildMatcher(args);
+        logger.info('Secondary tapping with matcher: $matcher');
+        return runTool(logger, 'secondary tap', () async {
+          final response = await connector.secondaryTap(matcher);
+          final message = response['message'] as String?;
+          return CallToolResult(
+            content: [
+              TextContent(text: message ?? 'Successfully secondary tapped'),
+            ],
+          );
+        });
+      },
+    )
+    ..registerTool(
+      'tertiary_tap',
+      description:
+          'Simulates a tertiary tap (middle mouse button click) on an element in the Flutter app. Desktop only — dispatches a mouse pointer with the tertiary button pressed, which is what Flutter recognises as onTertiaryTap. You can match elements by their key (a ValueKey<String>), by their text content, by their widget type, or by screen coordinates. Only one matching method should be used. Prefer using the key if available, as it is more reliable. Requires an active connection established via connect.',
+      annotations: const ToolAnnotations(title: 'Tertiary Tap Element'),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'key': JsonSchema.string(
+            description:
+                'The key of the element to tertiary tap. You can get the key of an element by calling get_interactive_elements.',
+          ),
+          'text': JsonSchema.string(
+            description:
+                'The visible text content of the element to tertiary tap.',
+          ),
+          'type': JsonSchema.string(
+            description:
+                'The widget type name of the element to tertiary tap (e.g., "ElevatedButton", "ListTile").',
+          ),
+          'coordinates': JsonSchema.object(
+            description: 'Screen coordinates to tertiary tap at.',
+            properties: {
+              'x': JsonSchema.number(
+                description:
+                    'The x coordinate (horizontal position from left).',
+              ),
+              'y': JsonSchema.number(
+                description: 'The y coordinate (vertical position from top).',
+              ),
+            },
+            required: ['x', 'y'],
+          ),
+        },
+      ),
+      callback: (args, extra) async {
+        final matcher = buildMatcher(args);
+        logger.info('Tertiary tapping with matcher: $matcher');
+        return runTool(logger, 'tertiary tap', () async {
+          final response = await connector.tertiaryTap(matcher);
+          final message = response['message'] as String?;
+          return CallToolResult(
+            content: [
+              TextContent(text: message ?? 'Successfully tertiary tapped'),
+            ],
           );
         });
       },

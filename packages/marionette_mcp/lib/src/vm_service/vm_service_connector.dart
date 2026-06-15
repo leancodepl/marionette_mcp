@@ -265,6 +265,26 @@ class VmServiceConnector {
     return _callExtension('marionette.tap', matcher);
   }
 
+  /// Secondary-taps (right mouse button) an element matching the given
+  /// criteria. Desktop only — dispatches a mouse pointer with the secondary
+  /// button pressed.
+  ///
+  /// [matcher] should contain one of: 'key', 'text', 'type', or 'x' & 'y'.
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> secondaryTap(Map<String, dynamic> matcher) {
+    return _callExtension('marionette.secondaryTap', matcher);
+  }
+
+  /// Tertiary-taps (middle mouse button) an element matching the given
+  /// criteria. Desktop only — dispatches a mouse pointer with the tertiary
+  /// button pressed.
+  ///
+  /// [matcher] should contain one of: 'key', 'text', 'type', or 'x' & 'y'.
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> tertiaryTap(Map<String, dynamic> matcher) {
+    return _callExtension('marionette.tertiaryTap', matcher);
+  }
+
   /// Double taps an element matching the given criteria.
   ///
   /// [matcher] should contain one of:

@@ -758,4 +758,182 @@ void main() {
       },
     );
   });
+
+  group('GestureDispatcher - secondaryTap / tertiaryTap', () {
+    testWidgets(
+      'secondaryTap dispatches a mouse pointer with the secondary button',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.secondaryTap(
+              const CoordinatesMatcher(100, 100),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        final addedEvents = events.whereType<PointerAddedEvent>().toList();
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
+
+        expect(addedEvents, hasLength(1));
+        expect(downEvents, hasLength(1));
+        expect(upEvents, hasLength(1));
+        expect(removedEvents, hasLength(1));
+
+        for (final event in events) {
+          expect(
+            event.kind,
+            equals(PointerDeviceKind.mouse),
+            reason: '${event.runtimeType} should be a mouse pointer',
+          );
+          expect(
+            event.device,
+            isNot(equals(0)),
+            reason: '${event.runtimeType} should use a unique device id, '
+                'not 0 which is the real desktop cursor',
+          );
+        }
+
+        expect(
+          downEvents.single.buttons,
+          equals(kSecondaryButton),
+          reason: 'PointerDownEvent should press the secondary button',
+        );
+        expect(
+          upEvents.single.buttons,
+          equals(0),
+          reason: 'PointerUpEvent should release all buttons',
+        );
+      },
+    );
+
+    testWidgets(
+      'tertiaryTap dispatches a mouse pointer with the tertiary button',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.tertiaryTap(
+              const CoordinatesMatcher(100, 100),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+
+        expect(downEvents, hasLength(1));
+        expect(
+          downEvents.single.kind,
+          equals(PointerDeviceKind.mouse),
+        );
+        expect(
+          downEvents.single.buttons,
+          equals(kTertiaryButton),
+          reason: 'PointerDownEvent should press the tertiary button',
+        );
+        expect(upEvents.single.buttons, equals(0));
+      },
+    );
+
+    testWidgets(
+      'secondaryTap actually triggers onSecondaryTap on a widget',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var secondaryTapped = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: GestureDetector(
+                  onSecondaryTap: () => secondaryTapped = true,
+                  child: const SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: Text('target'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.secondaryTap(
+              const TextMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        expect(
+          secondaryTapped,
+          isTrue,
+          reason: 'GestureDetector.onSecondaryTap should have fired',
+        );
+      },
+    );
+
+    testWidgets(
+      'tertiaryTap actually triggers onTertiaryTapUp on a widget',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var tertiaryTapped = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: GestureDetector(
+                  onTertiaryTapUp: (_) => tertiaryTapped = true,
+                  child: const SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: Text('target'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.tertiaryTap(
+              const TextMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        expect(
+          tertiaryTapped,
+          isTrue,
+          reason: 'GestureDetector.onTertiaryTapUp should have fired',
+        );
+      },
+    );
+  });
 }
