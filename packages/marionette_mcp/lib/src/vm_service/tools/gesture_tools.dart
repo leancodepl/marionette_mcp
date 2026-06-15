@@ -4,8 +4,8 @@ import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
-/// Registers gesture-based MCP tools: tap, double_tap, long_press, swipe,
-/// pinch_zoom, scroll_to, press_back_button.
+/// Registers gesture-based MCP tools: tap, right_click, double_tap,
+/// long_press, swipe, pinch_zoom, scroll_to, press_back_button.
 void registerGestureTools(
   McpServer server,
   VmServiceConnector connector,
@@ -55,6 +55,55 @@ void registerGestureTools(
           final message = response['message'] as String?;
           return CallToolResult(
             content: [TextContent(text: message ?? 'Successfully tapped')],
+          );
+        });
+      },
+    )
+    ..registerTool(
+      'right_click',
+      description:
+          'Simulates a right-click (secondary mouse button click) on an element in the Flutter app that matches the given criteria. This dispatches a mouse-kind pointer with the secondary button pressed, which is what triggers context menus and GestureDetector onSecondaryTap / onSecondaryTapUp handlers. Mainly relevant for desktop and web Flutter apps. You can match elements by their key (a ValueKey<String>), by their text content (but not accessibility!), by their widget type, or by screen coordinates. Only one matching method should be used: either key, text, type, or coordinates. Prefer using the key if available, as it is more reliable. Requires an active connection established via connect.',
+      annotations: const ToolAnnotations(title: 'Right-Click Element'),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'key': JsonSchema.string(
+            description:
+                'The key of the element to right-click. You can get the key of an element by calling get_interactive_elements.',
+          ),
+          'text': JsonSchema.string(
+            description:
+                'The visible text content of the element to right-click. Use this for elements that display text like buttons or labels.',
+          ),
+          'type': JsonSchema.string(
+            description:
+                'The widget type name of the element to right-click (e.g., "ElevatedButton", "IconButton"). Use this to match elements by their Flutter widget type.',
+          ),
+          'coordinates': JsonSchema.object(
+            description:
+                'Screen coordinates to right-click at. Use this to right-click at a specific position on the screen.',
+            properties: {
+              'x': JsonSchema.number(
+                description:
+                    'The x coordinate (horizontal position from left).',
+              ),
+              'y': JsonSchema.number(
+                description: 'The y coordinate (vertical position from top).',
+              ),
+            },
+            required: ['x', 'y'],
+          ),
+        },
+      ),
+      callback: (args, extra) async {
+        final matcher = buildMatcher(args);
+        logger.info('Right-clicking with matcher: $matcher');
+        return runTool(logger, 'right click', () async {
+          final response = await connector.rightClick(matcher);
+          final message = response['message'] as String?;
+          return CallToolResult(
+            content: [
+              TextContent(text: message ?? 'Successfully right-clicked'),
+            ],
           );
         });
       },

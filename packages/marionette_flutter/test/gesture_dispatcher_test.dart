@@ -92,6 +92,96 @@ void main() {
     );
   });
 
+  group('GestureDispatcher.rightClick', () {
+    testWidgets(
+      'should dispatch a mouse-kind secondary-button down/up sequence',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
+        );
+
+        final events = <PointerEvent>[];
+        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
+        addTearDown(
+          () => GestureBinding.instance.pointerRouter
+              .removeGlobalRoute(events.add),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.rightClick(
+              const CoordinatesMatcher(100, 100),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        expect(events, isNotEmpty, reason: 'Should have dispatched events');
+
+        // Verify correct event sequence: Added, Down, Up, Removed
+        final addedEvents = events.whereType<PointerAddedEvent>().toList();
+        final downEvents = events.whereType<PointerDownEvent>().toList();
+        final upEvents = events.whereType<PointerUpEvent>().toList();
+        final removedEvents = events.whereType<PointerRemovedEvent>().toList();
+
+        expect(addedEvents, hasLength(1));
+        expect(downEvents, hasLength(1));
+        expect(upEvents, hasLength(1));
+        expect(removedEvents, hasLength(1));
+
+        // The down event must be a mouse with the secondary button pressed,
+        // which is what triggers onSecondaryTap handlers and context menus.
+        expect(downEvents.single.kind, PointerDeviceKind.mouse);
+        expect(downEvents.single.buttons, kSecondaryButton);
+
+        // All events should use a mouse kind and a non-zero device id so they
+        // do not collide with the real macOS mouse at device 0.
+        for (final event in events) {
+          expect(event.kind, PointerDeviceKind.mouse);
+          expect(
+            event.device,
+            isNot(equals(0)),
+            reason: '${event.runtimeType} should use a unique device id',
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'should trigger onSecondaryTapUp on the matched widget',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var secondaryTapped = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: GestureDetector(
+                  onSecondaryTapUp: (_) => secondaryTapped = true,
+                  child: const Text('Target'),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.rightClick(
+              const TextMatcher('Target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        expect(
+          secondaryTapped,
+          isTrue,
+          reason: 'Right-click should fire onSecondaryTapUp',
+        );
+      },
+    );
+  });
+
   group('GestureDispatcher - Bug B5: macOS pointer device collision', () {
     testWidgets(
       'should use a unique device id (not 0) to avoid colliding with the real mouse',

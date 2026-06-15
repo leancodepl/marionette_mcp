@@ -78,6 +78,91 @@ class GestureDispatcher {
     await _handlePointerEventRecord(records);
   }
 
+  /// Simulates a right-click (secondary mouse button click) on an element that
+  /// matches the given [matcher].
+  ///
+  /// Unlike [tap], this dispatches a mouse-kind pointer with
+  /// [kSecondaryButton] pressed, which is what Flutter's tap recognizers
+  /// require to fire `onSecondaryTap` / `onSecondaryTapUp` handlers and to
+  /// open context menus. Mainly relevant for desktop and web apps.
+  ///
+  /// If [matcher] is a [CoordinatesMatcher], clicks directly at the specified
+  /// coordinates without searching the widget tree (fast path).
+  Future<void> rightClick(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration,
+  ) async {
+    // Fast path for coordinate-based right-clicking
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchSecondaryTapAtPosition(matcher.offset);
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    } else {
+      await _dispatchSecondaryTapAtElement(element);
+    }
+  }
+
+  Future<void> _dispatchSecondaryTapAtElement(Element element) async {
+    final renderObject = element.renderObject;
+
+    if (renderObject is! RenderBox) {
+      throw Exception('Element does not have a RenderBox');
+    }
+
+    if (!renderObject.hasSize) {
+      throw Exception('RenderBox does not have a size yet');
+    }
+
+    final center = renderObject.size.center(Offset.zero);
+    final globalPosition = renderObject.localToGlobal(center);
+
+    await _dispatchSecondaryTapAtPosition(globalPosition);
+  }
+
+  Future<void> _dispatchSecondaryTapAtPosition(Offset globalPosition) async {
+    final pointerId = _nextPointerId++;
+
+    final records = [
+      // Mouse pointer down with the secondary button pressed
+      [
+        PointerAddedEvent(
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          device: _kDeviceId,
+        ),
+        PointerDownEvent(
+          pointer: pointerId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          buttons: kSecondaryButton,
+          device: _kDeviceId,
+        ),
+      ],
+      // Release (buttons defaults to 0 = no buttons pressed), then remove
+      [
+        PointerUpEvent(
+          pointer: pointerId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          device: _kDeviceId,
+        ),
+        PointerRemovedEvent(
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          device: _kDeviceId,
+        ),
+      ],
+    ];
+
+    await _handlePointerEventRecord(records);
+  }
+
   /// Simulates a double tap on an element that matches the given [matcher].
   ///
   /// Two taps are dispatched with [delay] between them.

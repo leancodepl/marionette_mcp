@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add `right_click` support across all layers (MCP tool, `marionette.rightClick` extension, `GestureDispatcher.rightClick`, and the `right-click` CLI command). Dispatches a mouse-kind pointer with the secondary button pressed to trigger context menus and `onSecondaryTap` handlers, mainly for desktop and web apps.
 - Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
 
 # 0.5.0

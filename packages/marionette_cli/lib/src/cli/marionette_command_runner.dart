@@ -16,6 +16,7 @@ import 'package:marionette_cli/src/cli/commands/pinch_zoom_command.dart';
 import 'package:marionette_cli/src/cli/commands/record_video_command.dart';
 import 'package:marionette_cli/src/cli/commands/press_back_button_command.dart';
 import 'package:marionette_cli/src/cli/commands/register_command.dart';
+import 'package:marionette_cli/src/cli/commands/right_click_command.dart';
 import 'package:marionette_cli/src/cli/commands/scroll_to_command.dart';
 import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
@@ -51,6 +52,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(ListCommand(_registry));
     addCommand(ElementsCommand(_registry));
     addCommand(TapCommand(_registry));
+    addCommand(RightClickCommand(_registry));
     addCommand(DoubleTapCommand(_registry));
     addCommand(LongPressCommand(_registry));
     addCommand(PinchZoomCommand(_registry));

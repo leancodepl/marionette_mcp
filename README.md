@@ -467,6 +467,7 @@ Once connected, the AI agent has access to these tools:
 | `disconnect`               | Disconnect from the currently connected app.                                                                              |
 | `get_interactive_elements` | Returns a list of all interactive UI elements (buttons, inputs, etc.) visible on screen.                                  |
 | `tap`                      | Taps an element matching a specific key or visible text.                                                                  |
+| `right_click`              | Right-clicks (secondary mouse button) an element to trigger context menus / `onSecondaryTap` handlers (desktop/web).      |
 | `enter_text`               | Enters text into a text field matching a key.                                                                             |
 | `scroll_to`                | Scrolls the view until an element matching a key or text becomes visible.                                                 |
 | `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |

@@ -8,8 +8,8 @@ import 'package:marionette_flutter/src/services/scroll_simulator.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
-/// Registers gesture-based `marionette.*` extensions: tap, doubleTap,
-/// longPress, swipe, pinchZoom, scrollTo.
+/// Registers gesture-based `marionette.*` extensions: tap, rightClick,
+/// doubleTap, longPress, swipe, pinchZoom, scrollTo.
 void registerGestureExtensions({
   required GestureDispatcher gestureDispatcher,
   required WidgetFinder widgetFinder,
@@ -23,6 +23,17 @@ void registerGestureExtensions({
       await gestureDispatcher.tap(matcher, widgetFinder, configuration);
       return MarionetteExtensionResult.success({
         'message': 'Tapped element matching: ${matcher.toJson()}',
+      });
+    },
+  );
+
+  registerInternalMarionetteExtension(
+    name: 'marionette.rightClick',
+    callback: (params) async {
+      final matcher = WidgetMatcher.fromJson(params);
+      await gestureDispatcher.rightClick(matcher, widgetFinder, configuration);
+      return MarionetteExtensionResult.success({
+        'message': 'Right-clicked element matching: ${matcher.toJson()}',
       });
     },
   );

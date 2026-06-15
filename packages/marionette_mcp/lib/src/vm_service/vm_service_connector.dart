@@ -265,6 +265,19 @@ class VmServiceConnector {
     return _callExtension('marionette.tap', matcher);
   }
 
+  /// Right-clicks (secondary mouse button) an element matching the criteria.
+  ///
+  /// [matcher] should contain one of:
+  /// - 'key': matches by `ValueKey<String>`
+  /// - 'text': matches by visible text content
+  /// - 'type': matches by widget type name
+  /// - 'x' and 'y': screen coordinates for clicking at a specific position
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> rightClick(Map<String, dynamic> matcher) {
+    return _callExtension('marionette.rightClick', matcher);
+  }
+
   /// Double taps an element matching the given criteria.
   ///
   /// [matcher] should contain one of:
