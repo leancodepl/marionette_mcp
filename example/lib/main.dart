@@ -31,17 +31,15 @@ void _registerNavigationExtensions() {
   registerMarionetteExtension(
     name: 'appNavigation.goToPage',
     description: 'Navigates to a page by name.',
-    inputSchema: {
-      'type': 'object',
-      'properties': {
-        'page': {
-          'type': 'string',
-          'description': 'Page name. One of: ${availablePages.keys.join(', ')}',
-          'enum': availablePages.keys.toList(),
-        },
+    inputSchema: ExtensionInputSchema(
+      properties: {
+        'page': ExtensionParam.string(
+          description: 'Page name. One of: ${availablePages.keys.join(', ')}',
+          enumValues: availablePages.keys.toList(),
+        ),
       },
-      'required': ['page'],
-    },
+      required: const ['page'],
+    ),
     callback: (params) async {
       final page = params['page'];
       if (page == null) {

@@ -82,7 +82,8 @@ void registerInfoExtensions({
             {
               'name': ext.name,
               if (ext.description != null) 'description': ext.description,
-              if (ext.inputSchema != null) 'inputSchema': ext.inputSchema,
+              if (ext.inputSchema != null)
+                'inputSchema': ext.inputSchema!.toJson(),
             },
         ],
       });

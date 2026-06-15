@@ -29,61 +29,6 @@ void main() {
       );
     });
 
-    test('throws when inputSchema top-level type is not "object"', () {
-      expect(
-        () => registerMarionetteExtension(
-          name: 'broken',
-          inputSchema: const {'type': 'string'},
-          callback: (_) async => MarionetteExtensionResult.success({}),
-        ),
-        throwsA(
-          isA<ArgumentError>().having(
-            (e) => e.message,
-            'message',
-            contains('top-level "type" must be "object"'),
-          ),
-        ),
-      );
-    });
-
-    test('throws when inputSchema property type is not scalar', () {
-      expect(
-        () => registerMarionetteExtension(
-          name: 'broken',
-          inputSchema: const {
-            'type': 'object',
-            'properties': {
-              'tags': {'type': 'array'},
-            },
-          },
-          callback: (_) async => MarionetteExtensionResult.success({}),
-        ),
-        throwsA(
-          isA<ArgumentError>().having(
-            (e) => e.message,
-            'message',
-            contains('must declare a scalar "type"'),
-          ),
-        ),
-      );
-    });
-
-    test('throws when inputSchema property is not a JSON object', () {
-      expect(
-        () => registerMarionetteExtension(
-          name: 'broken',
-          inputSchema: const {
-            'type': 'object',
-            'properties': {
-              'oops': 'not-a-schema',
-            },
-          },
-          callback: (_) async => MarionetteExtensionResult.success({}),
-        ),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
-
     test('accepts a valid scalar-only schema', () {
       // Validation must not throw — the underlying VM service registration
       // will fail outside a real isolate, which is expected here.
@@ -91,16 +36,15 @@ void main() {
         registerMarionetteExtension(
           name: 'reg.test.valid',
           description: 'A valid extension',
-          inputSchema: const {
-            'type': 'object',
-            'properties': {
-              'slideIndex': {'type': 'integer', 'minimum': 0},
-              'animate': {'type': 'boolean'},
-              'name': {'type': 'string'},
-              'speed': {'type': 'number'},
+          inputSchema: const ExtensionInputSchema(
+            properties: {
+              'slideIndex': ExtensionParam.integer(minimum: 0),
+              'animate': ExtensionParam.boolean(),
+              'name': ExtensionParam.string(),
+              'speed': ExtensionParam.number(),
             },
-            'required': ['slideIndex'],
-          },
+            required: ['slideIndex'],
+          ),
           callback: (_) async => MarionetteExtensionResult.success({}),
         );
       } catch (e) {
@@ -118,14 +62,40 @@ void main() {
     });
 
     test('preserves inputSchema verbatim', () {
-      const schema = {
-        'type': 'object',
-        'properties': {
-          'x': {'type': 'integer'},
+      const schema = ExtensionInputSchema(
+        properties: {
+          'x': ExtensionParam.integer(),
         },
-      };
+      );
       const details = ExtensionDetails(name: 'foo', inputSchema: schema);
       expect(details.inputSchema, same(schema));
+    });
+
+    test('inputSchema serializes to the expected wire format', () {
+      const details = ExtensionDetails(
+        name: 'appNavigation.goToPage',
+        inputSchema: ExtensionInputSchema(
+          properties: {
+            'page': ExtensionParam.string(
+              description: 'Page name.',
+              enumValues: ['home', 'settings'],
+            ),
+          },
+          required: ['page'],
+        ),
+      );
+
+      expect(details.inputSchema!.toJson(), {
+        'type': 'object',
+        'properties': {
+          'page': {
+            'description': 'Page name.',
+            'type': 'string',
+            'enum': ['home', 'settings'],
+          },
+        },
+        'required': ['page'],
+      });
     });
   });
 }
