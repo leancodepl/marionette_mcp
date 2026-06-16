@@ -1,5 +1,6 @@
 library marionette_flutter;
 
+export 'src/binding/extension_schema.dart';
 export 'src/binding/marionette_binding.dart';
 export 'src/binding/marionette_configuration.dart';
 export 'src/binding/marionette_extension_result.dart';

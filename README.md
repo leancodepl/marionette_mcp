@@ -473,6 +473,71 @@ Once connected, the AI agent has access to these tools:
 | `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
 | `take_screenshots`         | Captures screenshots of all active views and returns them as base64 images.                                               |
 | `hot_reload`               | Performs a hot reload of the Flutter app, applying code changes without losing state.                                     |
+| `list_custom_extensions`   | Lists the app-specific extensions registered via `registerMarionetteExtension` (see [Custom Extensions](#custom-extensions)). |
+| `call_custom_extension`    | Calls a custom extension that does not declare an `inputSchema` (the generic escape hatch).                               |
+
+In addition, any custom extension that declares an `inputSchema` appears as a **dedicated tool of its own**, named after the extension — see [Custom Extensions](#custom-extensions) below.
+
+## Custom Extensions
+
+Beyond the built-in tools, your app can expose its own actions to the agent by registering a custom VM service extension with `registerMarionetteExtension`. This is useful for app-specific operations the generic tools can't express — navigating by route name, seeding test data, toggling feature flags, and so on.
+
+### Declaring a schema (recommended)
+
+When an extension declares an `inputSchema`, the MCP server promotes it to a **first-class, individually-named tool** with a validated input schema. The agent discovers it in the tool list, gets argument hints and enum autocomplete, and invalid arguments are rejected before they ever reach your app:
+
+```dart
+import 'package:marionette_flutter/marionette_flutter.dart';
+
+registerMarionetteExtension(
+  name: 'appNavigation.goToPage',
+  description: 'Navigates to a page by name.',
+  inputSchema: ExtensionInputSchema(
+    properties: {
+      'page': ExtensionParam.string(
+        description: 'The page to navigate to.',
+        enumValues: ['home', 'profile', 'settings'],
+      ),
+      'animate': ExtensionParam.boolean(
+        description: 'Whether to animate the transition.',
+        defaultValue: true,
+      ),
+    },
+    required: ['page'],
+  ),
+  callback: (params) async {
+    final page = params['page'];
+    if (page == null) {
+      return MarionetteExtensionResult.invalidParams('Missing required parameter: page');
+    }
+    // `params` always arrives as Map<String, String>; parse non-string values.
+    final animate = params['animate'] != 'false';
+    navigateTo(page, animate: animate); // your app's own navigation
+    return MarionetteExtensionResult.success({'page': page});
+  },
+);
+```
+
+The agent can now call `appNavigation.goToPage` directly — e.g. _"navigate to the profile page"_ — and a bad value like `page: "banana"` is rejected by schema validation.
+
+`ExtensionParam` supports `.string` (with optional `enumValues`), `.integer`, `.number`, and `.boolean`. **Schemas are restricted to flat scalar parameters** by design: custom extension arguments travel over the VM service as a `Map<String, String>`, so nested objects/arrays can't round-trip reliably as typed values.
+
+### No schema (the fallback)
+
+A schema is optional. An extension without one — e.g. a parameter-less action, or one whose inputs a scalar schema can't capture — stays fully supported: it is **not** promoted to its own tool, but remains reachable through the generic `call_custom_extension` tool and shows up in `list_custom_extensions`.
+
+```dart
+registerMarionetteExtension(
+  name: 'appNavigation.getPageInfo',
+  description: 'Returns the current page and the list of available pages.',
+  callback: (params) async => MarionetteExtensionResult.success({
+    'currentPage': currentPageName(),
+    'availablePages': allPageNames(),
+  }),
+);
+```
+
+> **Prefer declaring an `inputSchema`** whenever your parameters are flat scalars — you get validation and a dedicated, discoverable tool. Reach for the schema-less form only for parameter-less extensions or inputs a scalar schema can't express.
 
 ## Example Scenarios
 
