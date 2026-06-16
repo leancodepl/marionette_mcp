@@ -19,8 +19,8 @@ import 'dart:convert';
 /// Both the dynamically-promoted extension tools and the generic
 /// `call_custom_extension` escape hatch route through this so they produce
 /// identical wire args for the same input.
-Map<String, dynamic> coerceToStringMap(Map<String, dynamic> args) {
-  final result = <String, dynamic>{};
+Map<String, String> coerceToStringMap(Map<String, dynamic> args) {
+  final result = <String, String>{};
   for (final entry in args.entries) {
     final value = entry.value;
     if (value == null) {
