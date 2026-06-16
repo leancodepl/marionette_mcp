@@ -53,6 +53,15 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/pinch-zoom'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.mouse_outlined),
+            title: const Text('Mouse Buttons'),
+            subtitle: const Text('Test secondary (right) and tertiary '
+                '(middle) tap gestures'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/mouse-tap'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),

@@ -125,9 +125,8 @@ class GestureDispatcher {
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');
-    } else {
-      await _dispatchMouseTapAtPosition(_globalCenterOf(element), buttons);
     }
+    await _dispatchMouseTapAtPosition(_globalCenterOf(element), buttons);
   }
 
   Future<void> _dispatchMouseTapAtPosition(

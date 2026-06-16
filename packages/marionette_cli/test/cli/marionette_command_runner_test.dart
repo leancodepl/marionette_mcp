@@ -28,6 +28,8 @@ void main() {
         'list',
         'get-interactive-elements',
         'tap',
+        'secondary-tap',
+        'tertiary-tap',
         'double-tap',
         'long-press',
         'pinch-zoom',
