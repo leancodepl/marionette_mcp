@@ -53,6 +53,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/pinch-zoom'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.ads_click_outlined),
+            title: const Text('Right Click'),
+            subtitle: const Text('Test secondary (right) click gesture'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/right-click'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),

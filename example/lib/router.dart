@@ -9,6 +9,7 @@ import 'screens/notifications_screen.dart';
 import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/right_click_screen.dart';
 import 'screens/settings_screen.dart';
 
 /// Page name → route path mapping used by the custom VM service extension.
@@ -22,6 +23,7 @@ const availablePages = <String, String>{
   'page_view': '/settings/page-view',
   'dismissible': '/settings/dismissible',
   'pinch_zoom': '/settings/pinch-zoom',
+  'right_click': '/settings/right-click',
 };
 
 final router = GoRouter(
@@ -58,6 +60,10 @@ final router = GoRouter(
             GoRoute(
               path: 'pinch-zoom',
               builder: (context, state) => const PinchZoomScreen(),
+            ),
+            GoRoute(
+              path: 'right-click',
+              builder: (context, state) => const RightClickScreen(),
             ),
           ],
         ),
