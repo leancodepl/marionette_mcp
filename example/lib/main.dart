@@ -25,10 +25,10 @@ void main() {
 
 void _registerNavigationExtensions() {
   // goToPage opts into the new dynamic-tool surface by declaring an
-  // inputSchema — when an MCP client supports tools/list_changed, it
-  // appears alongside the built-in marionette tools as
-  // `appNavigation.goToPage` with full argument autocomplete.
-  registerMarionetteExtension(
+  // inputSchema — when an MCP client supports dynamic tool lists (the
+  // `listChanged` tools capability), it appears alongside the built-in
+  // marionette tools as `appNavigation.goToPage` with full argument
+  // autocomplete.
     name: 'appNavigation.goToPage',
     description: 'Navigates to a page by name.',
     inputSchema: ExtensionInputSchema(
