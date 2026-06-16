@@ -5,6 +5,7 @@ import 'screens/about_screen.dart';
 import 'screens/dismissible_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/items_screen.dart';
+import 'screens/mouse_tap_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
@@ -22,6 +23,7 @@ const availablePages = <String, String>{
   'page_view': '/settings/page-view',
   'dismissible': '/settings/dismissible',
   'pinch_zoom': '/settings/pinch-zoom',
+  'mouse_tap': '/settings/mouse-tap',
 };
 
 final router = GoRouter(
@@ -58,6 +60,10 @@ final router = GoRouter(
             GoRoute(
               path: 'pinch-zoom',
               builder: (context, state) => const PinchZoomScreen(),
+            ),
+            GoRoute(
+              path: 'mouse-tap',
+              builder: (context, state) => const MouseTapScreen(),
             ),
           ],
         ),

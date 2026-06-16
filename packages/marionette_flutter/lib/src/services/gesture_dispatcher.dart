@@ -11,6 +11,7 @@ class GestureDispatcher {
 
   static const _kDeviceId = 1;
   static const _kSecondDeviceId = 2;
+  static const _kMouseDeviceId = 3;
 
   int _nextPointerId = 1;
 
@@ -39,6 +40,13 @@ class GestureDispatcher {
   }
 
   Future<void> _dispatchTapAtElement(Element element) async {
+    await _dispatchTapAtPosition(_globalCenterOf(element));
+  }
+
+  /// Returns the global position of the center of [element]'s [RenderBox].
+  ///
+  /// Throws if the element has no [RenderBox] or has not been laid out yet.
+  Offset _globalCenterOf(Element element) {
     final renderObject = element.renderObject;
 
     if (renderObject is! RenderBox) {
@@ -49,11 +57,8 @@ class GestureDispatcher {
       throw Exception('RenderBox does not have a size yet');
     }
 
-    // Get the center position of the widget
     final center = renderObject.size.center(Offset.zero);
-    final globalPosition = renderObject.localToGlobal(center);
-
-    await _dispatchTapAtPosition(globalPosition);
+    return renderObject.localToGlobal(center);
   }
 
   Future<void> _dispatchTapAtPosition(Offset globalPosition) async {
@@ -72,6 +77,81 @@ class GestureDispatcher {
         PointerUpEvent(
             pointer: pointerId, position: globalPosition, device: _kDeviceId),
         PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
+      ],
+    ];
+
+    await _handlePointerEventRecord(records);
+  }
+
+  /// Simulates a secondary (right mouse button) tap on an element matching
+  /// [matcher].
+  ///
+  /// Dispatches a mouse pointer with [kSecondaryButton] pressed, which is what
+  /// Flutter recognises as `onSecondaryTap` (e.g. context menus). Desktop only —
+  /// touch devices do not support non-primary buttons.
+  Future<void> secondaryTap(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration,
+  ) =>
+      _mouseTap(matcher, widgetFinder, configuration,
+          buttons: kSecondaryButton);
+
+  Future<void> _mouseTap(
+    WidgetMatcher matcher,
+    WidgetFinder widgetFinder,
+    MarionetteConfiguration configuration, {
+    required int buttons,
+  }) async {
+    if (matcher is CoordinatesMatcher) {
+      await _dispatchMouseTapAtPosition(matcher.offset, buttons);
+      return;
+    }
+
+    final element = widgetFinder.findHittableElement(matcher, configuration);
+
+    if (element == null) {
+      throw Exception('Element matching ${matcher.toJson()} not found');
+    }
+    await _dispatchMouseTapAtPosition(_globalCenterOf(element), buttons);
+  }
+
+  Future<void> _dispatchMouseTapAtPosition(
+    Offset globalPosition,
+    int buttons,
+  ) async {
+    final pointerId = _nextPointerId++;
+
+    final records = [
+      // Mouse moves in and presses the requested button.
+      [
+        PointerAddedEvent(
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          device: _kMouseDeviceId,
+        ),
+        PointerDownEvent(
+          pointer: pointerId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          buttons: buttons,
+          device: _kMouseDeviceId,
+        ),
+      ],
+      // Button released (buttons: 0), then the device is removed.
+      [
+        PointerUpEvent(
+          pointer: pointerId,
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          buttons: 0,
+          device: _kMouseDeviceId,
+        ),
+        PointerRemovedEvent(
+          position: globalPosition,
+          kind: PointerDeviceKind.mouse,
+          device: _kMouseDeviceId,
+        ),
       ],
     ];
 
@@ -111,20 +191,7 @@ class GestureDispatcher {
     Element element,
     Duration delay,
   ) async {
-    final renderObject = element.renderObject;
-
-    if (renderObject is! RenderBox) {
-      throw Exception('Element does not have a RenderBox');
-    }
-
-    if (!renderObject.hasSize) {
-      throw Exception('RenderBox does not have a size yet');
-    }
-
-    final center = renderObject.size.center(Offset.zero);
-    final globalPosition = renderObject.localToGlobal(center);
-
-    await _dispatchDoubleTapAtPosition(globalPosition, delay);
+    await _dispatchDoubleTapAtPosition(_globalCenterOf(element), delay);
   }
 
   Future<void> _dispatchDoubleTapAtPosition(
@@ -174,20 +241,7 @@ class GestureDispatcher {
     Element element,
     Duration duration,
   ) async {
-    final renderObject = element.renderObject;
-
-    if (renderObject is! RenderBox) {
-      throw Exception('Element does not have a RenderBox');
-    }
-
-    if (!renderObject.hasSize) {
-      throw Exception('RenderBox does not have a size yet');
-    }
-
-    final center = renderObject.size.center(Offset.zero);
-    final globalPosition = renderObject.localToGlobal(center);
-
-    await _dispatchLongPressAtPosition(globalPosition, duration);
+    await _dispatchLongPressAtPosition(_globalCenterOf(element), duration);
   }
 
   Future<void> _dispatchLongPressAtPosition(
@@ -238,17 +292,7 @@ class GestureDispatcher {
       throw Exception('Element matching ${matcher.toJson()} not found');
     }
 
-    final renderObject = element.renderObject;
-    if (renderObject is! RenderBox) {
-      throw Exception('Element does not have a RenderBox');
-    }
-
-    if (!renderObject.hasSize) {
-      throw Exception('RenderBox does not have a size yet');
-    }
-
-    final center = renderObject.size.center(Offset.zero);
-    final start = renderObject.localToGlobal(center);
+    final start = _globalCenterOf(element);
 
     final end = switch (direction) {
       'left' => start + Offset(-distance, 0),
@@ -298,17 +342,7 @@ class GestureDispatcher {
       throw Exception('Element matching ${matcher.toJson()} not found');
     }
 
-    final renderObject = element.renderObject;
-    if (renderObject is! RenderBox) {
-      throw Exception('Element does not have a RenderBox');
-    }
-
-    if (!renderObject.hasSize) {
-      throw Exception('RenderBox does not have a size yet');
-    }
-
-    final center = renderObject.size.center(Offset.zero);
-    final globalCenter = renderObject.localToGlobal(center);
+    final globalCenter = _globalCenterOf(element);
 
     await _dispatchPinchZoomAtPosition(
       globalCenter,
