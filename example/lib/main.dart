@@ -29,6 +29,7 @@ void _registerNavigationExtensions() {
   // `listChanged` tools capability), it appears alongside the built-in
   // marionette tools as `appNavigation.goToPage` with full argument
   // autocomplete.
+  registerMarionetteExtension(
     name: 'appNavigation.goToPage',
     description: 'Navigates to a page by name.',
     inputSchema: ExtensionInputSchema(
