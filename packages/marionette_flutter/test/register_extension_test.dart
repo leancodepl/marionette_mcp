@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
+import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 
 void main() {
   group('registerMarionetteExtension validation', () {
@@ -96,6 +97,64 @@ void main() {
         },
         'required': ['page'],
       });
+    });
+  });
+
+  group('mergeSchemaDefaults', () {
+    const schema = ExtensionInputSchema(
+      properties: {
+        'name': ExtensionParam.string(defaultValue: 'guest'),
+        'count': ExtensionParam.integer(defaultValue: 3),
+        'ratio': ExtensionParam.number(defaultValue: 1.5),
+        'animate': ExtensionParam.boolean(defaultValue: true),
+        'page': ExtensionParam.string(), // no default
+      },
+    );
+
+    test('fills omitted params with their stringified defaults', () {
+      expect(mergeSchemaDefaults(schema, const {}), {
+        'name': 'guest',
+        'count': '3',
+        'ratio': '1.5',
+        'animate': 'true',
+      });
+    });
+
+    test('caller-supplied values override declared defaults', () {
+      expect(
+        mergeSchemaDefaults(schema, const {'count': '10', 'animate': 'false'}),
+        {
+          'name': 'guest',
+          'count': '10',
+          'ratio': '1.5',
+          'animate': 'false',
+        },
+      );
+    });
+
+    test('does not inject keys for properties without a default', () {
+      final merged = mergeSchemaDefaults(schema, const {});
+      expect(merged.containsKey('page'), isFalse);
+    });
+
+    test('passes parameters through verbatim when schema is null', () {
+      const params = {'a': '1'};
+      expect(mergeSchemaDefaults(null, params), same(params));
+    });
+
+    test('passes parameters through when no property declares a default', () {
+      const params = {'page': 'home'};
+      const noDefaults = ExtensionInputSchema(
+        properties: {'page': ExtensionParam.string()},
+      );
+      expect(mergeSchemaDefaults(noDefaults, params), same(params));
+    });
+
+    test('preserves caller params not described by the schema', () {
+      expect(
+        mergeSchemaDefaults(schema, const {'extra': 'kept'}),
+        containsPair('extra', 'kept'),
+      );
     });
   });
 }

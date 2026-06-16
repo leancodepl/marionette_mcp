@@ -67,6 +67,10 @@ List<ExtensionDetails> get customExtensionRegistry =>
 /// serializes parameters as strings, so nested objects/arrays cannot travel
 /// as a single param.
 ///
+/// Any property that declares a `defaultValue` is filled in (as its string
+/// form) before [callback] runs when the caller omits it, so the callback
+/// never has to reimplement the default it already declared.
+///
 /// The `ext.flutter.` prefix is added automatically to [name].
 ///
 /// Throws [ArgumentError] if [name] is empty or already contains the
@@ -96,5 +100,9 @@ void registerMarionetteExtension({
     ),
   );
 
-  registerInternalMarionetteExtension(name: name, callback: callback);
+  registerInternalMarionetteExtension(
+    name: name,
+    callback: callback,
+    inputSchema: inputSchema,
+  );
 }
