@@ -56,8 +56,7 @@ class SettingsScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.mouse_outlined),
             title: const Text('Mouse Buttons'),
-            subtitle: const Text('Test secondary (right) and tertiary '
-                '(middle) tap gestures'),
+            subtitle: const Text('Test the secondary (right) tap gesture'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/settings/mouse-tap'),
           ),

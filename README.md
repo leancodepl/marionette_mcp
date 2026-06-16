@@ -468,7 +468,6 @@ Once connected, the AI agent has access to these tools:
 | `get_interactive_elements` | Returns a list of all interactive UI elements (buttons, inputs, etc.) visible on screen.                                  |
 | `tap`                      | Taps an element matching a specific key or visible text.                                                                  |
 | `secondary_tap`            | Right mouse button click on a matching element (desktop only); triggers `onSecondaryTap`, e.g. context menus.             |
-| `tertiary_tap`             | Middle mouse button click on a matching element (desktop only); triggers `onTertiaryTap`.                                 |
 | `enter_text`               | Enters text into a text field matching a key.                                                                             |
 | `scroll_to`                | Scrolls the view until an element matching a key or text becomes visible.                                                 |
 | `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |

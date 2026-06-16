@@ -9,7 +9,7 @@ import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
 /// Registers gesture-based `marionette.*` extensions: tap, secondaryTap,
-/// tertiaryTap, doubleTap, longPress, swipe, pinchZoom, scrollTo.
+/// doubleTap, longPress, swipe, pinchZoom, scrollTo.
 void registerGestureExtensions({
   required GestureDispatcher gestureDispatcher,
   required WidgetFinder widgetFinder,
@@ -35,17 +35,6 @@ void registerGestureExtensions({
           matcher, widgetFinder, configuration);
       return MarionetteExtensionResult.success({
         'message': 'Secondary-tapped element matching: ${matcher.toJson()}',
-      });
-    },
-  );
-
-  registerInternalMarionetteExtension(
-    name: 'marionette.tertiaryTap',
-    callback: (params) async {
-      final matcher = WidgetMatcher.fromJson(params);
-      await gestureDispatcher.tertiaryTap(matcher, widgetFinder, configuration);
-      return MarionetteExtensionResult.success({
-        'message': 'Tertiary-tapped element matching: ${matcher.toJson()}',
       });
     },
   );

@@ -97,19 +97,6 @@ class GestureDispatcher {
       _mouseTap(matcher, widgetFinder, configuration,
           buttons: kSecondaryButton);
 
-  /// Simulates a tertiary (middle mouse button) tap on an element matching
-  /// [matcher].
-  ///
-  /// Dispatches a mouse pointer with [kTertiaryButton] pressed, which is what
-  /// Flutter recognises as `onTertiaryTap`. Desktop only — touch devices do not
-  /// support non-primary buttons.
-  Future<void> tertiaryTap(
-    WidgetMatcher matcher,
-    WidgetFinder widgetFinder,
-    MarionetteConfiguration configuration,
-  ) =>
-      _mouseTap(matcher, widgetFinder, configuration, buttons: kTertiaryButton);
-
   Future<void> _mouseTap(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,

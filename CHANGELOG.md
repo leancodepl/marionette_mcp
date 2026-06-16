@@ -1,6 +1,6 @@
 # Unreleased
 
-- Add `secondary_tap` and `tertiary_tap` tools (plus the `secondary-tap` / `tertiary-tap` CLI commands) for right and middle mouse button clicks on desktop. They dispatch a mouse pointer with the secondary/tertiary button pressed, triggering Flutter's `onSecondaryTap`/`onTertiaryTap` (e.g. context menus). Touch `tap` is unchanged.
+- Add the `secondary_tap` tool (plus the `secondary-tap` CLI command) for right mouse button clicks on desktop. It dispatches a mouse pointer with the secondary button pressed, triggering Flutter's `onSecondaryTap` (e.g. context menus). Touch `tap` is unchanged.
 - Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
 
 # 0.5.0

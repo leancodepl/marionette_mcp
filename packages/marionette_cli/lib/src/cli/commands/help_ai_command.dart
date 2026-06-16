@@ -180,29 +180,6 @@ strategy.
 
 ---
 
-### tertiary-tap
-
-Tertiary (middle mouse button) tap an element. Desktop only — triggers
-Flutter's onTertiaryTap. Provide exactly one matching strategy.
-
-  Requires: -i <instance> or --uri <ws-uri>
-
-  Options:
-    --key <string>    Match by ValueKey<String> (most reliable)
-    --text <string>   Match by visible text content
-    --type <string>   Match by widget type name (e.g., ElevatedButton)
-    --x <number>      X screen coordinate (use with --y)
-    --y <number>      Y screen coordinate (use with --x)
-
-  Examples:
-    marionette -i my-app tertiary-tap --key tab_item
-    marionette -i my-app tertiary-tap --x 100 --y 200
-
-  Output (stdout):
-    Tertiary tapped element matching {key: tab_item}
-
----
-
 ### enter-text
 
 Enter text into a text field.

@@ -20,7 +20,6 @@ import 'package:marionette_cli/src/cli/commands/scroll_to_command.dart';
 import 'package:marionette_cli/src/cli/commands/secondary_tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
-import 'package:marionette_cli/src/cli/commands/tertiary_tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/unregister_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 
@@ -54,7 +53,6 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(ElementsCommand(_registry));
     addCommand(TapCommand(_registry));
     addCommand(SecondaryTapCommand(_registry));
-    addCommand(TertiaryTapCommand(_registry));
     addCommand(DoubleTapCommand(_registry));
     addCommand(LongPressCommand(_registry));
     addCommand(PinchZoomCommand(_registry));

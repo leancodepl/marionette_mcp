@@ -759,7 +759,7 @@ void main() {
     );
   });
 
-  group('GestureDispatcher - secondaryTap / tertiaryTap', () {
+  group('GestureDispatcher - secondaryTap', () {
     testWidgets(
       'secondaryTap dispatches a mouse pointer with the secondary button',
       timeout: _timeout,
@@ -821,46 +821,6 @@ void main() {
     );
 
     testWidgets(
-      'tertiaryTap dispatches a mouse pointer with the tertiary button',
-      timeout: _timeout,
-      (WidgetTester tester) async {
-        await tester.pumpWidget(
-          MaterialApp(home: Scaffold(body: Center(child: Text('Hello')))),
-        );
-
-        final events = <PointerEvent>[];
-        GestureBinding.instance.pointerRouter.addGlobalRoute(events.add);
-        addTearDown(
-          () => GestureBinding.instance.pointerRouter
-              .removeGlobalRoute(events.add),
-        );
-
-        final dispatcher = GestureDispatcher();
-        await tester.runAsync(() => dispatcher.tertiaryTap(
-              const CoordinatesMatcher(100, 100),
-              WidgetFinder(),
-              const MarionetteConfiguration(),
-            ));
-        await tester.pump();
-
-        final downEvents = events.whereType<PointerDownEvent>().toList();
-        final upEvents = events.whereType<PointerUpEvent>().toList();
-
-        expect(downEvents, hasLength(1));
-        expect(
-          downEvents.single.kind,
-          equals(PointerDeviceKind.mouse),
-        );
-        expect(
-          downEvents.single.buttons,
-          equals(kTertiaryButton),
-          reason: 'PointerDownEvent should press the tertiary button',
-        );
-        expect(upEvents.single.buttons, equals(0));
-      },
-    );
-
-    testWidgets(
       'secondaryTap actually triggers onSecondaryTap on a widget',
       timeout: _timeout,
       (WidgetTester tester) async {
@@ -894,44 +854,6 @@ void main() {
           secondaryTapped,
           isTrue,
           reason: 'GestureDetector.onSecondaryTap should have fired',
-        );
-      },
-    );
-
-    testWidgets(
-      'tertiaryTap actually triggers onTertiaryTapUp on a widget',
-      timeout: _timeout,
-      (WidgetTester tester) async {
-        var tertiaryTapped = false;
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: Center(
-                child: GestureDetector(
-                  onTertiaryTapUp: (_) => tertiaryTapped = true,
-                  child: const SizedBox(
-                    width: 100,
-                    height: 100,
-                    child: Text('target'),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-
-        final dispatcher = GestureDispatcher();
-        await tester.runAsync(() => dispatcher.tertiaryTap(
-              const TextMatcher('target'),
-              WidgetFinder(),
-              const MarionetteConfiguration(),
-            ));
-        await tester.pump();
-
-        expect(
-          tertiaryTapped,
-          isTrue,
-          reason: 'GestureDetector.onTertiaryTapUp should have fired',
         );
       },
     );
