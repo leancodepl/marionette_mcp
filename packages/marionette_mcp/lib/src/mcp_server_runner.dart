@@ -38,7 +38,13 @@ Future<int> runMcpServer({
   final server = McpServer(
     const Implementation(name: 'marionette-mcp', version: version),
     options: const McpServerOptions(
-      capabilities: ServerCapabilities(tools: ServerCapabilitiesTools()),
+      // listChanged: true advertises that the tool set can change at
+      // runtime — required for clients to refetch tools/list when an app
+      // connects with custom extensions registered via
+      // registerMarionetteExtension.
+      capabilities: ServerCapabilities(
+        tools: ServerCapabilitiesTools(listChanged: true),
+      ),
       instructions: _instructions,
     ),
   );

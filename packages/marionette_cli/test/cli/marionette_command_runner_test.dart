@@ -32,6 +32,7 @@ void main() {
         'double-tap',
         'long-press',
         'pinch-zoom',
+        'swipe',
         'enter-text',
         'press-back-button',
         'scroll-to',

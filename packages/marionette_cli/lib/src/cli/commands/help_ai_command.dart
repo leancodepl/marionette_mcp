@@ -222,6 +222,37 @@ Simulate a system back button press (Android back / iOS swipe-back).
 
 ---
 
+### swipe
+
+Swipe/drag on the app. Useful for PageView, Dismissible, Drawer, and Slider.
+Use either element-based mode (matcher + direction) or coordinate-based mode.
+
+  Requires: -i <instance> or --uri <ws-uri>
+
+  Element-based options:
+    --key <string>        Match by ValueKey<String> (most reliable)
+    --text <string>       Match by visible text content
+    --type <string>       Match by widget type name (e.g., PageView)
+    --direction <dir>     left, right, up, or down (required for this mode)
+    --distance <number>   Swipe distance in pixels (default: 200)
+
+  Coordinate-based options (all required together):
+    --start-x <number>    Start X coordinate
+    --start-y <number>    Start Y coordinate
+    --end-x <number>      End X coordinate
+    --end-y <number>      End Y coordinate
+
+  Examples:
+    marionette -i my-app swipe --type PageView --direction left
+    marionette -i my-app swipe --key carousel --direction right --distance 300
+    marionette -i my-app swipe --start-x 300 --start-y 400 --end-x 50 --end-y 400
+
+  Output (stdout):
+    Swiped left on element matching: {type: PageView}
+    Swiped from (300.0, 400.0) to (50.0, 400.0)
+
+---
+
 ### scroll-to
 
 Scroll until an element becomes visible.

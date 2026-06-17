@@ -21,579 +21,84 @@ The official [Dart & Flutter MCP server](https://docs.flutter.dev/ai/mcp-server)
 
 ## Quick Start
 
-**Note: Your Flutter app must be prepared to be compatible with this MCP.**
-
-1. **Prepare your Flutter app** - Add the `marionette_flutter` package and initialize `MarionetteBinding` in your `main.dart`.
-2. **Install the MCP server** - Add `marionette_mcp` to your projects `dev_dependencies`.
-3. **Configure your AI tool** - Add the MCP server command (`dart run marionette_mcp`) to your tool's configuration (Claude Code, Copilot, Cursor, Gemini CLI).
-4. **Run your app in debug mode** - Look for the VM service URI in the console (e.g., `ws://127.0.0.1:12345/ws`).
-5. **Connect and interact** - Ask your AI agent (Claude, Copilot, or any MCP-compatible assistant) to connect to your app using the URI and start interacting.
-
-## Installation
-
-### 1. Add MCP Server Package
-
-Run the following command to activate the `marionette_mcp` [global tool](https://dart.dev/tools/pub/cmd/pub-global):
-
-```bash
-dart pub global activate marionette_mcp
-```
-
 > [!NOTE]
-> You can also install the package as a dev-dependency using
->
-> ```bash
-> dart pub add dev:marionette_mcp
-> ```
->
-> Then invoke the MCP server as `dart run marionette_mcp`.
-> It might be necessary to change the working directory, so that `dart run` is able to find `marionette_mcp`.
-> You can do it like so: `cd ${workspaceFolder}/packages/mypackage && dart run marionette_mcp` (it will vary between tooling).
->
-> If it does not work, we suggest using the global tool method.
+> Your Flutter app must be prepared to be compatible with Marionette. The steps below are the short version — the [Getting Started guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/getting-started.md) walks through each one.
 
-### 2. Add Flutter Package
+1. **Prepare your app** — add `marionette_flutter` and initialize `MarionetteBinding` in `main.dart`:
 
-Run the following command in your Flutter app directory:
+   ```bash
+   flutter pub add marionette_flutter
+   ```
 
-```bash
-flutter pub add marionette_flutter
-```
+   ```dart
+   void main() {
+     if (kDebugMode) {
+       MarionetteBinding.ensureInitialized();
+     } else {
+       WidgetsFlutterBinding.ensureInitialized();
+     }
+     runApp(const MyApp());
+   }
+   ```
 
-## Flutter App Integration
+2. **Install the bridge** — activate the MCP server (for the CLI alternative, see the [CLI guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md)):
 
-You need to initialize the `MarionetteBinding` in your app. This binding registers the necessary VM service extensions that the MCP server communicates with.
+   ```bash
+   dart pub global activate marionette_mcp
+   ```
 
-### Basic Setup
+3. **Configure your AI tool** — e.g. for Claude Code:
 
-If your app uses standard Flutter widgets (like `ElevatedButton`, `TextField`, `Text`, etc.), the default configuration works out of the box.
+   ```bash
+   claude mcp add --transport stdio marionette -- marionette_mcp
+   ```
 
-```dart
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:marionette_flutter/marionette_flutter.dart';
+   Other tools (Cursor, Gemini CLI, Copilot, Antigravity): see [Configuring your AI tool](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md#configuring-your-ai-tool).
 
-void main() {
-  // Initialize Marionette only in debug mode
-  if (kDebugMode) {
-    MarionetteBinding.ensureInitialized();
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-  }
+4. **Run your app in debug mode** — `flutter run`, then copy the VM service URI from the console (e.g. `ws://127.0.0.1:9101/ws`).
 
-  runApp(const MyApp());
-}
-```
+5. **Connect and interact** — ask your agent to connect using that URI and start driving the app.
 
 > [!IMPORTANT]
-> **`MarionetteBinding` must be the only binding initialized in the process.**
-> Flutter allows only one `WidgetsBinding` per app. If another binding (e.g. `AutomatedTestWidgetsFlutterBinding` from `flutter test`, or `IntegrationTestWidgetsFlutterBinding`) is already initialized, calling `MarionetteBinding.ensureInitialized()` will throw a binding assertion error.
->
-> This commonly happens when your test calls `main()` and `kDebugMode` is `true` during tests. You can work around it in several ways:
->
-> **Option A – Check the `FLUTTER_TEST` environment variable**
->
-> ```dart
-> import 'dart:io' show Platform;
->
-> final bool isFlutterTest = Platform.environment.containsKey('FLUTTER_TEST');
-> if (kDebugMode && !isFlutterTest) {
->   MarionetteBinding.ensureInitialized();
-> } else {
->   WidgetsFlutterBinding.ensureInitialized();
-> }
-> ```
->
-> **Option B – Use a separate entrypoint for tests**
->
-> Keep `MarionetteBinding` in your production `main()` (`lib/main.dart`) and create a different entrypoint for tests (e.g. `lib/main_test.dart` or `test/app_test.dart`) that does **not** initialize `MarionetteBinding`.
+> Standard Material widgets work out of the box. **If your app uses a custom design system, configuration is required** — otherwise the agent can't see or tap your custom buttons and fields. Start with the [Production Setup Checklist](https://github.com/leancodepl/marionette_mcp/blob/main/docs/configuration.md#production-setup-checklist).
 
-### Log Collection (`get_logs`)
+## What you can do
 
-Marionette supports flexible log collection through the `LogCollector` interface. You can choose from several options depending on your logging setup:
+Once connected, an agent can drive your app with a small, focused toolset: inspect the widget tree (`get_interactive_elements`), `tap` / `secondary_tap` / `double_tap` / `long_press` / `swipe` / `pinch_zoom` / `scroll_to`, `enter_text`, `press_back_button`, `take_screenshots`, read `get_logs`, and `hot_reload`. Full list: [MCP Tools](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md).
 
-#### Option 1: Using the `logging` package
+Your app can also expose its own actions to the agent via [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) — navigate by route name, seed test data, toggle feature flags, and more.
 
-If your app uses Dart's [`logging`](https://pub.dev/packages/logging) package:
+Some real-world prompts:
 
-```bash
-flutter pub add marionette_logging
-```
+> "I implemented the Forgot Password screen — connect, navigate to login, tap 'Forgot Password', enter a valid email, submit, and check the logs that the API call fired."
 
-```dart
-import 'package:flutter/foundation.dart';
-import 'package:logging/logging.dart';
-import 'package:marionette_flutter/marionette_flutter.dart';
-import 'package:marionette_logging/marionette_logging.dart';
+> "I refactored the routing. Run a smoke test: cycle through all bottom-nav tabs and verify each screen loads without exceptions in the logs."
 
-void main() {
-  if (kDebugMode) {
-    MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: LoggingLogCollector()),
-    );
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-  }
+> "Investigate the unresponsive 'Clear Cache' button on Settings — find it via `get_interactive_elements`, tap it, and analyze the logs."
 
-  Logger.root.level = Level.ALL;
-  runApp(const MyApp());
-}
-```
+## Documentation
 
-#### Option 2: Using the `logger` package
+| Guide | What's inside |
+| --- | --- |
+| [Getting Started](https://github.com/leancodepl/marionette_mcp/blob/main/docs/getting-started.md) | Zero-to-driving in 5 steps. |
+| [Flutter Setup](https://github.com/leancodepl/marionette_mcp/blob/main/docs/flutter-setup.md) | The binding, debug-only init, the single-binding rule. |
+| [Configuration](https://github.com/leancodepl/marionette_mcp/blob/main/docs/configuration.md) | **Custom design systems, production checklist, complete `main.dart`.** |
+| [Log Collection](https://github.com/leancodepl/marionette_mcp/blob/main/docs/logging.md) | Wire up `get_logs` (`logging`, `logger`, or custom). |
+| [Semantics](https://github.com/leancodepl/marionette_mcp/blob/main/docs/semantics.md) | Make custom-painted / rich content readable to agents. |
+| [MCP Tools](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md) | Full tool reference + AI-tool configuration. |
+| [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) | Expose app-specific actions as agent tools via `registerMarionetteExtension`. |
+| [CLI](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md) | Drive Marionette from any shell-capable agent. |
+| [Troubleshooting](https://github.com/leancodepl/marionette_mcp/blob/main/docs/troubleshooting.md) | Common gotchas and limitations. |
 
-If your app uses the [`logger`](https://pub.dev/packages/logger) package:
+## Packages
 
-```bash
-flutter pub add marionette_logger
-```
-
-```dart
-import 'package:flutter/foundation.dart';
-import 'package:logger/logger.dart';
-import 'package:marionette_flutter/marionette_flutter.dart';
-import 'package:marionette_logger/marionette_logger.dart';
-
-void main() {
-  final logCollector = LoggerLogCollector();
-
-  if (kDebugMode) {
-    MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: logCollector),
-    );
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-  }
-
-  final logger = Logger(
-    output: MultiOutput([ConsoleOutput(), logCollector]),
-  );
-
-  runApp(const MyApp());
-}
-```
-
-#### Option 3: Custom logging with `PrintLogCollector`
-
-For other logging solutions or custom setups, use `PrintLogCollector`:
-
-```dart
-import 'package:flutter/foundation.dart';
-import 'package:marionette_flutter/marionette_flutter.dart';
-
-void main() {
-  final collector = PrintLogCollector();
-
-  if (kDebugMode) {
-    MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: collector),
-    );
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-  }
-
-  // Hook into your logging system
-  myLogger.onLog((message) => collector.addLog(message));
-
-  runApp(const MyApp());
-}
-```
-
-#### No logging
-
-If you don't need log collection, simply omit the `logCollector` parameter. The `get_logs` tool will return a helpful message explaining how to enable it.
-
-### Custom Design System
-
-If you use custom widgets in your design system, you can configure Marionette to recognize them as interactive elements or extract text from them.
-
-**Why `isInteractiveWidget`?** A typical Flutter screen has hundreds of widgets in its tree - `Padding`, `Container`, `Column`, `SizedBox`, etc. When the AI agent calls `get_interactive_elements`, Marionette filters this down to only actionable targets: buttons, text fields, switches, sliders, etc. This gives the agent a concise, manageable list instead of an overwhelming dump of layout widgets.
-
-By default, Marionette recognizes standard Flutter widgets like `ElevatedButton`, `TextField`, and `Switch`. If your app uses custom widgets (e.g., `MyPrimaryButton` that wraps styling around a `GestureDetector`), Marionette won't know they're tappable unless you tell it. The `isInteractiveWidget` callback lets you mark your custom widget types as interactive, so they appear in the element list and can be targeted by `tap` and other tools.
-
-**Why `extractText`?** The `extractText` callback serves two purposes:
-
-1. **Element discovery**: Widgets with extractable text are automatically included in the interactive elements tree returned by `get_interactive_elements`, even if they are not explicitly interactive. The extracted text appears in the element's `text` field, helping the AI agent understand what each element displays.
-
-2. **Text-based matching**: The `tap`, `scroll_to`, and other interaction tools can match elements by their text content using the `text` parameter (e.g., `tap(text: "Submit")`).
-
-By default, Marionette extracts text from standard Flutter widgets (`Text`, `RichText`, `EditableText`, `TextField`, `TextFormField`) for both purposes above. `Semantics(label:|value:)` annotations are surfaced in `get_interactive_elements` as a **discovery-only** fallback — they are intentionally not consulted by the matcher path, so wrapping a control in `Semantics` will not cause `tap`/`scroll_to`/`enter_text` to redirect to the wrapper instead of the inner widget. Use `extractText` to add support for your custom widgets. The callback receives the `Element` (access the widget via `element.widget`), which lets you walk the element subtree — essential when widget properties like labels or placeholders are `Widget` instances rather than plain strings.
-
-```dart
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:marionette_flutter/marionette_flutter.dart';
-import 'package:my_app/design_system/text.dart';
-import 'package:my_app/design_system/input_decorator.dart';
-import 'package:my_app/design_system/text_field.dart';
-
-void main() {
-  if (kDebugMode) {
-    MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(
-        // Identify your custom interactive widgets
-        isInteractiveWidget: (type) =>
-            type == MyPrimaryButton || type == MyTextField,
-
-        // Extract text from your custom widgets.
-        // MyText.data is a String, so we can read it directly.
-        // MyTextField.label is a Widget, so we need Element access
-        // to walk the tree and find the rendered text.
-        extractText: (element) {
-          final widget = element.widget;
-          if (widget is MyText) return widget.data;
-          if (widget is MyTextField) {
-            return _extractMyTextFieldText(element, widget);
-          }
-          return null;
-        },
-      ),
-    );
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-  }
-
-  runApp(const MyApp());
-}
-
-/// Extracts label text from a MyTextField by walking the element tree.
-/// The label lives inside a MyInputDecorator child widget, so we first
-/// find the decorator by type, then extract the rendered text from its
-/// label widget.
-String? _extractMyTextFieldText(Element element, MyTextField widget) {
-  // Find the MyInputDecorator descendant that holds the label
-  final decorator = _findElementOfType<MyInputDecorator>(element);
-  if (decorator != null) {
-    final decoratorWidget = decorator.widget as MyInputDecorator;
-    if (decoratorWidget.label != null) {
-      final label = _findTextInWidgetSlot(decorator, decoratorWidget.label!);
-      if (label != null) return label;
-    }
-  }
-
-  // Fall back to current value
-  return widget.controller?.text;
-}
-
-/// Finds the first descendant Element whose widget is type [T].
-Element? _findElementOfType<T extends Widget>(Element root) {
-  Element? found;
-  root.visitChildren((child) {
-    if (found != null) return;
-    if (child.widget is T) {
-      found = child;
-    } else {
-      found = _findElementOfType<T>(child);
-    }
-  });
-  return found;
-}
-
-/// Finds the Element for [targetWidget] under [parent], then
-/// collects all rendered text beneath it.
-String? _findTextInWidgetSlot(Element parent, Widget targetWidget) {
-  Element? slotElement;
-  parent.visitChildren((child) {
-    if (slotElement != null) return;
-    if (identical(child.widget, targetWidget)) {
-      slotElement = child;
-    } else {
-      slotElement = _findElementForWidget(child, targetWidget);
-    }
-  });
-  if (slotElement == null) return null;
-
-  final buffer = StringBuffer();
-  _collectText(slotElement!, buffer);
-  final result = buffer.toString().trim();
-  return result.isEmpty ? null : result;
-}
-
-Element? _findElementForWidget(Element root, Widget target) {
-  Element? found;
-  root.visitChildren((child) {
-    if (found != null) return;
-    if (identical(child.widget, target)) {
-      found = child;
-    } else {
-      found = _findElementForWidget(child, target);
-    }
-  });
-  return found;
-}
-
-void _collectText(Element element, StringBuffer buffer) {
-  final widget = element.widget;
-  if (widget is Text && widget.data != null) {
-    if (buffer.isNotEmpty) buffer.write(' ');
-    buffer.write(widget.data);
-    return;
-  }
-  if (widget is RichText) {
-    final plain = widget.text.toPlainText();
-    if (plain.isNotEmpty) {
-      if (buffer.isNotEmpty) buffer.write(' ');
-      buffer.write(plain);
-    }
-    return;
-  }
-  element.visitChildren((child) => _collectText(child, buffer));
-}
-```
-
-### Making complex content readable via `Semantics`
-
-Most rich content is already extracted out of the box — `Text.rich` and `RichText` flatten their span tree via `toPlainText()`, so an agent reads the rendered plaintext without any extra annotation. `Semantics` is the escape hatch for the cases where that plaintext isn't enough or doesn't exist:
-
-- **Custom-painted text** — `CustomPaint` and direct `TextPainter` rendering bypass the `Text` widget entirely, so there is nothing for `toPlainText()` to flatten.
-- **Lossy `WidgetSpan` content** — `toPlainText()` cannot reach text rendered inside `WidgetSpan` children, so anything composed that way (badges, inline icons-with-text, embedded widgets) is invisible.
-- **Raw-source preservation** — when you want the agent to see the markdown/markup source you parsed, not the rendered plaintext (e.g. so it can reason about structure), `Semantics(label: rawSource)` carries that through.
-
-The fix is the same primitive screen readers already rely on: wrap the visual widget in `Semantics` and supply an explicit `label` (or `value`). Marionette surfaces these annotations in `get_interactive_elements` as `Type: Semantics, text: "<label>"`, giving agents a stable, structured channel alongside whatever `toPlainText()` already produced.
-
-```dart
-// Pattern B: structural label + dynamic value. Both the screen reader
-// ("Volume, 70 percent") and the agent (Type: Semantics, text:
-// "Volume: 70%") get clean, human-friendly strings.
-Semantics(
-  label: 'Volume',
-  value: '70%',
-  child: CustomPaint(painter: _VolumeBarPainter(level: 0.7)),
-)
-```
-
-When both `label` and `value` are set, Marionette joins them as `'label: value'` in the discovery output, so widgets with dynamic state (sliders, progress bars, gauges) keep their current value visible to agents instead of dropping it.
-
-This works without any `extractText` configuration. `Semantics` annotations are surfaced as a **discovery-only** fallback in `get_interactive_elements` — they are not consulted by the matcher path used by `tap`/`scroll_to`/`enter_text`, so wrapping a control in `Semantics(label: ...)` will not cause gestures to be redirected to the wrapper. `Semantics` widgets without an explicit `label` or `value` (i.e. framework-generated annotations with no user-visible content) are not reported, so the output stays quiet by default.
-
-The same technique works for tables, lists, charts, badges, and any custom-rendered content where you want to give an agent a single authoritative summary instead of asking it to reconstruct meaning from a flat list of cells.
-
-#### Accessibility trade-off: keep `label` human-friendly
-
-Whatever you put in `Semantics.label` is announced verbatim by VoiceOver and TalkBack. Stuffing markup, raw markdown, or machine-readable identifiers into `label` so the agent can read them will degrade the experience for screen-reader users — `**bold**` is read as "star star bold star star", not "bold". Two patterns avoid the trade-off:
-
-- **Pattern A — clean label, render via `Text.rich`.** Keep `label` as the human-friendly string and let `Text.rich.toPlainText()` cover the rendered version. Both the agent and the screen reader get clean text; the agent simply sees two complementary entries (`Type: Semantics` + `Type: Text`).
-- **Pattern B — structural label + dynamic value.** Use `label` for what the control *is* and `value` for its current state. Marionette emits the combined `'label: value'` for agents; screen readers announce the pair the same way they announce a native slider.
-
-If your `label` is genuinely not human-readable (e.g. you really do want the agent to see raw markup), prefer a custom widget with `extractText` so the markup never reaches the accessibility tree.
-
-#### Screenshot sizing
-
-By default, Marionette will downscale screenshots to fit within 2000×2000
-physical pixels. You can override this via `maxScreenshotSize` in
-`MarionetteConfiguration` (set it to `null` to disable resizing).
-
-## Tool Configuration
-
-Add the MCP server to your AI coding assistant's configuration.
-
-### Cursor
-
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en-US/install-mcp?name=marionette&config=eyJlbnYiOnt9LCJjb21tYW5kIjoibWFyaW9uZXR0ZV9tY3AgIn0%3D)
-
-Or manually add to your project's `.cursor/mcp.json` or your global `~/.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "marionette": {
-      "command": "marionette_mcp",
-      "args": []
-    }
-  }
-}
-```
-
-### Google Antigravity
-
-Open the MCP store, click “Manage MCP Servers”, then “View raw config” and add to the opened `mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "marionette": {
-      "command": "marionette_mcp",
-      "args": []
-    }
-  }
-}
-```
-
-### Gemini CLI
-
-Add to your `~/.gemini/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "marionette": {
-      "command": "marionette_mcp",
-      "args": []
-    }
-  }
-}
-```
-
-### Claude Code
-
-You can run the following command to add it:
-
-```bash
-claude mcp add --transport stdio marionette -- marionette_mcp
-```
-
-### Copilot
-
-Add to your `mcp.json`:
-
-```json
-{
-  "servers": {
-    "marionette": {
-      "command": "marionette_mcp",
-      "args": []
-    }
-  }
-}
-```
-
-## Available Tools
-
-Once connected, the AI agent has access to these tools:
-
-| Tool                       | Description                                                                                                               |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `connect`                  | Connect to a Flutter app via its VM service URI (e.g., `ws://127.0.0.1:54321/ws`).                                        |
-| `disconnect`               | Disconnect from the currently connected app.                                                                              |
-| `get_interactive_elements` | Returns a list of all interactive UI elements (buttons, inputs, etc.) visible on screen.                                  |
-| `tap`                      | Taps an element matching a specific key or visible text.                                                                  |
-| `secondary_tap`            | Right mouse button click on a matching element (desktop only); triggers `onSecondaryTap`, e.g. context menus.             |
-| `enter_text`               | Enters text into a text field matching a key.                                                                             |
-| `scroll_to`                | Scrolls the view until an element matching a key or text becomes visible.                                                 |
-| `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
-| `take_screenshots`         | Captures screenshots of all active views and returns them as base64 images.                                               |
-| `hot_reload`               | Performs a hot reload of the Flutter app, applying code changes without losing state.                                     |
-| `hot_restart`              | Performs a hot restart of the Flutter app, fully restarting it from `main()` and resetting all state (requires `flutter run`). |
-
-## Example Scenarios
-
-Marionette MCP shines when used by coding agents to verify their work or explore the app. Here are some real-world scenarios:
-
-### 1. Verify a New Feature
-
-**Context:** You just asked the agent to implement a "Forgot Password" flow.
-**Prompt:**
-
-> "Now that you've implemented the Forgot Password screen, let's verify it. Connect to the app, navigate to the login screen, tap 'Forgot Password', enter a valid email, and submit. Check the logs to ensure the API call was made successfully."
-
-### 2. Post-Refactor Smoke Test
-
-**Context:** You performed a large refactor on the navigation logic.
-**Prompt:**
-
-> "I've refactored the routing. Please run a quick smoke test: connect to the app, cycle through all tabs in the bottom navigation bar, and verify that each screen loads without throwing exceptions in the logs."
-
-### 3. Debugging UI Issues
-
-**Context:** Users reported a button is unresponsive on the Settings page.
-**Prompt:**
-
-> "Investigate the 'Clear Cache' button on the Settings page. Connect to the app, navigate there, find the button using `get_interactive_elements`, tap it, and analyze the logs to see if an error is occurring or if the tap is being ignored."
-
-## How It Works
-
-1. **Initialization**: Your Flutter app initializes `MarionetteBinding`, which registers custom VM service extensions (`ext.flutter.marionette.*`).
-2. **Connection**: The MCP server connects to your app's VM Service URL.
-3. **Interaction**: When an AI agent calls a tool (like `tap`), the MCP server translates this into a call to the corresponding VM service extension in your app.
-4. **Execution**: The Flutter app executes the action (e.g., simulates a tap gesture) and returns the result.
-
-## Assumptions & Limitations
-
-- **Prefer pasting the VM Service URI manually**: While some tooling can sometimes discover or infer the VM Service endpoint, the most reliable workflow is to copy the `ws://.../ws` URI from your `flutter run` output (or DevTools link) and paste it to the agent when calling `connect`.
-
-- **The agent may not know your app**: Marionette can “see” the widget tree and interact with UI elements, but it doesn’t automatically understand your product’s flows, naming conventions, or edge cases. If you want reliable navigation and assertions, provide extra context in the prompt (what screen to reach, expected labels/keys, preconditions, and the goal of the interaction).
-
-- **“Your mileage may vary” interactions**: Some actions are implemented via best-effort simulation of user behavior (gestures, focus, text entry, scrolling). Depending on platform, custom widgets, overlays, or app-specific gesture handling, results may vary. If a flow is flaky, consider exposing clearer widget keys, simplifying hit targets, or adding custom `MarionetteConfiguration` hooks for your design system. And if you hit something that consistently doesn’t behave as expected, a small repro in an issue helps us improve it.
-
-## Marionette CLI
-
-### Why a CLI?
-
-The MCP server works great with tools that support MCP natively (Cursor, Claude Code, etc.), but many enterprise environments have restrictions on which AI models can be used and which protocols are allowed. Not every team can run an MCP server.
-
-The CLI bridges this gap. Any AI agent that can execute shell commands — even smaller, less capable models — can drive a Flutter app through Marionette if given a clear reference document. A well-structured `.md` file describing each command's syntax, expected outputs, and exit codes is often all a constrained agent needs to work autonomously. This makes the CLI the most portable and universally compatible way to integrate Marionette into AI workflows.
-
-### Installation
-
-Install the CLI globally from [pub.dev](https://pub.dev/packages/marionette_cli):
-
-```bash
-dart pub global activate marionette_cli
-```
-
-This adds the `marionette` executable to your PATH (ensure `~/.pub-cache/bin` is on your PATH).
-
-### Teaching AI Agents to Use the CLI
-
-For an AI agent to use the CLI effectively, it needs a reference describing every command, its arguments, expected outputs, and exit codes. The `help-ai` command prints exactly that — a comprehensive, machine-readable reference designed for AI consumption:
-
-```bash
-marionette help-ai
-```
-
-Have the agent run this once at the start of a session, capture the output, and use it as a guide for all subsequent interactions. You can also pipe it to a file and include it in your project as a Cursor rule, Agent Skill (`SKILL.md`) or system prompt:
-
-```bash
-marionette help-ai > .cursor/rules/marionette-cli.md
-```
-
-### Direct URI Mode (Stateless)
-
-Pass the VM service URI directly with `--uri` — no registration, no cleanup, no files on disk:
-
-```bash
-marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
-marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
-marionette --uri ws://127.0.0.1:8181/ws take-screenshots --output ./screenshot.png
-marionette --uri ws://127.0.0.1:8181/ws record-video --output ./recording.webm
-```
-
-`--uri` and `--instance` are mutually exclusive. Use `--uri` for one-off interactions and `--instance` when targeting the same app repeatedly.
-
-### Named Instance Mode (Stateful)
-
-For repeated interactions with the same app, register it as a named instance to avoid passing the URI every time:
-
-```bash
-# Register Flutter app instances (use the VM service URI from flutter run output)
-marionette register my-app ws://127.0.0.1:8181/ws
-marionette register other-app ws://127.0.0.1:9090/ws
-
-# Interact with a specific instance
-marionette -i my-app get-interactive-elements
-marionette -i my-app tap --key submit_button
-marionette -i my-app tap --text "Submit"
-marionette -i my-app enter-text --key email_field --input "test@example.com"
-marionette -i my-app scroll-to --text "Bottom Item"
-marionette -i my-app take-screenshots --output ./screenshot.png
-marionette -i my-app record-video --output ./recording.webm
-marionette -i my-app record-video -o ./demo.webm -d 10
-marionette -i my-app get-logs
-marionette -i my-app hot-reload
-marionette -i my-app hot-restart
-
-# Instance management
-marionette list
-marionette unregister my-app
-marionette doctor              # Check connectivity of all instances
-```
-
-## Troubleshooting
-
-- **"Not connected to any app"**: Ensure the AI agent has called `connect` with the valid VM Service URI before using other tools.
-- **Finding the URI**: Run your Flutter app in debug mode (`flutter run`). Look for a line like: `The Flutter DevTools debugger and profiler on iPhone 15 Pro is available at: http://127.0.0.1:9101?uri=ws://127.0.0.1:9101/ws`. Use the `ws://...` part.
-- **Release Mode**: Marionette only works in debug (and profile) mode because it relies on the VM Service. It will not work in release builds.
-- **Elements not found**: Ensure your widgets are visible. If using custom widgets, make sure they are configured in `MarionetteConfiguration`.
+| Package | Role |
+| --- | --- |
+| [`marionette_flutter`](https://pub.dev/packages/marionette_flutter) | The binding you add to your Flutter app. **Required.** |
+| [`marionette_mcp`](https://pub.dev/packages/marionette_mcp) | MCP server bridging AI agents to your running app. |
+| [`marionette_cli`](https://pub.dev/packages/marionette_cli) | CLI alternative for shell-only / restricted environments. |
+| [`marionette_logging`](https://pub.dev/packages/marionette_logging) | `LogCollector` adapter for the `logging` package. |
+| [`marionette_logger`](https://pub.dev/packages/marionette_logger) | `LogCollector` adapter for the `logger` package. |
 
 ---
 
