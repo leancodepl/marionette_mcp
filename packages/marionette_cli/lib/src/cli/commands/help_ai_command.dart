@@ -344,6 +344,26 @@ Perform a hot reload of the Flutter app.
 
 ---
 
+### hot-restart
+
+Perform a hot restart of the Flutter app. Fully restarts the app from main()
+and resets all state. Use it for changes a hot reload cannot pick up (e.g.
+main()/bootstrap edits, global singletons, or state shape). Requires the app
+to be running via `flutter run`.
+
+  Requires: -i <instance> or --uri <ws-uri>
+
+  Example:
+    marionette -i my-app hot-restart
+
+  Output (stdout, exit 0):
+    Hot restart completed successfully.
+
+  Output on failure (stderr, exit 1):
+    Hot restart failed or is unavailable. Make sure the app is running via `flutter run`.
+
+---
+
 ### doctor
 
 Check connectivity of all registered instances.

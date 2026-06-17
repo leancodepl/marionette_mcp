@@ -9,6 +9,7 @@ import 'package:marionette_cli/src/cli/commands/get_interactive_elements_command
 import 'package:marionette_cli/src/cli/commands/get_logs_command.dart';
 import 'package:marionette_cli/src/cli/commands/help_ai_command.dart';
 import 'package:marionette_cli/src/cli/commands/hot_reload_command.dart';
+import 'package:marionette_cli/src/cli/commands/hot_restart_command.dart';
 import 'package:marionette_cli/src/cli/commands/long_press_command.dart';
 import 'package:marionette_cli/src/cli/commands/list_command.dart';
 import 'package:marionette_cli/src/cli/commands/mcp_command.dart';
@@ -63,6 +64,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(RecordVideoCommand(_registry));
     addCommand(LogsCommand(_registry));
     addCommand(HotReloadCommand(_registry));
+    addCommand(HotRestartCommand(_registry));
     addCommand(DoctorCommand(_registry));
     addCommand(HelpAiCommand());
     addCommand(McpCommand());

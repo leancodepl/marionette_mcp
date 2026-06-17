@@ -473,6 +473,7 @@ Once connected, the AI agent has access to these tools:
 | `get_logs`                 | Retrieves application logs collected since app start or the last hot reload (requires a `LogCollector` to be configured). |
 | `take_screenshots`         | Captures screenshots of all active views and returns them as base64 images.                                               |
 | `hot_reload`               | Performs a hot reload of the Flutter app, applying code changes without losing state.                                     |
+| `hot_restart`              | Performs a hot restart of the Flutter app, fully restarting it from `main()` and resetting all state (requires `flutter run`). |
 
 ## Example Scenarios
 
@@ -579,6 +580,7 @@ marionette -i my-app record-video --output ./recording.webm
 marionette -i my-app record-video -o ./demo.webm -d 10
 marionette -i my-app get-logs
 marionette -i my-app hot-reload
+marionette -i my-app hot-restart
 
 # Instance management
 marionette list

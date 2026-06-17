@@ -39,6 +39,7 @@ void main() {
         'record-video',
         'get-logs',
         'hot-reload',
+        'hot-restart',
         'doctor',
         'help-ai',
         'mcp',

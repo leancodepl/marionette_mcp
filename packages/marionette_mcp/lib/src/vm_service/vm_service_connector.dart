@@ -449,37 +449,97 @@ class VmServiceConnector {
     }
   }
 
+  /// Performs a hot restart of the Flutter app.
+  ///
+  /// Unlike [hotReload], a hot restart fully restarts the app from `main()`
+  /// and resets all state. There is no native VM service RPC for this — it
+  /// relies on the `hotRestart` service that `flutter run` registers over the
+  /// VM service. Returns `false` if that service is not available (e.g. the
+  /// app was not launched via `flutter run`).
+  ///
+  /// On success the root isolate is replaced, so the cached isolate id is
+  /// re-resolved to the freshly started isolate before returning.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<bool> hotRestart() async {
+    _ensureConnected();
+
+    _logger.info('Performing hot restart');
+
+    try {
+      final method = await waitForServiceRegistration('hotRestart');
+      if (method == null) {
+        _logger.warning(
+          'hotRestart service not registered; app must be run via flutter run',
+        );
+        return false;
+      }
+
+      final result = await _service!.callMethod(method, isolateId: _isolateId!);
+      _logger.fine('Hot restart completed: result=${result.json}');
+      final success = result.json?['type'] == 'Success';
+
+      if (success) {
+        // The previous isolate was torn down and replaced. Re-resolve the new
+        // isolate, retrying while it boots and re-registers its extensions.
+        _isolateId = await _findIsolateWithMarionetteExtensions(
+          attempts: 10,
+          delay: const Duration(milliseconds: 500),
+        );
+        _logger.info('Reconnected to isolate after hot restart: $_isolateId');
+      }
+
+      return success;
+    } catch (err) {
+      _logger.severe('Hot restart failed', err);
+      rethrow;
+    }
+  }
+
   /// Finds the first isolate that has the marionette extensions.
   ///
-  /// Throws an exception if no suitable isolate is found.
-  Future<String> _findIsolateWithMarionetteExtensions() async {
-    final vm = await _service!.getVM();
-    if (vm.isolates == null || vm.isolates!.isEmpty) {
-      throw Exception('No isolates found in the VM');
-    }
+  /// After a hot restart the root isolate is replaced and registers its
+  /// extensions asynchronously, so this polls up to [attempts] times with a
+  /// [delay] between tries before giving up.
+  ///
+  /// Throws an exception if no suitable isolate is found within the retries.
+  Future<String> _findIsolateWithMarionetteExtensions({
+    int attempts = 1,
+    Duration delay = const Duration(milliseconds: 500),
+  }) async {
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(delay);
+      }
 
-    // Find the first isolate that has the marionette.getLogs extension
-    for (final isolateRef in vm.isolates!) {
-      if (isolateRef.id == null) {
+      final vm = await _service!.getVM();
+      if (vm.isolates == null || vm.isolates!.isEmpty) {
         continue;
       }
 
-      try {
-        final isolate = await _service!.getIsolate(isolateRef.id!);
-        final hasExtension = isolate.extensionRPCs?.any(
-              (ext) => ext == 'ext.flutter.marionette.getLogs',
-            ) ??
-            false;
-
-        if (hasExtension) {
-          return isolateRef.id!;
+      // Find the first isolate that has the marionette.getLogs extension
+      for (final isolateRef in vm.isolates!) {
+        if (isolateRef.id == null) {
+          continue;
         }
-      } catch (err) {
-        _logger.warning(
-          'Failed to check extensions for isolate ${isolateRef.id}',
-          err,
-        );
-        continue;
+
+        try {
+          final isolate = await _service!.getIsolate(isolateRef.id!);
+          final hasExtension = isolate.extensionRPCs?.any(
+                (ext) => ext == 'ext.flutter.marionette.getLogs',
+              ) ??
+              false;
+
+          if (hasExtension) {
+            return isolateRef.id!;
+          }
+        } catch (err) {
+          _logger.warning(
+            'Failed to check extensions for isolate ${isolateRef.id}',
+            err,
+          );
+          continue;
+        }
       }
     }
 
