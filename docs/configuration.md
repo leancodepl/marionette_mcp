@@ -60,7 +60,7 @@ Now `MyPrimaryButton` and `MyTextField` appear in the element list and can be ta
 `extractText` serves two purposes:
 
 1. **Element discovery** — widgets with extractable text are included in `get_interactive_elements` (even if not interactive), and the text appears in the element's `text` field so the agent knows what each element shows.
-2. **Text-based matching** — `tap`, `scroll_to`, and `enter_text` can match by visible text via the `text` parameter (e.g. `tap(text: "Submit")`).
+2. **Text-based matching** — `tap` and `scroll_to` can match by visible text via the `text` parameter (e.g. `tap(text: "Submit")`). (`enter_text` is the exception: it targets a field by `key`, or by focusing it first via `tap` and passing `focused_element: true` — it has no `text` matcher.)
 
 The callback receives the `Element` (access the widget via `element.widget`), which lets you walk the subtree — essential when a label or placeholder is itself a `Widget` rather than a plain `String`.
 
