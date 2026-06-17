@@ -21,10 +21,13 @@ class SwipeCommand extends InstanceCommand {
         help: 'Swipe distance in pixels for element-based mode.',
         defaultsTo: '200',
       )
-      ..addOption('start-x', help: 'Start X coordinate for coordinate-based swipe.')
-      ..addOption('start-y', help: 'Start Y coordinate for coordinate-based swipe.')
+      ..addOption('start-x',
+          help: 'Start X coordinate for coordinate-based swipe.')
+      ..addOption('start-y',
+          help: 'Start Y coordinate for coordinate-based swipe.')
       ..addOption('end-x', help: 'End X coordinate for coordinate-based swipe.')
-      ..addOption('end-y', help: 'End Y coordinate for coordinate-based swipe.');
+      ..addOption('end-y',
+          help: 'End Y coordinate for coordinate-based swipe.');
   }
 
   final InstanceRegistry _registry;
