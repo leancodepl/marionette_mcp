@@ -24,10 +24,23 @@ void main() {
 }
 
 void _registerNavigationExtensions() {
+  // goToPage opts into the new dynamic-tool surface by declaring an
+  // inputSchema — when an MCP client supports dynamic tool lists (the
+  // `listChanged` tools capability), it appears alongside the built-in
+  // marionette tools as `appNavigation.goToPage` with full argument
+  // autocomplete.
   registerMarionetteExtension(
     name: 'appNavigation.goToPage',
-    description: 'Navigates to a page by name. '
-        'Requires a "page" parameter with the page name.',
+    description: 'Navigates to a page by name.',
+    inputSchema: ExtensionInputSchema(
+      properties: {
+        'page': ExtensionParam.string(
+          description: 'Page name. One of: ${availablePages.keys.join(', ')}',
+          enumValues: availablePages.keys.toList(),
+        ),
+      },
+      required: const ['page'],
+    ),
     callback: (params) async {
       final page = params['page'];
       if (page == null) {
@@ -47,6 +60,10 @@ void _registerNavigationExtensions() {
     },
   );
 
+  // No inputSchema — getPageInfo takes no arguments, but the absence of a
+  // schema also exercises the schema-less code path. It stays reachable
+  // through `call_custom_extension` and does not get promoted to a
+  // first-class MCP tool.
   registerMarionetteExtension(
     name: 'appNavigation.getPageInfo',
     description: 'Returns the current page name, path, and a list of all '

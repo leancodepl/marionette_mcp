@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/version.g.dart' as v;
+import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/inspection_tools.dart';
@@ -17,6 +18,11 @@ final class VmServiceContext {
   final VmServiceConnector connector;
   final logging.Logger _logger;
 
+  /// Owns the registry of dynamic extension tools across the lifetime of
+  /// this context. Reused across connect/disconnect cycles so a previously
+  /// disabled tool can be revived in place — see [DynamicExtensionTools].
+  late final DynamicExtensionTools _dynamicTools;
+
   /// Registers all VM service related tools with the MCP server.
   ///
   /// Connection lifecycle tools (`connect`, `disconnect`) are registered here
@@ -24,6 +30,11 @@ final class VmServiceContext {
   /// and don't fit the standard tool error-handling shape. Everything else
   /// is delegated to themed registration functions.
   void registerTools(McpServer server) {
+    _dynamicTools = DynamicExtensionTools(
+      server: server,
+      connector: connector,
+      logger: _logger,
+    );
     _registerConnectionTools(server);
     registerInspectionTools(server, connector, _logger);
     registerGestureTools(server, connector, _logger);
@@ -88,6 +99,11 @@ final class VmServiceContext {
               );
             }
 
+            // Promote each schema-bearing custom extension into a first-class
+            // MCP tool. Failures here are logged but don't fail the connect —
+            // the generic call_custom_extension fallback keeps working.
+            await _registerDynamicTools();
+
             return CallToolResult(
               content: [
                 TextContent(text: 'Successfully connected to app at $uri'),
@@ -112,6 +128,9 @@ final class VmServiceContext {
           _logger.info('Disconnecting from app');
 
           try {
+            // Retire dynamic tools before tearing down the connection so a
+            // mid-disconnect tools/list reflects only what's still callable.
+            _disableDynamicTools();
             await connector.disconnect();
             return CallToolResult(
               content: [
@@ -128,4 +147,13 @@ final class VmServiceContext {
         },
       );
   }
+
+  Future<void> _registerDynamicTools() async {
+    // A reconnect without a clean disconnect would leak the previous
+    // batch — disable any leftovers before registering fresh ones.
+    _dynamicTools.disableAll();
+    await _dynamicTools.registerAll();
+  }
+
+  void _disableDynamicTools() => _dynamicTools.disableAll();
 }

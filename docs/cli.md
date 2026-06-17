@@ -80,6 +80,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | --- | --- |
 | `get-interactive-elements` | List interactive UI elements. |
 | `tap` | Tap an element (`--key`, `--text`, `--type`, or `--x`/`--y`). |
+| `secondary-tap` | Right-click a matching element (desktop only). |
 | `double-tap` | Double tap (matchers + `--delay`). |
 | `long-press` | Long press (matchers + `--duration`). |
 | `pinch-zoom` | Pinch zoom (matchers + `--scale`, `--start-distance`). |

@@ -24,6 +24,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 | Tool | Description |
 | --- | --- |
 | `tap` | Tap an element matched by `key`, `text`, `type`, or `coordinates`. Prefer `key`. Tapping a text field focuses it. |
+| `secondary_tap` | Right mouse button click on a matching element (**desktop only**); triggers `onSecondaryTap`, e.g. context menus. |
 | `double_tap` | Double tap an element (optional `delay` between taps, default 100 ms). |
 | `long_press` | Long press an element (optional `duration`, default 600 ms) — context menus, reorderable lists. |
 | `swipe` | Swipe/drag. Element-based (`key`/`text` + `direction` + optional `distance`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
@@ -41,8 +42,10 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `list_custom_extensions` | List custom VM service extensions the app registered (outside Marionette's built-ins). |
-| `call_custom_extension` | Call one by name (without the `ext.flutter.` prefix), passing key-value args. An escape hatch for app-specific extensions — e.g. jump straight to a deep route. See the [example app](https://github.com/leancodepl/marionette_mcp/tree/main/example). |
+| `list_custom_extensions` | List the app-specific extensions registered via `registerMarionetteExtension`. |
+| `call_custom_extension` | Call a custom extension that does **not** declare an `inputSchema` (the generic escape hatch), passing key-value args. |
+
+Custom extensions that declare an `inputSchema` are promoted to **first-class, individually-named tools** the agent discovers directly — see [Custom Extensions](./custom-extensions.md).
 
 ### Dev workflow
 
