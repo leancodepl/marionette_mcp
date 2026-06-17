@@ -54,6 +54,20 @@ class SwipeCommand extends InstanceCommand {
     final anyCoordinate =
         startX != null || startY != null || endX != null || endY != null;
 
+    final anyElement = argResults?['key'] != null ||
+        argResults?['text'] != null ||
+        argResults?['type'] != null ||
+        argResults?['direction'] != null ||
+        (argResults?.wasParsed('distance') ?? false);
+
+    if (anyCoordinate && anyElement) {
+      usageException(
+        'Cannot mix coordinate-based options '
+        '(--start-x/--start-y/--end-x/--end-y) with element-based options '
+        '(--key/--text/--type/--direction/--distance). Use one mode.',
+      );
+    }
+
     final swipeArgs = <String, dynamic>{};
 
     if (anyCoordinate) {

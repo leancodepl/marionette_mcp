@@ -248,7 +248,7 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
     marionette -i my-app swipe --start-x 300 --start-y 400 --end-x 50 --end-y 400
 
   Output (stdout):
-    Swiped left on element matching {type: PageView}
+    Swiped left on element matching: {type: PageView}
     Swiped from (300.0, 400.0) to (50.0, 400.0)
 
 ---
