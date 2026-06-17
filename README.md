@@ -41,7 +41,7 @@ The official [Dart & Flutter MCP server](https://docs.flutter.dev/ai/mcp-server)
    }
    ```
 
-2. **Install the bridge** — activate the MCP server (or the [CLI](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md)):
+2. **Install the bridge** — activate the MCP server (for the CLI alternative, see the [CLI guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md)):
 
    ```bash
    dart pub global activate marionette_mcp
