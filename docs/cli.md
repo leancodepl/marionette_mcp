@@ -60,6 +60,7 @@ marionette -i my-app tap --key submit_button
 marionette -i my-app tap --text "Submit"
 marionette -i my-app enter-text --key email_field --input "test@example.com"
 marionette -i my-app scroll-to --text "Bottom Item"
+marionette -i my-app swipe --type PageView --direction left
 marionette -i my-app take-screenshots --output ./screenshot.png
 marionette -i my-app record-video --output ./recording.webm
 marionette -i my-app record-video -o ./demo.webm -d 10
@@ -84,6 +85,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | `double-tap` | Double tap (matchers + `--delay`). |
 | `long-press` | Long press (matchers + `--duration`). |
 | `pinch-zoom` | Pinch zoom (matchers + `--scale`, `--start-distance`). |
+| `swipe` | Swipe/drag (matchers + `--direction`, `--distance`, or `--start-x`/`--start-y`/`--end-x`/`--end-y`). |
 | `enter-text` | Enter text (`--key` or `--focused`, plus `--input`). |
 | `scroll-to` | Scroll to an element (`--key` or `--text`). |
 | `press-back-button` | Simulate the system back button. |
@@ -97,5 +99,3 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | `doctor` | Check connectivity of all instances. |
 | `help-ai` | Print the AI-oriented command reference. |
 | `mcp` | Run the MCP server (`-l/--log-level`, `--log-file`, `--sse-port`). |
-
-> The `swipe` gesture is currently available via the [MCP server](./mcp-tools.md#gestures) only, not the CLI.
