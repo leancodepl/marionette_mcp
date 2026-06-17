@@ -233,10 +233,14 @@ void main() {
       ),
     );
 
-    // Route your app's logs into the collector.
+    // Route your app's logs into the collector. Tee into the existing
+    // debugPrint implementation rather than replacing it — this preserves
+    // Flutter's default throttling (debugPrintThrottled) instead of forcing
+    // synchronous output, which can degrade performance under heavy logging.
+    final defaultDebugPrint = debugPrint;
     debugPrint = (message, {wrapWidth}) {
       if (message != null) logCollector.addLog(message);
-      debugPrintSynchronously(message, wrapWidth: wrapWidth);
+      defaultDebugPrint(message, wrapWidth: wrapWidth);
     };
   } else {
     WidgetsFlutterBinding.ensureInitialized();
