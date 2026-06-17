@@ -52,6 +52,7 @@ Custom extensions that declare an `inputSchema` are promoted to **first-class, i
 | Tool | Description |
 | --- | --- |
 | `hot_reload` | Hot reload the app — apply code changes without losing state. |
+| `hot_restart` | Hot restart the app — fully restart from `main()`, resetting all state. Requires `flutter run`. |
 
 ## How it works
 

@@ -66,6 +66,7 @@ marionette -i my-app record-video --output ./recording.webm
 marionette -i my-app record-video -o ./demo.webm -d 10
 marionette -i my-app get-logs
 marionette -i my-app hot-reload
+marionette -i my-app hot-restart
 
 # Instance management
 marionette list
@@ -93,6 +94,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | `record-video` | Record video (`-o/--output`, `-d/--duration`, `--width`, `--height`, `--ffmpeg-path`, `--open`, …). |
 | `get-logs` | Retrieve app logs. |
 | `hot-reload` | Hot reload the app. |
+| `hot-restart` | Hot restart the app — restart from `main()`, resetting all state. |
 | `register <name> <uri>` | Register a named instance. |
 | `unregister [<name>` &#124; `--all` &#124; `--stale]` | Remove instance(s). |
 | `list` | List registered instances. |
