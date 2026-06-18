@@ -16,17 +16,24 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// This transport rewrites those fields to `true` before handing the message to
 /// `JsonRpcMessage.fromJson`, keeping behavior backward compatible.
 final class CopilotCompatStdioServerTransport implements Transport {
-  CopilotCompatStdioServerTransport({io.Stdin? stdin, io.IOSink? stdout})
+  CopilotCompatStdioServerTransport(
+      {Stream<List<int>>? stdin, io.IOSink? stdout})
       : _stdin = stdin ?? io.stdin,
         _stdout = stdout ?? io.stdout,
         _logger = logging.Logger('CopilotCompatStdioServerTransport');
 
-  final io.Stdin _stdin;
+  final Stream<List<int>> _stdin;
   final io.IOSink _stdout;
   final logging.Logger _logger;
 
   bool _started = false;
   StreamSubscription<String>? _linesSubscription;
+  final Completer<void> _closed = Completer<void>();
+
+  /// Completes when the transport closes — either via [close] or because the
+  /// client disconnected (stdin reached EOF). Lets the server shut down when
+  /// the host closes the connection without sending a POSIX signal.
+  Future<void> get done => _closed.future;
 
   @override
   void Function()? onclose;
@@ -147,6 +154,10 @@ final class CopilotCompatStdioServerTransport implements Transport {
 
   @override
   Future<void> close() async {
+    // Complete [done] on the first close, even if start() was never called, so
+    // callers awaiting it are always released.
+    if (!_closed.isCompleted) _closed.complete();
+
     if (!_started) return;
 
     await _linesSubscription?.cancel();

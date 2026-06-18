@@ -103,8 +103,19 @@ Future<int> _runStdioServer(McpServer server) async {
     return 1;
   }
 
-  final signal = await ExitSignal().wait;
-  logger.info('Received ${signal.name}, stopping');
+  // Stop on either an OS signal (SIGINT/SIGTERM) or the client closing the
+  // connection (stdin EOF). MCP hosts shut a stdio server down by closing its
+  // stdin; honoring that is required so the process exits when the host goes
+  // away without sending a signal (e.g. the host is killed and this process is
+  // reparented to init), instead of lingering idle forever.
+  // See https://github.com/leancodepl/marionette_mcp/issues/84.
+  final exitSignal = ExitSignal();
+  final reason = await Future.any([
+    exitSignal.wait.then((signal) => 'Received ${signal.name}'),
+    transport.done.then((_) => 'stdin closed'),
+  ]);
+  exitSignal.dispose();
+  logger.info('$reason, stopping');
 
   await server.close();
   await transport.close();
@@ -159,6 +170,11 @@ class ExitSignal {
   late final StreamSubscription<ProcessSignal> _sigintSubscription;
 
   Future<ProcessSignal> get wait => _completer.future;
+
+  /// Cancels the signal subscriptions. Must be called when shutting down for a
+  /// reason other than a caught signal (e.g. stdin EOF); otherwise the watch
+  /// subscriptions keep the Dart event loop alive and the process never exits.
+  void dispose() => _cleanup();
 
   void _handleSignal(ProcessSignal signal) {
     if (!_completer.isCompleted) {

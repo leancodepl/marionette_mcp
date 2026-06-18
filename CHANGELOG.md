@@ -2,6 +2,7 @@
 
 - Add the `secondary_tap` tool (plus the `secondary-tap` CLI command) for right mouse button clicks on desktop. It dispatches a mouse pointer with the secondary button pressed, triggering Flutter's `onSecondaryTap` (e.g. context menus). Touch `tap` is unchanged.
 - Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
+- Exit the stdio server when its stdin reaches EOF. Previously the process only stopped on `SIGINT`/`SIGTERM`, so when an MCP host closed the connection without sending a signal (e.g. the host was killed and the server reparented to init), the process lingered idle indefinitely and such orphans accumulated over time.
 
 # 0.5.0
 
