@@ -21,6 +21,13 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// Only extensions that ship an `inputSchema` get promoted — schema-less
 /// extensions remain reachable through the generic `call_custom_extension`
 /// tool, preserving backward compatibility with apps that haven't migrated.
+///
+/// Extension names are sanitized to a client-safe MCP tool name (see
+/// [sanitizeToolName]) because some clients (notably VS Code Copilot) reject
+/// tool names outside `[a-z0-9_-]`. The underlying extension is still invoked
+/// by its real name, so `appNavigation.goToPage` is exposed as the tool
+/// `app_navigation_go_to_page` but dispatched to `appNavigation.goToPage` on
+/// the VM service.
 class DynamicExtensionTools {
   DynamicExtensionTools({
     required McpServer server,
@@ -34,19 +41,34 @@ class DynamicExtensionTools {
   final VmServiceConnector _connector;
   final logging.Logger _logger;
 
-  /// Every tool we have ever registered with the server, keyed by name.
-  /// Persists across connect/disconnect cycles so we can revive entries via
-  /// [RegisteredTool.update] instead of hitting the duplicate-name guard in
-  /// [McpServer.registerTool].
+  /// Every tool we have ever registered with the server, keyed by the
+  /// (sanitized) MCP tool name. Persists across connect/disconnect cycles so
+  /// we can revive entries via [RegisteredTool.update] instead of hitting the
+  /// duplicate-name guard in [McpServer.registerTool].
   final Map<String, RegisteredTool> _pool = {};
 
-  /// Names that are currently enabled (i.e. promoted in this connect cycle).
+  /// Maps a sanitized tool name back to the real extension name that owns it.
+  /// Used to tell a same-extension revival (across reconnects) apart from two
+  /// distinct extensions whose names sanitize to the same tool name (a
+  /// collision we must skip rather than silently clobber). Persists for the
+  /// lifetime of the instance, mirroring [_pool].
+  final Map<String, String> _extensionByTool = {};
+
+  /// Tool names that are currently enabled (i.e. promoted in this connect
+  /// cycle).
   final Set<String> _active = {};
 
   /// The tools enabled by the most recent [registerAll] call that have not
   /// yet been disabled. Exposed for tests.
   List<RegisteredTool> get registeredTools =>
       List.unmodifiable(_active.map((name) => _pool[name]!));
+
+  /// The real extension name backing the promoted MCP tool [toolName], or
+  /// null if no such tool has been pooled. The promoted tool name is
+  /// sanitized (see [sanitizeToolName]); this maps it back to the name the
+  /// VM service extension is actually invoked with. Exposed for introspection
+  /// and tests.
+  String? extensionNameForTool(String toolName) => _extensionByTool[toolName];
 
   /// Reads the connected app's custom extensions and promotes each one
   /// with an `inputSchema` to a first-class MCP tool.
@@ -102,13 +124,15 @@ class DynamicExtensionTools {
         continue;
       }
 
+      final toolName = sanitizeToolName(name);
       final tool = _promote(
-        name: name,
+        extensionName: name,
+        toolName: toolName,
         description: description,
         schemaJson: schemaJson,
       );
       if (tool != null) {
-        _active.add(name);
+        _active.add(toolName);
         registered++;
       }
     }
@@ -141,7 +165,8 @@ class DynamicExtensionTools {
   }
 
   RegisteredTool? _promote({
-    required String name,
+    required String extensionName,
+    required String toolName,
     required String? description,
     required Map<String, dynamic> schemaJson,
   }) {
@@ -150,7 +175,7 @@ class DynamicExtensionTools {
       final parsed = JsonSchema.fromJson(schemaJson);
       if (parsed is! ToolInputSchema) {
         _logger.warning(
-          'Skipping extension "$name": inputSchema parsed to '
+          'Skipping extension "$extensionName": inputSchema parsed to '
           '${parsed.runtimeType} but MCP requires a JSON object schema.',
         );
         return null;
@@ -158,21 +183,35 @@ class DynamicExtensionTools {
       schema = parsed;
     } catch (err) {
       _logger.warning(
-        'Skipping extension "$name": failed to parse inputSchema',
+        'Skipping extension "$extensionName": failed to parse inputSchema',
         err,
       );
       return null;
     }
 
-    final callback = _buildCallback(name);
+    // The extension is always invoked by its real name; only the MCP tool
+    // name is sanitized for clients that restrict the character set.
+    final callback = _buildCallback(extensionName);
+    final effectiveDescription =
+        _describe(extensionName, toolName, description);
 
-    final pooled = _pool[name];
+    final pooled = _pool[toolName];
     if (pooled != null) {
+      if (_extensionByTool[toolName] != extensionName) {
+        // Two distinct extensions sanitize to the same tool name. Reviving in
+        // place would silently hijack the first one's tool, so skip instead.
+        _logger.warning(
+          'Skipping extension "$extensionName": its sanitized MCP tool name '
+          '"$toolName" collides with extension "${_extensionByTool[toolName]}". '
+          'Rename one of them on the Flutter side.',
+        );
+        return null;
+      }
       // Previously seen — revive in place. Re-registering by name would
       // throw because mcp_dart's `disable()` leaves the entry in the
       // server's tool map.
       pooled.update(
-        description: description,
+        description: effectiveDescription,
         inputSchema: schema,
         callback: FunctionToolCallback(callback),
         enabled: true,
@@ -182,32 +221,43 @@ class DynamicExtensionTools {
 
     try {
       final tool = _server.registerTool(
-        name,
-        description: description,
+        toolName,
+        description: effectiveDescription,
         inputSchema: schema,
         callback: callback,
       );
-      _pool[name] = tool;
+      _pool[toolName] = tool;
+      _extensionByTool[toolName] = extensionName;
       return tool;
     } on ArgumentError catch (err) {
       // mcp_dart throws ArgumentError on duplicate name — most likely a
-      // collision with a built-in marionette tool (tap, scroll_to, etc.)
-      // or another already-registered custom extension. We don't pool
-      // colliding names so subsequent reconnects re-emit the warning.
+      // collision with a built-in marionette tool (tap, scroll_to, etc.).
+      // We don't pool colliding names so subsequent reconnects re-emit the
+      // warning.
       _logger.warning(
-        'Skipping extension "$name": MCP tool name collision. '
-        'Rename the extension on the Flutter side. Details: ${err.message}',
+        'Skipping extension "$extensionName" (tool name "$toolName"): MCP '
+        'tool name collision. Rename the extension on the Flutter side. '
+        'Details: ${err.message}',
       );
       return null;
     }
   }
 
-  ToolFunction _buildCallback(String name) {
+  /// Builds the tool description, appending the real extension name when it
+  /// differs from the sanitized tool name so agents can still reach it via
+  /// `call_custom_extension` and understand what the tool maps to.
+  String? _describe(String extensionName, String toolName, String? base) {
+    if (toolName == extensionName) return base;
+    final note = 'Custom extension: $extensionName';
+    return base == null || base.isEmpty ? note : '$base\n\n$note';
+  }
+
+  ToolFunction _buildCallback(String extensionName) {
     return (args, extra) async {
-      return runTool(_logger, 'call extension "$name"', () async {
+      return runTool(_logger, 'call extension "$extensionName"', () async {
         final stringArgs = coerceToStringMap(args);
         final response = await _connector.callCustomExtension(
-          name,
+          extensionName,
           stringArgs,
         );
         return CallToolResult(
@@ -216,4 +266,27 @@ class DynamicExtensionTools {
       });
     };
   }
+}
+
+/// Maps a custom-extension name to an MCP tool name accepted by strict
+/// clients (notably VS Code Copilot, which rejects anything outside
+/// `[a-z0-9_-]`).
+///
+/// The transform lower-cases the name, inserts `_` at camelCase boundaries so
+/// `goToPage` reads as `go_to_page`, replaces every other disallowed
+/// character (e.g. the `.` namespace separator) with `_`, then collapses and
+/// trims runs of `_`. For example `appNavigation.goToPage` becomes
+/// `app_navigation_go_to_page`. Names already within the allowed set pass
+/// through unchanged.
+String sanitizeToolName(String name) {
+  final withBoundaries = name.replaceAllMapped(
+    RegExp('[a-z0-9][A-Z]'),
+    (m) => '${m[0]![0]}_${m[0]![1]}',
+  );
+  final sanitized = withBoundaries
+      .toLowerCase()
+      .replaceAll(RegExp('[^a-z0-9_-]'), '_')
+      .replaceAll(RegExp('_+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+  return sanitized.isEmpty ? '_' : sanitized;
 }

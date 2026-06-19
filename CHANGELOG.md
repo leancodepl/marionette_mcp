@@ -1,5 +1,6 @@
 # Unreleased
 
+- Sanitize custom-extension tool names when promoting them to first-class MCP tools, so clients that restrict tool names to `[a-z0-9_-]` (notably VS Code Copilot) accept them. `appNavigation.goToPage` is now exposed as the tool `app_navigation_go_to_page` while still being invoked by its real name; the real name is recorded in the tool description and remains usable via `call_custom_extension`. Extensions whose names collide after sanitization are skipped with a warning.
 - Add the `secondary_tap` tool (plus the `secondary-tap` CLI command) for right mouse button clicks on desktop. It dispatches a mouse pointer with the secondary button pressed, triggering Flutter's `onSecondaryTap` (e.g. context menus). Touch `tap` is unchanged.
 - Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
 

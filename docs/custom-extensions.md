@@ -40,7 +40,7 @@ registerMarionetteExtension(
 );
 ```
 
-The agent can now call `appNavigation.goToPage` directly — e.g. _"navigate to the profile page"_ — and a bad value like `page: "banana"` is rejected by schema validation.
+The agent can now call this tool directly — e.g. _"navigate to the profile page"_ — and a bad value like `page: "banana"` is rejected by schema validation. The tool is exposed under a sanitized name (here `app_navigation_go_to_page`; see [Tool name sanitization](#tool-name-sanitization)), but you still invoke the extension by its real name through `call_custom_extension`.
 
 `ExtensionParam` supports `.string` (with optional `enumValues`), `.integer`, `.number`, and `.boolean`. **Schemas are restricted to flat scalar parameters** by design: custom extension arguments travel over the VM service as a `Map<String, String>`, so nested objects/arrays can't round-trip reliably as typed values.
 
@@ -63,9 +63,22 @@ registerMarionetteExtension(
 
 > **Prefer declaring an `inputSchema`** whenever your parameters are flat scalars — you get validation and a dedicated, discoverable tool. Reach for the schema-less form only for parameter-less extensions or inputs a scalar schema can't express.
 
+## Tool name sanitization
+
+MCP clients disagree on what characters a tool name may contain — VS Code Copilot, for instance, rejects anything outside `[a-z0-9_-]`. So when an extension is promoted to a first-class tool, its name is sanitized for the MCP tool list: lower-cased, camelCase split on word boundaries, and every other disallowed character (such as the `.` namespace separator) replaced with `_`. For example:
+
+| Extension name | MCP tool name |
+| --- | --- |
+| `appNavigation.goToPage` | `app_navigation_go_to_page` |
+| `analytics.flush` | `analytics_flush` |
+| `already_valid-name` | `already_valid-name` (unchanged) |
+
+The **extension is always invoked by its real name** — only the tool-list entry is renamed — and the real name is recorded in the tool's description so it stays reachable via `call_custom_extension`. If two extensions sanitize to the same tool name, only the first is promoted and the collision is logged; rename one on the Flutter side.
+
 ## Notes
 
 - The `ext.flutter.` prefix is added automatically — pass the bare name (e.g. `appNavigation.goToPage`). Passing a name that already includes the prefix, or an empty name, throws `ArgumentError`.
+- Extension names are sanitized to `[a-z0-9_-]` when promoted to MCP tools — see [Tool name sanitization](#tool-name-sanitization).
 - Your `callback` returns a `MarionetteExtensionResult` — use `MarionetteExtensionResult.success(<map>)` or `MarionetteExtensionResult.invalidParams(<message>)`.
 - For a runnable end-to-end demo, see the [example app](https://github.com/leancodepl/marionette_mcp/tree/main/example).
 
