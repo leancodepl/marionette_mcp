@@ -330,6 +330,25 @@ class VmServiceConnector {
     return _callExtension('marionette.enterText', args);
   }
 
+  /// Presses a keyboard key against the currently focused element.
+  ///
+  /// [key] is a named key (e.g. 'enter', 'tab', 'escape', 'backspace',
+  /// 'arrowDown') or a single character ('a'-'z', '0'-'9').
+  /// [modifiers] is an optional comma-separated list of modifiers to hold
+  /// during the press: any of 'control', 'shift', 'alt', 'meta'.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> pressKey(
+    String key, {
+    String? modifiers,
+  }) {
+    final args = <String, dynamic>{'key': key};
+    if (modifiers != null && modifiers.isNotEmpty) {
+      args['modifiers'] = modifiers;
+    }
+    return _callExtension('marionette.pressKey', args);
+  }
+
   /// Simulates a swipe gesture.
   ///
   /// Supports two modes:

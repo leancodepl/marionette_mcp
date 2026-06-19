@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/extensions/gesture_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/info_extensions.dart';
+import 'package:marionette_flutter/src/binding/extensions/keyboard_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/media_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/text_extensions.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
@@ -10,6 +11,7 @@ import 'package:marionette_flutter/src/binding/register_extension_internal.dart'
 import 'package:marionette_flutter/src/services/create_screencast_server.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
+import 'package:marionette_flutter/src/services/keyboard_simulator.dart';
 import 'package:marionette_flutter/src/services/log_store.dart';
 import 'package:marionette_flutter/src/services/screencast_server.dart';
 import 'package:marionette_flutter/src/services/screencast_service.dart';
@@ -45,6 +47,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   // Service instances
   late final ElementTreeFinder _elementTreeFinder;
   late final GestureDispatcher _gestureDispatcher;
+  late final KeyboardSimulator _keyboardSimulator;
   LogStore? _logStore;
   late final ScreenshotService _screenshotService;
   late final ScrollSimulator _scrollSimulator;
@@ -73,6 +76,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     );
     _scrollSimulator = ScrollSimulator(_gestureDispatcher, _widgetFinder);
     _textInputSimulator = TextInputSimulator(_widgetFinder);
+    _keyboardSimulator = KeyboardSimulator();
 
     if (configuration.logCollector != null) {
       _logStore = LogStore();
@@ -97,6 +101,9 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     registerTextExtensions(
       textInputSimulator: _textInputSimulator,
       configuration: configuration,
+    );
+    registerKeyboardExtensions(
+      keyboardSimulator: _keyboardSimulator,
     );
     registerMediaExtensions(
       screenshotService: _screenshotService,
