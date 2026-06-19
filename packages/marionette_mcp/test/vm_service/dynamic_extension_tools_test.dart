@@ -72,7 +72,10 @@ void main() {
             },
             {
               'name': 'analytics.flush',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -140,7 +143,10 @@ void main() {
             {
               'name': 'analytics_flush',
               'description': 'Flush analytics.',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -167,12 +173,18 @@ void main() {
           'extensions': [
             {
               'name': 'fooBar',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
             {
               // Distinct extension, same sanitized tool name (`foo_bar`).
               'name': 'foo.bar',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -219,7 +231,10 @@ void main() {
             // Valid one — must still register.
             {
               'name': 'good',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -236,8 +251,7 @@ void main() {
       expect(names, ['good']);
     });
 
-    test('skips when name collides with an already-registered tool',
-        () async {
+    test('skips when name collides with an already-registered tool', () async {
       final server = _server()
         ..registerTool(
           'tap', // Pretend this is a built-in name.
@@ -252,7 +266,10 @@ void main() {
           'extensions': [
             {
               'name': 'tap',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -295,11 +312,17 @@ void main() {
           'extensions': [
             {
               'name': 'a',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
             {
               'name': 'b',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -533,6 +556,32 @@ void main() {
       // caught again).
       await dynamicTools.registerAll();
       expect(dynamicTools.registeredTools, isEmpty);
+    });
+  });
+
+  group('sanitizeToolName', () {
+    test('rewrites camelCase + dotted names', () {
+      expect(sanitizeToolName('appNavigation.goToPage'),
+          'app_navigation_go_to_page');
+      expect(sanitizeToolName('analytics.flush'), 'analytics_flush');
+    });
+
+    test('returns names already in [a-z0-9_-] verbatim', () {
+      // Including unusual-but-valid shapes: collapsing/trimming here would
+      // silently rewrite a name the author deliberately chose.
+      for (final name in [
+        'analytics_flush',
+        'already_valid-name',
+        'a',
+        '__foo__',
+        'a--b'
+      ]) {
+        expect(sanitizeToolName(name), name, reason: name);
+      }
+    });
+
+    test('never yields an empty name', () {
+      expect(sanitizeToolName('...'), '_');
     });
   });
 }

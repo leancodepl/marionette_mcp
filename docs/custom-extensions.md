@@ -65,7 +65,7 @@ registerMarionetteExtension(
 
 ## Tool name sanitization
 
-The MCP spec itself doesn't constrain tool-name characters, but the LLM tool-calling APIs the names ultimately flow into do: Anthropic accepts `[a-zA-Z0-9_]`, OpenAI `[a-zA-Z0-9_-]` — both reject the `.` namespace separator. The `namespace.method` convention is therefore out of spec for essentially every client; clients just handle it differently (Claude Code silently rewrites the name, VS Code Copilot rejects anything outside `[a-z0-9_-]` and drops the tool). So when an extension is promoted to a first-class tool, its name is sanitized to the lowest common denominator `[a-z0-9_-]` for the MCP tool list: lower-cased, camelCase split on word boundaries, and every other disallowed character (such as the `.`) replaced with `_`. For example:
+The MCP spec itself doesn't constrain tool-name characters, but the LLM tool-calling APIs the names ultimately flow into do: Anthropic and OpenAI both require `[a-zA-Z0-9_-]` (max 64 chars) and reject the `.` namespace separator. The `namespace.method` convention is therefore out of spec for essentially every client; clients just handle it differently (Claude Code silently rewrites the name, VS Code Copilot is stricter still — it allows only `[a-z0-9_-]` and drops anything else). So when an extension is promoted to a first-class tool, its name is sanitized to `[a-z0-9_-]` — the lowest common denominator across these — for the MCP tool list: lower-cased, camelCase split on word boundaries, and every other disallowed character (such as the `.`) replaced with `_`. For example:
 
 | Extension name | MCP tool name |
 | --- | --- |

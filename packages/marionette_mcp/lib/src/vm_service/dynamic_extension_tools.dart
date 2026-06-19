@@ -278,13 +278,19 @@ class DynamicExtensionTools {
 /// Anthropic and OpenAI tool-calling APIs require, which the `namespace.method`
 /// convention would otherwise violate.
 ///
-/// The transform lower-cases the name, inserts `_` at camelCase boundaries so
-/// `goToPage` reads as `go_to_page`, replaces every other disallowed
-/// character (e.g. the `.` namespace separator) with `_`, then collapses and
-/// trims runs of `_`. For example `appNavigation.goToPage` becomes
-/// `app_navigation_go_to_page`. Names already within the allowed set pass
-/// through unchanged.
+/// A name already within the allowed set is returned verbatim — including
+/// any leading, trailing, or repeated `_`/`-` the author chose — so valid
+/// names are never silently rewritten. Otherwise the transform lower-cases
+/// the name, inserts `_` at camelCase boundaries so `goToPage` reads as
+/// `go_to_page`, replaces every other disallowed character (e.g. the `.`
+/// namespace separator) with `_`, then collapses and trims runs of `_`. For
+/// example `appNavigation.goToPage` becomes `app_navigation_go_to_page`.
 String sanitizeToolName(String name) {
+  // Already client-safe: leave it exactly as the author wrote it. Collapsing
+  // or trimming here would change valid names (e.g. `__foo__` -> `foo`) and
+  // could create surprising collisions.
+  if (RegExp(r'^[a-z0-9_-]+$').hasMatch(name)) return name;
+
   final withBoundaries = name.replaceAllMapped(
     RegExp('[a-z0-9][A-Z]'),
     (m) => '${m[0]![0]}_${m[0]![1]}',
