@@ -10,20 +10,29 @@ class ElementTreeFinder {
   final MarionetteConfiguration configuration;
 
   /// Returns a list of interactive elements from the current widget tree.
-  List<Map<String, dynamic>> findInteractiveElements() {
+  ///
+  /// When [compact] is true, the per-element property dump is reduced to
+  /// primitive-valued properties only (see [_extractElementData]), dropping the
+  /// large `ButtonStyle`/`TextStyle`/`InputDecoration` blobs that otherwise
+  /// dominate the output.
+  List<Map<String, dynamic>> findInteractiveElements({bool compact = false}) {
     final elements = <Map<String, dynamic>>[];
     final rootElement = WidgetsBinding.instance.rootElement;
 
     if (rootElement != null) {
-      _visitElement(rootElement, elements);
+      _visitElement(rootElement, elements, compact: compact);
     }
 
     return elements;
   }
 
-  void _visitElement(Element element, List<Map<String, dynamic>> result) {
+  void _visitElement(
+    Element element,
+    List<Map<String, dynamic>> result, {
+    required bool compact,
+  }) {
     final widget = element.widget;
-    final elementData = _extractElementData(element, widget);
+    final elementData = _extractElementData(element, widget, compact: compact);
 
     if (elementData != null) {
       result.add(elementData);
@@ -34,11 +43,15 @@ class ElementTreeFinder {
     }
 
     element.visitChildren((child) {
-      _visitElement(child, result);
+      _visitElement(child, result, compact: compact);
     });
   }
 
-  Map<String, dynamic>? _extractElementData(Element element, Widget widget) {
+  Map<String, dynamic>? _extractElementData(
+    Element element,
+    Widget widget, {
+    required bool compact,
+  }) {
     // Only process elements with render objects
     final renderObject = element.renderObject;
     if (renderObject == null) {
@@ -71,12 +84,20 @@ class ElementTreeFinder {
 
     final properties = DiagnosticPropertiesBuilder();
     widget.debugFillProperties(properties);
+    // In compact mode keep only primitive-valued properties (bool/num/String/
+    // Enum) and drop object blobs (ButtonStyle, TextStyle, InputDecoration,
+    // Color, controllers, FocusNode) and callbacks/closures. Filtering by value
+    // type — rather than by DiagnosticsNode subtype — is necessary because
+    // widgets are inconsistent: e.g. TextField declares `enabled`/`obscureText`
+    // as generic DiagnosticsProperty<bool> while ElevatedButton uses
+    // FlagProperty. Exact retained fields therefore vary per widget.
     final data = Map<String, Object>.fromEntries(
       properties.properties
           .where((p) =>
               p.runtimeType != DiagnosticsProperty &&
               p.name != null &&
-              p.value != null)
+              p.value != null &&
+              (!compact || _isPrimitive(p.value)))
           .map(
             (p) => MapEntry(p.name!, p.value.toString()),
           ),
@@ -90,6 +111,18 @@ class ElementTreeFinder {
 
     if (discoverableText != null) {
       data['text'] = discoverableText;
+    }
+
+    // The InputDecoration blob is dropped in compact mode, but it carries a
+    // keyless text field's only human-readable handle (its `text` holds the
+    // entered value, empty for a blank field). Surface the label/hint so such
+    // fields stay identifiable. TextFormField has no public `decoration`, so
+    // this only applies to TextField.
+    if (compact && widget is TextField) {
+      final label = widget.decoration?.labelText ?? widget.decoration?.hintText;
+      if (label != null && label.isNotEmpty) {
+        data['label'] = label;
+      }
     }
 
     // Get position and size if available
@@ -113,6 +146,10 @@ class ElementTreeFinder {
 
     return data;
   }
+
+  /// Whether [value] is a primitive worth keeping in compact mode.
+  static bool _isPrimitive(Object? value) =>
+      value is bool || value is num || value is String || value is Enum;
 
   String? _extractKeyValue(Key? key) {
     if (key is ValueKey<String>) {

@@ -15,17 +15,26 @@ void registerInspectionTools(
     ..registerTool(
       'get_interactive_elements',
       description:
-          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Requires an active connection established via connect.',
+          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Set compact to true to omit verbose widget properties (e.g. ButtonStyle, TextStyle, InputDecoration, colors) and return only the type, key, text, bounds, visibility, and primitive state flags (e.g. enabled, value, obscureText) — this is much more token-efficient for agent loops, and a text field\'s label/hint is preserved. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Get Interactive Elements',
         readOnlyHint: true,
         idempotentHint: true,
       ),
-      inputSchema: const ToolInputSchema(properties: {}),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'compact': JsonSchema.boolean(
+            description:
+                'When true, omit verbose widget properties (style/decoration/color blobs) and return only identifying fields plus primitive state flags. Defaults to false (full properties).',
+          ),
+        },
+      ),
       callback: (args, extra) async {
-        logger.info('Getting interactive elements');
+        final compact = args['compact'] == true;
+        logger.info('Getting interactive elements (compact: $compact)');
         return runTool(logger, 'get interactive elements', () async {
-          final response = await connector.getInteractiveElements();
+          final response =
+              await connector.getInteractiveElements(compact: compact);
           final elements = response['elements'] as List<dynamic>;
 
           final buffer = StringBuffer()

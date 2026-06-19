@@ -15,7 +15,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, and identifying properties. The agent's primary way to "see" the screen. |
+| `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, and identifying properties. The agent's primary way to "see" the screen. Pass `compact: true` to omit verbose widget properties (style/decoration/color blobs) and return only identifying fields plus primitive state flags (e.g. `enabled`, `value`, `obscureText`) — much more token-efficient for agent loops; a text field's label/hint is preserved. |
 | `take_screenshots` | Capture screenshots of all active views, returned as base64 PNGs. |
 | `get_logs` | Retrieve app logs collected since start or the last hot reload. Requires a [`LogCollector`](./logging.md). |
 

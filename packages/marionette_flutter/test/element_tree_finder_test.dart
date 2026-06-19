@@ -145,4 +145,74 @@ void main() {
       );
     });
   });
+
+  group('ElementTreeFinder compact mode', () {
+    testWidgets('drops style/object blobs but keeps primitive state and bounds',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                ),
+                onPressed: () {},
+                child: const Text('Submit'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final verbose = _finder.findInteractiveElements();
+      final verboseButton =
+          verbose.firstWhere((e) => e['type'] == 'ElevatedButton');
+      expect(verboseButton.containsKey('style'), isTrue,
+          reason: 'verbose mode (default) still dumps the ButtonStyle blob');
+
+      final compact = _finder.findInteractiveElements(compact: true);
+      final compactButton =
+          compact.firstWhere((e) => e['type'] == 'ElevatedButton');
+      expect(compactButton.containsKey('style'), isFalse,
+          reason: 'compact drops the ButtonStyle object blob');
+      expect(compactButton.containsKey('focusNode'), isFalse,
+          reason: 'compact drops the FocusNode object blob');
+      expect(compactButton['enabled'], isNotNull,
+          reason: 'compact keeps the primitive enabled flag');
+      expect(compactButton.containsKey('bounds'), isTrue);
+      expect(compactButton['visible'], isTrue);
+    });
+
+    testWidgets(
+        'keeps generic DiagnosticsProperty<bool> state and preserves '
+        'TextField label', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TextField(
+              controller: TextEditingController(),
+              enabled: true,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+          ),
+        ),
+      );
+
+      final compact = _finder.findInteractiveElements(compact: true);
+      final field = compact.firstWhere((e) => e['type'] == 'TextField');
+
+      // These are declared as DiagnosticsProperty<bool> by TextField, so a
+      // node-type filter would wrongly drop them — value-type keeps them.
+      expect(field['obscureText'], 'true');
+      expect(field['enabled'], isNotNull);
+      // Object blobs are dropped.
+      expect(field.containsKey('decoration'), isFalse);
+      expect(field.containsKey('controller'), isFalse);
+      expect(field.containsKey('style'), isFalse);
+      // Label is preserved from the dropped InputDecoration.
+      expect(field['label'], 'Email');
+    });
+  });
 }

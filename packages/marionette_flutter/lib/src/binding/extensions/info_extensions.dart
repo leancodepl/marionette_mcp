@@ -53,7 +53,11 @@ void registerInfoExtensions({
   registerInternalMarionetteExtension(
     name: 'marionette.interactiveElements',
     callback: (params) async {
-      final elements = elementTreeFinder.findInteractiveElements();
+      // VM service delivers params as strings; absent defaults to false.
+      final compact = params['compact'] == 'true';
+      final elements = elementTreeFinder.findInteractiveElements(
+        compact: compact,
+      );
       return MarionetteExtensionResult.success({'elements': elements});
     },
   );
