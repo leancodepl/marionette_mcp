@@ -95,15 +95,19 @@ Future<int> _runStdioServer(McpServer server) async {
   final exitSignal = ExitSignal();
   final stdinClosed = Completer<void>();
 
+  // Install the close handler before connecting. An immediate stdin EOF
+  // (e.g. `</dev/null`) can close the transport during or right after
+  // connect(); registering afterwards risks missing that close and hanging
+  // until a signal. Fires when the transport closes — including stdin EOF,
+  // i.e. the MCP host went away without sending a signal. Per the stdio
+  // lifecycle the server should shut down then, not wait for SIGINT/SIGTERM.
+  server.server.onclose = () {
+    if (!stdinClosed.isCompleted) stdinClosed.complete();
+  };
+
   try {
     logger.fine('Running MCP server on stdio');
     await server.connect(transport);
-    // Fires when the transport closes, including when stdin reaches EOF (the
-    // MCP host went away without sending a signal). Per the stdio lifecycle the
-    // server should shut down in that case, not hang until SIGINT/SIGTERM.
-    server.server.onclose = () {
-      if (!stdinClosed.isCompleted) stdinClosed.complete();
-    };
     logger.info('Server started');
   } catch (e, st) {
     logger.severe('Error when starting the Stdio transport', e, st);
@@ -180,11 +184,13 @@ class ExitSignal {
   final _completer = Completer<ProcessSignal>();
   StreamSubscription<ProcessSignal>? _sigtermSubscription;
   late final StreamSubscription<ProcessSignal> _sigintSubscription;
+  bool _disposed = false;
 
   Future<ProcessSignal> get wait => _completer.future;
 
   /// Cancels the signal subscriptions so they no longer keep the event loop
-  /// alive. Safe to call multiple times.
+  /// alive. Safe to call multiple times — in normal operation it runs once
+  /// from [_handleSignal] and again from the shutdown path.
   void dispose() => _cleanup();
 
   void _handleSignal(ProcessSignal signal) {
@@ -195,6 +201,8 @@ class ExitSignal {
   }
 
   void _cleanup() {
+    if (_disposed) return;
+    _disposed = true;
     _sigtermSubscription?.cancel();
     _sigintSubscription.cancel();
   }
