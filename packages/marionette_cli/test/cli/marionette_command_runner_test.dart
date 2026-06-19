@@ -34,6 +34,7 @@ void main() {
         'pinch-zoom',
         'swipe',
         'enter-text',
+        'press-key',
         'press-back-button',
         'scroll-to',
         'take-screenshots',
