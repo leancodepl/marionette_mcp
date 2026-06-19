@@ -1,5 +1,6 @@
 # Unreleased
 
+- Exit the stdio MCP server when its stdin reaches EOF (e.g. the MCP host crashes or disconnects without sending a signal), preventing orphaned `marionette_mcp` processes from accumulating. Removed the bespoke Copilot-compat stdio transport in favour of `mcp_dart`'s built-in `StdioServerTransport` — `mcp_dart` 2.1.0 parses GitHub Copilot's object-typed `tasks` capabilities natively, so the workaround is no longer needed.
 - Add the `secondary_tap` tool (plus the `secondary-tap` CLI command) for right mouse button clicks on desktop. It dispatches a mouse pointer with the secondary button pressed, triggering Flutter's `onSecondaryTap` (e.g. context menus). Touch `tap` is unchanged.
 - Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
 

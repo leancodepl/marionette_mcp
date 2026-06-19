@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/compat/copilot_stdio_server_transport.dart';
 import 'package:marionette_mcp/src/version.g.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -92,20 +91,44 @@ String _formatTime(DateTime time) {
 Future<int> _runStdioServer(McpServer server) async {
   final logger = logging.Logger('main');
 
-  final transport = CopilotCompatStdioServerTransport();
+  final transport = StdioServerTransport();
+  final exitSignal = ExitSignal();
+  final stdinClosed = Completer<void>();
 
   try {
     logger.fine('Running MCP server on stdio');
     await server.connect(transport);
+    // Fires when the transport closes, including when stdin reaches EOF (the
+    // MCP host went away without sending a signal). Per the stdio lifecycle the
+    // server should shut down in that case, not hang until SIGINT/SIGTERM.
+    server.server.onclose = () {
+      if (!stdinClosed.isCompleted) stdinClosed.complete();
+    };
     logger.info('Server started');
   } catch (e, st) {
     logger.severe('Error when starting the Stdio transport', e, st);
+    exitSignal.dispose();
     return 1;
   }
 
-  final signal = await ExitSignal().wait;
-  logger.info('Received ${signal.name}, stopping');
+  // Stop on whichever happens first: an OS signal or the transport closing.
+  // Only the first cause is logged — closing the server below re-triggers
+  // `onclose`, which would otherwise log a misleading second reason.
+  var stopping = false;
+  void logStop(String reason) {
+    if (stopping) return;
+    stopping = true;
+    logger.info('$reason, stopping');
+  }
 
+  await Future.any([
+    exitSignal.wait.then((signal) => logStop('Received ${signal.name}')),
+    stdinClosed.future.then((_) => logStop('stdin closed')),
+  ]);
+
+  // Release the signal subscriptions so the event loop can drain and the
+  // process actually exits on the stdin-EOF path.
+  exitSignal.dispose();
   await server.close();
   await transport.close();
   logger.info('Stopped');
@@ -159,6 +182,10 @@ class ExitSignal {
   late final StreamSubscription<ProcessSignal> _sigintSubscription;
 
   Future<ProcessSignal> get wait => _completer.future;
+
+  /// Cancels the signal subscriptions so they no longer keep the event loop
+  /// alive. Safe to call multiple times.
+  void dispose() => _cleanup();
 
   void _handleSignal(ProcessSignal signal) {
     if (!_completer.isCompleted) {
