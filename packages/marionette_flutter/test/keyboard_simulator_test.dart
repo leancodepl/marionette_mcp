@@ -96,10 +96,8 @@ void main() {
         expect(selectAllCount, 1, reason: 'control+a should fire the shortcut');
 
         // Control wraps the letter: control down, a down, a up, control up.
-        final logicalDownOrder = events
-            .whereType<KeyDownEvent>()
-            .map((e) => e.logicalKey)
-            .toList();
+        final logicalDownOrder =
+            events.whereType<KeyDownEvent>().map((e) => e.logicalKey).toList();
         expect(logicalDownOrder, [
           LogicalKeyboardKey.controlLeft,
           LogicalKeyboardKey.keyA,

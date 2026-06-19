@@ -59,7 +59,8 @@ String? invalidModifiersError(String? modifiers) {
       .split(',')
       .map((modifier) => modifier.trim())
       .where((modifier) => modifier.isNotEmpty)
-      .where((modifier) => !supportedKeyModifiers.contains(modifier.toLowerCase()))
+      .where(
+          (modifier) => !supportedKeyModifiers.contains(modifier.toLowerCase()))
       .toList();
   if (invalid.isEmpty) return null;
   final plural = invalid.length > 1 ? 's' : '';
@@ -374,7 +375,10 @@ class VmServiceConnector {
       throw ArgumentError(error);
     }
     final args = <String, dynamic>{'key': key};
-    if (modifiers != null && modifiers.isNotEmpty) {
+    // Only forward modifiers when there is real content; a blank/whitespace
+    // string means "no modifiers" (matching invalidModifiersError) and should
+    // not be sent over the wire.
+    if (modifiers != null && modifiers.trim().isNotEmpty) {
       args['modifiers'] = modifiers;
     }
     return _callExtension('marionette.pressKey', args);

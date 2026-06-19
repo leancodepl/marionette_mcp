@@ -68,8 +68,7 @@ class KeyboardSimulator {
     // key — Ctrl+A must not also type "a".
     String? character;
     if (!hasNonShiftModifier && keyDef.character != null) {
-      character =
-          hasShift ? keyDef.character!.toUpperCase() : keyDef.character;
+      character = hasShift ? keyDef.character!.toUpperCase() : keyDef.character;
     }
 
     // Press modifiers, then the key down/up, then release modifiers in reverse
@@ -86,7 +85,8 @@ class KeyboardSimulator {
     WidgetsBinding.instance.scheduleFrame();
   }
 
-  KeyEvent _downEvent(_KeyDef def, {required String? character}) => KeyDownEvent(
+  KeyEvent _downEvent(_KeyDef def, {required String? character}) =>
+      KeyDownEvent(
         physicalKey: def.physical,
         logicalKey: def.logical,
         character: character,
