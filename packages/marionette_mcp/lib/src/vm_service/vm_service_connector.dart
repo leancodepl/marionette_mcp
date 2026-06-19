@@ -40,6 +40,33 @@ class VmServiceExtensionException implements Exception {
   }
 }
 
+/// Modifier keys accepted by [VmServiceConnector.pressKey].
+///
+/// Must stay in sync with the modifiers the `marionette_flutter`
+/// `KeyboardSimulator` understands; this mirror lets the CLI and MCP server
+/// (which can't import the Flutter package) reject bad input before it reaches
+/// the device.
+const supportedKeyModifiers = {'control', 'shift', 'alt', 'meta'};
+
+/// Validates a comma-separated [modifiers] string against
+/// [supportedKeyModifiers] (case-insensitive).
+///
+/// Returns a human-readable error message listing the offending entries, or
+/// `null` when [modifiers] is null/empty or every entry is supported.
+String? invalidModifiersError(String? modifiers) {
+  if (modifiers == null || modifiers.trim().isEmpty) return null;
+  final invalid = modifiers
+      .split(',')
+      .map((modifier) => modifier.trim())
+      .where((modifier) => modifier.isNotEmpty)
+      .where((modifier) => !supportedKeyModifiers.contains(modifier.toLowerCase()))
+      .toList();
+  if (invalid.isEmpty) return null;
+  final plural = invalid.length > 1 ? 's' : '';
+  return 'Unsupported modifier$plural: ${invalid.join(', ')}. '
+      'Supported modifiers: ${supportedKeyModifiers.join(', ')}.';
+}
+
 /// Manages connection to a Flutter app's VM service and provides
 /// wrapper methods for custom marionette.* extensions.
 class VmServiceConnector {
@@ -342,6 +369,10 @@ class VmServiceConnector {
     String key, {
     String? modifiers,
   }) {
+    final error = invalidModifiersError(modifiers);
+    if (error != null) {
+      throw ArgumentError(error);
+    }
     final args = <String, dynamic>{'key': key};
     if (modifiers != null && modifiers.isNotEmpty) {
       args['modifiers'] = modifiers;

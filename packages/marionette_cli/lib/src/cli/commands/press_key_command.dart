@@ -37,6 +37,18 @@ class PressKeyCommand extends InstanceCommand {
       'modifiers (e.g. --key a --modifiers control).';
 
   @override
+  Future<int> run() {
+    // Validate before InstanceCommand.run() connects, so a bad modifier is a
+    // usage error (exit 64) that doesn't require a running app.
+    final modifierError =
+        invalidModifiersError(argResults?['modifiers'] as String?);
+    if (modifierError != null) {
+      usageException(modifierError);
+    }
+    return super.run();
+  }
+
+  @override
   Future<int> execute(VmServiceConnector connector) async {
     final key = argResults!['key'] as String;
     final modifiers = argResults?['modifiers'] as String?;

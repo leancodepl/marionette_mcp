@@ -44,6 +44,14 @@ void registerKeyboardTools(
       final key = args['key'] as String;
       final modifiers = args['modifiers'] as String?;
 
+      final modifierError = invalidModifiersError(modifiers);
+      if (modifierError != null) {
+        return CallToolResult(
+          isError: true,
+          content: [TextContent(text: modifierError)],
+        );
+      }
+
       logger.info('Pressing key: $key (modifiers: ${modifiers ?? 'none'})');
       return runTool(logger, 'press key', () async {
         final response = await connector.pressKey(key, modifiers: modifiers);
