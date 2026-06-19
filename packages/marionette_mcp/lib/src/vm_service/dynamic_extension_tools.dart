@@ -23,11 +23,15 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// tool, preserving backward compatibility with apps that haven't migrated.
 ///
 /// Extension names are sanitized to a client-safe MCP tool name (see
-/// [sanitizeToolName]) because some clients (notably VS Code Copilot) reject
-/// tool names outside `[a-z0-9_-]`. The underlying extension is still invoked
-/// by its real name, so `appNavigation.goToPage` is exposed as the tool
-/// `app_navigation_go_to_page` but dispatched to `appNavigation.goToPage` on
-/// the VM service.
+/// [sanitizeToolName]). The `namespace.method` convention is out of spec for
+/// the underlying tool-calling APIs — Anthropic allows `[a-zA-Z0-9_]`, OpenAI
+/// `[a-zA-Z0-9_-]`, both rejecting the `.` separator — and clients diverge on
+/// how they cope (Claude Code rewrites the name transparently; VS Code Copilot
+/// rejects anything outside `[a-z0-9_-]` and drops the tool). Sanitizing to
+/// the strictest set keeps the tool usable everywhere. The underlying
+/// extension is still invoked by its real name, so `appNavigation.goToPage` is
+/// exposed as the tool `app_navigation_go_to_page` but dispatched to
+/// `appNavigation.goToPage` on the VM service.
 class DynamicExtensionTools {
   DynamicExtensionTools({
     required McpServer server,
@@ -268,9 +272,11 @@ class DynamicExtensionTools {
   }
 }
 
-/// Maps a custom-extension name to an MCP tool name accepted by strict
-/// clients (notably VS Code Copilot, which rejects anything outside
-/// `[a-z0-9_-]`).
+/// Maps a custom-extension name to an MCP tool name accepted across clients.
+/// The target set `[a-z0-9_-]` is the strictest in common use (VS Code Copilot
+/// enforces it); it also stays within the `.`-rejecting character sets the
+/// Anthropic and OpenAI tool-calling APIs require, which the `namespace.method`
+/// convention would otherwise violate.
 ///
 /// The transform lower-cases the name, inserts `_` at camelCase boundaries so
 /// `goToPage` reads as `go_to_page`, replaces every other disallowed
