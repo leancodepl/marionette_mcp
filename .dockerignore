@@ -1,0 +1,3 @@
+# The Dockerfile installs marionette_mcp from pub.dev and copies nothing from the
+# build context, so exclude everything to keep the context empty and the build fast.
+*
