@@ -72,7 +72,10 @@ void main() {
             },
             {
               'name': 'analytics.flush',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -85,8 +88,119 @@ void main() {
       );
       await dynamicTools.registerAll();
 
+      // Tool names are sanitized for strict clients; the dotted/camelCase
+      // extension names map to `[a-z0-9_-]` tool names.
       final names = dynamicTools.registeredTools.map((t) => t.name).toSet();
-      expect(names, {'deckNavigation.goToSlide', 'analytics.flush'});
+      expect(names, {'deck_navigation_go_to_slide', 'analytics_flush'});
+    });
+
+    test(
+        'sanitizes camelCase + dotted names but dispatches to the real '
+        'extension name', () async {
+      final connector = _FakeConnector(
+        listExtensionsResponse: const {
+          'extensions': [
+            {
+              'name': 'appNavigation.goToPage',
+              'description': 'Navigates to a page by name.',
+              'inputSchema': {
+                'type': 'object',
+                'properties': {
+                  'page': {'type': 'string'},
+                },
+                'required': ['page'],
+              },
+            },
+          ],
+        },
+      );
+
+      final dynamicTools = DynamicExtensionTools(
+        server: _server(),
+        connector: connector,
+        logger: logging.Logger.detached('test'),
+      );
+      await dynamicTools.registerAll();
+
+      final tool = dynamicTools.registeredTools.single;
+      // Exposed to clients under a sanitized name...
+      expect(tool.name, 'app_navigation_go_to_page');
+      // ...but the real extension name is preserved for dispatch.
+      expect(
+        dynamicTools.extensionNameForTool('app_navigation_go_to_page'),
+        'appNavigation.goToPage',
+      );
+      // The description records the real name so it stays reachable via
+      // call_custom_extension.
+      expect(tool.description, contains('appNavigation.goToPage'));
+    });
+
+    test('leaves already-valid tool names (and their descriptions) unchanged',
+        () async {
+      final connector = _FakeConnector(
+        listExtensionsResponse: const {
+          'extensions': [
+            {
+              'name': 'analytics_flush',
+              'description': 'Flush analytics.',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
+            },
+          ],
+        },
+      );
+
+      final dynamicTools = DynamicExtensionTools(
+        server: _server(),
+        connector: connector,
+        logger: logging.Logger.detached('test'),
+      );
+      await dynamicTools.registerAll();
+
+      final tool = dynamicTools.registeredTools.single;
+      expect(tool.name, 'analytics_flush');
+      // No rename → description is left exactly as the author wrote it.
+      expect(tool.description, 'Flush analytics.');
+    });
+
+    test(
+        'skips a second extension whose name sanitizes to an '
+        'already-claimed tool name', () async {
+      final connector = _FakeConnector(
+        listExtensionsResponse: const {
+          'extensions': [
+            {
+              'name': 'fooBar',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
+            },
+            {
+              // Distinct extension, same sanitized tool name (`foo_bar`).
+              'name': 'foo.bar',
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
+            },
+          ],
+        },
+      );
+
+      final dynamicTools = DynamicExtensionTools(
+        server: _server(),
+        connector: connector,
+        logger: logging.Logger.detached('test'),
+      );
+      await dynamicTools.registerAll();
+
+      // Only the first claimant is registered; the colliding one is skipped.
+      final names = dynamicTools.registeredTools.map((t) => t.name).toList();
+      expect(names, ['foo_bar']);
+      expect(dynamicTools.extensionNameForTool('foo_bar'), 'fooBar');
     });
 
     test('skips schema-less extensions', () async {
@@ -117,7 +231,10 @@ void main() {
             // Valid one — must still register.
             {
               'name': 'good',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -134,8 +251,7 @@ void main() {
       expect(names, ['good']);
     });
 
-    test('skips when name collides with an already-registered tool',
-        () async {
+    test('skips when name collides with an already-registered tool', () async {
       final server = _server()
         ..registerTool(
           'tap', // Pretend this is a built-in name.
@@ -150,7 +266,10 @@ void main() {
           'extensions': [
             {
               'name': 'tap',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -193,11 +312,17 @@ void main() {
           'extensions': [
             {
               'name': 'a',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
             {
               'name': 'b',
-              'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
+              'inputSchema': {
+                'type': 'object',
+                'properties': <String, dynamic>{}
+              },
             },
           ],
         },
@@ -431,6 +556,32 @@ void main() {
       // caught again).
       await dynamicTools.registerAll();
       expect(dynamicTools.registeredTools, isEmpty);
+    });
+  });
+
+  group('sanitizeToolName', () {
+    test('rewrites camelCase + dotted names', () {
+      expect(sanitizeToolName('appNavigation.goToPage'),
+          'app_navigation_go_to_page');
+      expect(sanitizeToolName('analytics.flush'), 'analytics_flush');
+    });
+
+    test('returns names already in [a-z0-9_-] verbatim', () {
+      // Including unusual-but-valid shapes: collapsing/trimming here would
+      // silently rewrite a name the author deliberately chose.
+      for (final name in [
+        'analytics_flush',
+        'already_valid-name',
+        'a',
+        '__foo__',
+        'a--b'
+      ]) {
+        expect(sanitizeToolName(name), name, reason: name);
+      }
+    });
+
+    test('never yields an empty name', () {
+      expect(sanitizeToolName('...'), '_');
     });
   });
 }
