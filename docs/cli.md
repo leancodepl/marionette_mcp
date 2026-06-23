@@ -88,6 +88,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | `pinch-zoom` | Pinch zoom (matchers + `--scale`, `--start-distance`). |
 | `swipe` | Swipe/drag (matchers + `--direction`, `--distance`, or `--start-x`/`--start-y`/`--end-x`/`--end-y`). |
 | `enter-text` | Enter text (`--key` or `--focused`, plus `--input`). |
+| `press-key` | Press a key on the focused element (`--key`, optional `--modifiers`). Real key event: enter to submit, tab to move focus, escape, arrows/backspace to edit, or `--modifiers control` for shortcuts. |
 | `scroll-to` | Scroll to an element (`--key` or `--text`). |
 | `press-back-button` | Simulate the system back button. |
 | `take-screenshots` | Capture a screenshot (`-o/--output`, `--open`). |

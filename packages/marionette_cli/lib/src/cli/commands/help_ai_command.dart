@@ -199,6 +199,40 @@ Enter text into a text field.
 
 ---
 
+### press-key
+
+Press a keyboard key on the currently focused element. Unlike enter-text
+(which rewrites a field's value), this sends a real key event through the focus
+system, so onSubmitted, Shortcuts/Actions, and focus traversal all respond.
+The key goes to whatever has focus — focus a target first (e.g. with tap).
+
+  Requires: -i <instance> or --uri <ws-uri>
+
+  Options:
+    --key <string>        Key to press (mandatory). Named keys: enter, tab,
+                          escape, backspace, delete, space, arrowUp, arrowDown,
+                          arrowLeft, arrowRight, home, end, pageUp, pageDown.
+                          Also a single character a-z or 0-9.
+    --modifiers <list>    Comma-separated modifiers to hold: control, shift,
+                          alt, meta. On macOS use meta for the Command key.
+
+  Examples:
+    marionette -i my-app press-key --key enter
+    marionette -i my-app press-key --key tab
+    marionette -i my-app press-key --key a --modifiers control
+    marionette --uri ws://127.0.0.1:8181/ws press-key --key arrowDown
+
+  Output (stdout):
+    Pressed key: enter
+    Pressed key: control+a
+
+  Notes:
+    - A character is only typed for an unmodified (or shift-only) printable
+      key; control+a activates select-all rather than typing "a".
+    - Modifier combos match Flutter Shortcuts/SingleActivator.
+
+---
+
 ### press-back-button
 
 Simulate a system back button press (Android back / iOS swipe-back).
