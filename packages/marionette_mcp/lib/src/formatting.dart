@@ -2,7 +2,7 @@ import 'dart:convert';
 
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
-/// Supports matching by key, text, type, and coordinates.
+/// Supports matching by key, identifier, text, type, and coordinates.
 Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   final matcher = <String, dynamic>{};
   if (args['focused_element'] == true) {
@@ -15,6 +15,9 @@ Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   }
   if (args.containsKey('key')) {
     matcher['key'] = args['key'];
+  }
+  if (args.containsKey('identifier')) {
+    matcher['identifier'] = args['identifier'];
   }
   if (args.containsKey('text')) {
     matcher['text'] = args['text'];

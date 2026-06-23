@@ -57,6 +57,7 @@ marionette register other-app ws://127.0.0.1:9090/ws
 # Interact with a specific instance
 marionette -i my-app get-interactive-elements
 marionette -i my-app tap --key submit_button
+marionette -i my-app tap --identifier submit_button
 marionette -i my-app tap --text "Submit"
 marionette -i my-app enter-text --key email_field --input "test@example.com"
 marionette -i my-app scroll-to --text "Bottom Item"
@@ -81,14 +82,14 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | Command | Purpose |
 | --- | --- |
 | `get-interactive-elements` | List interactive UI elements. |
-| `tap` | Tap an element (`--key`, `--text`, `--type`, or `--x`/`--y`). |
+| `tap` | Tap an element (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`). |
 | `secondary-tap` | Right-click a matching element (desktop only). |
 | `double-tap` | Double tap (matchers + `--delay`). |
 | `long-press` | Long press (matchers + `--duration`). |
 | `pinch-zoom` | Pinch zoom (matchers + `--scale`, `--start-distance`). |
 | `swipe` | Swipe/drag (matchers + `--direction`, `--distance`, or `--start-x`/`--start-y`/`--end-x`/`--end-y`). |
-| `enter-text` | Enter text (`--key` or `--focused`, plus `--input`). |
-| `scroll-to` | Scroll to an element (`--key` or `--text`). |
+| `enter-text` | Enter text (`--key`, `--identifier`, or `--focused`, plus `--input`). |
+| `scroll-to` | Scroll to an element (`--key`, `--identifier`, or `--text`). |
 | `press-back-button` | Simulate the system back button. |
 | `take-screenshots` | Capture a screenshot (`-o/--output`, `--open`). |
 | `record-video` | Record video (`-o/--output`, `-d/--duration`, `--width`, `--height`, `--ffmpeg-path`, `--open`, …). |

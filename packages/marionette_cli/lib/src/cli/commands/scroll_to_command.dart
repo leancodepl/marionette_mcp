@@ -9,6 +9,7 @@ class ScrollToCommand extends InstanceCommand {
   ScrollToCommand(this._registry) {
     argParser
       ..addOption('key', help: 'Element key (ValueKey<String>).')
+      ..addOption('identifier', help: 'Semantics identifier of the element.')
       ..addOption('text', help: 'Visible text of the element to scroll to.');
   }
 
@@ -28,11 +29,14 @@ class ScrollToCommand extends InstanceCommand {
   Future<int> execute(VmServiceConnector connector) async {
     final matcher = buildMatcherFromArgs(
       key: argResults?['key'] as String?,
+      identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
     );
 
     if (matcher.isEmpty) {
-      usageException('At least one matcher required: --key or --text.');
+      usageException(
+        'At least one matcher required: --key, --identifier, or --text.',
+      );
     }
 
     final response = await connector.scrollToElement(matcher);

@@ -145,4 +145,62 @@ void main() {
       );
     });
   });
+
+  group('ElementTreeFinder identifier extraction', () {
+    testWidgets(
+        'Semantics with only an identifier (no label/value, no key) is '
+        'surfaced with its identifier so agents can discover it',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Semantics(
+                identifier: 'submit_button',
+                child: ElevatedButton(
+                  onPressed: () {},
+                  child: const Text('Submit'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final elements = _finder.findInteractiveElements();
+      expect(
+        elements.any(
+          (e) =>
+              e['type'] == 'Semantics' && e['identifier'] == 'submit_button',
+        ),
+        isTrue,
+        reason: 'An identifier-only Semantics wrapper must appear in '
+            'get_interactive_elements — mirroring how a keyed wrapper is '
+            'surfaced — otherwise agents cannot discover the identifier they '
+            'are told to match on',
+      );
+    });
+
+    testWidgets('Semantics with an empty identifier is not reported',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Semantics(
+              identifier: '',
+              child: Container(width: 100, height: 100, color: Colors.green),
+            ),
+          ),
+        ),
+      );
+
+      final elements = _finder.findInteractiveElements();
+      expect(
+        elements.any((e) => e['type'] == 'Semantics'),
+        isFalse,
+        reason: 'An empty identifier carries no content and should stay quiet, '
+            'consistent with the label/value discovery contract',
+      );
+    });
+  });
 }

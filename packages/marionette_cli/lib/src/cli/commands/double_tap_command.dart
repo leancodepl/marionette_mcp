@@ -9,6 +9,7 @@ class DoubleTapCommand extends InstanceCommand {
   DoubleTapCommand(this._registry) {
     argParser
       ..addOption('key', help: 'Element key (ValueKey<String>).')
+      ..addOption('identifier', help: 'Semantics identifier of the element.')
       ..addOption('text', help: 'Visible text content of the element.')
       ..addOption('type', help: 'Widget type name (e.g., ListTile).')
       ..addOption('x', help: 'X coordinate for positional double tap.')
@@ -30,12 +31,13 @@ class DoubleTapCommand extends InstanceCommand {
 
   @override
   String get description =>
-      'Double tap an element by key, text, type, or coordinates.';
+      'Double tap an element by key, identifier, text, type, or coordinates.';
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
     final matcher = buildMatcherFromArgs(
       key: argResults?['key'] as String?,
+      identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
       type: argResults?['type'] as String?,
       x: _parseNum(argResults?['x'] as String?),
@@ -50,7 +52,8 @@ class DoubleTapCommand extends InstanceCommand {
 
     if (matcher.isEmpty) {
       usageException(
-        'At least one matcher required: --key, --text, --type, or --x/--y.',
+        'At least one matcher required: --key, --identifier, --text, --type, '
+        'or --x/--y.',
       );
     }
 

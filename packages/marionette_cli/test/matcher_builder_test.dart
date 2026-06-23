@@ -11,6 +11,13 @@ void main() {
       expect(buildMatcherFromArgs(key: 'btn'), equals({'key': 'btn'}));
     });
 
+    test('single identifier arg', () {
+      expect(
+        buildMatcherFromArgs(identifier: 'submit_button'),
+        equals({'identifier': 'submit_button'}),
+      );
+    });
+
     test('single text arg', () {
       expect(buildMatcherFromArgs(text: 'Submit'), equals({'text': 'Submit'}));
     });
