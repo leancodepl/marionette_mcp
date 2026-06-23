@@ -23,20 +23,20 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `tap` | Tap an element matched by `key`, `text`, `type`, or `coordinates`. Prefer `key`. Tapping a text field focuses it. |
+| `tap` | Tap an element matched by `key`, `identifier`, `text`, `type`, or `coordinates`. Prefer `key`; `identifier` (Semantics identifier) is the next-best stable selector. Tapping a text field focuses it. |
 | `secondary_tap` | Right mouse button click on a matching element (**desktop only**); triggers `onSecondaryTap`, e.g. context menus. |
 | `double_tap` | Double tap an element (optional `delay` between taps, default 100 ms). |
 | `long_press` | Long press an element (optional `duration`, default 600 ms) — context menus, reorderable lists. |
-| `swipe` | Swipe/drag. Element-based (`key`/`text` + `direction` + optional `distance`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
+| `swipe` | Swipe/drag. Element-based (`key`/`identifier`/`text` + `direction` + optional `distance`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
 | `pinch_zoom` | Pinch to zoom an element. `scale > 1.0` zooms in, `< 1.0` zooms out. For maps, images, PDFs. |
 | `press_back_button` | Simulate the system back button (Android back / iOS swipe-back). Works with Navigator, GoRouter, etc. |
-| `scroll_to` | Scroll until an element matching `key` or `text` becomes visible. |
+| `scroll_to` | Scroll until an element matching `key`, `identifier`, or `text` becomes visible. |
 
 ### Text input
 
 | Tool | Description |
 | --- | --- |
-| `enter_text` | Enter text into a field. Target by `key`, or focus a field first (via `tap`) and pass `focused_element: true`. Exactly one selector required. |
+| `enter_text` | Enter text into a field. Target by `key`, by `identifier`, or focus a field first (via `tap`) and pass `focused_element: true`. Exactly one selector required. |
 
 ### Custom extensions
 

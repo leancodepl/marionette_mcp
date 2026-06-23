@@ -10,7 +10,7 @@ sealed class WidgetMatcher {
 
   /// Creates a matcher from a JSON map.
   /// If multiple fields are present, precedence is:
-  /// 'focused' > coordinates (x & y) > 'key' > 'text' > 'type'.
+  /// 'focused' > coordinates (x & y) > 'key' > 'identifier' > 'text' > 'type'.
   static WidgetMatcher fromJson(Map<String, dynamic> json) {
     // Focused matcher has highest precedence because it bypasses tree search.
     if (json.containsKey('focused')) {
@@ -19,13 +19,16 @@ sealed class WidgetMatcher {
       return CoordinatesMatcher.fromJson(json);
     } else if (json.containsKey('key')) {
       return KeyMatcher.fromJson(json);
+    } else if (json.containsKey('identifier')) {
+      return IdentifierMatcher.fromJson(json);
     } else if (json.containsKey('text')) {
       return TextMatcher.fromJson(json);
     } else if (json.containsKey('type')) {
       return TypeStringMatcher.fromJson(json);
     } else {
       throw ArgumentError(
-        'Matcher JSON must contain "focused", "x" & "y", "key", "text", or "type" field',
+        'Matcher JSON must contain "focused", "x" & "y", "key", '
+        '"identifier", "text", or "type" field',
       );
     }
   }
@@ -110,6 +113,46 @@ class KeyMatcher extends WidgetMatcher {
   @override
   Map<String, dynamic> toJson() {
     return <String, dynamic>{'key': keyValue};
+  }
+}
+
+/// Matches widgets by their `Semantics` identifier.
+///
+/// Unlike [TextMatcher], which is deliberately kept away from `Semantics`
+/// annotations (see the rationale on `MarionetteConfiguration`), the
+/// accessibility `identifier` is an explicit, unique, machine-readable handle
+/// set intentionally by the developer. It only ever lives on a [Semantics]
+/// widget — never on the inner control — so there is no ambiguity about which
+/// element to match. The matched `Semantics` wrapper shares the bounds of (and
+/// is hittable through) its child, so gestures land on the real control.
+///
+/// Convenience identifier parameters that other widgets forward to a generated
+/// `Semantics` are covered by the same mechanism: e.g. `Text(semanticsIdentifier:
+/// ...)` builds a `Semantics(identifier: ...)` wrapper, which this matcher then
+/// matches like any other. Per-span identifiers (`TextSpan.semanticsIdentifier`
+/// / `InlineSpan.semanticsIdentifier`) are applied at the `SemanticsNode` level
+/// inside `RenderParagraph`, not as widgets, so they are not matchable here.
+class IdentifierMatcher extends WidgetMatcher {
+  const IdentifierMatcher(this.identifierValue);
+
+  factory IdentifierMatcher.fromJson(Map<String, dynamic> json) {
+    return IdentifierMatcher(json['identifier'] as String);
+  }
+
+  final String identifierValue;
+
+  @override
+  bool matches(Element element, MarionetteConfiguration configuration) {
+    final widget = element.widget;
+    if (widget is Semantics) {
+      return widget.properties.identifier == identifierValue;
+    }
+    return false;
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{'identifier': identifierValue};
   }
 }
 

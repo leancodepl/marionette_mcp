@@ -9,6 +9,7 @@ class SwipeCommand extends InstanceCommand {
   SwipeCommand(this._registry) {
     argParser
       ..addOption('key', help: 'Element key (ValueKey<String>).')
+      ..addOption('identifier', help: 'Semantics identifier of the element.')
       ..addOption('text', help: 'Visible text content of the element.')
       ..addOption('type', help: 'Widget type name (e.g., PageView).')
       ..addOption(
@@ -40,9 +41,9 @@ class SwipeCommand extends InstanceCommand {
 
   @override
   String get description =>
-      'Swipe/drag on an element (key, text, or type) in a direction, '
-      'or between coordinates. Useful for PageView, Dismissible, Drawer, '
-      'and Slider widgets.';
+      'Swipe/drag on an element (key, identifier, text, or type) in a '
+      'direction, or between coordinates. Useful for PageView, Dismissible, '
+      'Drawer, and Slider widgets.';
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
@@ -55,6 +56,7 @@ class SwipeCommand extends InstanceCommand {
         startX != null || startY != null || endX != null || endY != null;
 
     final anyElement = argResults?['key'] != null ||
+        argResults?['identifier'] != null ||
         argResults?['text'] != null ||
         argResults?['type'] != null ||
         argResults?['direction'] != null ||
@@ -64,7 +66,8 @@ class SwipeCommand extends InstanceCommand {
       usageException(
         'Cannot mix coordinate-based options '
         '(--start-x/--start-y/--end-x/--end-y) with element-based options '
-        '(--key/--text/--type/--direction/--distance). Use one mode.',
+        '(--key/--identifier/--text/--type/--direction/--distance). '
+        'Use one mode.',
       );
     }
 
@@ -88,14 +91,15 @@ class SwipeCommand extends InstanceCommand {
     } else {
       final matcher = buildMatcherFromArgs(
         key: argResults?['key'] as String?,
+        identifier: argResults?['identifier'] as String?,
         text: argResults?['text'] as String?,
         type: argResults?['type'] as String?,
       );
       if (matcher.isEmpty) {
         usageException(
-          'Element-based swipe requires a matcher: --key, --text, or --type. '
-          'Alternatively provide --start-x/--start-y/--end-x/--end-y for '
-          'coordinate-based swipe.',
+          'Element-based swipe requires a matcher: --key, --identifier, '
+          '--text, or --type. Alternatively provide '
+          '--start-x/--start-y/--end-x/--end-y for coordinate-based swipe.',
         );
       }
 

@@ -59,8 +59,12 @@ class ElementTreeFinder {
     // shadow the inner button.
     final discoverableText = text ?? _extractSemanticsText(widget);
     final keyValue = _extractKeyValue(widget.key);
+    final identifierValue = _extractIdentifier(widget);
 
-    if (!isInteractive && discoverableText == null && keyValue == null) {
+    if (!isInteractive &&
+        discoverableText == null &&
+        keyValue == null &&
+        identifierValue == null) {
       return null;
     }
 
@@ -86,6 +90,10 @@ class ElementTreeFinder {
 
     if (keyValue != null) {
       data['key'] = keyValue;
+    }
+
+    if (identifierValue != null) {
+      data['identifier'] = identifierValue;
     }
 
     if (discoverableText != null) {
@@ -119,6 +127,21 @@ class ElementTreeFinder {
       return key.value;
     }
     return null;
+  }
+
+  /// Extracts the accessibility `identifier` from a `Semantics` widget.
+  ///
+  /// Unlike `label`/`value` (see [_extractSemanticsText]), the `identifier` is
+  /// a unique, machine-readable handle that lives only on the `Semantics`
+  /// widget, so it is both surfaced for discovery here and consulted by the
+  /// matcher path (see `IdentifierMatcher`). Returns null when the widget is
+  /// not a `Semantics` or carries no identifier, keeping the output quiet by
+  /// default.
+  static String? _extractIdentifier(Widget widget) {
+    if (widget is! Semantics) return null;
+    final identifier = widget.properties.identifier;
+    if (identifier == null || identifier.isEmpty) return null;
+    return identifier;
   }
 
   /// Discovery-only fallback: extracts the accessibility annotation from a

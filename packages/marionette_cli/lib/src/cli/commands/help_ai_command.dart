@@ -126,8 +126,9 @@ List interactive UI elements in the app's widget tree.
     Type: TextField, Key: "email_field"
     Type: IconButton, Text: ""
 
-  Each element may have: type, key, text, and additional properties.
-  Use the key or text values as matchers for tap, enter-text, scroll-to.
+  Each element may have: type, key, text, identifier, and additional
+  properties. Use the key, identifier, or text values as matchers for tap,
+  enter-text, scroll-to.
 
 ---
 
@@ -138,14 +139,16 @@ Tap an element. Provide exactly one matching strategy.
   Requires: -i <instance> or --uri <ws-uri>
 
   Options:
-    --key <string>    Match by ValueKey<String> (most reliable)
-    --text <string>   Match by visible text content
-    --type <string>   Match by widget type name (e.g., ElevatedButton)
-    --x <number>      X screen coordinate (use with --y)
-    --y <number>      Y screen coordinate (use with --x)
+    --key <string>        Match by ValueKey<String> (most reliable)
+    --identifier <string> Match by Semantics identifier (stable alternative)
+    --text <string>       Match by visible text content
+    --type <string>       Match by widget type name (e.g., ElevatedButton)
+    --x <number>          X screen coordinate (use with --y)
+    --y <number>          Y screen coordinate (use with --x)
 
   Examples:
     marionette -i my-app tap --key submit_button
+    marionette -i my-app tap --identifier submit_button
     marionette -i my-app tap --text "Submit"
     marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
     marionette -i my-app tap --x 100 --y 200
@@ -164,14 +167,16 @@ strategy.
   Requires: -i <instance> or --uri <ws-uri>
 
   Options:
-    --key <string>    Match by ValueKey<String> (most reliable)
-    --text <string>   Match by visible text content
-    --type <string>   Match by widget type name (e.g., ElevatedButton)
-    --x <number>      X screen coordinate (use with --y)
-    --y <number>      Y screen coordinate (use with --x)
+    --key <string>        Match by ValueKey<String> (most reliable)
+    --identifier <string> Match by Semantics identifier (stable alternative)
+    --text <string>       Match by visible text content
+    --type <string>       Match by widget type name (e.g., ElevatedButton)
+    --x <number>          X screen coordinate (use with --y)
+    --y <number>          Y screen coordinate (use with --x)
 
   Examples:
     marionette -i my-app secondary-tap --key file_item
+    marionette -i my-app secondary-tap --identifier file_item
     marionette -i my-app secondary-tap --text "Document"
     marionette -i my-app secondary-tap --x 100 --y 200
 
@@ -186,13 +191,16 @@ Enter text into a text field.
 
   Requires: -i <instance> or --uri <ws-uri>
 
-  Options (all required):
-    --key <string>      Match text field by key (or use --text)
-    --text <string>     Match text field by visible text
-    --input <string>    Text to enter (mandatory)
+  Options:
+    --key <string>        Match text field by key
+    --identifier <string> Match text field by Semantics identifier
+    --text <string>       Match text field by visible text
+    --focused             Target the currently focused text field
+    --input <string>      Text to enter (mandatory)
 
   Example:
     marionette -i my-app enter-text --key email_field --input "user@example.com"
+    marionette -i my-app enter-text --identifier email_field --input "user@example.com"
 
   Output (stdout):
     Entered text into element matching {key: email_field}
@@ -231,6 +239,7 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
 
   Element-based options:
     --key <string>        Match by ValueKey<String> (most reliable)
+    --identifier <string> Match by Semantics identifier (stable alternative)
     --text <string>       Match by visible text content
     --type <string>       Match by widget type name (e.g., PageView)
     --direction <dir>     left, right, up, or down (required for this mode)
@@ -260,8 +269,9 @@ Scroll until an element becomes visible.
   Requires: -i <instance> or --uri <ws-uri>
 
   Options:
-    --key <string>    Match by ValueKey<String>
-    --text <string>   Match by visible text content
+    --key <string>        Match by ValueKey<String>
+    --identifier <string> Match by Semantics identifier
+    --text <string>       Match by visible text content
 
   Example:
     marionette -i my-app scroll-to --text "Bottom Item"
@@ -449,6 +459,8 @@ If a command fails with a connection error, the app may have stopped.
 - Prefer --uri for one-off interactions (no setup/cleanup overhead)
 - Prefer --instance for repeated interactions with the same app (shorter commands)
 - Prefer --key over --text for matching elements (keys are stable, text may change)
+- --identifier (Semantics identifier) is an equally stable alternative to --key
+  when a widget has no ValueKey but does set an accessibility identifier
 - Run `get-interactive-elements` first to discover what's on screen before interacting
 - Instance names are alphanumeric with hyphens/underscores: [a-zA-Z0-9_-]+
 - Commands are stateless — each opens a fresh connection, so no session management needed

@@ -1,9 +1,10 @@
 /// Builds a widget matcher map from CLI arguments.
 ///
-/// Accepts named args like --key, --text, --type, --x, --y and
+/// Accepts named args like --key, --identifier, --text, --type, --x, --y and
 /// constructs the matcher map expected by [VmServiceConnector].
 Map<String, dynamic> buildMatcherFromArgs({
   String? key,
+  String? identifier,
   String? text,
   String? type,
   num? x,
@@ -12,6 +13,7 @@ Map<String, dynamic> buildMatcherFromArgs({
 }) {
   final matcher = <String, dynamic>{};
   if (key != null) matcher['key'] = key;
+  if (identifier != null) matcher['identifier'] = identifier;
   if (text != null) matcher['text'] = text;
   if (type != null) matcher['type'] = type;
   if (x != null) matcher['x'] = x;

@@ -9,6 +9,7 @@ class EnterTextCommand extends InstanceCommand {
   EnterTextCommand(this._registry) {
     argParser
       ..addOption('key', help: 'Element key (ValueKey<String>).')
+      ..addOption('identifier', help: 'Semantics identifier of the text field.')
       ..addOption('text', help: 'Visible text of the text field.')
       ..addFlag(
         'focused',
@@ -39,13 +40,15 @@ class EnterTextCommand extends InstanceCommand {
     final focused = argResults!['focused'] as bool;
     final matcher = buildMatcherFromArgs(
       key: argResults?['key'] as String?,
+      identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
       focused: focused,
     );
 
     if (matcher.isEmpty) {
       usageException(
-        'At least one matcher required: --key, --text, or --focused.',
+        'At least one matcher required: --key, --identifier, --text, '
+        'or --focused.',
       );
     }
 
