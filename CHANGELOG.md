@@ -1,8 +1,16 @@
 # Unreleased
 
-- Exit the stdio MCP server when its stdin reaches EOF (e.g. the MCP host crashes or disconnects without sending a signal), preventing orphaned `marionette_mcp` processes from accumulating. Removed the bespoke Copilot-compat stdio transport in favour of `mcp_dart`'s built-in `StdioServerTransport` — `mcp_dart` 2.1.0 parses GitHub Copilot's object-typed `tasks` capabilities natively, so the workaround is no longer needed.
+# 0.6.0
+
+- Promote schema-bearing custom extensions to first-class MCP tools. Registering an extension with an `inputSchema` (declared via the new typed `ExtensionInputSchema`/`ExtensionParam` DSL) now surfaces it as an individually-named, discoverable tool with a validated input schema — the agent gets argument hints and enum autocomplete, invalid arguments are rejected before reaching your app, and declared defaults are applied before the callback runs. Promoted tool names are sanitized for strict clients (e.g. VS Code Copilot's `[a-z0-9_-]`-only rule) while the extension is still invoked by its real name. Schema-less extensions stay supported through the generic `call_custom_extension` tool.
+- Add the `press_key` tool (plus the `press-key` CLI command) for dispatching real hardware key events to the focused element — named keys (`enter`, `tab`, `escape`, arrows, etc.) and single characters, with optional control/shift/alt/meta modifiers. Unlike `enter_text`, which rewrites a field's value, this drives form submission, focus traversal, dismiss, and app shortcuts.
+- Add the `hot_restart` tool (plus the `hot-restart` CLI command), mirroring hot reload but fully restarting the app from `main()` and resetting all state. Requires the app to be launched via `flutter run`; the connector re-resolves the new root isolate and re-registers its extensions after the restart.
+- Add a `swipe` CLI command, wiring the existing swipe/drag gesture into the CLI in both element-based (`--key`/`--text`/`--type` + `--direction`) and coordinate-based (`--start-x`/`--start-y`/`--end-x`/`--end-y`) modes.
 - Add the `secondary_tap` tool (plus the `secondary-tap` CLI command) for right mouse button clicks on desktop. It dispatches a mouse pointer with the secondary button pressed, triggering Flutter's `onSecondaryTap` (e.g. context menus). Touch `tap` is unchanged.
 - Surface `Semantics(label:)` and `Semantics(value:)` in `get_interactive_elements`. Widgets that render via inline-span trees (`Text.rich`, custom-painted text, etc.) where `toPlainText()` loses structure can now be made fully readable by agents through an explicit accessibility annotation, without altering the rendered widget.
+- Bump the `mcp_dart` dependency to `^2.1.0`.
+- Exit the stdio MCP server when its stdin reaches EOF (e.g. the MCP host crashes or disconnects without sending a signal), preventing orphaned `marionette_mcp` processes from accumulating. Removed the bespoke Copilot-compat stdio transport in favour of `mcp_dart`'s built-in `StdioServerTransport` — `mcp_dart` 2.1.0 parses GitHub Copilot's object-typed `tasks` capabilities natively, so the workaround is no longer needed.
+- Add a `Dockerfile` so `marionette_mcp` can be built as a container image and submitted to the Docker MCP Registry; the image installs the published package from pub.dev and runs the server over stdio.
 
 # 0.5.0
 

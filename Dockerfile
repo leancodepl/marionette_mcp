@@ -4,7 +4,7 @@ FROM dart:stable
 # Version of marionette_mcp to install from pub.dev.
 # Bump this (or override with --build-arg) to track releases; pinning keeps the
 # image reproducible for a given Docker MCP Registry commit.
-ARG MARIONETTE_VERSION=0.5.0
+ARG MARIONETTE_VERSION=0.6.0
 
 RUN dart pub global activate marionette_mcp ${MARIONETTE_VERSION}
 ENV PATH="${PATH}:/root/.pub-cache/bin"
