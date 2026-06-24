@@ -275,9 +275,16 @@ class VmServiceConnector {
 
   /// Gets the list of interactive elements in the widget tree.
   ///
+  /// When [compact] is true, each element's property dump is reduced to
+  /// primitive-valued properties only, dropping the large style/decoration
+  /// blobs (see `get_interactive_elements`).
+  ///
   /// Throws [NotConnectedException] if not connected.
-  Future<Map<String, dynamic>> getInteractiveElements() {
-    return _callExtension('marionette.interactiveElements', {});
+  Future<Map<String, dynamic>> getInteractiveElements({bool compact = false}) {
+    return _callExtension(
+      'marionette.interactiveElements',
+      {if (compact) 'compact': true},
+    );
   }
 
   /// Taps an element matching the given criteria.

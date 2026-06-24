@@ -115,8 +115,14 @@ List interactive UI elements in the app's widget tree.
 
   Requires: -i <instance> or --uri <ws-uri>
 
+  Options:
+    --compact   Omit verbose widget properties (style/decoration/color blobs);
+                show only identifying fields and primitive state flags. Much
+                more token-efficient; a text field's label/hint is preserved.
+
   Examples:
     marionette -i my-app get-interactive-elements
+    marionette -i my-app get-interactive-elements --compact
     marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 
   Output (stdout), one line per element:

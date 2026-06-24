@@ -80,7 +80,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 
 | Command | Purpose |
 | --- | --- |
-| `get-interactive-elements` | List interactive UI elements. |
+| `get-interactive-elements` | List interactive UI elements (`--compact` to omit verbose widget properties). |
 | `tap` | Tap an element (`--key`, `--text`, `--type`, or `--x`/`--y`). |
 | `secondary-tap` | Right-click a matching element (desktop only). |
 | `double-tap` | Double tap (matchers + `--delay`). |
