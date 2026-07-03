@@ -82,6 +82,12 @@ Then register it with your tool:
 claude mcp add --transport stdio marionette -- marionette_mcp
 ```
 
+### Codex
+
+```bash
+codex mcp add marionette -- marionette_mcp
+```
+
 ### Cursor
 
 [![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en-US/install-mcp?name=marionette&config=eyJlbnYiOnt9LCJjb21tYW5kIjoibWFyaW9uZXR0ZV9tY3AgIn0%3D)
