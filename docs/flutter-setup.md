@@ -33,7 +33,7 @@ The zero-config setup above recognizes the **standard Flutter widgets**: buttons
 
 ## Single-binding rule
 
-Flutter allows only **one** `WidgetsBinding` per process. `MarionetteBinding` is a binding. If another binding (e.g. `AutomatedTestWidgetsFlutterBinding` from `flutter test`, or `IntegrationTestWidgetsFlutterBinding`) is already initialized, calling `MarionetteBinding.ensureInitialized()` throws a binding assertion error.
+Flutter allows only **one** `WidgetsBinding` per process. `MarionetteBinding` is a binding. If another binding (e.g. `AutomatedTestWidgetsFlutterBinding` from `flutter test`, or `IntegrationTestWidgetsFlutterBinding`) is already initialized, calling `MarionetteBinding.ensureInitialized()` throws a clear error telling you which binding got there first.
 
 This commonly bites when your test calls `main()` and `kDebugMode` is `true` during tests. Two ways to avoid it:
 
@@ -53,6 +53,33 @@ if (kDebugMode && !isFlutterTest) {
 ### Option B — Use a separate test entrypoint
 
 Keep `MarionetteBinding` in your production `main()` (`lib/main.dart`) and create a different entrypoint for tests (e.g. `lib/main_test.dart`) that does **not** initialize `MarionetteBinding`.
+
+### Watch out for plugins that install their own binding
+
+The same rule bites in production, not just under `flutter test` — and it's much harder to spot there, because it doesn't always look like a crash.
+
+Some plugins install their own `WidgetsBinding` subclass as part of their own `init()`, before your `appRunner` code runs. **Sentry is the known case**: `SentryFlutter.init()` always registers a `WidgetsFlutterBindingIntegration` that calls `WidgetsBinding.ensureInitialized()` before invoking `appRunner` — so if `MarionetteBinding.ensureInitialized()` is the first line of your `appRunner`, the "real" binding has already been claimed by Sentry by the time it runs.
+
+Normally this would throw immediately and you'd notice right away. With Sentry specifically, it doesn't: the app just hangs on the native splash screen forever, with **no exception, no crash, and no log output**. That's because `appRunner` executes inside Sentry's own error-capturing zone, which intercepts the binding error as if it were a reportable crash instead of letting it surface to your console — so nothing after the `ensureInitialized()` call ever runs, including `runApp()`. See [#96](https://github.com/leancodepl/marionette_mcp/issues/96) for a full repro.
+
+The fix is to initialize `MarionetteBinding` **before** `SentryFlutter.init()`, not inside its `appRunner`:
+
+```dart
+void main() {
+  if (kDebugMode) {
+    MarionetteBinding.ensureInitialized();
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+
+  SentryFlutter.init(
+    (options) => options.dsn = _sentryDsn,
+    appRunner: () => runApp(const MyApp()),
+  );
+}
+```
+
+Sentry's own binding setup checks for an existing `WidgetsBinding` first and reuses it rather than replacing it, so initializing Marionette first avoids the conflict entirely. The same fix applies to any other plugin whose `init()` touches `WidgetsBinding` ahead of your `appRunner`.
 
 ## Next steps
 

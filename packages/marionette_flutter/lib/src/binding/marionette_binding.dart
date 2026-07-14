@@ -26,13 +26,63 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   /// Creates and initializes the binding with the given configuration.
   ///
   /// Returns the singleton instance of [MarionetteBinding].
+  ///
+  /// Flutter only allows a single [WidgetsBinding] instance per app, so this
+  /// must be called before any other plugin has a chance to install its own
+  /// binding subclass. A common way to trip over this without realizing it
+  /// is calling `SentryFlutter.init()` first: it installs a
+  /// `WidgetsFlutterBindingIntegration` that initializes `WidgetsBinding`
+  /// itself before running `appRunner`, so by the time this method runs
+  /// inside `appRunner`, the "real" binding is already spoken for. Flutter's
+  /// binding constructor then fails an internal assertion, and — because
+  /// that happens inside Sentry's error-capturing zone — the failure is
+  /// swallowed rather than surfaced, leaving the app hung on the splash
+  /// screen with no exception, crash, or log output. See
+  /// https://github.com/leancodepl/marionette_mcp/issues/96.
+  ///
+  /// To avoid this, call [ensureInitialized] as the very first statement in
+  /// `main()`/`appRunner`, before any other plugin initialization
+  /// (including `SentryFlutter.init()`).
   static MarionetteBinding ensureInitialized([
     MarionetteConfiguration configuration = const MarionetteConfiguration(),
   ]) {
     if (_instance == null) {
+      final existing = _existingWidgetsBinding();
+      if (existing != null) {
+        throw FlutterError.fromParts([
+          ErrorSummary(
+            'MarionetteBinding.ensureInitialized() was called after a '
+            '${existing.runtimeType} was already installed as the '
+            'WidgetsBinding.',
+          ),
+          ErrorDescription(
+            'Flutter only supports a single WidgetsBinding instance per '
+            'app. This usually happens when another plugin (for example, '
+            'Sentry via SentryFlutter.init(), which installs its own '
+            'binding as part of its default integrations before your '
+            'appRunner callback runs) initializes the binding first.',
+          ),
+          ErrorHint(
+            'Call MarionetteBinding.ensureInitialized() as the very first '
+            'statement in your main()/appRunner, before any other plugin '
+            'initialization that might touch WidgetsBinding — including '
+            'SentryFlutter.init().',
+          ),
+        ]);
+      }
       MarionetteBinding._(configuration);
     }
     return instance;
+  }
+
+  /// Returns the currently installed [WidgetsBinding], if any, without
+  /// throwing when none has been initialized yet.
+  static WidgetsBinding? _existingWidgetsBinding() {
+    try {
+      return WidgetsBinding.instance;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// The singleton instance of [MarionetteBinding].
