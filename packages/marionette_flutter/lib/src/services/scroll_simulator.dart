@@ -84,19 +84,22 @@ class ScrollSimulator {
       return targetScrollable;
     }
 
-    // The target is not in the tree yet, which is normal for lazily built
-    // lists. Fall back to picking a Scrollable, preferring ones the user can
-    // currently reach so a covered layer does not win just by being first.
+    // The target isn't built yet (e.g. it's off-screen in a lazily built
+    // list), so it can't be found directly. Fall back to scanning the tree
+    // for candidate Scrollables. A screen can have more than one — a
+    // horizontal chip row or tab strip alongside the main vertical list, for
+    // example — so instead of taking the first scrollable-with-range found
+    // in traversal order (which can latch onto a small auxiliary scrollable
+    // and then scroll the wrong axis entirely), prefer the one covering the
+    // most screen area: the main scroll body is almost always larger than an
+    // auxiliary strip/carousel.
     Element? fallbackScrollable;
     Element? scrollableWithRange;
     Element? reachableFallback;
     Element? reachableWithRange;
+    var bestArea = -1.0;
 
     void visit(Element element) {
-      if (reachableWithRange != null) {
-        return;
-      }
-
       if (element.widget is Scrollable) {
         final position = _tryResolveScrollPosition(element);
         final hasRange = position != null && _hasScrollableRange(position);
@@ -109,8 +112,11 @@ class ScrollSimulator {
         if (isElementHittable(element)) {
           reachableFallback ??= element;
           if (hasRange) {
-            reachableWithRange ??= element;
-            return;
+            final area = _elementArea(element);
+            if (area > bestArea) {
+              bestArea = area;
+              reachableWithRange = element;
+            }
           }
         }
       }
@@ -129,6 +135,15 @@ class ScrollSimulator {
         reachableFallback ??
         scrollableWithRange ??
         fallbackScrollable;
+  }
+
+  double _elementArea(Element element) {
+    final renderObject = element.renderObject;
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      return 0;
+    }
+    final size = renderObject.size;
+    return size.width * size.height;
   }
 
   /// Returns the [Scrollable] containing a match that the user can reach.
