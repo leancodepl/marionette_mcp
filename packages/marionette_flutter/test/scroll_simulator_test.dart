@@ -115,6 +115,70 @@ void main() {
         expect(dispatcher.dragCount, 200);
       },
     );
+
+    testWidgets(
+      'picks the main list over a smaller auxiliary scrollable that '
+      'appears first in the tree',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // Regression test for #76: a screen with a small horizontal chip
+        // row above the main vertical list used to make the fallback
+        // scrollable search latch onto the chip row (first
+        // scrollable-with-range found in traversal order) instead of the
+        // list actually containing the target, so scrollUntilVisible
+        // dragged the wrong axis and never reached below-the-fold targets.
+        final listController = ScrollController();
+        addTearDown(listController.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Column(
+                children: [
+                  SizedBox(
+                    height: 40,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: 30,
+                      itemBuilder: (context, index) => SizedBox(
+                        width: 60,
+                        child: Center(child: Text('Chip $index')),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: listController,
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: 60,
+                      itemBuilder: (context, index) => ListTile(
+                        key: ValueKey('item_$index'),
+                        minTileHeight: 80,
+                        title: Text('Item $index'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final simulator = ScrollSimulator(
+          _LocationBasedGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await simulator.scrollUntilVisible(
+          const KeyMatcher('item_40'),
+          _configuration,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('item_40')), findsOneWidget);
+        expect(listController.offset, greaterThan(0));
+      },
+    );
   });
 }
 
@@ -141,6 +205,23 @@ Widget _buildItemsApp({
       ),
     ),
   );
+}
+
+/// Mirrors the real [GestureDispatcher.drag]: dispatches the gesture at the
+/// given screen coordinates and lets Flutter's hit-testing route it,
+/// instead of targeting a fixed [Finder]. Needed to catch bugs where the
+/// wrong Scrollable is selected, since a Finder-based double would always
+/// drag the pre-selected widget regardless of what the simulator picked.
+class _LocationBasedGestureDispatcher extends GestureDispatcher {
+  _LocationBasedGestureDispatcher(this._tester);
+
+  final WidgetTester _tester;
+
+  @override
+  Future<void> drag(Offset from, Offset to) async {
+    await _tester.dragFrom(from, to - from);
+    await _tester.pump();
+  }
 }
 
 class _WidgetTesterGestureDispatcher extends GestureDispatcher {

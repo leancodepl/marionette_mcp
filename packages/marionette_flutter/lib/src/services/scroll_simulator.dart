@@ -79,20 +79,29 @@ class ScrollSimulator {
       return null;
     }
 
+    // The target isn't built yet (e.g. it's off-screen in a lazily built
+    // list), so it can't be found directly. Fall back to scanning the tree
+    // for candidate Scrollables. A screen can have more than one — a
+    // horizontal chip row or tab strip alongside the main vertical list, for
+    // example — so instead of taking the first scrollable-with-range found
+    // in traversal order (which can latch onto a small auxiliary
+    // scrollable and then scroll the wrong axis entirely), collect every
+    // candidate and prefer the one covering the most screen area: the main
+    // scroll body is almost always larger than an auxiliary strip/carousel.
     Element? fallbackScrollable;
-    Element? scrollableWithRange;
+    Element? bestScrollableWithRange;
+    var bestArea = -1.0;
 
     void visit(Element element) {
-      if (scrollableWithRange != null) {
-        return;
-      }
-
       if (element.widget is Scrollable) {
         fallbackScrollable ??= element;
         final position = _tryResolveScrollPosition(element);
         if (position != null && _hasScrollableRange(position)) {
-          scrollableWithRange = element;
-          return;
+          final area = _elementArea(element);
+          if (area > bestArea) {
+            bestArea = area;
+            bestScrollableWithRange = element;
+          }
         }
       }
 
@@ -100,7 +109,16 @@ class ScrollSimulator {
     }
 
     visit(root);
-    return scrollableWithRange ?? fallbackScrollable;
+    return bestScrollableWithRange ?? fallbackScrollable;
+  }
+
+  double _elementArea(Element element) {
+    final renderObject = element.renderObject;
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      return 0;
+    }
+    final size = renderObject.size;
+    return size.width * size.height;
   }
 
   Element? _findScrollableAncestor(Element element) {
