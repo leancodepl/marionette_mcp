@@ -56,11 +56,13 @@ Keep `MarionetteBinding` in your production `main()` (`lib/main.dart`) and creat
 
 ### Watch out for plugins that install their own binding
 
-The same rule bites in production, not just under `flutter test` — and it's much harder to spot there, because it doesn't always look like a crash.
+The same rule bites in production, not just under `flutter test`. Some plugins install their own `WidgetsBinding` subclass as part of their own initialization, before your app code runs. Sentry is one example.
 
-Some plugins install their own `WidgetsBinding` subclass as part of their own `init()`, before your `appRunner` code runs. **Sentry is the known case**: `SentryFlutter.init()` always registers a `WidgetsFlutterBindingIntegration` that calls `WidgetsBinding.ensureInitialized()` before invoking `appRunner` — so if `MarionetteBinding.ensureInitialized()` is the first line of your `appRunner`, the "real" binding has already been claimed by Sentry by the time it runs.
+#### Sentry
 
-Normally this would throw immediately and you'd notice right away. With Sentry specifically, it doesn't: the app just hangs on the native splash screen forever, with **no exception, no crash, and no log output**. That's because `appRunner` executes inside Sentry's own error-capturing zone, which intercepts the binding error as if it were a reportable crash instead of letting it surface to your console — so nothing after the `ensureInitialized()` call ever runs, including `runApp()`. See [#96](https://github.com/leancodepl/marionette_mcp/issues/96) for a full repro.
+`SentryFlutter.init()` always registers a `WidgetsFlutterBindingIntegration` that calls `WidgetsBinding.ensureInitialized()` before invoking `appRunner` — so if `MarionetteBinding.ensureInitialized()` is the first line of your `appRunner`, the "real" binding has already been claimed by Sentry by the time it runs.
+
+Normally this would throw immediately and you'd notice right away. With Sentry it doesn't: the app just hangs on the native splash screen forever, with **no exception, no crash, and no log output**. That's because `appRunner` executes inside Sentry's own error-capturing zone, which intercepts the binding error as if it were a reportable crash instead of letting it surface to your console — so nothing after the `ensureInitialized()` call ever runs, including `runApp()`. See [#96](https://github.com/leancodepl/marionette_mcp/issues/96) for a full repro.
 
 The fix is to initialize `MarionetteBinding` **before** `SentryFlutter.init()`, not inside its `appRunner`:
 

@@ -40,9 +40,11 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   /// screen with no exception, crash, or log output. See
   /// https://github.com/leancodepl/marionette_mcp/issues/96.
   ///
-  /// To avoid this, call [ensureInitialized] as the very first statement in
-  /// `main()`/`appRunner`, before any other plugin initialization
-  /// (including `SentryFlutter.init()`).
+  /// To avoid this, call [ensureInitialized] early in `main()`, before any
+  /// other plugin initialization that might touch `WidgetsBinding`. When a
+  /// plugin installs the binding from inside a callback it runs for you (as
+  /// `SentryFlutter.init()` does with its `appRunner`), call
+  /// [ensureInitialized] before that plugin — not inside the callback.
   static MarionetteBinding ensureInitialized([
     MarionetteConfiguration configuration = const MarionetteConfiguration(),
   ]) {
@@ -57,16 +59,17 @@ class MarionetteBinding extends WidgetsFlutterBinding {
           ),
           ErrorDescription(
             'Flutter only supports a single WidgetsBinding instance per '
-            'app. This usually happens when another plugin (for example, '
-            'Sentry via SentryFlutter.init(), which installs its own '
-            'binding as part of its default integrations before your '
-            'appRunner callback runs) initializes the binding first.',
+            'app. This usually happens when another plugin initializes the '
+            'binding first — for example, a plugin that installs its own '
+            'binding from within a callback that runs before your app code.',
           ),
           ErrorHint(
-            'Call MarionetteBinding.ensureInitialized() as the very first '
-            'statement in your main()/appRunner, before any other plugin '
-            'initialization that might touch WidgetsBinding — including '
-            'SentryFlutter.init().',
+            'Call MarionetteBinding.ensureInitialized() early in main(), '
+            'before any other plugin initialization that might touch '
+            'WidgetsBinding. If a plugin initializes the binding from '
+            'inside a callback it invokes for you (such as an appRunner), '
+            'call MarionetteBinding.ensureInitialized() before that plugin '
+            'rather than inside the callback.',
           ),
         ]);
       }
