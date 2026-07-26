@@ -40,5 +40,34 @@ void main() {
         equals({'type': 'ElevatedButton'}),
       );
     });
+
+    test('within key arg', () {
+      expect(
+        buildMatcherFromArgs(key: 'join_button', withinKey: 'grid.cell_2'),
+        equals({'key': 'join_button', 'within_key': 'grid.cell_2'}),
+      );
+    });
+  });
+
+  group('hasSelector', () {
+    test('empty matcher has no selector', () {
+      expect(hasSelector(buildMatcherFromArgs()), isFalse);
+    });
+
+    test('a scope alone is not a selector', () {
+      expect(
+        hasSelector(buildMatcherFromArgs(withinKey: 'grid.cell_2')),
+        isFalse,
+      );
+    });
+
+    test('a scoped key is a selector', () {
+      expect(
+        hasSelector(
+          buildMatcherFromArgs(key: 'join_button', withinKey: 'grid.cell_2'),
+        ),
+        isTrue,
+      );
+    });
   });
 }

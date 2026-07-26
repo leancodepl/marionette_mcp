@@ -42,6 +42,39 @@ void main() {
 
       expect(matcher, isA<IdentifierMatcher>());
     });
+
+    test('within_key does not select the target matcher', () {
+      final matcher = WidgetMatcher.fromJson({
+        'key': 'join_button',
+        'within_key': 'grid.cell_2',
+      });
+
+      expect(matcher, isA<KeyMatcher>());
+      expect((matcher as KeyMatcher).keyValue, 'join_button');
+    });
+
+    test('within_key alone is not a valid matcher', () {
+      expect(
+        () => WidgetMatcher.fromJson({'within_key': 'grid.cell_2'}),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('WidgetMatcher.scopeFromJson', () {
+    test('returns null when within_key is absent', () {
+      expect(WidgetMatcher.scopeFromJson({'key': 'join_button'}), isNull);
+    });
+
+    test('returns a KeyMatcher for within_key', () {
+      final scope = WidgetMatcher.scopeFromJson({
+        'key': 'join_button',
+        'within_key': 'grid.cell_2',
+      });
+
+      expect(scope, isA<KeyMatcher>());
+      expect(scope!.keyValue, 'grid.cell_2');
+    });
   });
 
   group('FocusedElementMatcher', () {

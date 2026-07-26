@@ -20,7 +20,12 @@ void registerGestureExtensions({
     name: 'marionette.tap',
     callback: (params) async {
       final matcher = WidgetMatcher.fromJson(params);
-      await gestureDispatcher.tap(matcher, widgetFinder, configuration);
+      await gestureDispatcher.tap(
+        matcher,
+        widgetFinder,
+        configuration,
+        scope: WidgetMatcher.scopeFromJson(params),
+      );
       return MarionetteExtensionResult.success({
         'message': 'Tapped element matching: ${matcher.toJson()}',
       });
@@ -32,7 +37,11 @@ void registerGestureExtensions({
     callback: (params) async {
       final matcher = WidgetMatcher.fromJson(params);
       await gestureDispatcher.secondaryTap(
-          matcher, widgetFinder, configuration);
+        matcher,
+        widgetFinder,
+        configuration,
+        scope: WidgetMatcher.scopeFromJson(params),
+      );
       return MarionetteExtensionResult.success({
         'message': 'Secondary-tapped element matching: ${matcher.toJson()}',
       });
@@ -57,6 +66,7 @@ void registerGestureExtensions({
         widgetFinder,
         configuration,
         delay: parsed.duration!,
+        scope: WidgetMatcher.scopeFromJson(params),
       );
       return MarionetteExtensionResult.success({
         'message': 'Double tapped element matching: ${matcher.toJson()}',
@@ -81,6 +91,7 @@ void registerGestureExtensions({
         widgetFinder,
         configuration,
         duration: parsed.duration!,
+        scope: WidgetMatcher.scopeFromJson(params),
       );
       return MarionetteExtensionResult.success({
         'message': 'Long pressed element matching: ${matcher.toJson()}',
@@ -159,6 +170,7 @@ void registerGestureExtensions({
         configuration,
         direction: direction,
         distance: distance,
+        scope: WidgetMatcher.scopeFromJson(params),
       );
 
       return MarionetteExtensionResult.success({
@@ -210,6 +222,7 @@ void registerGestureExtensions({
         configuration,
         scale: scale,
         startDistance: distanceParse.value!,
+        scope: WidgetMatcher.scopeFromJson(params),
       );
 
       return MarionetteExtensionResult.success({
@@ -223,7 +236,11 @@ void registerGestureExtensions({
     name: 'marionette.scrollTo',
     callback: (params) async {
       final matcher = WidgetMatcher.fromJson(params);
-      await scrollSimulator.scrollUntilVisible(matcher, configuration);
+      await scrollSimulator.scrollUntilVisible(
+        matcher,
+        configuration,
+        scope: WidgetMatcher.scopeFromJson(params),
+      );
       return MarionetteExtensionResult.success({
         'message': 'Scrolled to element matching: ${matcher.toJson()}',
       });

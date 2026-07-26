@@ -13,7 +13,8 @@ class TapCommand extends InstanceCommand {
       ..addOption('text', help: 'Visible text content of the element.')
       ..addOption('type', help: 'Widget type name (e.g., ElevatedButton).')
       ..addOption('x', help: 'X coordinate for positional tap.')
-      ..addOption('y', help: 'Y coordinate for positional tap.');
+      ..addOption('y', help: 'Y coordinate for positional tap.')
+      ..addOption('within-key', help: withinKeyHelp);
   }
 
   final InstanceRegistry _registry;
@@ -37,9 +38,10 @@ class TapCommand extends InstanceCommand {
       type: argResults?['type'] as String?,
       x: _parseNum(argResults?['x'] as String?),
       y: _parseNum(argResults?['y'] as String?),
+      withinKey: argResults?['within-key'] as String?,
     );
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, --text, --type, '
         'or --x/--y.',

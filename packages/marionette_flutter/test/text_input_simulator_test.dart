@@ -478,5 +478,56 @@ void main() {
         expect(secondController.text, 'updated-second');
       });
     });
+
+    group('within_key scope', () {
+      testWidgets('types into the field inside the scope', (
+        WidgetTester tester,
+      ) async {
+        final firstController = TextEditingController();
+        final secondController = TextEditingController();
+        addTearDown(firstController.dispose);
+        addTearDown(secondController.dispose);
+
+        Widget cell(String cellKey, TextEditingController controller) {
+          return Expanded(
+            child: Column(
+              key: ValueKey(cellKey),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  key: const ValueKey('cell.nameField'),
+                  controller: controller,
+                ),
+              ],
+            ),
+          );
+        }
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: [
+                  cell('grid.cell_1', firstController),
+                  cell('grid.cell_2', secondController),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final simulator = TextInputSimulator(WidgetFinder());
+        await simulator.enterText(
+          const KeyMatcher('cell.nameField'),
+          'scoped',
+          configuration,
+          scope: const KeyMatcher('grid.cell_2'),
+        );
+        await tester.pump();
+
+        expect(firstController.text, isEmpty);
+        expect(secondController.text, 'scoped');
+      });
+    });
   });
 }

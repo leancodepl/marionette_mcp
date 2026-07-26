@@ -23,20 +23,28 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `tap` | Tap an element matched by `key`, `identifier`, `text`, `type`, or `coordinates`. Prefer `key`; `identifier` (Semantics identifier) is the next-best stable selector. Tapping a text field focuses it. |
-| `secondary_tap` | Right mouse button click on a matching element (**desktop only**); triggers `onSecondaryTap`, e.g. context menus. Match by `key`, `identifier`, `text`, `type`, or `coordinates`. |
-| `double_tap` | Double tap an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `delay` between taps, default 100 ms). |
-| `long_press` | Long press an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `duration`, default 600 ms) — context menus, reorderable lists. |
-| `swipe` | Swipe/drag. Element-based (`key`/`identifier`/`text` + `direction` + optional `distance`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
-| `pinch_zoom` | Pinch to zoom an element matched by `key`, `identifier`, `text`, `type`, or `coordinates`. `scale > 1.0` zooms in, `< 1.0` zooms out. For maps, images, PDFs. |
+| `tap` | Tap an element matched by `key`, `identifier`, `text`, `type`, or `coordinates`. Prefer `key`; `identifier` (Semantics identifier) is the next-best stable selector. Tapping a text field focuses it. Optional `within_key` scopes the search. |
+| `secondary_tap` | Right mouse button click on a matching element (**desktop only**); triggers `onSecondaryTap`, e.g. context menus. Match by `key`, `identifier`, `text`, `type`, or `coordinates`. Optional `within_key` scopes the search. |
+| `double_tap` | Double tap an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `delay` between taps, default 100 ms, and `within_key`). |
+| `long_press` | Long press an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `duration`, default 600 ms, and `within_key`) — context menus, reorderable lists. |
+| `swipe` | Swipe/drag. Element-based (`key`/`identifier`/`text` + `direction` + optional `distance` and `within_key`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
+| `pinch_zoom` | Pinch to zoom an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `within_key`). `scale > 1.0` zooms in, `< 1.0` zooms out. For maps, images, PDFs. |
 | `press_back_button` | Simulate the system back button (Android back / iOS swipe-back). Works with Navigator, GoRouter, etc. |
-| `scroll_to` | Scroll until an element matching `key`, `identifier`, or `text` becomes visible. |
+| `scroll_to` | Scroll until an element matching `key`, `identifier`, or `text` becomes visible. Optional `within_key` scrolls inside one subtree. |
+
+> **Scoping a match with `within_key`:** every matcher-based tool takes an optional `within_key`. It names the `ValueKey<String>` of a wrapper element; the target is then searched for inside that element's subtree only, so a key repeated across identical subtrees (grid cells, repeated cards, embedded app instances) can be disambiguated without baking indices into leaf keys:
+>
+> ```json
+> { "key": "cell.joinButton", "within_key": "grid.cell_2" }
+> ```
+>
+> If no element has the scope key the call fails rather than falling back to a tree-wide search. It is ignored by `coordinates` and `focused_element`, which do not search the tree.
 
 ### Text input
 
 | Tool | Description |
 | --- | --- |
-| `enter_text` | Enter text into a field. Target by `key`, by `identifier`, or focus a field first (via `tap`) and pass `focused_element: true`. Exactly one selector required. |
+| `enter_text` | Enter text into a field. Target by `key`, by `identifier`, or focus a field first (via `tap`) and pass `focused_element: true`. Exactly one selector required; optional `within_key` scopes the search. |
 | `press_key` | Press a key on the focused element, producing a real key event (unlike `enter_text`). `key` is a named key (`enter`, `tab`, `escape`, `backspace`, `delete`, `space`, `arrowUp`/`arrowDown`/`arrowLeft`/`arrowRight`, `home`, `end`, `pageUp`, `pageDown`) or a single character `a`-`z`/`0`-`9`. Optional `modifiers` (comma-separated: `control`, `shift`, `alt`, `meta`) for shortcuts like `control,a`. Focus a target first via `tap`. |
 
 > **Platform note for `press_key`:** key events reach `Focus`, `Shortcuts`/`Actions`, and focus traversal on every platform — so app shortcuts, submit (`enter`), dismiss (`escape`), and button activation work everywhere. In-field text editing with `backspace`/arrows/characters relies on Flutter's hardware-key text-editing actions, which are wired on **desktop and web**; on **mobile (iOS/Android)** `TextField` editing is owned by the platform keyboard, so use `enter_text` to change a field's value there.

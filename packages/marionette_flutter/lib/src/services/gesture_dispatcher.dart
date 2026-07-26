@@ -18,19 +18,25 @@ class GestureDispatcher {
   /// Simulates a tap on an element that matches the given [matcher].
   ///
   /// If [matcher] is a [CoordinatesMatcher], taps directly at the specified
-  /// coordinates without searching the widget tree (fast path).
+  /// coordinates without searching the widget tree (fast path), and [scope]
+  /// is ignored.
   Future<void> tap(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
-    MarionetteConfiguration configuration,
-  ) async {
+    MarionetteConfiguration configuration, {
+    KeyMatcher? scope,
+  }) async {
     // Fast path for coordinate-based tapping
     if (matcher is CoordinatesMatcher) {
       await _dispatchTapAtPosition(matcher.offset);
       return;
     }
 
-    final element = widgetFinder.findHittableElement(matcher, configuration);
+    final element = widgetFinder.findHittableElement(
+      matcher,
+      configuration,
+      scope: scope,
+    );
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');
@@ -92,23 +98,29 @@ class GestureDispatcher {
   Future<void> secondaryTap(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
-    MarionetteConfiguration configuration,
-  ) =>
+    MarionetteConfiguration configuration, {
+    KeyMatcher? scope,
+  }) =>
       _mouseTap(matcher, widgetFinder, configuration,
-          buttons: kSecondaryButton);
+          buttons: kSecondaryButton, scope: scope);
 
   Future<void> _mouseTap(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     required int buttons,
+    KeyMatcher? scope,
   }) async {
     if (matcher is CoordinatesMatcher) {
       await _dispatchMouseTapAtPosition(matcher.offset, buttons);
       return;
     }
 
-    final element = widgetFinder.findHittableElement(matcher, configuration);
+    final element = widgetFinder.findHittableElement(
+      matcher,
+      configuration,
+      scope: scope,
+    );
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');
@@ -168,6 +180,7 @@ class GestureDispatcher {
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     Duration delay = const Duration(milliseconds: 100),
+    KeyMatcher? scope,
   }) async {
     if (delay.isNegative || delay == Duration.zero) {
       throw ArgumentError('delay must be positive');
@@ -178,7 +191,11 @@ class GestureDispatcher {
       return;
     }
 
-    final element = widgetFinder.findHittableElement(matcher, configuration);
+    final element = widgetFinder.findHittableElement(
+      matcher,
+      configuration,
+      scope: scope,
+    );
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');
@@ -218,6 +235,7 @@ class GestureDispatcher {
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     Duration duration = const Duration(milliseconds: 600),
+    KeyMatcher? scope,
   }) async {
     if (duration.isNegative || duration == Duration.zero) {
       throw ArgumentError('duration must be positive');
@@ -228,7 +246,11 @@ class GestureDispatcher {
       return;
     }
 
-    final element = widgetFinder.findHittableElement(matcher, configuration);
+    final element = widgetFinder.findHittableElement(
+      matcher,
+      configuration,
+      scope: scope,
+    );
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');
@@ -285,8 +307,13 @@ class GestureDispatcher {
     MarionetteConfiguration configuration, {
     required String direction,
     double distance = 200.0,
+    KeyMatcher? scope,
   }) async {
-    final element = widgetFinder.findElement(matcher, configuration);
+    final element = widgetFinder.findElement(
+      matcher,
+      configuration,
+      scope: scope,
+    );
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');
@@ -319,6 +346,7 @@ class GestureDispatcher {
     MarionetteConfiguration configuration, {
     required double scale,
     double startDistance = 200.0,
+    KeyMatcher? scope,
   }) async {
     if (scale <= 0) {
       throw ArgumentError('scale must be positive');
@@ -336,7 +364,11 @@ class GestureDispatcher {
       return;
     }
 
-    final element = widgetFinder.findHittableElement(matcher, configuration);
+    final element = widgetFinder.findHittableElement(
+      matcher,
+      configuration,
+      scope: scope,
+    );
 
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');

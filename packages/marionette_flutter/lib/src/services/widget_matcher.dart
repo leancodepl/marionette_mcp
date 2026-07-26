@@ -33,6 +33,22 @@ sealed class WidgetMatcher {
     }
   }
 
+  /// Parses the optional `within_key` scope that accompanies a matcher.
+  ///
+  /// The scope is not part of the target matcher: it names the subtree the
+  /// target is searched in, so that a key repeated across identical subtrees
+  /// (grid cells, embedded app instances) can be disambiguated.
+  ///
+  /// Returns null when `within_key` is absent, meaning the whole tree is
+  /// searched.
+  static KeyMatcher? scopeFromJson(Map<String, dynamic> json) {
+    final withinKey = json['within_key'];
+    if (withinKey == null) {
+      return null;
+    }
+    return KeyMatcher(withinKey as String);
+  }
+
   /// Converts this matcher to a JSON-serializable map.
   Map<String, dynamic> toJson();
 }

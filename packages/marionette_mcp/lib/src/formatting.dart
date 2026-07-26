@@ -1,8 +1,20 @@
 import 'dart:convert';
 
+/// Shared description of the `within_key` field across every matcher-based
+/// tool, so agents read the same contract wherever they discover it.
+const withinKeyDescription =
+    'Optional. Restricts the search to the subtree of the element whose key '
+    '(a ValueKey<String>) is this value. Use it when the same inner key '
+    'appears in several identical subtrees — grid cells, repeated cards, '
+    'embedded app instances — to pick the one you mean, e.g. '
+    '{"key": "cell.joinButton", "within_key": "grid.cell_2"}. Fails if no '
+    'element has this key; ignored when matching by coordinates or '
+    'focused_element.';
+
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
-/// Supports matching by key, identifier, text, type, and coordinates.
+/// Supports matching by key, identifier, text, type, and coordinates, plus the
+/// optional `within_key` scope.
 Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   final matcher = <String, dynamic>{};
   if (args['focused_element'] == true) {
@@ -31,7 +43,18 @@ Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   if (args.containsKey('y')) {
     matcher['y'] = args['y'];
   }
+  if (args.containsKey('within_key')) {
+    matcher['within_key'] = args['within_key'];
+  }
   return matcher;
+}
+
+/// Whether [matcher] identifies an element to act on.
+///
+/// `within_key` only narrows where the search happens, so a matcher carrying
+/// nothing but a scope still selects nothing.
+bool hasSelector(Map<String, dynamic> matcher) {
+  return matcher.keys.any((field) => field != 'within_key');
 }
 
 /// Formats an element map for human-readable display.

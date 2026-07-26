@@ -10,7 +10,8 @@ class ScrollToCommand extends InstanceCommand {
     argParser
       ..addOption('key', help: 'Element key (ValueKey<String>).')
       ..addOption('identifier', help: 'Semantics identifier of the element.')
-      ..addOption('text', help: 'Visible text of the element to scroll to.');
+      ..addOption('text', help: 'Visible text of the element to scroll to.')
+      ..addOption('within-key', help: withinKeyHelp);
   }
 
   final InstanceRegistry _registry;
@@ -31,9 +32,10 @@ class ScrollToCommand extends InstanceCommand {
       key: argResults?['key'] as String?,
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
+      withinKey: argResults?['within-key'] as String?,
     );
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, or --text.',
       );

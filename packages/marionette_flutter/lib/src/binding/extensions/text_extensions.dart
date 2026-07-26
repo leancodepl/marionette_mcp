@@ -21,7 +21,12 @@ void registerTextExtensions({
         );
       }
 
-      await textInputSimulator.enterText(matcher, input, configuration);
+      await textInputSimulator.enterText(
+        matcher,
+        input,
+        configuration,
+        scope: WidgetMatcher.scopeFromJson(params),
+      );
 
       return MarionetteExtensionResult.success({
         'message': 'Entered text into element matching: ${matcher.toJson()}',

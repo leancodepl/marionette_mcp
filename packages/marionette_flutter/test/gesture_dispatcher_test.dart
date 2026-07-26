@@ -858,4 +858,138 @@ void main() {
       },
     );
   });
+
+  group('GestureDispatcher - within_key scope', () {
+    /// Two structurally identical cells; only the wrapping cell key tells the
+    /// colliding `cell.joinButton` instances apart.
+    Widget grid({
+      required void Function(String label) onJoin,
+      bool secondCellHittable = true,
+    }) {
+      Widget cell(String cellKey, String label, {bool hittable = true}) {
+        final content = Column(
+          key: ValueKey(cellKey),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ElevatedButton(
+              key: const ValueKey('cell.joinButton'),
+              onPressed: () => onJoin(label),
+              child: Text('Join $label'),
+            ),
+          ],
+        );
+        return hittable ? content : IgnorePointer(child: content);
+      }
+
+      return MaterialApp(
+        home: Scaffold(
+          body: Row(
+            children: [
+              Expanded(child: cell('grid.cell_1', 'First')),
+              Expanded(
+                child: cell(
+                  'grid.cell_2',
+                  'Second',
+                  hittable: secondCellHittable,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    testWidgets(
+      'tap hits the target inside the scope, not the first match',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final joined = <String>[];
+        await tester.pumpWidget(grid(onJoin: joined.add));
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.tap(
+              const KeyMatcher('cell.joinButton'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              scope: const KeyMatcher('grid.cell_2'),
+            ));
+        await tester.pump();
+
+        expect(joined, ['Second']);
+      },
+    );
+
+    testWidgets(
+      'tap throws naming the scope key when the scope is not found',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(grid(onJoin: (_) {}));
+
+        await expectLater(
+          () => GestureDispatcher().tap(
+            const KeyMatcher('cell.joinButton'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            scope: const KeyMatcher('grid.cell_3'),
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'message',
+              contains('grid.cell_3'),
+            ),
+          ),
+        );
+      },
+    );
+
+    testWidgets(
+      'tap still enforces hittability inside the scope',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final joined = <String>[];
+        await tester.pumpWidget(
+          grid(onJoin: joined.add, secondCellHittable: false),
+        );
+
+        await expectLater(
+          () => GestureDispatcher().tap(
+            const KeyMatcher('cell.joinButton'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            scope: const KeyMatcher('grid.cell_2'),
+          ),
+          throwsA(isA<Exception>()),
+        );
+        expect(
+          joined,
+          isEmpty,
+          reason: 'must not fall back to the hittable button outside the scope',
+        );
+      },
+    );
+
+    testWidgets(
+      'coordinate taps ignore the scope',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final joined = <String>[];
+        await tester.pumpWidget(grid(onJoin: joined.add));
+
+        final target = tester.getCenter(
+          find.widgetWithText(ElevatedButton, 'Join First'),
+        );
+
+        await tester.runAsync(() => GestureDispatcher().tap(
+              CoordinatesMatcher(target.dx, target.dy),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              scope: const KeyMatcher('grid.cell_3'),
+            ));
+        await tester.pump();
+
+        expect(joined, ['First']);
+      },
+    );
+  });
 }

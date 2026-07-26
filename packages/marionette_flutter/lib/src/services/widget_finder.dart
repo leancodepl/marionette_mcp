@@ -8,16 +8,18 @@ class WidgetFinder {
   /// Finds the first element that matches the given [matcher].
   ///
   /// Traverses the widget tree starting from the root element and returns
-  /// the first element whose widget matches the provided matcher.
+  /// the first element whose widget matches the provided matcher. When [scope]
+  /// is given, only the subtree of the element it matches is traversed.
   ///
   /// Returns null if no matching element is found.
   Element? findElement(
     WidgetMatcher matcher,
-    MarionetteConfiguration configuration,
-  ) {
+    MarionetteConfiguration configuration, {
+    KeyMatcher? scope,
+  }) {
     return findElementFrom(
       matcher,
-      WidgetsBinding.instance.rootElement,
+      resolveScopeRoot(scope, configuration),
       configuration,
     );
   }
@@ -58,15 +60,44 @@ class WidgetFinder {
   /// where matching a non-hittable widget would result in a silent failure.
   /// Tools that need to find offscreen elements (e.g. scroll_to) should use
   /// [findElement] instead.
+  ///
+  /// When [scope] is given, only the subtree of the element it matches is
+  /// traversed.
   Element? findHittableElement(
     WidgetMatcher matcher,
-    MarionetteConfiguration configuration,
-  ) {
+    MarionetteConfiguration configuration, {
+    KeyMatcher? scope,
+  }) {
     return _findHittableElementFrom(
       matcher,
-      WidgetsBinding.instance.rootElement,
+      resolveScopeRoot(scope, configuration),
       configuration,
     );
+  }
+
+  /// Resolves the element that a `within_key` [scope] limits a search to.
+  ///
+  /// Returns the app's root element when [scope] is null.
+  ///
+  /// Throws when [scope] is given but matches no element: falling back to a
+  /// tree-wide search would silently act on a different subtree than the one
+  /// that was asked for.
+  Element? resolveScopeRoot(
+    KeyMatcher? scope,
+    MarionetteConfiguration configuration,
+  ) {
+    final root = WidgetsBinding.instance.rootElement;
+    if (scope == null) {
+      return root;
+    }
+
+    final scopeElement = findElementFrom(scope, root, configuration);
+    if (scopeElement == null) {
+      throw Exception(
+        'Scope element with key "${scope.keyValue}" (within_key) not found',
+      );
+    }
+    return scopeElement;
   }
 
   Element? _findHittableElementFrom(

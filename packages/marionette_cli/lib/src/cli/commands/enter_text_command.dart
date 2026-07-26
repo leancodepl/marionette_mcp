@@ -16,6 +16,7 @@ class EnterTextCommand extends InstanceCommand {
         help: 'Target the currently focused text field.',
         negatable: false,
       )
+      ..addOption('within-key', help: withinKeyHelp)
       ..addOption(
         'input',
         help: 'Text to enter into the field.',
@@ -43,9 +44,10 @@ class EnterTextCommand extends InstanceCommand {
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
       focused: focused,
+      withinKey: argResults?['within-key'] as String?,
     );
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, --text, '
         'or --focused.',
