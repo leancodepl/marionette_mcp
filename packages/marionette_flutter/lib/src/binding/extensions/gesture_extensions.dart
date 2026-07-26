@@ -211,8 +211,8 @@ void registerGestureExtensions({
         matcher = WidgetMatcher.fromJson(params);
       } on ArgumentError {
         return MarionetteExtensionResult.invalidParams(
-          'Missing required selector: provide "key", "text", "type", '
-          'or "x" & "y" coordinates.',
+          'Missing required selector: provide "key", "identifier", "text", '
+          '"type", or "x" & "y" coordinates.',
         );
       }
 
