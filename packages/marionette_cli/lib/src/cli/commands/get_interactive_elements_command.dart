@@ -1,12 +1,15 @@
 import 'dart:io';
 
 import 'package:marionette_cli/src/cli/instance_command.dart';
+import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class ElementsCommand extends InstanceCommand {
-  ElementsCommand(this._registry);
+  ElementsCommand(this._registry) {
+    argParser.addMultiOption('ancestor-key', help: ancestorKeyListHelp);
+  }
 
   final InstanceRegistry _registry;
 
@@ -22,7 +25,9 @@ class ElementsCommand extends InstanceCommand {
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
-    final response = await connector.getInteractiveElements();
+    final response = await connector.getInteractiveElements(
+      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
+    );
     final elements = response['elements'] as List<dynamic>;
 
     stdout.writeln('Found ${elements.length} interactive element(s):\n');

@@ -1,8 +1,11 @@
+import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/log_store.dart';
+import 'package:marionette_flutter/src/services/widget_finder.dart';
+import 'package:marionette_flutter/src/services/widget_matcher.dart';
 import 'package:marionette_flutter/src/version.g.dart' as v;
 
 /// Help text returned by `marionette.getLogs` when no log collector has been
@@ -39,8 +42,13 @@ See https://pub.dev/packages/marionette_flutter for more details.''';
 /// [logStoreProvider] is read at call time (not capture time) because the
 /// log store can be created lazily when the binding is configured with a
 /// log collector.
+///
+/// [widgetFinder] resolves the optional `ancestor_keys` scope of
+/// `marionette.interactiveElements`, which limits discovery to one subtree.
 void registerInfoExtensions({
   required ElementTreeFinder elementTreeFinder,
+  required WidgetFinder widgetFinder,
+  required MarionetteConfiguration configuration,
   required LogStore? Function() logStoreProvider,
 }) {
   registerInternalMarionetteExtension(
@@ -53,7 +61,12 @@ void registerInfoExtensions({
   registerInternalMarionetteExtension(
     name: 'marionette.interactiveElements',
     callback: (params) async {
-      final elements = elementTreeFinder.findInteractiveElements();
+      final elements = elementTreeFinder.findInteractiveElements(
+        startElement: widgetFinder.resolveScopeRoot(
+          WidgetMatcher.ancestorsFromJson(params),
+          configuration,
+        ),
+      );
       return MarionetteExtensionResult.success({'elements': elements});
     },
   );
