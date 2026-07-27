@@ -12,6 +12,10 @@ class WidgetFinder {
   /// [ancestors] is given, only the subtree it resolves to is traversed.
   ///
   /// Returns null if no matching element is found.
+  ///
+  /// Throws when [ancestors] is given but cannot be resolved — a missing scope
+  /// is a different failure from a missing target, so it is reported rather
+  /// than folded into a null. See [resolveScopeRoot].
   Element? findElement(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration, {
@@ -62,6 +66,11 @@ class WidgetFinder {
   /// [findElement] instead.
   ///
   /// When [ancestors] is given, only the subtree it resolves to is traversed.
+  ///
+  /// Returns null if no matching element is found, and throws when
+  /// [ancestors] is given but cannot be resolved — a missing scope is a
+  /// different failure from a missing target, so it is reported rather than
+  /// folded into a null. See [resolveScopeRoot].
   Element? findHittableElement(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration, {
