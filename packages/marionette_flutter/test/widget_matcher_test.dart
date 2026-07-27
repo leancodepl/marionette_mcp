@@ -72,7 +72,8 @@ void main() {
 
     test('is empty for an empty ancestor_keys array', () {
       expect(
-        WidgetMatcher.ancestorsFromJson({'ancestor_keys': jsonEncode(<String>[])}),
+        WidgetMatcher.ancestorsFromJson(
+            {'ancestor_keys': jsonEncode(<String>[])}),
         isEmpty,
       );
     });
