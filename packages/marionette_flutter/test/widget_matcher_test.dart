@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:test/test.dart';
 
@@ -43,37 +45,60 @@ void main() {
       expect(matcher, isA<IdentifierMatcher>());
     });
 
-    test('within_key does not select the target matcher', () {
+    test('ancestor_keys does not select the target matcher', () {
       final matcher = WidgetMatcher.fromJson({
         'key': 'join_button',
-        'within_key': 'grid.cell_2',
+        'ancestor_keys': jsonEncode(['grid.cell_2']),
       });
 
       expect(matcher, isA<KeyMatcher>());
       expect((matcher as KeyMatcher).keyValue, 'join_button');
     });
 
-    test('within_key alone is not a valid matcher', () {
+    test('ancestor_keys alone is not a valid matcher', () {
       expect(
-        () => WidgetMatcher.fromJson({'within_key': 'grid.cell_2'}),
+        () => WidgetMatcher.fromJson({
+          'ancestor_keys': jsonEncode(['grid.cell_2']),
+        }),
         throwsArgumentError,
       );
     });
   });
 
-  group('WidgetMatcher.scopeFromJson', () {
-    test('returns null when within_key is absent', () {
-      expect(WidgetMatcher.scopeFromJson({'key': 'join_button'}), isNull);
+  group('WidgetMatcher.ancestorsFromJson', () {
+    test('is empty when ancestor_keys is absent', () {
+      expect(WidgetMatcher.ancestorsFromJson({'key': 'join_button'}), isEmpty);
     });
 
-    test('returns a KeyMatcher for within_key', () {
-      final scope = WidgetMatcher.scopeFromJson({
+    test('is empty for an empty ancestor_keys array', () {
+      expect(
+        WidgetMatcher.ancestorsFromJson({'ancestor_keys': jsonEncode(<String>[])}),
+        isEmpty,
+      );
+    });
+
+    test('parses a single ancestor key', () {
+      final ancestors = WidgetMatcher.ancestorsFromJson({
         'key': 'join_button',
-        'within_key': 'grid.cell_2',
+        'ancestor_keys': jsonEncode(['grid.cell_2']),
       });
 
-      expect(scope, isA<KeyMatcher>());
-      expect(scope!.keyValue, 'grid.cell_2');
+      expect(ancestors.map((m) => m.keyValue), ['grid.cell_2']);
+    });
+
+    test('preserves outermost-first order of a nested chain', () {
+      final ancestors = WidgetMatcher.ancestorsFromJson({
+        'ancestor_keys': jsonEncode(['session_2', 'grid.cell_2']),
+      });
+
+      expect(ancestors.map((m) => m.keyValue), ['session_2', 'grid.cell_2']);
+    });
+
+    test('rejects a malformed ancestor_keys payload', () {
+      expect(
+        () => WidgetMatcher.ancestorsFromJson({'ancestor_keys': 'grid.cell_2'}),
+        throwsArgumentError,
+      );
     });
   });
 

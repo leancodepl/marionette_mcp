@@ -25,7 +25,7 @@ void registerTextExtensions({
         matcher,
         input,
         configuration,
-        scope: WidgetMatcher.scopeFromJson(params),
+        ancestors: WidgetMatcher.ancestorsFromJson(params),
       );
 
       return MarionetteExtensionResult.success({

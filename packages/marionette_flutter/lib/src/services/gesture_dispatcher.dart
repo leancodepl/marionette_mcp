@@ -18,13 +18,13 @@ class GestureDispatcher {
   /// Simulates a tap on an element that matches the given [matcher].
   ///
   /// If [matcher] is a [CoordinatesMatcher], taps directly at the specified
-  /// coordinates without searching the widget tree (fast path), and [scope]
-  /// is ignored.
+  /// coordinates without searching the widget tree (fast path), and
+  /// [ancestors] is ignored.
   Future<void> tap(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
     // Fast path for coordinate-based tapping
     if (matcher is CoordinatesMatcher) {
@@ -35,7 +35,7 @@ class GestureDispatcher {
     final element = widgetFinder.findHittableElement(
       matcher,
       configuration,
-      scope: scope,
+      ancestors: ancestors,
     );
 
     if (element == null) {
@@ -99,17 +99,17 @@ class GestureDispatcher {
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) =>
       _mouseTap(matcher, widgetFinder, configuration,
-          buttons: kSecondaryButton, scope: scope);
+          buttons: kSecondaryButton, ancestors: ancestors);
 
   Future<void> _mouseTap(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     required int buttons,
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
     if (matcher is CoordinatesMatcher) {
       await _dispatchMouseTapAtPosition(matcher.offset, buttons);
@@ -119,7 +119,7 @@ class GestureDispatcher {
     final element = widgetFinder.findHittableElement(
       matcher,
       configuration,
-      scope: scope,
+      ancestors: ancestors,
     );
 
     if (element == null) {
@@ -180,7 +180,7 @@ class GestureDispatcher {
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     Duration delay = const Duration(milliseconds: 100),
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
     if (delay.isNegative || delay == Duration.zero) {
       throw ArgumentError('delay must be positive');
@@ -194,7 +194,7 @@ class GestureDispatcher {
     final element = widgetFinder.findHittableElement(
       matcher,
       configuration,
-      scope: scope,
+      ancestors: ancestors,
     );
 
     if (element == null) {
@@ -235,7 +235,7 @@ class GestureDispatcher {
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     Duration duration = const Duration(milliseconds: 600),
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
     if (duration.isNegative || duration == Duration.zero) {
       throw ArgumentError('duration must be positive');
@@ -249,7 +249,7 @@ class GestureDispatcher {
     final element = widgetFinder.findHittableElement(
       matcher,
       configuration,
-      scope: scope,
+      ancestors: ancestors,
     );
 
     if (element == null) {
@@ -307,12 +307,12 @@ class GestureDispatcher {
     MarionetteConfiguration configuration, {
     required String direction,
     double distance = 200.0,
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
     final element = widgetFinder.findElement(
       matcher,
       configuration,
-      scope: scope,
+      ancestors: ancestors,
     );
 
     if (element == null) {
@@ -346,7 +346,7 @@ class GestureDispatcher {
     MarionetteConfiguration configuration, {
     required double scale,
     double startDistance = 200.0,
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
     if (scale <= 0) {
       throw ArgumentError('scale must be positive');
@@ -367,7 +367,7 @@ class GestureDispatcher {
     final element = widgetFinder.findHittableElement(
       matcher,
       configuration,
-      scope: scope,
+      ancestors: ancestors,
     );
 
     if (element == null) {

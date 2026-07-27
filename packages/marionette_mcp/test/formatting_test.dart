@@ -19,16 +19,33 @@ void main() {
       );
     });
 
-    test('forwards within_key alongside the selector', () {
+    test('encodes ancestor_keys as JSON for the string-only wire', () {
       expect(
-        buildMatcher({'key': 'join_button', 'within_key': 'grid.cell_2'}),
-        equals({'key': 'join_button', 'within_key': 'grid.cell_2'}),
+        buildMatcher({
+          'key': 'join_button',
+          'ancestor_keys': ['session_2', 'grid.cell_3'],
+        }),
+        equals({
+          'key': 'join_button',
+          'ancestor_keys': '["session_2","grid.cell_3"]',
+        }),
       );
     });
 
-    test('omits within_key when it is absent', () {
+    test('omits ancestor_keys when it is absent', () {
       expect(
-          buildMatcher({'key': 'join_button'}), equals({'key': 'join_button'}));
+        buildMatcher({'key': 'join_button'}),
+        equals({'key': 'join_button'}),
+      );
+    });
+
+    test('omits an empty ancestor_keys array', () {
+      expect(
+        buildMatcher({'key': 'join_button', 'ancestor_keys': <String>[]}),
+        equals({'key': 'join_button'}),
+        reason: 'an empty chain means no scope, so nothing should go on the '
+            'wire and behavior must match omitting the field',
+      );
     });
   });
 
@@ -38,14 +55,20 @@ void main() {
     });
 
     test('a scope alone is not a selector', () {
-      expect(hasSelector(buildMatcher({'within_key': 'grid.cell_2'})), isFalse);
+      expect(
+        hasSelector(buildMatcher({
+          'ancestor_keys': ['grid.cell_2'],
+        })),
+        isFalse,
+      );
     });
 
     test('a scoped key is a selector', () {
       expect(
-        hasSelector(
-          buildMatcher({'key': 'join_button', 'within_key': 'grid.cell_2'}),
-        ),
+        hasSelector(buildMatcher({
+          'key': 'join_button',
+          'ancestor_keys': ['grid.cell_2'],
+        })),
         isTrue,
       );
     });

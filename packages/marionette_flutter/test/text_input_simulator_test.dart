@@ -479,7 +479,7 @@ void main() {
       });
     });
 
-    group('within_key scope', () {
+    group('ancestor_keys scope', () {
       testWidgets('types into the field inside the scope', (
         WidgetTester tester,
       ) async {
@@ -521,7 +521,7 @@ void main() {
           const KeyMatcher('cell.nameField'),
           'scoped',
           configuration,
-          scope: const KeyMatcher('grid.cell_2'),
+          ancestors: const [KeyMatcher('grid.cell_2')],
         );
         await tester.pump();
 

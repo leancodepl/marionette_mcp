@@ -82,15 +82,15 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | Command | Purpose |
 | --- | --- |
 | `get-interactive-elements` | List interactive UI elements. |
-| `tap` | Tap an element (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--within-key`). |
-| `secondary-tap` | Right-click a matching element (desktop only) (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--within-key`). |
-| `double-tap` | Double tap (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--delay`, `--within-key`). |
-| `long-press` | Long press (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--duration`, `--within-key`). |
-| `pinch-zoom` | Pinch zoom (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--scale`, `--start-distance`, `--within-key`). |
-| `swipe` | Swipe/drag (`--key`/`--identifier`/`--text` + `--direction`, `--distance`, `--within-key`, or `--start-x`/`--start-y`/`--end-x`/`--end-y`). |
-| `enter-text` | Enter text (`--key`, `--identifier`, `--text`, or `--focused`, plus `--input`, `--within-key`). |
+| `tap` | Tap an element (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--ancestor-key`). |
+| `secondary-tap` | Right-click a matching element (desktop only) (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--ancestor-key`). |
+| `double-tap` | Double tap (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--delay`, `--ancestor-key`). |
+| `long-press` | Long press (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--duration`, `--ancestor-key`). |
+| `pinch-zoom` | Pinch zoom (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--scale`, `--start-distance`, `--ancestor-key`). |
+| `swipe` | Swipe/drag (`--key`/`--identifier`/`--text` + `--direction`, `--distance`, `--ancestor-key`, or `--start-x`/`--start-y`/`--end-x`/`--end-y`). |
+| `enter-text` | Enter text (`--key`, `--identifier`, `--text`, or `--focused`, plus `--input`, `--ancestor-key`). |
 | `press-key` | Press a key on the focused element (`--key`, optional `--modifiers`). Real key event: enter to submit, tab to move focus, escape, arrows/backspace to edit, or `--modifiers control` for shortcuts. |
-| `scroll-to` | Scroll to an element (`--key`, `--identifier`, or `--text`, plus `--within-key`). |
+| `scroll-to` | Scroll to an element (`--key`, `--identifier`, or `--text`, plus `--ancestor-key`). |
 | `press-back-button` | Simulate the system back button. |
 | `take-screenshots` | Capture a screenshot (`-o/--output`, `--open`). |
 | `record-video` | Record video (`-o/--output`, `-d/--duration`, `--width`, `--height`, `--ffmpeg-path`, `--open`, …). |
@@ -104,10 +104,17 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | `help-ai` | Print the AI-oriented command reference. |
 | `mcp` | Run the MCP server (`-l/--log-level`, `--log-file`, `--sse-port`). |
 
-`--within-key <key>` is available on every matcher-based command. It limits the match to the subtree of the element with that `ValueKey<String>`, which is how you pick one instance when the same key repeats across identical subtrees:
+`--ancestor-key <key>` is available on every matcher-based command. It limits the match to the subtree of the element with that `ValueKey<String>`, which is how you pick one instance when the same key repeats across identical subtrees:
 
 ```bash
-marionette -i my-app tap --key cell.joinButton --within-key grid.cell_2
+marionette -i my-app tap --key cell.joinButton --ancestor-key grid.cell_2
 ```
 
-The command fails if no element has the scope key, rather than silently matching elsewhere.
+Repeat the option — outermost wrapper first — when the wrapper key itself repeats. Each key is looked up inside the previous one's subtree:
+
+```bash
+marionette -i my-app tap --key cell.joinButton \
+  --ancestor-key session_2 --ancestor-key grid.cell_3
+```
+
+The command fails if any key in the chain matches no element, rather than silently matching elsewhere.

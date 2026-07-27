@@ -22,9 +22,9 @@ class ScrollSimulator {
   /// Scrolls until the widget matching [matcher] is visible.
   ///
   /// Finds the first [Scrollable] in the tree and scrolls it until the target
-  /// widget becomes visible or max attempts are exhausted. When [scope] is
+  /// widget becomes visible or max attempts are exhausted. When [ancestors] is
   /// given, both the target and the fallback [Scrollable] are searched for
-  /// inside its subtree only.
+  /// inside that subtree only.
   ///
   /// Throws an [Exception] if:
   /// - The target widget is not found
@@ -33,9 +33,10 @@ class ScrollSimulator {
   Future<void> scrollUntilVisible(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration, {
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
-    final scrollable = _findScrollableElement(matcher, configuration, scope);
+    final scrollable =
+        _findScrollableElement(matcher, configuration, ancestors);
     if (scrollable == null) {
       throw Exception('No Scrollable widget found in the tree');
     }
@@ -62,16 +63,16 @@ class ScrollSimulator {
       initialMoveStep,
       maxScrollAttempts,
       configuration,
-      scope,
+      ancestors,
     );
   }
 
   Element? _findScrollableElement(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors,
   ) {
-    final root = _widgetFinder.resolveScopeRoot(scope, configuration);
+    final root = _widgetFinder.resolveScopeRoot(ancestors, configuration);
     if (root == null) {
       return null;
     }
@@ -131,7 +132,7 @@ class ScrollSimulator {
     Offset initialMoveStep,
     int maxScrollAttempts,
     MarionetteConfiguration configuration,
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors,
   ) async {
     var moveStep = initialMoveStep;
     var searchingTowardEnd = true;
@@ -143,7 +144,7 @@ class ScrollSimulator {
       final target = _widgetFinder.findElement(
         targetMatcher,
         configuration,
-        scope: scope,
+        ancestors: ancestors,
       );
       // Check if target is visible
       if (target != null && isElementHittable(target)) {

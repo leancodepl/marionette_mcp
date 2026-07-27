@@ -8,18 +8,18 @@ class WidgetFinder {
   /// Finds the first element that matches the given [matcher].
   ///
   /// Traverses the widget tree starting from the root element and returns
-  /// the first element whose widget matches the provided matcher. When [scope]
-  /// is given, only the subtree of the element it matches is traversed.
+  /// the first element whose widget matches the provided matcher. When
+  /// [ancestors] is given, only the subtree it resolves to is traversed.
   ///
   /// Returns null if no matching element is found.
   Element? findElement(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration, {
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) {
     return findElementFrom(
       matcher,
-      resolveScopeRoot(scope, configuration),
+      resolveScopeRoot(ancestors, configuration),
       configuration,
     );
   }
@@ -61,43 +61,48 @@ class WidgetFinder {
   /// Tools that need to find offscreen elements (e.g. scroll_to) should use
   /// [findElement] instead.
   ///
-  /// When [scope] is given, only the subtree of the element it matches is
-  /// traversed.
+  /// When [ancestors] is given, only the subtree it resolves to is traversed.
   Element? findHittableElement(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration, {
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) {
     return _findHittableElementFrom(
       matcher,
-      resolveScopeRoot(scope, configuration),
+      resolveScopeRoot(ancestors, configuration),
       configuration,
     );
   }
 
-  /// Resolves the element that a `within_key` [scope] limits a search to.
+  /// Resolves the element that an `ancestor_keys` chain limits a search to.
   ///
-  /// Returns the app's root element when [scope] is null.
+  /// [ancestors] is ordered outermost first and nests: each key is looked up
+  /// inside the subtree of the one before it, so a chain can reach a subtree
+  /// whose own key repeats elsewhere. An empty chain resolves to the app's
+  /// root element.
   ///
-  /// Throws when [scope] is given but matches no element: falling back to a
-  /// tree-wide search would silently act on a different subtree than the one
-  /// that was asked for.
+  /// Throws when a link matches no element: falling back to a tree-wide search
+  /// would silently act on a different subtree than the one that was asked
+  /// for. The message names the link that broke and where it was looked for.
   Element? resolveScopeRoot(
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors,
     MarionetteConfiguration configuration,
   ) {
-    final root = WidgetsBinding.instance.rootElement;
-    if (scope == null) {
-      return root;
+    Element? scopeRoot = WidgetsBinding.instance.rootElement;
+
+    for (var i = 0; i < ancestors.length; i++) {
+      final found = findElementFrom(ancestors[i], scopeRoot, configuration);
+      if (found == null) {
+        final within = i == 0 ? '' : ' inside "${ancestors[i - 1].keyValue}"';
+        throw Exception(
+          'Scope element with key "${ancestors[i].keyValue}" '
+          '(ancestor_keys[$i]) not found$within',
+        );
+      }
+      scopeRoot = found;
     }
 
-    final scopeElement = findElementFrom(scope, root, configuration);
-    if (scopeElement == null) {
-      throw Exception(
-        'Scope element with key "${scope.keyValue}" (within_key) not found',
-      );
-    }
-    return scopeElement;
+    return scopeRoot;
   }
 
   Element? _findHittableElementFrom(

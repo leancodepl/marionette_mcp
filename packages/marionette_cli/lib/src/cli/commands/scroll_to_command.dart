@@ -11,7 +11,7 @@ class ScrollToCommand extends InstanceCommand {
       ..addOption('key', help: 'Element key (ValueKey<String>).')
       ..addOption('identifier', help: 'Semantics identifier of the element.')
       ..addOption('text', help: 'Visible text of the element to scroll to.')
-      ..addOption('within-key', help: withinKeyHelp);
+      ..addMultiOption('ancestor-key', help: ancestorKeyHelp);
   }
 
   final InstanceRegistry _registry;
@@ -32,7 +32,7 @@ class ScrollToCommand extends InstanceCommand {
       key: argResults?['key'] as String?,
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
-      withinKey: argResults?['within-key'] as String?,
+      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
     );
 
     if (!hasSelector(matcher)) {

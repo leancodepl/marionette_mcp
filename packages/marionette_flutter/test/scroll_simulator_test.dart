@@ -117,7 +117,7 @@ void main() {
     );
 
     testWidgets(
-      'scrolls the list inside the within_key scope, not the first one',
+      'scrolls the list inside the ancestor scope, not the first one',
       timeout: _timeout,
       (WidgetTester tester) async {
         final firstController = ScrollController();
@@ -163,7 +163,7 @@ void main() {
         await simulator.scrollUntilVisible(
           const KeyMatcher('item_15'),
           _configuration,
-          scope: const KeyMatcher('grid.cell_2'),
+          ancestors: const [KeyMatcher('grid.cell_2')],
         );
         await tester.pump();
 

@@ -41,10 +41,23 @@ void main() {
       );
     });
 
-    test('within key arg', () {
+    test('ancestor keys are JSON-encoded for the string-only wire', () {
       expect(
-        buildMatcherFromArgs(key: 'join_button', withinKey: 'grid.cell_2'),
-        equals({'key': 'join_button', 'within_key': 'grid.cell_2'}),
+        buildMatcherFromArgs(
+          key: 'join_button',
+          ancestorKeys: ['session_2', 'grid.cell_3'],
+        ),
+        equals({
+          'key': 'join_button',
+          'ancestor_keys': '["session_2","grid.cell_3"]',
+        }),
+      );
+    });
+
+    test('an empty ancestor chain is omitted', () {
+      expect(
+        buildMatcherFromArgs(key: 'join_button', ancestorKeys: const []),
+        equals({'key': 'join_button'}),
       );
     });
   });
@@ -56,7 +69,7 @@ void main() {
 
     test('a scope alone is not a selector', () {
       expect(
-        hasSelector(buildMatcherFromArgs(withinKey: 'grid.cell_2')),
+        hasSelector(buildMatcherFromArgs(ancestorKeys: ['grid.cell_2'])),
         isFalse,
       );
     });
@@ -64,7 +77,10 @@ void main() {
     test('a scoped key is a selector', () {
       expect(
         hasSelector(
-          buildMatcherFromArgs(key: 'join_button', withinKey: 'grid.cell_2'),
+          buildMatcherFromArgs(
+            key: 'join_button',
+            ancestorKeys: ['grid.cell_2'],
+          ),
         ),
         isTrue,
       );

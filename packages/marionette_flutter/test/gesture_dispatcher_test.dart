@@ -859,7 +859,7 @@ void main() {
     );
   });
 
-  group('GestureDispatcher - within_key scope', () {
+  group('GestureDispatcher - ancestor_keys scope', () {
     /// Two structurally identical cells; only the wrapping cell key tells the
     /// colliding `cell.joinButton` instances apart.
     Widget grid({
@@ -911,7 +911,7 @@ void main() {
               const KeyMatcher('cell.joinButton'),
               WidgetFinder(),
               const MarionetteConfiguration(),
-              scope: const KeyMatcher('grid.cell_2'),
+              ancestors: const [KeyMatcher('grid.cell_2')],
             ));
         await tester.pump();
 
@@ -920,7 +920,7 @@ void main() {
     );
 
     testWidgets(
-      'tap throws naming the scope key when the scope is not found',
+      'tap throws naming the ancestor key that was not found',
       timeout: _timeout,
       (WidgetTester tester) async {
         await tester.pumpWidget(grid(onJoin: (_) {}));
@@ -930,7 +930,7 @@ void main() {
             const KeyMatcher('cell.joinButton'),
             WidgetFinder(),
             const MarionetteConfiguration(),
-            scope: const KeyMatcher('grid.cell_3'),
+            ancestors: const [KeyMatcher('grid.cell_3')],
           ),
           throwsA(
             isA<Exception>().having(
@@ -957,7 +957,7 @@ void main() {
             const KeyMatcher('cell.joinButton'),
             WidgetFinder(),
             const MarionetteConfiguration(),
-            scope: const KeyMatcher('grid.cell_2'),
+            ancestors: const [KeyMatcher('grid.cell_2')],
           ),
           throwsA(isA<Exception>()),
         );
@@ -984,7 +984,7 @@ void main() {
               CoordinatesMatcher(target.dx, target.dy),
               WidgetFinder(),
               const MarionetteConfiguration(),
-              scope: const KeyMatcher('grid.cell_3'),
+              ancestors: const [KeyMatcher('grid.cell_3')],
             ));
         await tester.pump();
 

@@ -11,17 +11,18 @@ class TextInputSimulator {
 
   /// Enters text into a text field identified by the given matcher.
   ///
-  /// When [scope] is given, the field is searched for inside its subtree only.
-  /// It is ignored for [FocusedElementMatcher], which does not search the tree.
+  /// When [ancestors] is given, the field is searched for inside that subtree
+  /// only. It is ignored for [FocusedElementMatcher], which does not search
+  /// the tree.
   Future<void> enterText(
     WidgetMatcher matcher,
     String text,
     MarionetteConfiguration configuration, {
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors = const [],
   }) async {
     final editableTextState = switch (matcher) {
       FocusedElementMatcher() => _findEditableTextStateFromFocusedElement(),
-      _ => _findEditableTextStateFromMatcher(matcher, configuration, scope),
+      _ => _findEditableTextStateFromMatcher(matcher, configuration, ancestors),
     };
 
     _applyText(editableTextState, text);
@@ -60,12 +61,12 @@ class TextInputSimulator {
   EditableTextState _findEditableTextStateFromMatcher(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
-    KeyMatcher? scope,
+    List<KeyMatcher> ancestors,
   ) {
     final element = _widgetFinder.findHittableElement(
       matcher,
       configuration,
-      scope: scope,
+      ancestors: ancestors,
     );
 
     if (element == null) {
