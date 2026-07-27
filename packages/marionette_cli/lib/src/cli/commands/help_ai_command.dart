@@ -115,8 +115,14 @@ List interactive UI elements in the app's widget tree.
 
   Requires: -i <instance> or --uri <ws-uri>
 
+  Options:
+    --ancestor-key <str>  List only the elements inside the subtree of the
+                          element with this key (grid cells, repeated cards).
+                          Repeat it, outermost first, to go deeper
+
   Examples:
     marionette -i my-app get-interactive-elements
+    marionette -i my-app get-interactive-elements --ancestor-key grid.cell_2
     marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 
   Output (stdout), one line per element:
@@ -128,7 +134,9 @@ List interactive UI elements in the app's widget tree.
 
   Each element may have: type, key, text, identifier, and additional
   properties. Use the key, identifier, or text values as matchers for tap,
-  enter-text, scroll-to.
+  enter-text, scroll-to. On a screen that repeats the same subtree, pass
+  --ancestor-key <wrapper key> to list just that subtree, then reuse the same
+  keys as --ancestor-key on tap/enter-text to act inside it.
 
 ---
 
@@ -516,7 +524,8 @@ If a command fails with a connection error, the app may have stopped.
 - --ancestor-key scopes a match to one subtree when the same key repeats across
   identical subtrees; repeat it (outermost first) when the wrapper key itself
   repeats. Every key must exist or the command fails
-- Run `get-interactive-elements` first to discover what's on screen before interacting
+- Run `get-interactive-elements` first to discover what's on screen before interacting;
+  add --ancestor-key to list just one subtree on busy screens
 - Instance names are alphanumeric with hyphens/underscores: [a-zA-Z0-9_-]+
 - Commands are stateless — each opens a fresh connection, so no session management needed
 ''';

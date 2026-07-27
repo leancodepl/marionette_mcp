@@ -13,6 +13,23 @@ const ancestorKeysDescription =
     'whose own key also repeats in other sessions. Fails if any of these keys '
     'has no element; ignored when matching by coordinates or focused_element.';
 
+/// `ancestor_keys` as worded for `get_interactive_elements`, which lists a
+/// subtree rather than matching one element inside it.
+///
+/// Kept separate from [ancestorKeysDescription] so neither has to carry a
+/// caveat that does not apply to it: this tool has no coordinates or
+/// focused_element selectors to be ignored by.
+const ancestorKeysListDescription =
+    'Optional. Lists only the elements inside the subtree named by these '
+    'wrapper keys (each a ValueKey<String>), instead of the whole screen. Use '
+    'it to cut the output down on a screen that repeats the same subtree — '
+    'grid cells, repeated cards, embedded app instances — e.g. '
+    '["grid.cell_2"]. The keys nest, outermost first: each is looked up '
+    'inside the subtree of the previous, so ["session_2", "grid.cell_3"] '
+    'reaches a cell whose own key also repeats. The same list can then be '
+    'passed as ancestor_keys to tap, enter_text and the other tools to act '
+    'inside that subtree. Fails if any of these keys has no element.';
+
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
 /// Supports matching by key, identifier, text, type, and coordinates, plus the

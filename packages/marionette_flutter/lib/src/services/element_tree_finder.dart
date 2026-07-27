@@ -10,9 +10,15 @@ class ElementTreeFinder {
   final MarionetteConfiguration configuration;
 
   /// Returns a list of interactive elements from the current widget tree.
-  List<Map<String, dynamic>> findInteractiveElements() {
+  ///
+  /// When [startElement] is given, only that element and its subtree are
+  /// walked; it defaults to the app's root element. Callers scoping by
+  /// `ancestor_keys` resolve the start element with
+  /// `WidgetFinder.resolveScopeRoot`, which is also where a missing scope key
+  /// fails loud — this class stays deliberately unaware of matchers.
+  List<Map<String, dynamic>> findInteractiveElements({Element? startElement}) {
     final elements = <Map<String, dynamic>>[];
-    final rootElement = WidgetsBinding.instance.rootElement;
+    final rootElement = startElement ?? WidgetsBinding.instance.rootElement;
 
     if (rootElement != null) {
       _visitElement(rootElement, elements);

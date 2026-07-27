@@ -81,7 +81,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 
 | Command | Purpose |
 | --- | --- |
-| `get-interactive-elements` | List interactive UI elements. |
+| `get-interactive-elements` | List interactive UI elements (`--ancestor-key` to list just one subtree). |
 | `tap` | Tap an element (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--ancestor-key`). |
 | `secondary-tap` | Right-click a matching element (desktop only) (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--ancestor-key`). |
 | `double-tap` | Double tap (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--delay`, `--ancestor-key`). |
@@ -117,4 +117,4 @@ marionette -i my-app tap --key cell.joinButton \
   --ancestor-key session_2 --ancestor-key grid.cell_3
 ```
 
-The command fails if any key in the chain matches no element, rather than silently matching elsewhere.
+The command fails if any key in the chain matches no element, rather than silently matching elsewhere. `get-interactive-elements` accepts it too, where it narrows the listing instead of the match — a cheap way to cut the output down on a busy screen before acting inside the subtree you found.

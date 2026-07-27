@@ -15,7 +15,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, identifier (Semantics identifier), and other identifying properties. The agent's primary way to "see" the screen. |
+| `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, identifier (Semantics identifier), and other identifying properties. The agent's primary way to "see" the screen. Optional `ancestor_keys` lists just one subtree. |
 | `take_screenshots` | Capture screenshots of all active views, returned as base64 PNGs. |
 | `get_logs` | Retrieve app logs collected since start or the last hot reload. Requires a [`LogCollector`](./logging.md). |
 
@@ -45,6 +45,8 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 > ```
 >
 > If any key in the chain matches no element the call fails — naming the link that broke — rather than falling back to a tree-wide search. It is ignored by `coordinates` and `focused_element`, which do not search the tree.
+>
+> `get_interactive_elements` takes the same field, but to *list* a subtree rather than match inside one — so you can narrow the listing to one cell and then pass the same chain as `ancestor_keys` to `tap` or `enter_text` to act inside it.
 
 ### Text input
 

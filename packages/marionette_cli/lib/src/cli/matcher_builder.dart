@@ -46,3 +46,11 @@ const ancestorKeyHelp = 'Limit the search to the subtree of the element with '
     'subtrees (grid cells, repeated cards). Repeat the option, outermost '
     'wrapper first, to go deeper: each key is looked up inside the previous '
     "one's subtree.";
+
+/// Help text for `--ancestor-key` on `get-interactive-elements`, which lists a
+/// subtree rather than matching one element inside it.
+const ancestorKeyListHelp = 'List only the elements inside the subtree of the '
+    'element with this key. Use it to cut the output down on screens that '
+    'repeat the same subtree (grid cells, repeated cards). Repeat the option, '
+    "outermost wrapper first, to go deeper: each key is looked up inside the "
+    "previous one's subtree.";

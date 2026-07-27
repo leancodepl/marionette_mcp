@@ -20,7 +20,7 @@ Usage:
 
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 
-When the same key exists in several identical subtrees (grid cells, repeated cards, embedded app instances), a plain match always hits the first one. Pass "ancestor_keys" alongside the selector to scope the search to one subtree, e.g. `{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}`. The keys nest, outermost first — each is looked up inside the previous one's subtree — so `["session_2", "grid.cell_3"]` reaches a cell whose own key also repeats in the other sessions.
+When the same key exists in several identical subtrees (grid cells, repeated cards, embedded app instances), a plain match always hits the first one. Pass "ancestor_keys" alongside the selector to scope the search to one subtree, e.g. `{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}`. The keys nest, outermost first — each is looked up inside the previous one's subtree — so `["session_2", "grid.cell_3"]` reaches a cell whose own key also repeats in the other sessions. "get_interactive_elements" accepts "ancestor_keys" as well, to list only that subtree — use it to find the right scope keys and to keep the listing small on busy screens.
 ''';
 
 /// Runs the Marionette MCP server with the given configuration.
