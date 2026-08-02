@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/binding/marionette_widget_adapter.dart';
 import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 
 /// Finds and extracts interactive elements from the Flutter widget tree.
@@ -23,13 +24,19 @@ class ElementTreeFinder {
 
   void _visitElement(Element element, List<Map<String, dynamic>> result) {
     final widget = element.widget;
-    final elementData = _extractElementData(element, widget);
+    final descriptor = configuration.describeWidget(element);
+    final elementData = _extractElementData(
+      element,
+      widget,
+      descriptor: descriptor,
+    );
 
     if (elementData != null) {
       result.add(elementData);
     }
 
-    if (configuration.shouldStopAtType(widget.runtimeType)) {
+    if (descriptor?.traversalPolicy == MarionetteTraversalPolicy.ownSubtree ||
+        configuration.shouldStopAtType(widget.runtimeType)) {
       return;
     }
 
@@ -38,7 +45,11 @@ class ElementTreeFinder {
     });
   }
 
-  Map<String, dynamic>? _extractElementData(Element element, Widget widget) {
+  Map<String, dynamic>? _extractElementData(
+    Element element,
+    Widget widget, {
+    MarionetteWidgetDescriptor? descriptor,
+  }) {
     // Only process elements with render objects
     final renderObject = element.renderObject;
     if (renderObject == null) {
@@ -49,7 +60,8 @@ class ElementTreeFinder {
     final isInteractive = configuration.isInteractiveWidgetType(
       widget.runtimeType,
     );
-    final text = configuration.extractTextFromWidget(element);
+    final text =
+        descriptor?.text ?? configuration.extractTextFromWidget(element);
     // Discovery-only Semantics fallback: if the standard matcher path yielded
     // no text, surface explicit accessibility annotations so agents can read
     // content rendered via inline-span trees, custom painters, or third-party
@@ -61,7 +73,8 @@ class ElementTreeFinder {
     final keyValue = _extractKeyValue(widget.key);
     final identifierValue = _extractIdentifier(widget);
 
-    if (!isInteractive &&
+    if (descriptor == null &&
+        !isInteractive &&
         discoverableText == null &&
         keyValue == null &&
         identifierValue == null) {
@@ -73,23 +86,28 @@ class ElementTreeFinder {
       return null;
     }
 
-    final properties = DiagnosticPropertiesBuilder();
-    widget.debugFillProperties(properties);
-    final data = Map<String, Object>.fromEntries(
-      properties.properties
-          .where((p) =>
-              p.runtimeType != DiagnosticsProperty &&
-              p.name != null &&
-              p.value != null)
-          .map(
-            (p) => MapEntry(p.name!, p.value.toString()),
-          ),
-    );
+    final Map<String, Object?> data;
+    if (descriptor != null) {
+      data = descriptor.toJson();
+    } else {
+      final properties = DiagnosticPropertiesBuilder();
+      widget.debugFillProperties(properties);
+      data = Map<String, Object?>.fromEntries(
+        properties.properties
+            .where(
+              (p) =>
+                  p.runtimeType != DiagnosticsProperty &&
+                  p.name != null &&
+                  p.value != null,
+            )
+            .map((p) => MapEntry(p.name!, p.value.toString())),
+      );
 
-    data['type'] = widget.runtimeType.toString();
+      data['type'] = widget.runtimeType.toString();
+    }
 
     if (keyValue != null) {
-      data['key'] = keyValue;
+      data.putIfAbsent('key', () => keyValue);
     }
 
     if (identifierValue != null) {
@@ -97,7 +115,7 @@ class ElementTreeFinder {
     }
 
     if (discoverableText != null) {
-      data['text'] = discoverableText;
+      data.putIfAbsent('text', () => discoverableText);
     }
 
     // Get position and size if available
@@ -187,12 +205,22 @@ class ElementTreeFinder {
 
       try {
         final offset = renderObject.localToGlobal(Offset.zero);
-        final screenSize = WidgetsBinding
-                .instance.platformDispatcher.views.first.physicalSize /
+        final screenSize =
             WidgetsBinding
-                .instance.platformDispatcher.views.first.devicePixelRatio;
+                .instance
+                .platformDispatcher
+                .views
+                .first
+                .physicalSize /
+            WidgetsBinding
+                .instance
+                .platformDispatcher
+                .views
+                .first
+                .devicePixelRatio;
 
-        final isOnScreen = offset.dx + size.width >= 0 &&
+        final isOnScreen =
+            offset.dx + size.width >= 0 &&
             offset.dy + size.height >= 0 &&
             offset.dx < screenSize.width &&
             offset.dy < screenSize.height;

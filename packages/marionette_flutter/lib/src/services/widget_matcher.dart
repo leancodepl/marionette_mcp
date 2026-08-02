@@ -105,9 +105,11 @@ class KeyMatcher extends WidgetMatcher {
   bool matches(Element element, MarionetteConfiguration configuration) {
     final key = element.widget.key;
     if (key is ValueKey<String>) {
-      return key.value == keyValue;
+      if (key.value == keyValue) {
+        return true;
+      }
     }
-    return false;
+    return configuration.describeWidget(element)?.key == keyValue;
   }
 
   @override
@@ -210,7 +212,8 @@ class TypeStringMatcher extends WidgetMatcher {
 
   @override
   bool matches(Element element, MarionetteConfiguration configuration) {
-    return element.widget.runtimeType.toString() == typeName;
+    return element.widget.runtimeType.toString() == typeName ||
+        configuration.describeWidget(element)?.type == typeName;
   }
 
   @override
