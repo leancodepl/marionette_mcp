@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 
 /// Controls how Marionette traverses below an adapted widget.
@@ -40,7 +42,7 @@ class MarionetteWidgetDescriptor {
   final MarionetteTraversalPolicy traversalPolicy;
 
   Map<String, Object?> toJson() {
-    return <String, Object?>{
+    final result = <String, Object?>{
       'type': type,
       if (role != null) 'role': role,
       if (key != null) 'key': key,
@@ -51,7 +53,21 @@ class MarionetteWidgetDescriptor {
       if (actions.isNotEmpty) 'actions': actions,
       if (properties.isNotEmpty) 'properties': properties,
     };
+    assert(_debugAssertJsonEncodable(result));
+    return result;
   }
+}
+
+bool _debugAssertJsonEncodable(Map<String, Object?> value) {
+  try {
+    jsonEncode(value);
+  } catch (error) {
+    throw ArgumentError(
+      'MarionetteWidgetDescriptor fields must contain only JSON-encodable '
+      'values: $error',
+    );
+  }
+  return true;
 }
 
 /// Application or design-system bridge for Marionette introspection.
