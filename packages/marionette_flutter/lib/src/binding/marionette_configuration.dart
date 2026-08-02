@@ -144,9 +144,14 @@ class MarionetteConfiguration {
   }
 
   /// Extracts text from a widget (built-in + custom).
-  String? extractTextFromWidget(Element element) {
-    final descriptor = describeWidget(element);
-    return descriptor?.text ??
+  String? extractTextFromWidget(
+    Element element, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
+    final effectiveDescriptor = describeWidget == null
+        ? this.describeWidget(element)
+        : describeWidget();
+    return effectiveDescriptor?.text ??
         _extractBuiltInText(element.widget) ??
         extractText?.call(element);
   }

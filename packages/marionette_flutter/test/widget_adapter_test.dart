@@ -75,6 +75,23 @@ class _FallbackCompositeButtonAdapter implements MarionetteWidgetAdapter {
   }
 }
 
+class _CountingCompositeButtonAdapter implements MarionetteWidgetAdapter {
+  final calls = <Element, int>{};
+
+  @override
+  MarionetteWidgetDescriptor? describe(Element element) {
+    calls.update(element, (count) => count + 1, ifAbsent: () => 1);
+    if (element.widget is! _CompositeButton) return null;
+    return const MarionetteWidgetDescriptor(
+      type: 'CompositeButton',
+      key: 'counted',
+      traversalPolicy: MarionetteTraversalPolicy.ownSubtree,
+    );
+  }
+}
+
+class _NonJsonValue {}
+
 class _ContinueCompositeButtonAdapter implements MarionetteWidgetAdapter {
   const _ContinueCompositeButtonAdapter();
 
@@ -150,6 +167,24 @@ void main() {
     expect(() => jsonEncode(descriptor.toJson()), returnsNormally);
   });
 
+  test('descriptor rejects non-JSON values at the descriptor boundary', () {
+    final descriptor = MarionetteWidgetDescriptor(
+      type: 'CompositeButton',
+      state: <String, Object?>{'bad': _NonJsonValue()},
+    );
+
+    expect(
+      descriptor.toJson,
+      throwsA(
+        isA<ArgumentError>().having(
+          (error) => error.message,
+          'message',
+          contains('JSON-encodable'),
+        ),
+      ),
+    );
+  });
+
   testWidgets('adapter emits one logical target for a composite widget', (
     tester,
   ) async {
@@ -203,6 +238,30 @@ void main() {
       const TextMatcher('Continue').matches(element, configuration),
       isTrue,
     );
+  });
+
+  testWidgets('hittable matching describes each visited element at most once', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: _CompositeButton(label: 'Continue')),
+      ),
+    );
+    final adapter = _CountingCompositeButtonAdapter();
+    final countedConfiguration = MarionetteConfiguration(
+      widgetAdapters: <MarionetteWidgetAdapter>[adapter],
+    );
+    final target = tester.element(find.byType(_CompositeButton));
+
+    final found = WidgetFinder().findHittableElement(
+      const KeyMatcher('counted'),
+      countedConfiguration,
+    );
+
+    expect(found, target);
+    expect(adapter.calls[target], 1);
+    expect(adapter.calls.values, everyElement(1));
   });
 
   testWidgets('the first matching adapter wins', (tester) async {
