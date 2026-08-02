@@ -84,7 +84,9 @@ class WidgetFinder {
       if (found != null) {
         return;
       } else if (matcher.matches(element, configuration) &&
-          isElementHittable(element)) {
+          (configuration.describeWidget(element) == null
+              ? isElementHittable(element)
+              : isElementOrDescendantHittable(element))) {
         found = element;
       } else {
         element.visitChildren(visitor);

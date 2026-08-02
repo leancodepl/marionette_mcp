@@ -81,8 +81,12 @@ class ElementTreeFinder {
       return null;
     }
 
-    // Only return widgets that can be hit
-    if (!isElementHittable(element)) {
+    // Adapted composites can delegate hit testing to a private descendant
+    // without placing their own render object in the hit-test path.
+    final isHittable = descriptor == null
+        ? isElementHittable(element)
+        : isElementOrDescendantHittable(element);
+    if (!isHittable) {
       return null;
     }
 

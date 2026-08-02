@@ -1,9 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
+import 'package:marionette_flutter/src/services/widget_finder.dart';
 
 class _CompositeButton extends StatelessWidget {
   const _CompositeButton({required this.label});
@@ -85,6 +87,39 @@ class _ContinueCompositeButtonAdapter implements MarionetteWidgetAdapter {
     return MarionetteWidgetDescriptor(
       type: 'CompositeButton',
       text: widget.label,
+    );
+  }
+}
+
+class _DelegatingCompositeControl extends SingleChildRenderObjectWidget {
+  const _DelegatingCompositeControl({super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _DelegatingCompositeRenderBox();
+}
+
+class _DelegatingCompositeRenderBox extends RenderProxyBox {
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    final target = child;
+    return target != null && target.hitTest(result, position: position);
+  }
+}
+
+class _DelegatingCompositeAdapter implements MarionetteWidgetAdapter {
+  const _DelegatingCompositeAdapter();
+
+  @override
+  MarionetteWidgetDescriptor? describe(Element element) {
+    if (element.widget is! _DelegatingCompositeControl) {
+      return null;
+    }
+    return const MarionetteWidgetDescriptor(
+      type: 'DelegatingCompositeControl',
+      key: 'delegating-control',
+      actions: <String>['tap'],
+      traversalPolicy: MarionetteTraversalPolicy.ownSubtree,
     );
   }
 }
@@ -246,5 +281,40 @@ void main() {
       const TextMatcher('pending').matches(element, valueOnlyConfiguration),
       isFalse,
     );
+  });
+
+  testWidgets('a hittable descendant makes an adapted composite actionable', (
+    tester,
+  ) async {
+    const delegatedConfiguration = MarionetteConfiguration(
+      widgetAdapters: <MarionetteWidgetAdapter>[_DelegatingCompositeAdapter()],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: _DelegatingCompositeControl(
+            child: ElevatedButton(
+              onPressed: () {},
+              child: const Text('Private gesture target'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    const treeFinder = ElementTreeFinder(delegatedConfiguration);
+    final elements = treeFinder.findInteractiveElements();
+    final matched = WidgetFinder().findHittableElement(
+      const KeyMatcher('delegating-control'),
+      delegatedConfiguration,
+    );
+
+    expect(
+      elements.any(
+        (element) => element['type'] == 'DelegatingCompositeControl',
+      ),
+      isTrue,
+    );
+    expect(matched?.widget, isA<_DelegatingCompositeControl>());
   });
 }
