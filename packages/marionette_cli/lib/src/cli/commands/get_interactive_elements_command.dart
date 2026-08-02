@@ -5,6 +5,9 @@ import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
+String formatInteractiveElementsCommandOutput(Map<String, dynamic> response) =>
+    formatInteractiveElementsResponse(response);
+
 class ElementsCommand extends InstanceCommand {
   ElementsCommand(this._registry);
 
@@ -23,13 +26,7 @@ class ElementsCommand extends InstanceCommand {
   @override
   Future<int> execute(VmServiceConnector connector) async {
     final response = await connector.getInteractiveElements();
-    final elements = response['elements'] as List<dynamic>;
-
-    stdout.writeln('Found ${elements.length} interactive element(s):\n');
-
-    for (final element in elements) {
-      stdout.writeln(formatElement(element as Map<String, dynamic>));
-    }
+    stdout.write(formatInteractiveElementsCommandOutput(response));
 
     return 0;
   }
