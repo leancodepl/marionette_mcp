@@ -28,4 +28,13 @@ void main() {
     expect(output, isNot(contains('Schema version:')));
     expect(output, isNot(contains('Context:')));
   });
+
+  test('requires the core elements payload', () {
+    expect(
+      () => formatInteractiveElementsResponse(<String, dynamic>{
+        'schemaVersion': 1,
+      }),
+      throwsA(isA<TypeError>()),
+    );
+  });
 }

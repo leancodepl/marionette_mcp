@@ -4,7 +4,7 @@ import 'dart:convert';
 ///
 /// Legacy responses containing only `elements` retain their previous output.
 String formatInteractiveElementsResponse(Map<String, dynamic> response) {
-  final elements = response['elements'] as List<dynamic>? ?? const [];
+  final elements = response['elements'] as List<dynamic>;
   final buffer = StringBuffer();
   if (response['schemaVersion'] != null) {
     buffer.writeln('Schema version: ${response['schemaVersion']}');
