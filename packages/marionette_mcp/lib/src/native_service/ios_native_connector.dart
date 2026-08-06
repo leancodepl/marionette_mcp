@@ -63,15 +63,20 @@ class IosNativeConnector implements NativeConnector {
     return parseWdaSource(source);
   }
 
-  /// Foreground app identifier derived from the WDA page source.
-  ///
-  /// There is no reliable WDA `/status`-equivalent for the frontmost bundle
-  /// id. We read the first `XCUIElementTypeApplication` node's `name` (falling
-  /// back to `label`). Returns null when the source has no Application node.
+  /// Foreground app bundle identifier from WDA's active-app endpoint, with
+  /// page-source fallback when that endpoint is unavailable.
   @override
   Future<String?> get foregroundApp async {
+    try {
+      final info = await _client.wdaActiveAppInfo(_sessionId);
+      final bundleId = info['bundleId'];
+      if (bundleId is String && bundleId.isNotEmpty) return bundleId;
+    } on WebDriverException {
+      // Fall back to page source parsing below.
+    }
+
     final source = await _client.getPageSource(_sessionId);
-    return _foregroundAppFromSource(source);
+    return foregroundAppFromWdaSource(source);
   }
 
   @override
@@ -181,8 +186,9 @@ class IosNativeConnector implements NativeConnector {
   }
 }
 
-/// Reads the frontmost application name/label from WDA XML source.
-String? _foregroundAppFromSource(String xml) {
+/// Reads a bundle identifier from WDA page source when [wdaActiveAppInfo] is
+/// unavailable.
+String? foregroundAppFromWdaSource(String xml) {
   final apps = parseUiTree(
     xml,
     isRelevant: (attributes) =>
@@ -191,9 +197,16 @@ String? _foregroundAppFromSource(String xml) {
   if (apps.isEmpty) return null;
 
   final attrs = apps.first;
+  final bundleId = attrs['bundleId'] ?? '';
+  if (bundleId.isNotEmpty) return bundleId;
+
   final name = attrs['name'] ?? '';
-  if (name.isNotEmpty) return name;
-  final label = attrs['label'] ?? '';
-  if (label.isNotEmpty) return label;
+  if (_looksLikeBundleIdentifier(name)) return name;
+
   return null;
 }
+
+final _bundleIdentifierPattern = RegExp(r'^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$');
+
+bool _looksLikeBundleIdentifier(String value) =>
+    _bundleIdentifierPattern.hasMatch(value);

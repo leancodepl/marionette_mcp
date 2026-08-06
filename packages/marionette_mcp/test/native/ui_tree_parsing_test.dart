@@ -1,3 +1,4 @@
+import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:test/test.dart';
 
@@ -193,6 +194,28 @@ void main() {
         'bounds': {'x': 48, 'y': 520, 'width': 294, 'height': 48},
         'clickable': true,
       });
+    });
+  });
+
+  group('foregroundAppFromWdaSource', () {
+    test('prefers bundleId attribute over display name', () {
+      const xml = '''
+<XCUIElementTypeApplication type="XCUIElementTypeApplication"
+    bundleId="com.example.app" name="Example" label="Example" />
+''';
+      expect(foregroundAppFromWdaSource(xml), 'com.example.app');
+    });
+
+    test('accepts bundle-like name when bundleId is absent', () {
+      const xml = '''
+<XCUIElementTypeApplication type="XCUIElementTypeApplication"
+    name="com.example.app" label="Example" />
+''';
+      expect(foregroundAppFromWdaSource(xml), 'com.example.app');
+    });
+
+    test('returns null for SpringBoard display name without bundle id', () {
+      expect(foregroundAppFromWdaSource(wdaFixture), isNull);
     });
   });
 

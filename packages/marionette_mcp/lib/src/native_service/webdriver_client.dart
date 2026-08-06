@@ -221,6 +221,26 @@ class WebDriverClient {
     ]);
   }
 
+  /// Returns WDA device metadata from `GET /wda/device/info` (simulator UDID, etc.).
+  Future<Map<String, dynamic>> wdaDeviceInfo() async {
+    final value = await _request('GET', '/wda/device/info');
+    if (value is Map<String, dynamic>) return value;
+    throw const WebDriverException(
+      'WDA device info response was not an object',
+    );
+  }
+
+  /// Returns the foreground app's bundle id from WDA
+  /// `GET /session/{id}/wda/activeAppInfo`.
+  Future<Map<String, dynamic>> wdaActiveAppInfo(String sessionId) async {
+    final value =
+        await _request('GET', '/session/$sessionId/wda/activeAppInfo');
+    if (value is Map<String, dynamic>) return value;
+    throw const WebDriverException(
+      'WDA activeAppInfo response was not an object',
+    );
+  }
+
   /// Returns true when the server responds successfully to `GET /status`.
   ///
   /// Never throws — intended as a bootstrap health check that is polled

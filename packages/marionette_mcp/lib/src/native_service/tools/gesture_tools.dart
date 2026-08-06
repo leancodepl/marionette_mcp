@@ -1,3 +1,5 @@
+import 'dart:math' show min;
+
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
@@ -323,7 +325,14 @@ Future<void> _swipeInDirection(
 
   final centerX = maxX ~/ 2;
   final centerY = maxY ~/ 2;
-  final half = distance ~/ 2;
+  final half = cappedSwipeHalf(
+    direction: direction,
+    half: distance ~/ 2,
+    centerX: centerX,
+    centerY: centerY,
+    maxX: maxX,
+    maxY: maxY,
+  );
 
   final endpoints = direction.swipeEndpoints(
     centerX: centerX,
@@ -337,4 +346,21 @@ Future<void> _swipeInDirection(
     endX: endpoints.endX,
     endY: endpoints.endY,
   );
+}
+
+/// Limits swipe distance so finger endpoints stay within the viewport.
+int cappedSwipeHalf({
+  required SwipeDirection direction,
+  required int half,
+  required int centerX,
+  required int centerY,
+  required int maxX,
+  required int maxY,
+}) {
+  final maxHalfX = min(centerX, maxX - centerX);
+  final maxHalfY = min(centerY, maxY - centerY);
+  return switch (direction) {
+    SwipeDirection.up || SwipeDirection.down => min(half, maxHalfY),
+    SwipeDirection.left || SwipeDirection.right => min(half, maxHalfX),
+  };
 }

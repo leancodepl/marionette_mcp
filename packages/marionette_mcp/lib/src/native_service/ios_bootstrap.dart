@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 
 /// Signature for running a short-lived process — injectable for testing.
@@ -82,6 +83,7 @@ class IosBootstrap {
     Directory? cacheDir,
     Duration readyTimeout = const Duration(seconds: 60),
     Duration pollInterval = const Duration(milliseconds: 500),
+    logging.Logger? logger,
   })  : _udid = udid,
         _run = processRunner ?? Process.run,
         _start = processStarter ?? Process.start,
@@ -89,7 +91,8 @@ class IosBootstrap {
         _wdaPathOverride = wdaPath,
         _cacheDir = cacheDir ?? defaultWdaCacheDir,
         _readyTimeout = readyTimeout,
-        _pollInterval = pollInterval;
+        _pollInterval = pollInterval,
+        _logger = logger ?? logging.Logger('IosBootstrap');
 
   final String? _udid;
   final ProcessRunner _run;
@@ -99,10 +102,17 @@ class IosBootstrap {
   final Directory _cacheDir;
   final Duration _readyTimeout;
   final Duration _pollInterval;
+  final logging.Logger _logger;
 
   String? _resolvedUdid;
   Process? _wdaProcess;
   int? _wdaExitCode;
+  String? _simctlLaunchedUdid;
+  String? _simctlLaunchedBundleId;
+
+  /// Default WDA runner bundle id used by facebook/appium WebDriverAgent.
+  static const wdaRunnerBundleId =
+      'com.facebook.WebDriverAgentRunner.xctrunner';
 
   /// Local port WDA is expected to listen on.
   int get wdaLocalPort => _wdaLocalPort;
@@ -122,13 +132,19 @@ class IosBootstrap {
       port: _wdaLocalPort,
     );
 
-    // Fast path: something is already healthy on the port (e.g. leftover WDA).
-    if (await _isHealthy(baseUri)) {
-      _resolvedUdid ??= await _resolveSimulatorUdid();
-      return baseUri;
-    }
-
     _resolvedUdid = await _resolveSimulatorUdid();
+
+    // Fast path: WDA is already healthy on the port for this simulator.
+    if (await _isHealthy(baseUri)) {
+      if (await _wdaServesSimulator(baseUri, _resolvedUdid!)) {
+        return baseUri;
+      }
+      throw StateError(
+        'Port $_wdaLocalPort is already in use by WebDriverAgent attached to '
+        'a different simulator than $_resolvedUdid. Stop the other WDA '
+        'instance or choose another wdaLocalPort.',
+      );
+    }
     final artifacts = _resolveWdaArtifacts();
     await _launchWda(artifacts, _resolvedUdid!);
     await _waitUntilHealthy(baseUri);
@@ -137,6 +153,8 @@ class IosBootstrap {
 
   /// Kills any xcodebuild/WDA process started by this instance. Best-effort.
   Future<void> dispose() async {
+    await _terminateSimctlLaunch();
+
     final process = _wdaProcess;
     _wdaProcess = null;
     if (process == null) return;
@@ -185,6 +203,7 @@ class IosBootstrap {
       throw StateError('Unexpected simctl JSON: missing devices map');
     }
 
+    final booted = <String>[];
     for (final entry in devices.values) {
       if (entry is! List) continue;
       for (final device in entry) {
@@ -192,17 +211,28 @@ class IosBootstrap {
         final state = device['state'] as String?;
         final udid = device['udid'] as String?;
         if (state == 'Booted' && udid != null && udid.isNotEmpty) {
-          return udid;
+          booted.add(udid);
         }
       }
     }
 
-    throw StateError(
-      'No booted iOS Simulator found. Boot one first, e.g.:\n'
-      '  open -a Simulator\n'
-      '  xcrun simctl boot "iPhone 16"\n'
-      'Or pass an explicit udid to IosBootstrap.',
-    );
+    if (booted.isEmpty) {
+      throw StateError(
+        'No booted iOS Simulator found. Boot one first, e.g.:\n'
+        '  open -a Simulator\n'
+        '  xcrun simctl boot "iPhone 16"\n'
+        'Or pass an explicit udid to IosBootstrap.',
+      );
+    }
+
+    final selected = booted.first;
+    if (booted.length > 1) {
+      _logger.info(
+        'Multiple booted iOS Simulators (${booted.length}); '
+        'using first: $selected. Pass an explicit udid to choose another.',
+      );
+    }
+    return selected;
   }
 
   _WdaArtifacts _resolveWdaArtifacts() {
@@ -326,8 +356,7 @@ class IosBootstrap {
       );
     }
 
-    // Default WDA runner bundle id used by facebook/appium WebDriverAgent.
-    const bundleId = 'com.facebook.WebDriverAgentRunner.xctrunner';
+    const bundleId = wdaRunnerBundleId;
     final launch = await _run('xcrun', [
       'simctl',
       'launch',
@@ -341,6 +370,36 @@ class IosBootstrap {
         'Note: WDA typically needs to run as an XCUITest. Prefer setting '
         'MARIONETTE_WDA_XCTESTRUN and using xcodebuild test-without-building.',
       );
+    }
+
+    _simctlLaunchedUdid = udid;
+    _simctlLaunchedBundleId = bundleId;
+  }
+
+  Future<void> _terminateSimctlLaunch() async {
+    final udid = _simctlLaunchedUdid;
+    final bundleId = _simctlLaunchedBundleId;
+    _simctlLaunchedUdid = null;
+    _simctlLaunchedBundleId = null;
+    if (udid == null || bundleId == null) return;
+
+    try {
+      await _run('xcrun', ['simctl', 'terminate', udid, bundleId]);
+    } catch (_) {
+      // Best-effort cleanup.
+    }
+  }
+
+  Future<bool> _wdaServesSimulator(Uri baseUri, String expectedUdid) async {
+    final client = WebDriverClient(baseUri.toString());
+    try {
+      final info = await client.wdaDeviceInfo();
+      final udid = info['udid'];
+      return udid is String && udid == expectedUdid;
+    } catch (_) {
+      return false;
+    } finally {
+      client.close();
     }
   }
 

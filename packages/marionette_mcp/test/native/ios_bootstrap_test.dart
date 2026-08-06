@@ -78,6 +78,45 @@ void main() {
     );
 
     test(
+      'uses first booted simulator when multiple are booted',
+      () async {
+        const firstUdid = '11111111-1111-1111-1111-111111111111';
+        final bootstrap = IosBootstrap(
+          processRunner: (executable, arguments) async {
+            expect(executable, 'xcrun');
+            return ProcessResult(
+              0,
+              0,
+              '''
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+      {"state": "Booted", "udid": "$firstUdid"},
+      {"state": "Booted", "udid": "22222222-2222-2222-2222-222222222222"}
+    ]
+  }
+}
+''',
+              '',
+            );
+          },
+          cacheDir: cacheDir,
+          wdaLocalPort: 18103,
+        );
+
+        try {
+          await bootstrap.ensureServerReady();
+          fail('expected missing WDA artifacts');
+        } on StateError catch (e) {
+          expect(e.message, contains('No prebuilt WebDriverAgent found'));
+        }
+
+        expect(bootstrap.resolvedUdid, firstUdid);
+      },
+      skip: !Platform.isMacOS ? 'IosBootstrap requires macOS' : false,
+    );
+
+    test(
       'throws a helpful message when WDA artifacts are missing',
       () async {
         final bootstrap = IosBootstrap(

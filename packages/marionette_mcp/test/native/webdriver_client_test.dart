@@ -306,6 +306,40 @@ void main() {
       );
     });
 
+    test('wdaDeviceInfo reads /wda/device/info value', () async {
+      routes['GET /wda/device/info'] = (request, _) => writeJson(request, {
+        'udid': 'SIM-UDID',
+        'name': 'iPhone 16',
+      });
+
+      final client = WebDriverClient(baseUri.toString());
+      addTearDown(client.close);
+
+      expect(await client.wdaDeviceInfo(), {
+        'udid': 'SIM-UDID',
+        'name': 'iPhone 16',
+      });
+    });
+
+    test('wdaActiveAppInfo reads session active app value', () async {
+      routes['GET /session/sess-1/wda/activeAppInfo'] =
+          (request, _) => writeJson(request, {
+                'bundleId': 'com.example.app',
+                'processArguments': <dynamic>[],
+              });
+
+      final client = WebDriverClient(baseUri.toString());
+      addTearDown(client.close);
+
+      expect(
+        await client.wdaActiveAppInfo('sess-1'),
+        {
+          'bundleId': 'com.example.app',
+          'processArguments': isEmpty,
+        },
+      );
+    });
+
     test('close cleans up so further requests fail', () async {
       routes['GET /status'] = (request, _) => writeJson(request, {'ready': true});
 
