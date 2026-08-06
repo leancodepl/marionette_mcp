@@ -1,0 +1,42 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "marionette_mcp (stdio, debug)",
+            "type": "dart",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "packages/marionette_mcp/bin/marionette_mcp.dart",
+            "args": [
+                "-l",
+                "FINEST"
+            ],
+            "console": "terminal"
+        },
+        {
+            "name": "marionette_mcp (SSE, debug)",
+            "type": "dart",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "packages/marionette_mcp/bin/marionette_mcp.dart",
+            "args": [
+                "--sse-port",
+                "8765",
+                "-l",
+                "FINEST"
+            ],
+            "env": {
+                "MARIONETTE_SCREENSHOTS_DIR": "${workspaceFolder}/screenshots"
+            }
+        },
+        {
+            "name": "example",
+            "cwd": "example",
+            "request": "launch",
+            "type": "dart"
+        },
+    ]
+}

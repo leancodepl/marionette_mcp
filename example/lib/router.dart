@@ -11,11 +11,13 @@ import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/webview_screen.dart';
 
 /// Page name → route path mapping used by the custom VM service extension.
 const availablePages = <String, String>{
   'home': '/',
   'profile': '/profile',
+  'webview': '/webview',
   'settings': '/settings',
   'notifications': '/settings/notifications',
   'items': '/settings/items',
@@ -36,6 +38,10 @@ final router = GoRouter(
         GoRoute(
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: '/webview',
+          builder: (context, state) => const WebViewScreen(),
         ),
         GoRoute(
           path: '/settings',
@@ -101,6 +107,11 @@ class ScaffoldWithNav extends StatelessWidget {
             label: 'Profile',
           ),
           NavigationDestination(
+            icon: Icon(Icons.language_outlined),
+            selectedIcon: Icon(Icons.language),
+            label: 'WebView',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
@@ -112,7 +123,8 @@ class ScaffoldWithNav extends StatelessWidget {
 
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    if (location.startsWith('/settings')) return 2;
+    if (location.startsWith('/settings')) return 3;
+    if (location.startsWith('/webview')) return 2;
     if (location.startsWith('/profile')) return 1;
     return 0;
   }
@@ -124,6 +136,8 @@ class ScaffoldWithNav extends StatelessWidget {
       case 1:
         context.go('/profile');
       case 2:
+        context.go('/webview');
+      case 3:
         context.go('/settings');
     }
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/version.g.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -18,7 +19,11 @@ Usage:
 6. Use "hot_reload" after making code changes to reload the app without losing state.
 7. Use "hot_restart" to fully restart the app from main() and reset all state — needed for changes a hot reload cannot pick up (e.g. main()/bootstrap edits, global singletons, or state shape). Requires the app to be running via `flutter run`.
 
+Screenshots: take_screenshots and native_take_screenshot always return base64 inline PNG images (default — no files written). When MARIONETTE_SCREENSHOTS_DIR is set, they also save PNG files to that directory and include absolute paths in the response alongside the inline images. When a path is returned, show the PNG to the user by embedding it as a markdown image: ![](/absolute/path.png). Do not rely on the inline image payload alone — hosts may hide it from the user.
+
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
+
+Native lane: Prefer Flutter tools for in-app widgets. Use native_connect / native_get_elements / native_tap / native_scroll / native_enter_text / native_take_screenshot only when the target is absent from the Flutter tree or a system dialog/permission UI covers the app. Use native_take_screenshot (not take_screenshots) to visually capture those system surfaces before dismissing them. Never mix Flutter logical coordinates with native physical coordinates.
 ''';
 
 /// Runs the Marionette MCP server with the given configuration.
@@ -33,6 +38,7 @@ Future<int> runMcpServer({
   setupLogging(logLevel, logFile);
 
   final vmService = VmServiceContext();
+  final native = NativeServiceContext();
 
   final server = McpServer(
     const Implementation(name: 'marionette-mcp', version: version),
@@ -49,11 +55,12 @@ Future<int> runMcpServer({
   );
 
   vmService.registerTools(server);
+  native.registerTools(server);
 
   if (ssePort != null) {
-    return _runSseServer(server, ssePort);
+    return _runSseServer(server, ssePort, native);
   } else {
-    return _runStdioServer(server);
+    return _runStdioServer(server, native);
   }
 }
 
@@ -88,7 +95,8 @@ String _formatTime(DateTime time) {
       '${time.second.toString().padLeft(2, '0')}';
 }
 
-Future<int> _runStdioServer(McpServer server) async {
+Future<int> _runStdioServer(
+    McpServer server, NativeServiceContext native) async {
   final logger = logging.Logger('main');
 
   final transport = StdioServerTransport();
@@ -112,6 +120,7 @@ Future<int> _runStdioServer(McpServer server) async {
   } catch (e, st) {
     logger.severe('Error when starting the Stdio transport', e, st);
     exitSignal.dispose();
+    await native.dispose();
     return 1;
   }
 
@@ -133,13 +142,18 @@ Future<int> _runStdioServer(McpServer server) async {
   // Release the signal subscriptions so the event loop can drain and the
   // process actually exits on the stdin-EOF path.
   exitSignal.dispose();
+  await native.dispose();
   await server.close();
   await transport.close();
   logger.info('Stopped');
   return 0;
 }
 
-Future<int> _runSseServer(McpServer server, int ssePort) async {
+Future<int> _runSseServer(
+  McpServer server,
+  int ssePort,
+  NativeServiceContext native,
+) async {
   final logger = logging.Logger('main');
   final sseServerManager = SseServerManager(server);
   try {
@@ -164,6 +178,8 @@ Future<int> _runSseServer(McpServer server, int ssePort) async {
   } catch (e, st) {
     logger.severe('Error when waiting for MCP client connection', e, st);
     return 1;
+  } finally {
+    await native.dispose();
   }
 
   logger.info('Stopped');

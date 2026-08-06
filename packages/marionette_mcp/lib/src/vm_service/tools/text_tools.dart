@@ -1,6 +1,6 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
+import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -25,14 +25,12 @@ void registerTextTools(
               'The key of the text field. You can get the key of an element by calling get_interactive_elements.',
         ),
         'identifier': JsonSchema.string(
-          description:
-              'The Semantics identifier of the text field. A stable, unique '
+          description: 'The Semantics identifier of the text field. A stable, unique '
               'accessibility identifier set via Semantics(identifier: ...). '
               'You can discover identifiers by calling get_interactive_elements.',
         ),
         'focused_element': JsonSchema.boolean(
-          description:
-              'If true, enters text into the currently focused text field. '
+          description: 'If true, enters text into the currently focused text field. '
               'A text field must be focused first (for example by using tap), otherwise this will fail.',
         ),
       },
@@ -44,15 +42,13 @@ void registerTextTools(
       final hasIdentifier = args['identifier'] != null;
       final hasFocusedElement = args['focused_element'] == true;
 
-      final selectorCount =
-          [hasKey, hasIdentifier, hasFocusedElement].where((e) => e).length;
+      final selectorCount = [hasKey, hasIdentifier, hasFocusedElement].where((e) => e).length;
       if (selectorCount != 1) {
         return CallToolResult(
           isError: true,
           content: [
             const TextContent(
-              text:
-                  'enter_text requires exactly one selector: provide key, identifier, or focused_element=true.',
+              text: 'enter_text requires exactly one selector: provide key, identifier, or focused_element=true.',
             ),
           ],
         );

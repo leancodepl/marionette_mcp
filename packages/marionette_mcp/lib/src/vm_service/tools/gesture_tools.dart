@@ -1,6 +1,6 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
+import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -24,8 +24,7 @@ void registerGestureTools(
                 'The key of the element to tap. You can get the key of an element by calling get_interactive_elements.',
           ),
           'identifier': JsonSchema.string(
-            description:
-                'The Semantics identifier of the element to tap. A stable, '
+            description: 'The Semantics identifier of the element to tap. A stable, '
                 'unique, accessibility identifier set via Semantics(identifier: ...). '
                 'Useful when an element has no ValueKey but does set an identifier. '
                 'You can discover identifiers by calling get_interactive_elements.',
@@ -39,12 +38,10 @@ void registerGestureTools(
                 'The widget type name of the element to tap (e.g., "ElevatedButton", "IconButton"). Use this to match elements by their Flutter widget type.',
           ),
           'coordinates': JsonSchema.object(
-            description:
-                'Screen coordinates to tap at. Use this to tap at a specific position on the screen.',
+            description: 'Screen coordinates to tap at. Use this to tap at a specific position on the screen.',
             properties: {
               'x': JsonSchema.number(
-                description:
-                    'The x coordinate (horizontal position from left).',
+                description: 'The x coordinate (horizontal position from left).',
               ),
               'y': JsonSchema.number(
                 description: 'The y coordinate (vertical position from top).',
@@ -78,25 +75,21 @@ void registerGestureTools(
                 'The key of the element to secondary tap. You can get the key of an element by calling get_interactive_elements.',
           ),
           'identifier': JsonSchema.string(
-            description:
-                'The Semantics identifier of the element to secondary tap. A '
+            description: 'The Semantics identifier of the element to secondary tap. A '
                 'stable, unique accessibility identifier set via '
                 'Semantics(identifier: ...).',
           ),
           'text': JsonSchema.string(
-            description:
-                'The visible text content of the element to secondary tap.',
+            description: 'The visible text content of the element to secondary tap.',
           ),
           'type': JsonSchema.string(
-            description:
-                'The widget type name of the element to secondary tap (e.g., "ElevatedButton", "ListTile").',
+            description: 'The widget type name of the element to secondary tap (e.g., "ElevatedButton", "ListTile").',
           ),
           'coordinates': JsonSchema.object(
             description: 'Screen coordinates to secondary tap at.',
             properties: {
               'x': JsonSchema.number(
-                description:
-                    'The x coordinate (horizontal position from left).',
+                description: 'The x coordinate (horizontal position from left).',
               ),
               'y': JsonSchema.number(
                 description: 'The y coordinate (vertical position from top).',
@@ -132,25 +125,21 @@ void registerGestureTools(
                 'The key of the element to double tap. You can get the key of an element by calling get_interactive_elements.',
           ),
           'identifier': JsonSchema.string(
-            description:
-                'The Semantics identifier of the element to double tap. A '
+            description: 'The Semantics identifier of the element to double tap. A '
                 'stable, unique accessibility identifier set via '
                 'Semantics(identifier: ...).',
           ),
           'text': JsonSchema.string(
-            description:
-                'The visible text content of the element to double tap.',
+            description: 'The visible text content of the element to double tap.',
           ),
           'type': JsonSchema.string(
-            description:
-                'The widget type name of the element to double tap (e.g., "ListTile", "Card").',
+            description: 'The widget type name of the element to double tap (e.g., "ListTile", "Card").',
           ),
           'coordinates': JsonSchema.object(
             description: 'Screen coordinates to double tap at.',
             properties: {
               'x': JsonSchema.number(
-                description:
-                    'The x coordinate (horizontal position from left).',
+                description: 'The x coordinate (horizontal position from left).',
               ),
               'y': JsonSchema.number(
                 description: 'The y coordinate (vertical position from top).',
@@ -201,25 +190,21 @@ void registerGestureTools(
                 'The key of the element to long press. You can get the key of an element by calling get_interactive_elements.',
           ),
           'identifier': JsonSchema.string(
-            description:
-                'The Semantics identifier of the element to long press. A '
+            description: 'The Semantics identifier of the element to long press. A '
                 'stable, unique accessibility identifier set via '
                 'Semantics(identifier: ...).',
           ),
           'text': JsonSchema.string(
-            description:
-                'The visible text content of the element to long press.',
+            description: 'The visible text content of the element to long press.',
           ),
           'type': JsonSchema.string(
-            description:
-                'The widget type name of the element to long press (e.g., "ListTile", "Card").',
+            description: 'The widget type name of the element to long press (e.g., "ListTile", "Card").',
           ),
           'coordinates': JsonSchema.object(
             description: 'Screen coordinates to long press at.',
             properties: {
               'x': JsonSchema.number(
-                description:
-                    'The x coordinate (horizontal position from left).',
+                description: 'The x coordinate (horizontal position from left).',
               ),
               'y': JsonSchema.number(
                 description: 'The y coordinate (vertical position from top).',
@@ -253,8 +238,7 @@ void registerGestureTools(
     )
     ..registerTool(
       'swipe',
-      description:
-          'Simulates a swipe/drag gesture on the Flutter app. Supports two modes: '
+      description: 'Simulates a swipe/drag gesture on the Flutter app. Supports two modes: '
           '1. Element-based: provide key, identifier, or text to identify the element, plus a direction (left, right, up, down) and optional distance in pixels (default 200). '
           '2. Coordinate-based: provide startX, startY, endX, endY for precise control. '
           'Useful for interacting with PageView, Dismissible, Drawer, Slider, and other swipe-based widgets. '
@@ -263,26 +247,21 @@ void registerGestureTools(
       inputSchema: ToolInputSchema(
         properties: {
           'key': JsonSchema.string(
-            description:
-                'The key of the element to swipe on. Use with direction.',
+            description: 'The key of the element to swipe on. Use with direction.',
           ),
           'identifier': JsonSchema.string(
-            description:
-                'The Semantics identifier of the element to swipe on. Use with '
+            description: 'The Semantics identifier of the element to swipe on. Use with '
                 'direction. A stable, unique accessibility identifier set via '
                 'Semantics(identifier: ...).',
           ),
           'text': JsonSchema.string(
-            description:
-                'The visible text content of the element to swipe on. Use with direction.',
+            description: 'The visible text content of the element to swipe on. Use with direction.',
           ),
           'direction': JsonSchema.string(
-            description:
-                'Swipe direction when using element-based mode: left, right, up, or down.',
+            description: 'Swipe direction when using element-based mode: left, right, up, or down.',
           ),
           'distance': JsonSchema.number(
-            description:
-                'Swipe distance in pixels for element-based mode (default: 200).',
+            description: 'Swipe distance in pixels for element-based mode (default: 200).',
           ),
           'startX': JsonSchema.number(
             description: 'Start X coordinate for coordinate-based swipe.',
@@ -304,9 +283,7 @@ void registerGestureTools(
         final swipeArgs = <String, dynamic>{};
 
         if (args.containsKey('startX')) {
-          if (!args.containsKey('startY') ||
-              !args.containsKey('endX') ||
-              !args.containsKey('endY')) {
+          if (!args.containsKey('startY') || !args.containsKey('endX') || !args.containsKey('endY')) {
             return CallToolResult(
               isError: true,
               content: [
@@ -351,8 +328,7 @@ void registerGestureTools(
     )
     ..registerTool(
       'pinch_zoom',
-      description:
-          'Simulates a pinch zoom gesture on an element in the Flutter app. '
+      description: 'Simulates a pinch zoom gesture on an element in the Flutter app. '
           'Use scale > 1.0 to zoom in (fingers move apart) and scale < 1.0 '
           'to zoom out (fingers move together). You can target the element by '
           'key, identifier, text, type, or coordinates. Useful for maps, '
@@ -365,18 +341,15 @@ void registerGestureTools(
             description: 'The key of the element to pinch zoom on.',
           ),
           'identifier': JsonSchema.string(
-            description:
-                'The Semantics identifier of the element to pinch zoom on. A '
+            description: 'The Semantics identifier of the element to pinch zoom on. A '
                 'stable, unique accessibility identifier set via '
                 'Semantics(identifier: ...).',
           ),
           'text': JsonSchema.string(
-            description:
-                'The visible text content of the element to pinch zoom on.',
+            description: 'The visible text content of the element to pinch zoom on.',
           ),
           'type': JsonSchema.string(
-            description:
-                'The widget type name of the element to pinch zoom on.',
+            description: 'The widget type name of the element to pinch zoom on.',
           ),
           'coordinates': JsonSchema.object(
             description: 'Screen coordinates to pinch zoom at.',
@@ -387,8 +360,7 @@ void registerGestureTools(
             required: ['x', 'y'],
           ),
           'scale': JsonSchema.number(
-            description:
-                'Zoom scale factor. Values > 1.0 zoom in, values < 1.0 '
+            description: 'Zoom scale factor. Values > 1.0 zoom in, values < 1.0 '
                 'zoom out. For example, 2.0 doubles the zoom level.',
           ),
           'start_distance': JsonSchema.number(
@@ -470,9 +442,7 @@ void registerGestureTools(
             content: [
               TextContent(
                 text: message ??
-                    (didPop == true
-                        ? 'Back button pressed, route was popped'
-                        : 'Back button pressed, no route to pop'),
+                    (didPop == true ? 'Back button pressed, route was popped' : 'Back button pressed, no route to pop'),
               ),
             ],
           );
@@ -491,14 +461,12 @@ void registerGestureTools(
                 'The key of the element to scroll to. You can get the key of an element by calling get_interactive_elements.',
           ),
           'identifier': JsonSchema.string(
-            description:
-                'The Semantics identifier of the element to scroll to. A '
+            description: 'The Semantics identifier of the element to scroll to. A '
                 'stable, unique accessibility identifier set via '
                 'Semantics(identifier: ...).',
           ),
           'text': JsonSchema.string(
-            description:
-                'The visible text content of the element to scroll to.',
+            description: 'The visible text content of the element to scroll to.',
           ),
         },
       ),

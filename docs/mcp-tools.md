@@ -16,7 +16,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 | Tool | Description |
 | --- | --- |
 | `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, identifier (Semantics identifier), and other identifying properties. The agent's primary way to "see" the screen. |
-| `take_screenshots` | Capture screenshots of all active views, returned as base64 PNGs. |
+| `take_screenshots` | Returns base64-encoded inline PNGs for all active views (default — no files written). When `MARIONETTE_SCREENSHOTS_DIR` is set, also saves PNG files to that directory and includes the absolute paths in the response alongside the inline images. |
 | `get_logs` | Retrieve app logs collected since start or the last hot reload. Requires a [`LogCollector`](./logging.md). |
 
 ### Gestures
@@ -49,6 +49,20 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 | `call_custom_extension` | Call a custom extension that does **not** declare an `inputSchema` (the generic escape hatch), passing key-value args. |
 
 Custom extensions that declare an `inputSchema` are promoted to **first-class, individually-named tools** the agent discovers directly — see [Custom Extensions](./custom-extensions.md).
+
+### Native lane
+
+Tools for system / native UI outside the Flutter widget tree (permission dialogs, OS sheets, embedded WebViews). All native tools use the `native_` prefix. Call `native_connect` first.
+
+| Tool | Description |
+| --- | --- |
+| `native_connect` | Start a native automation session (UIAutomator2 on Android, WebDriverAgent on iOS). Requires `platform`: `android` or `ios`. |
+| `native_disconnect` | Stop the native session and release device-side processes. |
+| `native_get_elements` | Return the native UI hierarchy as JSON (`elements`, optional `foregroundApp`). |
+| `native_tap` | Tap by exact `text`, `id`, or physical-pixel `x`/`y`. |
+| `native_scroll` | Swipe in a `direction`; optionally scroll until `text` is visible. |
+| `native_enter_text` | Type into a native field by `id` or `label`. |
+| `native_take_screenshot` | Returns a base64 inline PNG of the full device screen via the native session (system UI, WebViews). When `MARIONETTE_SCREENSHOTS_DIR` is set, also saves the PNG to that directory and includes the absolute path alongside the inline image. |
 
 ### Dev workflow
 
