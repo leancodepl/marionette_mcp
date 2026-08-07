@@ -16,6 +16,7 @@ All native-lane test cases live in the **example app** under the bottom-nav **Te
 | Camera preview       | `/testing/platform-views/camera`          | §1b GPU-backed platform view |
 | Google Maps          | `/testing/platform-views/google-maps`     | §1b GPU-backed platform view |
 | Video player         | `/testing/platform-views/video-player`    | §1b GPU-backed platform view |
+| Permission dialogs   | `/testing/permission-dialogs`             | §3 Permission dialogs        |
 
 
 **Prerequisites:** Flutter lane — `connect` + VM service URI. Native lane — `native_connect` with `platform: android` | `ios` (see [README — Native lane requirements](../README.md#native-lane-requirements-android)).
@@ -116,6 +117,26 @@ One visible Dart overlay; native player mirrors playback state in the accessibil
 | Time | ✓ | ✓ |
 
 iOS: Maps registers a `platform_view[…]` node; video_player does not (texture/hybrid composition vs true platform view).
+
+---
+
+## §3 — Permission dialogs
+
+|                        | Android | iOS |
+| ---------------------- | :-----: | :-: |
+| Implemented & verified | ✓       | ✓   |
+
+Screen: **Testing → Permission dialogs** (`/testing/permission-dialogs`). Triggers system prompts via `permission_handler` (notifications switch, camera/photos request buttons).
+
+| Tool | Lane | Result |
+| ---- | ---- | ------ |
+| `native_get_elements` | Native | **Allow / Don’t allow** (or equivalent) on the OS dialog — works on **both** platforms |
+| `native_tap` | Native | Can accept or deny the dialog |
+| `get_interactive_elements` | Flutter | App UI only — **does not** list the system dialog |
+| `take_screenshots` | Flutter | **Does not** show the dialog (drawn above Flutter by the OS) |
+| `native_take_screenshot` | Native | **Does** show the dialog |
+
+Reset between runs: `adb shell pm reset-permissions` (Android) or `xcrun simctl privacy booted reset all <bundle id>` (iOS).
 
 ---
 

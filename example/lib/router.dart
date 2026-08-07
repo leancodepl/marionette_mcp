@@ -6,7 +6,6 @@ import 'screens/dismissible_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/items_screen.dart';
 import 'screens/mouse_tap_screen.dart';
-import 'screens/notifications_screen.dart';
 import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
@@ -14,6 +13,7 @@ import 'screens/settings_screen.dart';
 import 'screens/testing/camera_platform_view_screen.dart';
 import 'screens/testing/google_maps_platform_view_screen.dart';
 import 'screens/testing/native_controls_platform_view_screen.dart';
+import 'screens/testing/permission_dialogs_screen.dart';
 import 'screens/testing/platform_views_screen.dart';
 import 'screens/testing/testing_screen.dart';
 import 'screens/testing/video_player_platform_view_screen.dart';
@@ -30,8 +30,8 @@ const availablePages = <String, String>{
   'camera_platform_view': '/testing/platform-views/camera',
   'google_maps_platform_view': '/testing/platform-views/google-maps',
   'video_player_platform_view': '/testing/platform-views/video-player',
+  'permission_dialogs': '/testing/permission-dialogs',
   'settings': '/settings',
-  'notifications': '/settings/notifications',
   'items': '/settings/items',
   'about': '/settings/about',
   'page_view': '/settings/page-view',
@@ -85,6 +85,10 @@ final router = GoRouter(
                 ),
               ],
             ),
+            GoRoute(
+              path: 'permission-dialogs',
+              builder: (context, state) => const PermissionDialogsScreen(),
+            ),
           ],
         ),
         GoRoute(
@@ -94,10 +98,6 @@ final router = GoRouter(
             GoRoute(
               path: 'items',
               builder: (context, state) => const ItemsScreen(),
-            ),
-            GoRoute(
-              path: 'notifications',
-              builder: (context, state) => const NotificationsScreen(),
             ),
             GoRoute(
               path: 'page-view',

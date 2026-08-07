@@ -28,6 +28,14 @@ class TestingScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/testing/platform-views'),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.security_outlined),
+            title: const Text('Permission dialogs'),
+            subtitle: const Text('OS permission prompts (§3)'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/permission-dialogs'),
+          ),
         ],
       ),
     );
