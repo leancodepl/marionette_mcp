@@ -12,5 +12,13 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+
+    let factory = NativeControlsViewFactory(
+      messenger: engineBridge.applicationRegistrar.messenger()
+    )
+    engineBridge.applicationRegistrar.register(
+      factory,
+      withId: "marionette-demo-native-controls"
+    )
   }
 }

@@ -11,13 +11,19 @@ import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/testing/native_controls_platform_view_screen.dart';
+import 'screens/testing/platform_views_screen.dart';
+import 'screens/testing/testing_screen.dart';
 import 'screens/webview_screen.dart';
 
 /// Page name → route path mapping used by the custom VM service extension.
 const availablePages = <String, String>{
   'home': '/',
   'profile': '/profile',
-  'webview': '/webview',
+  'testing': '/testing',
+  'webview': '/testing/webview',
+  'platform_views': '/testing/platform-views',
+  'native_controls_platform_view': '/testing/platform-views/native-controls',
   'settings': '/settings',
   'notifications': '/settings/notifications',
   'items': '/settings/items',
@@ -40,8 +46,25 @@ final router = GoRouter(
           builder: (context, state) => const ProfileScreen(),
         ),
         GoRoute(
-          path: '/webview',
-          builder: (context, state) => const WebViewScreen(),
+          path: '/testing',
+          builder: (context, state) => const TestingScreen(),
+          routes: [
+            GoRoute(
+              path: 'webview',
+              builder: (context, state) => const WebViewScreen(),
+            ),
+            GoRoute(
+              path: 'platform-views',
+              builder: (context, state) => const PlatformViewsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'native-controls',
+                  builder: (context, state) =>
+                      const NativeControlsPlatformViewScreen(),
+                ),
+              ],
+            ),
+          ],
         ),
         GoRoute(
           path: '/settings',
@@ -107,9 +130,9 @@ class ScaffoldWithNav extends StatelessWidget {
             label: 'Profile',
           ),
           NavigationDestination(
-            icon: Icon(Icons.language_outlined),
-            selectedIcon: Icon(Icons.language),
-            label: 'WebView',
+            icon: Icon(Icons.science_outlined),
+            selectedIcon: Icon(Icons.science),
+            label: 'Testing',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
@@ -124,7 +147,7 @@ class ScaffoldWithNav extends StatelessWidget {
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
     if (location.startsWith('/settings')) return 3;
-    if (location.startsWith('/webview')) return 2;
+    if (location.startsWith('/testing')) return 2;
     if (location.startsWith('/profile')) return 1;
     return 0;
   }
@@ -136,7 +159,7 @@ class ScaffoldWithNav extends StatelessWidget {
       case 1:
         context.go('/profile');
       case 2:
-        context.go('/webview');
+        context.go('/testing');
       case 3:
         context.go('/settings');
     }
