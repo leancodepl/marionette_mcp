@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/supported_platform.dart';
 import 'package:marionette_mcp/src/native_service/tools/connection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
@@ -15,7 +16,7 @@ class NativeNotConnectedException implements Exception {
   @override
   String toString() =>
       'Not connected to any native connector. Use native_connect first '
-      'with platform (android|ios).';
+      'with platform (${SupportedPlatform.commaSeparatedWireNames}).';
 }
 
 /// Context for managing the optional native automation session and

@@ -14,11 +14,11 @@ void registerNativeScreenshotTools(
   server.registerTool(
     'native_take_screenshot',
     description: 'Takes a PNG screenshot of the full device screen via the native '
-        'automation session (UIAutomator2 / WebDriverAgent). '
+        'automation session (UIAutomator2 / WebDriverAgent / ChromeDriver). '
         'Unlike Flutter take_screenshots, this captures content outside the '
-        'Flutter widget tree — embedded WebViews (e.g. webview_flutter pages) '
-        'and system surfaces on top of the app (permission dialogs, sheets, '
-        'status-bar panels). '
+        'Flutter widget tree — embedded WebViews (e.g. webview_flutter pages), '
+        'system surfaces on top of the app (permission dialogs, sheets, '
+        'status-bar panels), and on web, browser DOM outside Flutter CanvasKit. '
         'Use it when native_get_elements shows WebView or system UI you want '
         'to visually inspect, or when Flutter take_screenshots shows a blank '
         'platform-view area. By default returns the capture as a base64 inline '

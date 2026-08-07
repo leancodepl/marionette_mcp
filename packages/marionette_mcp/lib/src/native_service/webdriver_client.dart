@@ -93,6 +93,32 @@ class WebDriverClient {
     await _request('DELETE', '/session/$sessionId');
   }
 
+  /// Navigates the current browsing context to [url].
+  ///
+  /// Speaks `POST /session/{id}/url`. Used by the web native lane after
+  /// creating a Chrome session.
+  Future<void> navigateTo(String sessionId, String url) async {
+    await _request(
+      'POST',
+      '/session/$sessionId/url',
+      body: {'url': url},
+    );
+  }
+
+  /// Returns the current page title (`GET /session/{id}/title`).
+  Future<String> getTitle(String sessionId) async {
+    final value = await _request('GET', '/session/$sessionId/title');
+    if (value is String) return value;
+    throw const WebDriverException('Title response was not a string');
+  }
+
+  /// Returns the current page URL (`GET /session/{id}/url`).
+  Future<String> getUrl(String sessionId) async {
+    final value = await _request('GET', '/session/$sessionId/url');
+    if (value is String) return value;
+    throw const WebDriverException('URL response was not a string');
+  }
+
   /// Returns the current UI hierarchy as an XML string.
   Future<String> getPageSource(String sessionId) async {
     final value = await _request('GET', '/session/$sessionId/source');
@@ -186,7 +212,8 @@ class WebDriverClient {
   /// sequence that presses down at ([startX], [startY]) and moves to
   /// ([endX], [endY]) over [durationMs] milliseconds.
   ///
-  /// Coordinates are in the server's native (physical) pixel space.
+  /// Coordinates are in the server's native (physical / CSS) pixel space.
+  /// [pointerType] defaults to `touch` (mobile); use `mouse` for Chrome.
   Future<void> swipe(
     String sessionId, {
     required int startX,
@@ -194,12 +221,13 @@ class WebDriverClient {
     required int endX,
     required int endY,
     int durationMs = 300,
+    String pointerType = 'touch',
   }) async {
     await performActions(sessionId, [
       {
         'type': 'pointer',
         'id': 'finger1',
-        'parameters': {'pointerType': 'touch'},
+        'parameters': {'pointerType': pointerType},
         'actions': [
           {
             'type': 'pointerMove',

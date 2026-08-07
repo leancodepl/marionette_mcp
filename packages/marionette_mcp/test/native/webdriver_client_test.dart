@@ -340,6 +340,31 @@ void main() {
       );
     });
 
+    test('navigateTo posts url payload', () async {
+      routes['POST /session/sess-1/url'] = (request, body) {
+        expect(body?['url'], 'http://localhost:8080');
+        return writeJson(request, null);
+      };
+
+      final client = WebDriverClient(baseUri.toString());
+      addTearDown(client.close);
+
+      await client.navigateTo('sess-1', 'http://localhost:8080');
+    });
+
+    test('getTitle and getUrl return strings', () async {
+      routes['GET /session/sess-1/title'] =
+          (request, _) => writeJson(request, 'Demo App');
+      routes['GET /session/sess-1/url'] = (request, _) =>
+          writeJson(request, 'http://localhost:8080/home');
+
+      final client = WebDriverClient(baseUri.toString());
+      addTearDown(client.close);
+
+      expect(await client.getTitle('sess-1'), 'Demo App');
+      expect(await client.getUrl('sess-1'), 'http://localhost:8080/home');
+    });
+
     test('close cleans up so further requests fail', () async {
       routes['GET /status'] = (request, _) => writeJson(request, {'ready': true});
 

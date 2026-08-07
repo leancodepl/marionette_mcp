@@ -52,12 +52,12 @@ Custom extensions that declare an `inputSchema` are promoted to **first-class, i
 
 ### Native lane
 
-Tools for system / native UI outside the Flutter widget tree (permission dialogs, OS sheets, embedded WebViews). All native tools use the `native_` prefix. Call `native_connect` first.
+Tools for system / native / browser DOM UI outside the Flutter widget tree (permission dialogs, OS sheets, embedded WebViews, HTML on Flutter web). All native tools use the `native_` prefix. Call `native_connect` first.
 
 | Tool | Description |
 | --- | --- |
-| `native_connect` | Start a native automation session (UIAutomator2 on Android, WebDriverAgent on iOS). Requires `platform`: `android` or `ios`. |
-| `native_disconnect` | Stop the native session and release device-side processes. |
+| `native_connect` | Start a native automation session (UIAutomator2 on Android, WebDriverAgent on iOS, ChromeDriver on web). Requires `platform`: `android`, `ios`, or `web`. Optional: `serial` (Android), `udid` (iOS), `debuggerAddress` / `chromeDriverUrl` (web). On web, attaches to the Chrome from `flutter run`. |
+| `native_disconnect` | Stop the native session and release device-side processes (UIAutomator2 / WDA / ChromeDriver). |
 | `native_get_elements` | Return the native UI hierarchy as JSON (`elements`, optional `foregroundApp`). |
 | `native_tap` | Tap by exact `text`, `id`, or physical-pixel `x`/`y`. |
 | `native_scroll` | Swipe in a `direction`; optionally scroll until `text` is visible. |

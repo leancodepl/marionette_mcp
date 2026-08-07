@@ -23,7 +23,7 @@ Screenshots: take_screenshots and native_take_screenshot always return base64 in
 
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 
-Native lane: Prefer Flutter tools for in-app widgets. Use native_connect / native_get_elements / native_tap / native_scroll / native_enter_text / native_take_screenshot only when the target is absent from the Flutter tree or a system dialog/permission UI covers the app. Use native_take_screenshot (not take_screenshots) to visually capture those system surfaces before dismissing them. Never mix Flutter logical coordinates with native physical coordinates.
+Native lane: Prefer Flutter tools for in-app widgets. Use native_connect / native_get_elements / native_tap / native_scroll / native_enter_text / native_take_screenshot when the target is absent from the Flutter tree, a system dialog/permission UI covers the app, or (on web) you need browser DOM outside Flutter CanvasKit. Use native_take_screenshot (not take_screenshots) to visually capture those system surfaces before dismissing them. Never mix Flutter logical coordinates with native/browser coordinates.
 ''';
 
 /// Runs the Marionette MCP server with the given configuration.

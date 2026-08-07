@@ -197,6 +197,72 @@ void main() {
     });
   });
 
+  group('parseHtmlDom', () {
+    test('extracts interactive tags with id and text', () {
+      const html = '''
+<html><body>
+  <button id="allow_btn">Allow</button>
+  <a href="/x" id="nav_link">Go</a>
+  <input id="email" type="text" placeholder="Email" />
+  <textarea id="bio">Hello</textarea>
+  <div>ignored layout</div>
+</body></html>
+''';
+
+      final elements = parseHtmlDom(html);
+      expect(elements.map((e) => e.resourceId), containsAll([
+        'allow_btn',
+        'nav_link',
+        'email',
+        'bio',
+      ]));
+
+      final button = elements.firstWhere((e) => e.resourceId == 'allow_btn');
+      expect(button.className, 'button');
+      expect(button.text, 'Allow');
+      expect(button.clickable, isTrue);
+
+      final input = elements.firstWhere((e) => e.resourceId == 'email');
+      expect(input.text, 'Email');
+      expect(input.clickable, isTrue);
+    });
+
+    test('keeps role=button and aria-label', () {
+      const html = '''
+<div role="button" id="custom" aria-label="Save changes"></div>
+<span role="link" aria-label="Docs"></span>
+''';
+      final elements = parseHtmlDom(html);
+      expect(elements, hasLength(2));
+      expect(elements[0].resourceId, 'custom');
+      expect(elements[0].text, 'Save changes');
+      expect(elements[0].clickable, isTrue);
+      expect(elements[1].text, 'Docs');
+    });
+
+    test('skips hidden inputs and script contents', () {
+      const html = '''
+<script>document.write('<button id="fake">X</button>');</script>
+<input type="hidden" id="csrf" value="tok" />
+<button id="real">OK</button>
+''';
+      final elements = parseHtmlDom(html);
+      expect(elements.map((e) => e.resourceId), ['real']);
+      expect(elements.single.text, 'OK');
+    });
+
+    test('toJson shape matches native lane', () {
+      final elements = parseHtmlDom('<button id="b">Tap</button>');
+      expect(elements.single.toJson(), {
+        'type': 'button',
+        'text': 'Tap',
+        'id': 'b',
+        'bounds': {'x': 0, 'y': 0, 'width': 0, 'height': 0},
+        'clickable': true,
+      });
+    });
+  });
+
   group('foregroundAppFromWdaSource', () {
     test('prefers bundleId attribute over display name', () {
       const xml = '''
