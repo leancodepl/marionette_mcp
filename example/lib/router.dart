@@ -11,9 +11,12 @@ import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/testing/camera_platform_view_screen.dart';
+import 'screens/testing/google_maps_platform_view_screen.dart';
 import 'screens/testing/native_controls_platform_view_screen.dart';
 import 'screens/testing/platform_views_screen.dart';
 import 'screens/testing/testing_screen.dart';
+import 'screens/testing/video_player_platform_view_screen.dart';
 import 'screens/webview_screen.dart';
 
 /// Page name → route path mapping used by the custom VM service extension.
@@ -24,6 +27,9 @@ const availablePages = <String, String>{
   'webview': '/testing/webview',
   'platform_views': '/testing/platform-views',
   'native_controls_platform_view': '/testing/platform-views/native-controls',
+  'camera_platform_view': '/testing/platform-views/camera',
+  'google_maps_platform_view': '/testing/platform-views/google-maps',
+  'video_player_platform_view': '/testing/platform-views/video-player',
   'settings': '/settings',
   'notifications': '/settings/notifications',
   'items': '/settings/items',
@@ -61,6 +67,21 @@ final router = GoRouter(
                   path: 'native-controls',
                   builder: (context, state) =>
                       const NativeControlsPlatformViewScreen(),
+                ),
+                GoRoute(
+                  path: 'camera',
+                  builder: (context, state) =>
+                      const CameraPlatformViewScreen(),
+                ),
+                GoRoute(
+                  path: 'google-maps',
+                  builder: (context, state) =>
+                      const GoogleMapsPlatformViewScreen(),
+                ),
+                GoRoute(
+                  path: 'video-player',
+                  builder: (context, state) =>
+                      const VideoPlayerPlatformViewScreen(),
                 ),
               ],
             ),

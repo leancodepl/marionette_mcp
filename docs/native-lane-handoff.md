@@ -1,10 +1,11 @@
 # Native lane — testing handoff
 
-Handoff doc for validating Marionette against UI **outside** the Flutter widget tree. Full requirement catalog: [`native requirements.txt`](../native%20requirements.txt) (repo root).
+Handoff doc for validating Marionette against UI **outside** the Flutter widget tree. Full requirement catalog: `[native requirements.txt](../native%20requirements.txt)` (repo root).
 
 ## Example app — Testing tab
 
 All native-lane test cases live in the **example app** under the bottom-nav **Testing** tab:
+
 
 | Screen               | Route                                     | Requirement                  |
 | -------------------- | ----------------------------------------- | ---------------------------- |
@@ -12,20 +13,29 @@ All native-lane test cases live in the **example app** under the bottom-nav **Te
 | WebView              | `/testing/webview`                        | §2 WebViews                  |
 | Platform Views (hub) | `/testing/platform-views`                 | §1 Embedded platform views   |
 | Native controls      | `/testing/platform-views/native-controls` | §1a Plain native UI controls |
+| Camera preview       | `/testing/platform-views/camera`          | §1b GPU-backed platform view |
+| Google Maps          | `/testing/platform-views/google-maps`     | §1b GPU-backed platform view |
+| Video player         | `/testing/platform-views/video-player`    | §1b GPU-backed platform view |
+
 
 **Prerequisites:** Flutter lane — `connect` + VM service URI. Native lane — `native_connect` with `platform: android` | `ios` (see [README — Native lane requirements](../README.md#native-lane-requirements-android)).
 
 ---
 
+
+
 ## §1a — Plain native UI controls
 
+
 |                        | Android | iOS |
-| ---------------------- | :-----: | :-: |
-| Implemented & verified |    ✓    |  ✓  |
+| ---------------------- | ------- | --- |
+| Implemented & verified | ✓       | ✓   |
+
 
 Embedded `AndroidView` / `UiKitView` hosting native widgets (Android: `TextView`, `EditText`, `Button`; iOS: `UILabel`, `UITextField`, `UIButton`). Implementation: `example/lib/widgets/native_controls_platform_view.dart` + platform factories in `example/android/…/NativeControlsViewFactory.kt` and `example/ios/Runner/NativeControlsViewFactory.swift`.
 
 ### Expected Marionette behavior
+
 
 | Tool                              | Lane    | Result                                                                                                                              |
 | --------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -34,19 +44,22 @@ Embedded `AndroidView` / `UiKitView` hosting native widgets (Android: `TextView`
 | `native_tap`, `native_enter_text` | Native  | Can interact with those elements.                                                                                                   |
 | `tap`, `enter_text` (Flutter)     | Flutter | Cannot target inner native widgets (not in Flutter tree).                                                                           |
 
+
 Native UI inside a platform view is **not part of the Flutter element tree**; it is only exposed through the native lane after `native_connect`.
 
 ### Flutter `take_screenshots` vs platform views (Android ≠ iOS)
 
 Marionette `take_screenshots` rasterizes Flutter’s **Skia layer tree** (`RenderView` → `toImage`). Platform views are embedded differently per OS:
 
-| | Android | iOS |
-|---|---------|-----|
-| Embedding | Often **Virtual Display** — native view is copied into a Flutter **texture** in the layer tree | **Hybrid composition only** — `UIView` is a real UIKit subview alongside Flutter |
-| `take_screenshots` shows platform view? | **Usually yes** (texture is in the tree) | **No** — UIKit subviews are not in Skia; area appears empty / wrong in the PNG |
-| Use instead | — | `native_take_screenshot` (OS-level capture) |
 
-So on **iOS**, rely on **`native_get_elements`** + **`native_take_screenshot`** for platform-view content; Flutter screenshot + vision is misleading for that region. On **Android**, Flutter screenshot may still be enough for a quick visual check, but automation remains **native lane only**.
+|                                         | Android                                                                                        | iOS                                                                              |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Embedding                               | Often **Virtual Display** — native view is copied into a Flutter **texture** in the layer tree | **Hybrid composition only** — `UIView` is a real UIKit subview alongside Flutter |
+| `take_screenshots` shows platform view? | **Usually yes** (texture is in the tree)                                                       | **No** — UIKit subviews are not in Skia; area appears empty / wrong in the PNG   |
+| Use instead                             | —                                                                                              | `native_take_screenshot` (OS-level capture)                                      |
+
+
+So on **iOS**, rely on `native_get_elements` + `native_take_screenshot` for platform-view content; Flutter screenshot + vision is misleading for that region. On **Android**, Flutter screenshot may still be enough for a quick visual check, but automation remains **native lane only**.
 
 ### How to verify
 
@@ -59,4 +72,50 @@ So on **iOS**, rely on **`native_get_elements`** + **`native_take_screenshot`** 
 
 ---
 
-<!-- Remaining sections (§1b–§11) to be added as example app coverage lands. -->
+
+
+## §1b — GPU-backed platform views
+
+Platform-view **interactive elements** only (page chrome omitted — always **Both**).
+
+| Symbol | Meaning |
+| ------ | ------- |
+| **Both** | `get_interactive_elements` and `native_get_elements` |
+| **Flutter** | `get_interactive_elements` only |
+| **Native** | `native_get_elements` only |
+| **—** | Neither tool |
+
+### Camera preview
+
+| Platform-view element | Android | iOS |
+| --------------------- | :-------: | :-: |
+| Preview surface | **—** | *not tested* |
+
+**Android:** feed renders visually but neither lane lists the preview.
+
+**iOS:** not tested on device — Simulator has no camera. On Simulator only, init fails with *"No cameras found on this device"* and both lanes expose that error text (**Both**); this is not representative of real-device behavior.
+
+### Google Maps
+
+| Platform-view element | Android | iOS |
+| --------------------- | :-------: | :-: |
+| Map pan area | **Native** (TextureView) | **Native** (`platform_view[1]`) |
+| Zoom in / Zoom out | **Native** | **—** |
+| Google logo button | **—** | **Native** |
+
+Flutter lane misses the map on **both** platforms.
+
+### Video player
+
+One visible Dart overlay; native player mirrors playback state in the accessibility tree. Same on Android & iOS — **different nodes, same controls**:
+
+| Control | Flutter lane | Native lane |
+| ------- | :----------: | :-----------: |
+| Seek / progress | ✓ | ✓ |
+| Play / pause | ✓ | ✓ |
+| Time | ✓ | ✓ |
+
+iOS: Maps registers a `platform_view[…]` node; video_player does not (texture/hybrid composition vs true platform view).
+
+---
+

@@ -5,6 +5,22 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+fun localProperty(key: String, defaultValue: String = ""): String {
+    val propertiesFile = rootProject.file("local.properties")
+    if (!propertiesFile.exists()) return defaultValue
+    return propertiesFile
+        .readLines()
+        .asSequence()
+        .map { it.trim() }
+        .firstOrNull { line -> !line.startsWith("#") && line.startsWith("$key=") }
+        ?.substringAfter("=")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: defaultValue
+}
+
+val googleMapsApiKey = localProperty("google.maps.api.key")
+
 android {
     namespace = "com.example.counter"
     compileSdk = flutter.compileSdkVersion
@@ -28,6 +44,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {

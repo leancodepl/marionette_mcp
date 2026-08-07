@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../screens/in_app_camera_screen.dart';
-
 class ProfilePictureSection extends StatefulWidget {
   const ProfilePictureSection({super.key});
 
@@ -82,7 +80,7 @@ class _ProfilePictureSectionState extends State<ProfilePictureSection> {
 
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('In-app camera is not supported on web.')),
+        const SnackBar(content: Text('Camera is not supported on web.')),
       );
       return;
     }
@@ -93,8 +91,11 @@ class _ProfilePictureSectionState extends State<ProfilePictureSection> {
         return;
       }
 
-      final image = await Navigator.of(context).push<XFile>(
-        MaterialPageRoute(builder: (_) => const InAppCameraScreen()),
+      final image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
       );
       if (!mounted || image == null) {
         return;

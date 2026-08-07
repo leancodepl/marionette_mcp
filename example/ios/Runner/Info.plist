@@ -48,7 +48,9 @@
 		</dict>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>This app uses the camera to take your profile picture.</string>
+	<string>This app uses the camera for profile pictures and native-lane testing demos.</string>
+	<key>GOOGLE_MAPS_API_KEY</key>
+	<string>RANDOM_KEY</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app accesses your photo library so you can choose a profile picture.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
