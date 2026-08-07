@@ -14,6 +14,7 @@ import 'screens/testing/camera_platform_view_screen.dart';
 import 'screens/testing/google_maps_platform_view_screen.dart';
 import 'screens/testing/native_controls_platform_view_screen.dart';
 import 'screens/testing/permission_dialogs_screen.dart';
+import 'screens/testing/pickers_and_sheets_screen.dart';
 import 'screens/testing/platform_views_screen.dart';
 import 'screens/testing/testing_screen.dart';
 import 'screens/testing/video_player_platform_view_screen.dart';
@@ -31,6 +32,7 @@ const availablePages = <String, String>{
   'google_maps_platform_view': '/testing/platform-views/google-maps',
   'video_player_platform_view': '/testing/platform-views/video-player',
   'permission_dialogs': '/testing/permission-dialogs',
+  'pickers_and_sheets': '/testing/pickers-and-sheets',
   'settings': '/settings',
   'items': '/settings/items',
   'about': '/settings/about',
@@ -88,6 +90,10 @@ final router = GoRouter(
             GoRoute(
               path: 'permission-dialogs',
               builder: (context, state) => const PermissionDialogsScreen(),
+            ),
+            GoRoute(
+              path: 'pickers-and-sheets',
+              builder: (context, state) => const PickersAndSheetsScreen(),
             ),
           ],
         ),

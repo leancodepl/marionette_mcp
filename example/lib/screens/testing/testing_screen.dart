@@ -36,6 +36,14 @@ class TestingScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/testing/permission-dialogs'),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.folder_open_outlined),
+            title: const Text('Pickers & sheets'),
+            subtitle: const Text('File, photo, camera, share (§4)'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/pickers-and-sheets'),
+          ),
         ],
       ),
     );

@@ -17,6 +17,7 @@ All native-lane test cases live in the **example app** under the bottom-nav **Te
 | Google Maps          | `/testing/platform-views/google-maps`     | §1b GPU-backed platform view |
 | Video player         | `/testing/platform-views/video-player`    | §1b GPU-backed platform view |
 | Permission dialogs   | `/testing/permission-dialogs`             | §3 Permission dialogs        |
+| Pickers & sheets     | `/testing/pickers-and-sheets`             | §4 Pickers and sheets        |
 
 
 **Prerequisites:** Flutter lane — `connect` + VM service URI. Native lane — `native_connect` with `platform: android` | `ios` (see [README — Native lane requirements](../README.md#native-lane-requirements-android)).
@@ -137,6 +138,36 @@ Screen: **Testing → Permission dialogs** (`/testing/permission-dialogs`). Trig
 | `native_take_screenshot` | Native | **Does** show the dialog |
 
 Reset between runs: `adb shell pm reset-permissions` (Android) or `xcrun simctl privacy booted reset all <bundle id>` (iOS).
+
+---
+
+## §4 — Pickers and sheets
+
+|                        | Android | iOS |
+| ---------------------- | :-----: | :-: |
+| Implemented            | ✓       | ✓   |
+| Tested                 | ✓ (smoke) | *not tested* |
+
+Screen: **Testing → Pickers & sheets** (`/testing/pickers-and-sheets`). Each button opens an OS-owned UI outside the Flutter tree:
+
+| Case | Plugin | Native UI (Android / iOS) |
+| ---- | ------ | ------------------------- |
+| **Files** | `file_picker` | SAF DocumentsUI / `UIDocumentPickerViewController` |
+| **Photos** | `image_picker` (gallery) | Android photo picker / `PHPickerViewController` |
+| **Camera capture** | `image_picker` (camera) | Camera intent / `UIImagePickerController` |
+| **Share** | `share_plus` | Intent chooser / `UIActivityViewController` |
+
+Same pattern as §3 permission dialogs:
+
+| Tool | Lane | Result |
+| ---- | ---- | ------ |
+| `native_get_elements` | Native | Lists controls inside the open picker/sheet (e.g. Cancel, file rows, share targets) |
+| `native_tap` | Native | Can interact with picker/sheet UI |
+| `get_interactive_elements` | Flutter | App buttons only — **does not** list the open picker/sheet |
+| `take_screenshots` | Flutter | **Does not** show the picker/sheet |
+| `native_take_screenshot` | Native | **Does** show the picker/sheet |
+
+**Testing note:** Smoke-tested on **Android only** — all four cases open the expected native UI and respond to `native_get_elements` / `native_tap`. Not tested deeply (edge cases, every control, dismiss paths). **iOS not tested yet.**
 
 ---
 
