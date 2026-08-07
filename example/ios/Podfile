@@ -42,7 +42,8 @@ post_install do |installer|
 
     target.build_configurations.each do |config|
       # permission_handler compiles a permission in only when its macro is 1.
-      # The example app requests notifications only; the rest stay disabled so
+      # The example app requests notifications, camera, and photos; the rest stay
+      # disabled so unused permission code is not linked into the binary.
       # unused permission code is not linked into the binary.
       # https://pub.dev/packages/permission_handler
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
@@ -64,7 +65,7 @@ post_install do |installer|
         'PERMISSION_CONTACTS=0',
 
         ## dart: PermissionGroup.camera
-        'PERMISSION_CAMERA=0',
+        'PERMISSION_CAMERA=1',
 
         ## dart: PermissionGroup.microphone
         'PERMISSION_MICROPHONE=0',
@@ -73,7 +74,7 @@ post_install do |installer|
         'PERMISSION_SPEECH_RECOGNIZER=0',
 
         ## dart: PermissionGroup.photos
-        'PERMISSION_PHOTOS=0',
+        'PERMISSION_PHOTOS=1',
 
         ## dart: [PermissionGroup.location, PermissionGroup.locationAlways, PermissionGroup.locationWhenInUse]
         'PERMISSION_LOCATION=0',
