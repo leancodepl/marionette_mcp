@@ -20,7 +20,9 @@ void main() {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
 
-  runApp(const ExampleApp());
+  // Opting in to the set_device_config tool. Outside debug mode the binding
+  // is never installed, so this builds ExampleApp unchanged.
+  runApp(const MarionetteDeviceConfig(child: ExampleApp()));
 }
 
 void _registerNavigationExtensions() {
