@@ -98,6 +98,15 @@ class ExampleApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
+      // A dark theme so set_device_config's platform_brightness override has
+      // something to switch to.
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
       routerConfig: router,
     );
   }
