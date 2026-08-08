@@ -13,14 +13,11 @@ const _deviceConfigMissingHelp =
 Overriding text scale or accessibility settings needs a MediaQuery above your
 app, and Marionette does not insert one for you — wrap your root widget:
 
-  void main() {
-    MarionetteBinding.ensureInitialized();
-    runApp(
-      const MarionetteDeviceConfig(
-        child: MyApp(),
-      ),
-    );
-  }
+  runApp(
+    const MarionetteDeviceConfig(
+      child: MyApp(),
+    ),
+  );
 
 This lives in main(), which a hot reload does not re-run — hot restart the app
 after adding it.

@@ -86,11 +86,8 @@ Future<CallToolResult> setDeviceConfig(
     return _invalid('text_scale must be greater than 0.');
   }
 
-  if (brightness != null && !supportedBrightnessValues.contains(brightness)) {
-    return _invalid(
-      'platform_brightness must be one of: '
-      '${supportedBrightnessValues.join(', ')}.',
-    );
+  if (invalidBrightnessError(brightness) case final error?) {
+    return _invalid(error);
   }
 
   logger.info(

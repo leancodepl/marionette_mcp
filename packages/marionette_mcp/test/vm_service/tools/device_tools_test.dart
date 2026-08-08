@@ -120,7 +120,7 @@ void main() {
       });
 
       expect(result.isError, isTrue);
-      expect(textOf(result), contains('light, dark'));
+      expect(textOf(result), contains('Unsupported brightness: sepia'));
       expect(connector.calls, isEmpty);
     });
 
