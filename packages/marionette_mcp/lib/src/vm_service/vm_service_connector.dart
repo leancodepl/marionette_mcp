@@ -69,6 +69,13 @@ VmServiceExtensionException extensionExceptionFromRpcError(
 /// the device.
 const supportedKeyModifiers = {'control', 'shift', 'alt', 'meta'};
 
+/// Values accepted for `platformBrightness` by
+/// [VmServiceConnector.setDeviceConfig].
+///
+/// Mirrors Flutter's `Brightness` enum, which the CLI and MCP server can't
+/// import, so bad input is rejected before it reaches the device.
+const supportedBrightnessValues = {'light', 'dark'};
+
 /// Validates a comma-separated [modifiers] string against
 /// [supportedKeyModifiers] (case-insensitive).
 ///
@@ -448,6 +455,35 @@ class VmServiceConnector {
   /// Throws [NotConnectedException] if not connected.
   Future<Map<String, dynamic>> scrollToElement(Map<String, dynamic> matcher) {
     return _callExtension('marionette.scrollTo', matcher);
+  }
+
+  /// Overrides the device configuration the app sees through `MediaQuery`.
+  ///
+  /// Omitted fields keep whatever was set before. [reset] clears every
+  /// override first, so passing it alone reverts to the platform defaults and
+  /// passing it alongside values leaves exactly those values set.
+  ///
+  /// [platformBrightness] must be one of [supportedBrightnessValues].
+  ///
+  /// Requires the app to have mounted a `MarionetteDeviceConfig` widget;
+  /// without one the extension answers with setup instructions instead of
+  /// applying anything.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> setDeviceConfig({
+    double? textScale,
+    bool? boldText,
+    String? platformBrightness,
+    bool? disableAnimations,
+    bool reset = false,
+  }) {
+    return _callExtension('marionette.setDeviceConfig', {
+      if (textScale != null) 'textScale': textScale,
+      if (boldText != null) 'boldText': boldText,
+      if (platformBrightness != null) 'platformBrightness': platformBrightness,
+      if (disableAnimations != null) 'disableAnimations': disableAnimations,
+      if (reset) 'reset': true,
+    });
   }
 
   /// Gets the collected application logs.
