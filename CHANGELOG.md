@@ -1,5 +1,7 @@
 # Unreleased
 
+- Add `set_device_config` tool and `set-device-config` CLI command for overriding text scale, bold text, platform brightness, and reduced motion in a running app — opt in by wrapping your root widget in the new `MarionetteDeviceConfig`
+
 - Fix extension errors being reported as the generic `Server error` instead of the detail the extension returned — this silently swallowed every validation message and setup instruction, including the `get_logs` log-collector onboarding help
 
 # 0.6.0

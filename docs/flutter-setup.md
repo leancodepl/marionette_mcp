@@ -83,6 +83,26 @@ void main() {
 
 Sentry's own binding setup checks for an existing `WidgetsBinding` first and reuses it rather than replacing it, so initializing Marionette first avoids the conflict entirely. The same fix applies to any other plugin whose `init()` touches `WidgetsBinding` ahead of your `appRunner`.
 
+## Opting in to device config overrides
+
+`set_device_config` — overriding text scale, bold text, light/dark appearance, or reduced motion in the running app — is the one tool that needs a change beyond the binding. Marionette will not insert a widget into your tree behind your back, so your app mounts one:
+
+```dart
+void main() {
+  if (kDebugMode) {
+    MarionetteBinding.ensureInitialized();
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+
+  runApp(const MarionetteDeviceConfig(child: MyApp()));
+}
+```
+
+`MarionetteDeviceConfig` applies the overrides through a `MediaQuery` above your app, which is where `MaterialApp` takes its platform data from — so they reach the whole tree, theme resolution included. When the binding was never installed (a release build, or the `kDebugMode` branch above), the widget builds its child unchanged and costs one element.
+
+Leave it out and the tool stays inert: `set_device_config` answers with these setup instructions instead of reporting success on a no-op. Note that this lives in `main()`, which a hot reload does not re-run — **hot restart** after adding it.
+
 ## Next steps
 
 - [Configuration](./configuration.md) — custom widgets, the production checklist, and a complete `main.dart`.

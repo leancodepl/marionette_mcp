@@ -95,6 +95,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | `take-screenshots` | Capture a screenshot (`-o/--output`, `--open`). |
 | `record-video` | Record video (`-o/--output`, `-d/--duration`, `--width`, `--height`, `--ffmpeg-path`, `--open`, …). |
 | `get-logs` | Retrieve app logs. |
+| `set-device-config` | Override device config (`--text-scale`, `--bold-text`, `--platform-brightness`, `--disable-animations`, `--reset`). Requires the app to wrap its root widget in `MarionetteDeviceConfig` — see [MCP Tools](./mcp-tools.md#device-configuration). |
 | `hot-reload` | Hot reload the app. |
 | `hot-restart` | Hot restart the app — restart from `main()`, resetting all state. |
 | `register <name> <uri>` | Register a named instance. |
