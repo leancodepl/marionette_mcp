@@ -153,6 +153,9 @@ void main() {
       final detail = (result as MarionetteExtensionError).detail;
       expect(detail, contains('MarionetteDeviceConfig'));
       expect(detail, contains('hot restart'));
+      // Never suggest installing the binding unguarded — reaching this text
+      // means it is already installed, and the guard belongs in the docs.
+      expect(detail, isNot(contains('ensureInitialized')));
       expect(detached.current.hasOverrides, isFalse);
     });
   });

@@ -76,6 +76,18 @@ const supportedKeyModifiers = {'control', 'shift', 'alt', 'meta'};
 /// import, so bad input is rejected before it reaches the device.
 const supportedBrightnessValues = {'light', 'dark'};
 
+/// Validates [brightness] against [supportedBrightnessValues].
+///
+/// Returns a human-readable error message, or `null` when [brightness] is
+/// null or supported.
+String? invalidBrightnessError(String? brightness) {
+  if (brightness == null || supportedBrightnessValues.contains(brightness)) {
+    return null;
+  }
+  return 'Unsupported brightness: $brightness. '
+      'Supported values: ${supportedBrightnessValues.join(', ')}.';
+}
+
 /// Validates a comma-separated [modifiers] string against
 /// [supportedKeyModifiers] (case-insensitive).
 ///
