@@ -40,6 +40,27 @@ class VmServiceExtensionException implements Exception {
   }
 }
 
+/// Builds the [VmServiceExtensionException] for an extension call that came
+/// back as an [RPCError].
+///
+/// A failing extension answers with `ServiceExtensionResponse.error`, which
+/// carries two separate strings over the wire: the generic JSON-RPC label
+/// (`"Server error"`), which lands in [RPCError.message], and the detail the
+/// extension itself produced, which lands in [RPCError.details]. Only the
+/// detail says anything actionable — it is where the binding puts validation
+/// messages and setup instructions, such as the log-collector onboarding help
+/// — so it wins whenever it is present.
+VmServiceExtensionException extensionExceptionFromRpcError(
+  String extensionName,
+  RPCError error,
+) {
+  return VmServiceExtensionException(
+    'Extension $extensionName failed',
+    errorCode: error.code,
+    error: error.details ?? error.message,
+  );
+}
+
 /// Modifier keys accepted by [VmServiceConnector.pressKey].
 ///
 /// Must stay in sync with the modifiers the `marionette_flutter`
@@ -211,11 +232,7 @@ class VmServiceConnector {
       return responseJson;
     } on RPCError catch (e) {
       _logger.severe('Error calling extension $extensionName', e);
-      throw VmServiceExtensionException(
-        'Extension $extensionName failed',
-        errorCode: e.code,
-        error: e.message,
-      );
+      throw extensionExceptionFromRpcError(extensionName, e);
     } catch (err) {
       _logger.severe('Error calling extension $extensionName', err);
       rethrow;
