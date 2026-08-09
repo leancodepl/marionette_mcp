@@ -319,6 +319,44 @@ void main() {
       },
     );
   });
+
+  group('ScrollSimulator.scrollUntilVisible at list edges', () {
+    testWidgets(
+      'finds a target that only comes into view on the very last drag',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // The loop checks for the target at the top of each iteration but
+        // leaves from the middle: on reaching an edge for the second time it
+        // breaks without going back to the check. The position it stops at was
+        // never examined, so a target whose visible range lies entirely inside
+        // the final step of travel got scrolled to and then missed.
+        final controller = ScrollController(initialScrollOffset: 11000);
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          _buildItemsApp(
+            controller: controller,
+            itemCount: 150,
+            itemExtent: 80,
+          ),
+        );
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await simulator.scrollUntilVisible(
+          const KeyMatcher('item_0'),
+          _configuration,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('item_0')), findsOneWidget);
+        expect(controller.offset, 0);
+      },
+    );
+  });
 }
 
 /// A page holding [background] under a modal bottom sheet holding [sheet].

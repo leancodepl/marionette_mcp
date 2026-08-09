@@ -2,6 +2,7 @@
 
 - Fix extension errors being reported as the generic `Server error` instead of the detail the extension returned — this silently swallowed every validation message and setup instruction, including the `get_logs` log-collector onboarding help
 - Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route
+- Fix `scroll_to` missing a target that only comes into view on its final drag, at either end of a list
 
 # 0.6.0
 
