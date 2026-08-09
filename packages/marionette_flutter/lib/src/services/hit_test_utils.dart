@@ -42,3 +42,46 @@ bool isElementHittable(Element element) {
     return false;
   }
 }
+
+/// Checks whether [element] or one of its visible descendants can receive
+/// pointer events, within a bounded traversal.
+///
+/// A composite widget can delegate hit testing to a private render-object
+/// child without adding its own render object to the hit-test path. Adapters
+/// describe the public composite element, so discovery and action lookup need
+/// to accept the descendant that implements its pointer behavior.
+bool isElementOrDescendantHittable(
+  Element element, {
+  int maxVisitedElements = 512,
+}) {
+  if (maxVisitedElements <= 0) {
+    return false;
+  }
+  var remaining = maxVisitedElements;
+
+  bool visit(Element candidate) {
+    if (remaining <= 0) {
+      return false;
+    }
+    remaining--;
+
+    final widget = candidate.widget;
+    if ((widget is Offstage && widget.offstage) ||
+        (widget is Visibility && !widget.visible)) {
+      return false;
+    }
+    if (isElementHittable(candidate)) {
+      return true;
+    }
+
+    var result = false;
+    candidate.visitChildren((child) {
+      if (!result) {
+        result = visit(child);
+      }
+    });
+    return result;
+  }
+
+  return visit(element);
+}

@@ -4,6 +4,7 @@ export 'src/binding/extension_schema.dart';
 export 'src/binding/marionette_binding.dart';
 export 'src/binding/marionette_configuration.dart';
 export 'src/binding/marionette_extension_result.dart';
+export 'src/binding/marionette_widget_adapter.dart';
 export 'src/binding/register_extension.dart';
 export 'src/services/log_collector.dart';
 export 'src/services/log_store.dart';

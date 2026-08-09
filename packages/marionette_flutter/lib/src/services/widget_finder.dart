@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/binding/marionette_widget_adapter.dart';
 import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
@@ -40,7 +41,22 @@ class WidgetFinder {
     void visitor(Element element) {
       if (found != null) {
         return;
-      } else if (matcher.matches(element, configuration)) {
+      }
+      MarionetteWidgetDescriptor? descriptor;
+      var descriptorIsResolved = false;
+      MarionetteWidgetDescriptor? describeWidget() {
+        if (!descriptorIsResolved) {
+          descriptor = configuration.describeWidget(element);
+          descriptorIsResolved = true;
+        }
+        return descriptor;
+      }
+
+      if (matcher.matches(
+        element,
+        configuration,
+        describeWidget: describeWidget,
+      )) {
         found = element;
       } else {
         element.visitChildren(visitor);
@@ -83,12 +99,31 @@ class WidgetFinder {
     void visitor(Element element) {
       if (found != null) {
         return;
-      } else if (matcher.matches(element, configuration) &&
-          isElementHittable(element)) {
-        found = element;
-      } else {
-        element.visitChildren(visitor);
       }
+      MarionetteWidgetDescriptor? descriptor;
+      var descriptorIsResolved = false;
+      MarionetteWidgetDescriptor? describeWidget() {
+        if (!descriptorIsResolved) {
+          descriptor = configuration.describeWidget(element);
+          descriptorIsResolved = true;
+        }
+        return descriptor;
+      }
+
+      if (matcher.matches(
+        element,
+        configuration,
+        describeWidget: describeWidget,
+      )) {
+        descriptor = describeWidget();
+        if (descriptor == null
+            ? isElementHittable(element)
+            : isElementOrDescendantHittable(element)) {
+          found = element;
+          return;
+        }
+      }
+      element.visitChildren(visitor);
     }
 
     visitor(startElement);
