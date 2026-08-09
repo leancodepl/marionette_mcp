@@ -1,7 +1,41 @@
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:test/test.dart';
+import 'package:vm_service/vm_service.dart';
 
 void main() {
+  group('extensionExceptionFromRpcError', () {
+    test('surfaces the extension detail, not the generic JSON-RPC label', () {
+      // What a binding extension returning MarionetteExtensionResult.error
+      // looks like on the wire: the useful text is the detail, while `message`
+      // is the JSON-RPC label the VM fills in. Forwarding `message` used to
+      // reduce every extension failure — including onboarding help text — to
+      // "Server error".
+      final exception = extensionExceptionFromRpcError(
+        'marionette.getLogs',
+        RPCError.withDetails(
+          'ext.flutter.marionette.getLogs',
+          -32000,
+          'Server error',
+          details: 'Log collection is not configured.',
+        ),
+      );
+
+      expect(exception.error, 'Log collection is not configured.');
+      expect(exception.errorCode, -32000);
+      expect(exception.message, 'Extension marionette.getLogs failed');
+      expect(exception.toString(), contains('Log collection is not '));
+    });
+
+    test('falls back to the message when there is no detail', () {
+      final exception = extensionExceptionFromRpcError(
+        'marionette.tap',
+        RPCError('ext.flutter.marionette.tap', -32601, 'Method not found'),
+      );
+
+      expect(exception.error, 'Method not found');
+    });
+  });
+
   group('VmServiceConnector.callCustomExtension', () {
     late VmServiceConnector connector;
 

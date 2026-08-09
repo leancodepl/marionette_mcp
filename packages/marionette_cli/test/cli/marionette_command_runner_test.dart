@@ -40,6 +40,7 @@ void main() {
         'take-screenshots',
         'record-video',
         'get-logs',
+        'set-device-config',
         'hot-reload',
         'hot-restart',
         'doctor',
@@ -70,6 +71,28 @@ void main() {
         'tap',
         '--key',
         'k',
+      ]);
+      expect(exitCode, equals(64));
+    });
+
+    test('set-device-config rejects an unknown brightness with 64', () async {
+      final exitCode = await runner.run([
+        '-i',
+        'foo',
+        'set-device-config',
+        '--platform-brightness',
+        'sepia',
+      ]);
+      expect(exitCode, equals(64));
+    });
+
+    test('set-device-config rejects a non-boolean bold-text with 64', () async {
+      final exitCode = await runner.run([
+        '-i',
+        'foo',
+        'set-device-config',
+        '--bold-text',
+        'yes',
       ]);
       expect(exitCode, equals(64));
     });

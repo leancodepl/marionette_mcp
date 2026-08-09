@@ -7,7 +7,7 @@ import 'package:marionette_logging/marionette_logging.dart';
 import 'router.dart';
 
 void main() {
-  if (kDebugMode) {
+  if (!kReleaseMode) {
     MarionetteBinding.ensureInitialized(
       MarionetteConfiguration(logCollector: LoggingLogCollector()),
     );
@@ -20,7 +20,14 @@ void main() {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
 
-  runApp(const ExampleApp());
+  // Opting in to the set_device_config tool. kReleaseMode is a compile-time
+  // constant, so the wrapper is compiled out of a release build entirely
+  // rather than left in the tree to no-op.
+  if (!kReleaseMode) {
+    runApp(const MarionetteDeviceConfig(child: ExampleApp()));
+  } else {
+    runApp(const ExampleApp());
+  }
 }
 
 void _registerNavigationExtensions() {
@@ -94,6 +101,15 @@ class ExampleApp extends StatelessWidget {
       title: 'Marionette Example',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      // A dark theme so set_device_config's platform_brightness override has
+      // something to switch to.
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
       routerConfig: router,

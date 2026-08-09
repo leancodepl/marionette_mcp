@@ -20,6 +20,7 @@ import 'package:marionette_cli/src/cli/commands/press_key_command.dart';
 import 'package:marionette_cli/src/cli/commands/register_command.dart';
 import 'package:marionette_cli/src/cli/commands/scroll_to_command.dart';
 import 'package:marionette_cli/src/cli/commands/secondary_tap_command.dart';
+import 'package:marionette_cli/src/cli/commands/set_device_config_command.dart';
 import 'package:marionette_cli/src/cli/commands/swipe_command.dart';
 import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
@@ -67,6 +68,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(ScreenshotCommand(_registry));
     addCommand(RecordVideoCommand(_registry));
     addCommand(LogsCommand(_registry));
+    addCommand(SetDeviceConfigCommand(_registry));
     addCommand(HotReloadCommand(_registry));
     addCommand(HotRestartCommand(_registry));
     addCommand(DoctorCommand(_registry));
