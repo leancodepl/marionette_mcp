@@ -30,14 +30,12 @@ void main() {
         'textScale': '1.5',
         'boldText': 'true',
         'platformBrightness': 'dark',
-        'disableAnimations': 'true',
       }, service);
 
       expect(successData(result)['overrides'], {
         'textScale': 1.5,
         'boldText': true,
         'platformBrightness': 'dark',
-        'disableAnimations': true,
       });
       expect(service.current.textScale, 1.5);
       expect(service.current.platformBrightness, Brightness.dark);
@@ -114,12 +112,6 @@ void main() {
 
     test('rejects a non-boolean boldText', () {
       final result = setDeviceConfig({'boldText': 'yes'}, service);
-
-      expect(invalidParamsDetail(result), contains('"true" or "false"'));
-    });
-
-    test('rejects a non-boolean disableAnimations', () {
-      final result = setDeviceConfig({'disableAnimations': '1'}, service);
 
       expect(invalidParamsDetail(result), contains('"true" or "false"'));
     });

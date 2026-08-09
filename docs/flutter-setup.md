@@ -85,7 +85,7 @@ Sentry's own binding setup checks for an existing `WidgetsBinding` first and reu
 
 ## Opting in to device config overrides
 
-`set_device_config` — overriding text scale, bold text, light/dark appearance, or reduced motion in the running app — is the one tool that needs a change beyond the binding. Marionette will not insert a widget into your tree behind your back, so your app mounts one:
+`set_device_config` — overriding text scale, bold text, or light/dark appearance in the running app — is the one tool that needs a change beyond the binding. Marionette will not insert a widget into your tree behind your back, so your app mounts one:
 
 ```dart
 void main() {

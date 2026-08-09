@@ -68,11 +68,6 @@ MarionetteExtensionResult setDeviceConfig(
     return error;
   }
 
-  final disableAnimations = parseOptionalBool(params, 'disableAnimations');
-  if (disableAnimations.error case final error?) {
-    return error;
-  }
-
   final platformBrightness = _parseBrightness(params, 'platformBrightness');
   if (platformBrightness.error case final error?) {
     return error;
@@ -80,7 +75,6 @@ MarionetteExtensionResult setDeviceConfig(
 
   final setsAnyField = textScale.value != null ||
       boldText.value != null ||
-      disableAnimations.value != null ||
       platformBrightness.value != null;
 
   // `reset: false` on its own would otherwise report success having changed
@@ -88,14 +82,13 @@ MarionetteExtensionResult setDeviceConfig(
   if (!setsAnyField && reset.value != true) {
     return MarionetteExtensionResult.invalidParams(
       'At least one parameter is required: textScale, boldText, '
-      'platformBrightness, disableAnimations, or reset=true',
+      'platformBrightness, or reset=true',
     );
   }
 
   final applied = service.setOverrides(
     textScale: textScale.value,
     boldText: boldText.value,
-    disableAnimations: disableAnimations.value,
     platformBrightness: platformBrightness.value,
     reset: reset.value ?? false,
   );

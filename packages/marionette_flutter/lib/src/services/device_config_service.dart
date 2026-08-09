@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// Runtime overrides for the device configuration an app sees through
@@ -10,7 +11,6 @@ class DeviceConfigOverrides {
     this.textScale,
     this.boldText,
     this.platformBrightness,
-    this.disableAnimations,
   });
 
   /// Linear text scale, as in `TextScaler.linear(textScale)`.
@@ -22,22 +22,15 @@ class DeviceConfigOverrides {
   /// The system light/dark appearance.
   final Brightness? platformBrightness;
 
-  /// The system "reduce motion" accessibility setting.
-  final bool? disableAnimations;
-
   /// Whether any field is overridden.
   bool get hasOverrides =>
-      textScale != null ||
-      boldText != null ||
-      platformBrightness != null ||
-      disableAnimations != null;
+      textScale != null || boldText != null || platformBrightness != null;
 
   Map<String, Object> toJson() => {
         if (textScale != null) 'textScale': textScale!,
         if (boldText != null) 'boldText': boldText!,
         if (platformBrightness != null)
           'platformBrightness': platformBrightness!.name,
-        if (disableAnimations != null) 'disableAnimations': disableAnimations!,
       };
 
   @override
@@ -45,12 +38,10 @@ class DeviceConfigOverrides {
       other is DeviceConfigOverrides &&
       other.textScale == textScale &&
       other.boldText == boldText &&
-      other.platformBrightness == platformBrightness &&
-      other.disableAnimations == disableAnimations;
+      other.platformBrightness == platformBrightness;
 
   @override
-  int get hashCode =>
-      Object.hash(textScale, boldText, platformBrightness, disableAnimations);
+  int get hashCode => Object.hash(textScale, boldText, platformBrightness);
 
   @override
   String toString() => 'DeviceConfigOverrides(${toJson()})';
@@ -64,12 +55,14 @@ class DeviceConfigOverrides {
 /// callers whether an override can currently take effect — without it, setting
 /// one would silently do nothing.
 class DeviceConfigService {
-  /// Fires whenever the overrides change.
-  final ValueNotifier<DeviceConfigOverrides> overrides =
+  final ValueNotifier<DeviceConfigOverrides> _overrides =
       ValueNotifier(const DeviceConfigOverrides());
 
+  /// Fires whenever the overrides change.
+  ValueListenable<DeviceConfigOverrides> get overrides => _overrides;
+
   /// The overrides currently in effect.
-  DeviceConfigOverrides get current => overrides.value;
+  DeviceConfigOverrides get current => _overrides.value;
 
   int _attachedCount = 0;
 
@@ -87,7 +80,7 @@ class DeviceConfigService {
     _attachedCount--;
     if (_attachedCount <= 0) {
       _attachedCount = 0;
-      overrides.value = const DeviceConfigOverrides();
+      _overrides.value = const DeviceConfigOverrides();
     }
   }
 
@@ -102,15 +95,13 @@ class DeviceConfigService {
     double? textScale,
     bool? boldText,
     Brightness? platformBrightness,
-    bool? disableAnimations,
     bool reset = false,
   }) {
     final base = reset ? const DeviceConfigOverrides() : current;
-    return overrides.value = DeviceConfigOverrides(
+    return _overrides.value = DeviceConfigOverrides(
       textScale: textScale ?? base.textScale,
       boldText: boldText ?? base.boldText,
       platformBrightness: platformBrightness ?? base.platformBrightness,
-      disableAnimations: disableAnimations ?? base.disableAnimations,
     );
   }
 }

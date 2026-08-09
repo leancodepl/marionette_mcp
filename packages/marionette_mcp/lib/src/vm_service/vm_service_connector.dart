@@ -486,14 +486,12 @@ class VmServiceConnector {
     double? textScale,
     bool? boldText,
     String? platformBrightness,
-    bool? disableAnimations,
     bool reset = false,
   }) {
     return _callExtension('marionette.setDeviceConfig', {
       if (textScale != null) 'textScale': textScale,
       if (boldText != null) 'boldText': boldText,
       if (platformBrightness != null) 'platformBrightness': platformBrightness,
-      if (disableAnimations != null) 'disableAnimations': disableAnimations,
       if (reset) 'reset': true,
     });
   }

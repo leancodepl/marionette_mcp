@@ -17,14 +17,12 @@ class _CapturingConnector implements VmServiceConnector {
     double? textScale,
     bool? boldText,
     String? platformBrightness,
-    bool? disableAnimations,
     bool reset = false,
   }) async {
     calls.add({
       'textScale': textScale,
       'boldText': boldText,
       'platformBrightness': platformBrightness,
-      'disableAnimations': disableAnimations,
       'reset': reset,
     });
     if (nextError case final error?) {
@@ -56,14 +54,12 @@ void main() {
         'text_scale': 1.5,
         'bold_text': true,
         'platform_brightness': 'dark',
-        'disable_animations': true,
       });
 
       expect(connector.calls.single, {
         'textScale': 1.5,
         'boldText': true,
         'platformBrightness': 'dark',
-        'disableAnimations': true,
         'reset': false,
       });
     });
