@@ -269,6 +269,14 @@ class ScrollSimulator {
       break;
     }
 
+    // The loop checks for the target on entry but leaves from the middle, so
+    // the position the last drag landed on has not been examined yet. Look
+    // once more before giving up: the target may be sitting on screen.
+    if (_widgetFinder.findHittableElement(targetMatcher, configuration) !=
+        null) {
+      return;
+    }
+
     // Target still not visible after max scrolls
     throw StateError(
       'Widget not found after $maxScrollAttempts scroll attempts',
