@@ -7,14 +7,24 @@ import 'package:marionette_flutter/src/services/device_config_service.dart';
 ///
 /// This is opt-in: Marionette never inserts it for you, so an app that doesn't
 /// mount it keeps its widget tree exactly as written. Wrap the root widget to
-/// enable the `set_device_config` tool:
+/// enable the `set_device_config` tool, behind the same gate as the binding:
 ///
 /// ```dart
 /// void main() {
-///   MarionetteBinding.ensureInitialized();
-///   runApp(const MarionetteDeviceConfig(child: MyApp()));
+///   if (!kReleaseMode) {
+///     MarionetteBinding.ensureInitialized();
+///     runApp(const MarionetteDeviceConfig(child: MyApp()));
+///   } else {
+///     runApp(const MyApp());
+///   }
 /// }
 /// ```
+///
+/// `kReleaseMode` is a compile-time constant, so the release branch is the
+/// only one that survives compilation there — this widget is left out of the
+/// release binary rather than merely disabled at runtime. Marionette works in
+/// debug and profile, which is why the gate is `!kReleaseMode` and not
+/// `kDebugMode`.
 ///
 /// The overrides are applied through a [MediaQuery] slotted between the app
 /// and the live one `View` installs above it, so every `MediaQuery.of` below

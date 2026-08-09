@@ -7,7 +7,7 @@ import 'package:marionette_logging/marionette_logging.dart';
 import 'router.dart';
 
 void main() {
-  if (kDebugMode) {
+  if (!kReleaseMode) {
     MarionetteBinding.ensureInitialized(
       MarionetteConfiguration(logCollector: LoggingLogCollector()),
     );
@@ -20,9 +20,14 @@ void main() {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
 
-  // Opting in to the set_device_config tool. Outside debug mode the binding
-  // is never installed, so this builds ExampleApp unchanged.
-  runApp(const MarionetteDeviceConfig(child: ExampleApp()));
+  // Opting in to the set_device_config tool. kReleaseMode is a compile-time
+  // constant, so the wrapper is compiled out of a release build entirely
+  // rather than left in the tree to no-op.
+  if (!kReleaseMode) {
+    runApp(const MarionetteDeviceConfig(child: ExampleApp()));
+  } else {
+    runApp(const ExampleApp());
+  }
 }
 
 void _registerNavigationExtensions() {

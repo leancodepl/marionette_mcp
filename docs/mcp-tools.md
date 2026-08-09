@@ -53,15 +53,24 @@ one itself.
 
 ```dart
 void main() {
-  MarionetteBinding.ensureInitialized();
-  runApp(const MarionetteDeviceConfig(child: MyApp()));
+  if (!kReleaseMode) {
+    MarionetteBinding.ensureInitialized();
+    runApp(const MarionetteDeviceConfig(child: MyApp()));
+  } else {
+    runApp(const MyApp());
+  }
 }
 ```
 
 Without it the tool returns setup instructions rather than reporting success on
 a no-op. `MarionetteDeviceConfig` lives in `main()`, which a hot reload does not
-re-run — **hot restart** after adding it. In release builds, where the binding
-is never installed, the widget builds its child unchanged.
+re-run — **hot restart** after adding it.
+
+`kReleaseMode` is a compile-time constant, so the gate is resolved at build time
+and the widget never reaches your release binary. `!kReleaseMode` rather than
+`kDebugMode` because Marionette works in debug **and** profile. The widget also
+degrades on its own — with no binding installed it builds its child unchanged —
+so forgetting the gate costs you a single inert element, not a crash.
 
 Two things worth knowing when reading the results: some Material widgets
 (`NavigationBar` labels, for instance) clamp their own text scaling, and text
