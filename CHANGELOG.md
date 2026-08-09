@@ -2,6 +2,7 @@
 
 - Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route
 - Fix `scroll_to` missing a target that only comes into view on its final drag, at either end of a list
+- Fix `scroll_to` being unable to reach targets in long lists: it now scrolls by a share of the visible viewport instead of a fixed 64px, so lists past roughly 170 rows are reachable and shorter ones take far fewer gestures
 
 # 0.6.0
 
