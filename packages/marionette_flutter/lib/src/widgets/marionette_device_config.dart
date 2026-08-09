@@ -3,7 +3,7 @@ import 'package:marionette_flutter/src/binding/marionette_binding.dart';
 import 'package:marionette_flutter/src/services/device_config_service.dart';
 
 /// Lets Marionette override the device configuration — text scale, bold text,
-/// light/dark appearance, reduced motion — for the subtree below it.
+/// light/dark appearance — for the subtree below it.
 ///
 /// This is opt-in: Marionette never inserts it for you, so an app that doesn't
 /// mount it keeps its widget tree exactly as written. Wrap the root widget to
@@ -16,9 +16,11 @@ import 'package:marionette_flutter/src/services/device_config_service.dart';
 /// }
 /// ```
 ///
-/// The overrides are applied through a [MediaQuery], which becomes the
-/// platform-data source for the one `WidgetsApp` inserts internally — so they
-/// propagate through the whole app, including `MaterialApp`'s theme resolution.
+/// The overrides are applied through a [MediaQuery] slotted between the app
+/// and the live one `View` installs above it, so every `MediaQuery.of` below
+/// resolves to the overridden data — `MaterialApp`'s theme resolution
+/// included. `WidgetsApp` introduces no [MediaQuery] of its own; the `View`
+/// widget is the only source.
 ///
 /// When Marionette is not active — a release build, or a binding that was
 /// never initialized — this builds [child] unchanged.
@@ -79,23 +81,26 @@ class _MarionetteDeviceConfigState extends State<MarionetteDeviceConfig> {
     return ValueListenableBuilder<DeviceConfigOverrides>(
       valueListenable: service.overrides,
       child: widget.child,
-      builder: (context, config, child) {
-        if (!config.hasOverrides) {
-          return child!;
-        }
-
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: config.textScale != null
-                ? TextScaler.linear(config.textScale!)
-                : null,
-            boldText: config.boldText,
-            platformBrightness: config.platformBrightness,
-            disableAnimations: config.disableAnimations,
-          ),
-          child: child!,
-        );
-      },
+      // The MediaQuery goes in unconditionally, even with nothing overridden.
+      // Inserting it only once an override arrives would change the shape of
+      // the tree below this point, and Flutter answers a shape change by
+      // tearing the subtree down and building it again — the app would lose
+      // its navigation stack and every State below it the moment an override
+      // was applied, and again when it was reset.
+      //
+      // With no overrides the copy is field-for-field equal to the parent
+      // data, so MediaQuery.updateShouldNotify sees no change and nothing
+      // below rebuilds.
+      builder: (context, config, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: config.textScale != null
+              ? TextScaler.linear(config.textScale!)
+              : null,
+          boldText: config.boldText,
+          platformBrightness: config.platformBrightness,
+        ),
+        child: child!,
+      ),
     );
   }
 }

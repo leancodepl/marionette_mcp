@@ -13,7 +13,7 @@ void registerDeviceTools(
   server.registerTool(
     'set_device_config',
     description:
-        'Overrides the device configuration the running app sees — text scale, bold text, light/dark appearance, and reduced motion — without touching the real device settings. Use it to sweep a screen under accessibility or appearance conditions (large text, bold text, dark mode) and to make animations instant so subsequent interactions settle faster. Omitted parameters keep their current override; reset clears every override, and combining reset with values leaves exactly those values set (that is how a single override is reverted). Requires the app to wrap its root widget in MarionetteDeviceConfig — if it does not, this returns setup instructions. Requires an active connection established via connect.',
+        'Overrides the device configuration the running app sees — text scale, bold text, and light/dark appearance — without touching the real device settings. Use it to sweep a screen under accessibility or appearance conditions (large text, bold text, dark mode). Omitted parameters keep their current override; reset clears every override, and combining reset with values leaves exactly those values set (that is how a single override is reverted). Requires the app to wrap its root widget in MarionetteDeviceConfig — if it does not, this returns setup instructions. Requires an active connection established via connect.',
     annotations: const ToolAnnotations(title: 'Set Device Config'),
     inputSchema: ToolInputSchema(
       properties: {
@@ -34,12 +34,6 @@ void registerDeviceTools(
               'The system light/dark appearance. Drives MaterialApp theme '
               'resolution when themeMode is system.',
           enumValues: supportedBrightnessValues.toList(),
-        ),
-        'disable_animations': JsonSchema.boolean(
-          description:
-              'The system reduce-motion accessibility setting. Setting this '
-              'also makes agent-driven interaction less flaky, since screens '
-              'settle without waiting out transitions.',
         ),
         'reset': JsonSchema.boolean(
           description:
@@ -65,20 +59,17 @@ Future<CallToolResult> setDeviceConfig(
   final rawTextScale = args['text_scale'] as num?;
   final boldText = args['bold_text'] as bool?;
   final brightness = args['platform_brightness'] as String?;
-  final disableAnimations = args['disable_animations'] as bool?;
   final reset = args['reset'] == true;
 
-  final setsAnyField = rawTextScale != null ||
-      boldText != null ||
-      brightness != null ||
-      disableAnimations != null;
+  final setsAnyField =
+      rawTextScale != null || boldText != null || brightness != null;
 
   // A bare `reset: false` would otherwise report success having changed
   // nothing.
   if (!setsAnyField && !reset) {
     return _invalid(
       'At least one parameter is required: text_scale, bold_text, '
-      'platform_brightness, disable_animations, or reset=true.',
+      'platform_brightness, or reset=true.',
     );
   }
 
@@ -92,8 +83,7 @@ Future<CallToolResult> setDeviceConfig(
 
   logger.info(
     'Setting device config: textScale=$rawTextScale, boldText=$boldText, '
-    'platformBrightness=$brightness, disableAnimations=$disableAnimations, '
-    'reset=$reset',
+    'platformBrightness=$brightness, reset=$reset',
   );
 
   return runTool(logger, 'set device config', () async {
@@ -101,7 +91,6 @@ Future<CallToolResult> setDeviceConfig(
       textScale: rawTextScale?.toDouble(),
       boldText: boldText,
       platformBrightness: brightness,
-      disableAnimations: disableAnimations,
       reset: reset,
     );
     final message = response['message'] as String?;

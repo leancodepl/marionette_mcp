@@ -405,25 +405,22 @@ Retrieve collected application logs.
 ### set-device-config
 
 Override the device configuration the running app sees — text scale, bold text,
-light/dark appearance, reduced motion — without touching real device settings.
-Use it to sweep a screen under accessibility or appearance conditions, or to
-make animations instant so screens settle faster.
+light/dark appearance — without touching real device settings. Use it to sweep
+a screen under accessibility or appearance conditions.
 
 Requires the app to wrap its root widget in MarionetteDeviceConfig:
 
     runApp(const MarionetteDeviceConfig(child: MyApp()));
 
   Requires: -i <instance> or --uri <ws-uri>
-  At least one of: --text-scale, --bold-text, --platform-brightness,
-                   --disable-animations, --reset
+  At least one of: --text-scale, --bold-text, --platform-brightness, --reset
 
   Options:
-    --text-scale <n>              Linear text scale, > 0 (1.0 default, 2.0 very large)
+    --text-scale <n>              Linear text scale, > 0 (1.0 default, 2.0 very
+                                  large; real devices top out around 3.0)
     --bold-text <true|false>      System bold-text setting
     --platform-brightness <light|dark>
                                   System light/dark appearance
-    --disable-animations <true|false>
-                                  System reduce-motion setting
     --reset                       Clear every override; applied before the
                                   other options in the same call
 

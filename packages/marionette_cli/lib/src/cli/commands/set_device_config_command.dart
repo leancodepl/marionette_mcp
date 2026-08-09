@@ -9,7 +9,8 @@ class SetDeviceConfigCommand extends InstanceCommand {
     argParser
       ..addOption(
         'text-scale',
-        help: 'Linear text scale (e.g. 1.0, 1.5, 2.0). Must be > 0.',
+        help: 'Linear text scale (e.g. 1.0, 1.5, 2.0). Must be > 0; real '
+            'devices top out around 3.0.',
       )
       ..addOption(
         'bold-text',
@@ -20,11 +21,6 @@ class SetDeviceConfigCommand extends InstanceCommand {
         'platform-brightness',
         help: 'System light/dark appearance.',
         allowed: supportedBrightnessValues.toList(),
-      )
-      ..addOption(
-        'disable-animations',
-        help: 'System reduce-motion accessibility setting.',
-        allowed: ['true', 'false'],
       )
       ..addFlag(
         'reset',
@@ -44,8 +40,8 @@ class SetDeviceConfigCommand extends InstanceCommand {
 
   @override
   String get description =>
-      'Override device config (text scale, bold text, brightness, '
-      'animations) in the running app.';
+      'Override device config (text scale, bold text, brightness) in the '
+      'running app.';
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
@@ -53,16 +49,14 @@ class SetDeviceConfigCommand extends InstanceCommand {
     final rawTextScale = argResults?['text-scale'] as String?;
     final rawBoldText = argResults?['bold-text'] as String?;
     final brightness = argResults?['platform-brightness'] as String?;
-    final rawDisableAnimations = argResults?['disable-animations'] as String?;
 
     if (!reset &&
         rawTextScale == null &&
         rawBoldText == null &&
-        brightness == null &&
-        rawDisableAnimations == null) {
+        brightness == null) {
       usageException(
         'At least one option required: --text-scale, --bold-text, '
-        '--platform-brightness, --disable-animations, or --reset.',
+        '--platform-brightness, or --reset.',
       );
     }
 
@@ -80,8 +74,6 @@ class SetDeviceConfigCommand extends InstanceCommand {
       textScale: textScale,
       boldText: rawBoldText == null ? null : rawBoldText == 'true',
       platformBrightness: brightness,
-      disableAnimations:
-          rawDisableAnimations == null ? null : rawDisableAnimations == 'true',
       reset: reset,
     );
 

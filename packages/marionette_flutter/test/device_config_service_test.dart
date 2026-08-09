@@ -29,7 +29,6 @@ void main() {
         textScale: 2,
         boldText: true,
         platformBrightness: Brightness.dark,
-        disableAnimations: true,
       );
 
       final result = service.setOverrides(reset: true);

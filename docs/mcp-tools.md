@@ -45,7 +45,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `set_device_config` | Override what the running app sees as device configuration: `text_scale` (linear multiplier, > 0), `bold_text`, `platform_brightness` (`light`/`dark`), `disable_animations`. Omitted fields keep their current override; `reset` clears everything and is applied before the other fields in the same call. Requires the app to opt in — see below. |
+| `set_device_config` | Override what the running app sees as device configuration: `text_scale` (linear multiplier, > 0; real devices top out around 3.0), `bold_text`, `platform_brightness` (`light`/`dark`). Omitted fields keep their current override; `reset` clears everything and is applied before the other fields in the same call. Requires the app to opt in — see below. |
 
 `set_device_config` is the only tool that needs a change in the app: Marionette
 deliberately doesn't insert a widget into every app's tree, so the app mounts
@@ -66,9 +66,6 @@ is never installed, the widget builds its child unchanged.
 Two things worth knowing when reading the results: some Material widgets
 (`NavigationBar` labels, for instance) clamp their own text scaling, and text
 scales far above ~3.0 mostly produce overflow errors rather than useful signal.
-`disable_animations` is also worth setting for its own sake — screens settle
-without waiting out transitions, which makes agent-driven interaction less
-flaky.
 
 ### Custom extensions
 
