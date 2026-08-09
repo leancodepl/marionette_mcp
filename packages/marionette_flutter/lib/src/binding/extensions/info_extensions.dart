@@ -1,9 +1,27 @@
+import 'dart:convert';
+
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/log_store.dart';
 import 'package:marionette_flutter/src/version.g.dart' as v;
+
+/// Current wire schema for the interactive-elements response.
+const interactiveElementsSchemaVersion = 1;
+
+/// Builds a versioned response while safely snapshotting optional app context.
+Map<String, dynamic> buildInteractiveElementsResponse(
+  List<Map<String, dynamic>> elements, {
+  Map<String, Object?> Function()? contextProvider,
+}) {
+  final context = _readContext(contextProvider);
+  return <String, dynamic>{
+    'schemaVersion': interactiveElementsSchemaVersion,
+    if (context != null) 'context': context,
+    'elements': elements,
+  };
+}
 
 /// Help text returned by `marionette.getLogs` when no log collector has been
 /// configured. Carries setup instructions for the user.
@@ -42,6 +60,7 @@ See https://pub.dev/packages/marionette_flutter for more details.''';
 void registerInfoExtensions({
   required ElementTreeFinder elementTreeFinder,
   required LogStore? Function() logStoreProvider,
+  Map<String, Object?> Function()? contextProvider,
 }) {
   registerInternalMarionetteExtension(
     name: 'marionette.getVersion',
@@ -54,7 +73,12 @@ void registerInfoExtensions({
     name: 'marionette.interactiveElements',
     callback: (params) async {
       final elements = elementTreeFinder.findInteractiveElements();
-      return MarionetteExtensionResult.success({'elements': elements});
+      return MarionetteExtensionResult.success(
+        buildInteractiveElementsResponse(
+          elements,
+          contextProvider: contextProvider,
+        ),
+      );
     },
   );
 
@@ -89,4 +113,21 @@ void registerInfoExtensions({
       });
     },
   );
+}
+
+Map<String, Object?>? _readContext(Map<String, Object?> Function()? provider) {
+  if (provider == null) {
+    return null;
+  }
+  try {
+    final context = Map<String, Object?>.unmodifiable(provider());
+    if (context.isEmpty) {
+      return null;
+    }
+    jsonEncode(context);
+    return context;
+  } on Object {
+    // Context is optional and must never make element discovery unavailable.
+    return null;
+  }
 }

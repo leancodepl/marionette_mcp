@@ -26,18 +26,7 @@ void registerInspectionTools(
         logger.info('Getting interactive elements');
         return runTool(logger, 'get interactive elements', () async {
           final response = await connector.getInteractiveElements();
-          final elements = response['elements'] as List<dynamic>;
-
-          final buffer = StringBuffer()
-            ..writeln('Found ${elements.length} interactive element(s):\n');
-
-          for (final element in elements) {
-            buffer.writeln(formatElement(element as Map<String, dynamic>));
-          }
-
-          return CallToolResult(
-            content: [TextContent(text: buffer.toString())],
-          );
+          return buildInteractiveElementsToolResult(response);
         });
       },
     )
@@ -125,4 +114,15 @@ void registerInspectionTools(
         });
       },
     );
+}
+
+/// Preserves the versioned response for structured clients and provides a
+/// human-readable equivalent for text-only MCP clients.
+CallToolResult buildInteractiveElementsToolResult(
+  Map<String, dynamic> response,
+) {
+  return CallToolResult(
+    content: [TextContent(text: formatInteractiveElementsResponse(response))],
+    structuredContent: response,
+  );
 }
