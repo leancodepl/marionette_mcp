@@ -89,17 +89,23 @@ Sentry's own binding setup checks for an existing `WidgetsBinding` first and reu
 
 ```dart
 void main() {
-  if (kDebugMode) {
+  if (!kReleaseMode) {
     MarionetteBinding.ensureInitialized();
+    runApp(const MarionetteDeviceConfig(child: MyApp()));
   } else {
     WidgetsFlutterBinding.ensureInitialized();
+    runApp(const MyApp());
   }
-
-  runApp(const MarionetteDeviceConfig(child: MyApp()));
 }
 ```
 
-`MarionetteDeviceConfig` applies the overrides through a `MediaQuery` above your app, which is where `MaterialApp` takes its platform data from — so they reach the whole tree, theme resolution included. When the binding was never installed (a release build, or the `kDebugMode` branch above), the widget builds its child unchanged and costs one element.
+`MarionetteDeviceConfig` applies the overrides through a `MediaQuery` above your app, which is where `MaterialApp` takes its platform data from — so they reach the whole tree, theme resolution included.
+
+Both the binding and the widget sit behind `!kReleaseMode`. It's a compile-time constant, so the release branch is the only one that survives compilation and neither reaches your release binary.
+
+The [binding section above](#the-binding) gates on `kDebugMode`, which is the stricter choice and fine if you only ever drive Marionette in debug. `!kReleaseMode` additionally covers profile builds, where the VM service is also available. Pick one and use it for both the binding and the widget — gating the widget more loosely than the binding gains nothing, since without the binding the widget is inert.
+
+Should the gate ever be missed, the widget degrades on its own: with no binding installed it builds its child unchanged, costing one inert element.
 
 Leave it out and the tool stays inert: `set_device_config` answers with these setup instructions instead of reporting success on a no-op. Note that this lives in `main()`, which a hot reload does not re-run — **hot restart** after adding it.
 

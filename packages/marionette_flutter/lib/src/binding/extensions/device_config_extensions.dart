@@ -13,11 +13,14 @@ const _deviceConfigMissingHelp =
 Overriding text scale or accessibility settings needs a MediaQuery above your
 app, and Marionette does not insert one for you — wrap your root widget:
 
-  runApp(
-    const MarionetteDeviceConfig(
-      child: MyApp(),
-    ),
-  );
+  if (!kReleaseMode) {
+    runApp(const MarionetteDeviceConfig(child: MyApp()));
+  } else {
+    runApp(const MyApp());
+  }
+
+The gate keeps the widget out of your release binary; kReleaseMode comes from
+package:flutter/foundation.dart.
 
 This lives in main(), which a hot reload does not re-run — hot restart the app
 after adding it.
