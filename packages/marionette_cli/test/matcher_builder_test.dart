@@ -40,5 +40,50 @@ void main() {
         equals({'type': 'ElevatedButton'}),
       );
     });
+
+    test('ancestor keys are JSON-encoded for the string-only wire', () {
+      expect(
+        buildMatcherFromArgs(
+          key: 'join_button',
+          ancestorKeys: ['session_2', 'grid.cell_3'],
+        ),
+        equals({
+          'key': 'join_button',
+          'ancestor_keys': '["session_2","grid.cell_3"]',
+        }),
+      );
+    });
+
+    test('an empty ancestor chain is omitted', () {
+      expect(
+        buildMatcherFromArgs(key: 'join_button', ancestorKeys: const []),
+        equals({'key': 'join_button'}),
+      );
+    });
+  });
+
+  group('hasSelector', () {
+    test('empty matcher has no selector', () {
+      expect(hasSelector(buildMatcherFromArgs()), isFalse);
+    });
+
+    test('a scope alone is not a selector', () {
+      expect(
+        hasSelector(buildMatcherFromArgs(ancestorKeys: ['grid.cell_2'])),
+        isFalse,
+      );
+    });
+
+    test('a scoped key is a selector', () {
+      expect(
+        hasSelector(
+          buildMatcherFromArgs(
+            key: 'join_button',
+            ancestorKeys: ['grid.cell_2'],
+          ),
+        ),
+        isTrue,
+      );
+    });
   });
 }

@@ -22,7 +22,9 @@ class ScrollSimulator {
   /// Scrolls until the widget matching [matcher] is visible.
   ///
   /// Finds the first [Scrollable] in the tree and scrolls it until the target
-  /// widget becomes visible or max attempts are exhausted.
+  /// widget becomes visible or max attempts are exhausted. When [ancestors] is
+  /// given, both the target and the fallback [Scrollable] are searched for
+  /// inside that subtree only.
   ///
   /// Throws an [Exception] if:
   /// - The target widget is not found
@@ -30,9 +32,11 @@ class ScrollSimulator {
   /// - The target widget is not visible after all attempts are exhausted
   Future<void> scrollUntilVisible(
     WidgetMatcher matcher,
-    MarionetteConfiguration configuration,
-  ) async {
-    final scrollable = _findScrollableElement(matcher, configuration);
+    MarionetteConfiguration configuration, {
+    List<KeyMatcher> ancestors = const [],
+  }) async {
+    final scrollable =
+        _findScrollableElement(matcher, configuration, ancestors);
     if (scrollable == null) {
       throw Exception('No Scrollable widget found in the tree');
     }
@@ -59,24 +63,29 @@ class ScrollSimulator {
       initialMoveStep,
       maxScrollAttempts,
       configuration,
+      ancestors,
     );
   }
 
   Element? _findScrollableElement(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
+    List<KeyMatcher> ancestors,
   ) {
-    final initialTarget = _widgetFinder.findElement(matcher, configuration);
+    final root = _widgetFinder.resolveScopeRoot(ancestors, configuration);
+    if (root == null) {
+      return null;
+    }
+
+    final initialTarget =
+        _widgetFinder.findElementFrom(matcher, root, configuration);
     if (initialTarget != null) {
+      // The enclosing Scrollable may well sit above the scope — scrolling it
+      // is what brings the scoped target into view.
       final ancestorScrollable = _findScrollableAncestor(initialTarget);
       if (ancestorScrollable != null) {
         return ancestorScrollable;
       }
-    }
-
-    final root = WidgetsBinding.instance.rootElement;
-    if (root == null) {
-      return null;
     }
 
     Element? fallbackScrollable;
@@ -123,6 +132,7 @@ class ScrollSimulator {
     Offset initialMoveStep,
     int maxScrollAttempts,
     MarionetteConfiguration configuration,
+    List<KeyMatcher> ancestors,
   ) async {
     var moveStep = initialMoveStep;
     var searchingTowardEnd = true;
@@ -131,7 +141,11 @@ class ScrollSimulator {
 
     for (var i = 0; i < maxScrollAttempts; i++) {
       // Find the target element
-      final target = _widgetFinder.findElement(targetMatcher, configuration);
+      final target = _widgetFinder.findElement(
+        targetMatcher,
+        configuration,
+        ancestors: ancestors,
+      );
       // Check if target is visible
       if (target != null && isElementHittable(target)) {
         return;

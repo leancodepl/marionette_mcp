@@ -145,6 +145,9 @@ Tap an element. Provide exactly one matching strategy.
     --type <string>       Match by widget type name (e.g., ElevatedButton)
     --x <number>          X screen coordinate (use with --y)
     --y <number>          Y screen coordinate (use with --x)
+    --ancestor-key <str>  Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
 
   Examples:
     marionette -i my-app tap --key submit_button
@@ -152,6 +155,9 @@ Tap an element. Provide exactly one matching strategy.
     marionette -i my-app tap --text "Submit"
     marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
     marionette -i my-app tap --x 100 --y 200
+    marionette -i my-app tap --key cell.joinButton --ancestor-key grid.cell_2
+    marionette -i my-app tap --key cell.joinButton \
+      --ancestor-key session_2 --ancestor-key grid.cell_3
 
   Output (stdout):
     Tapped element matching {key: submit_button}
@@ -173,6 +179,9 @@ strategy.
     --type <string>       Match by widget type name (e.g., ElevatedButton)
     --x <number>          X screen coordinate (use with --y)
     --y <number>          Y screen coordinate (use with --x)
+    --ancestor-key <str>  Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
 
   Examples:
     marionette -i my-app secondary-tap --key file_item
@@ -196,6 +205,9 @@ Enter text into a text field.
     --identifier <string> Match text field by Semantics identifier
     --text <string>       Match text field by visible text
     --focused             Target the currently focused text field
+    --ancestor-key <str>  Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
     --input <string>      Text to enter (mandatory)
 
   Example:
@@ -276,6 +288,9 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
     --identifier <string> Match by Semantics identifier (stable alternative)
     --text <string>       Match by visible text content
     --type <string>       Match by widget type name (e.g., PageView)
+    --ancestor-key <str>  Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
     --direction <dir>     left, right, up, or down (required for this mode)
     --distance <number>   Swipe distance in pixels (default: 200)
 
@@ -306,6 +321,9 @@ Scroll until an element becomes visible.
     --key <string>        Match by ValueKey<String>
     --identifier <string> Match by Semantics identifier
     --text <string>       Match by visible text content
+    --ancestor-key <str>  Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
 
   Example:
     marionette -i my-app scroll-to --text "Bottom Item"
@@ -495,6 +513,9 @@ If a command fails with a connection error, the app may have stopped.
 - Prefer --key over --text for matching elements (keys are stable, text may change)
 - --identifier (Semantics identifier) is an equally stable alternative to --key
   when a widget has no ValueKey but does set an accessibility identifier
+- --ancestor-key scopes a match to one subtree when the same key repeats across
+  identical subtrees; repeat it (outermost first) when the wrapper key itself
+  repeats. Every key must exist or the command fails
 - Run `get-interactive-elements` first to discover what's on screen before interacting
 - Instance names are alphanumeric with hyphens/underscores: [a-zA-Z0-9_-]+
 - Commands are stateless — each opens a fresh connection, so no session management needed

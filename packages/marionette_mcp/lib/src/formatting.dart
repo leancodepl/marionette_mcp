@@ -1,8 +1,22 @@
 import 'dart:convert';
 
+/// Shared description of the `ancestor_keys` field across every matcher-based
+/// tool, so agents read the same contract wherever they discover it.
+const ancestorKeysDescription =
+    'Optional. Restricts the search to the subtree of the element whose key '
+    '(a ValueKey<String>) is this value. Use it when the same inner key '
+    'appears in several identical subtrees — grid cells, repeated cards, '
+    'embedded app instances — to pick the one you mean, e.g. '
+    '{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}. List the '
+    'keys outermost first to go deeper: each one is looked up inside the '
+    'subtree of the previous, so ["session_2", "grid.cell_3"] reaches a cell '
+    'whose own key also repeats in other sessions. Fails if any of these keys '
+    'has no element; ignored when matching by coordinates or focused_element.';
+
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
-/// Supports matching by key, identifier, text, type, and coordinates.
+/// Supports matching by key, identifier, text, type, and coordinates, plus the
+/// optional `ancestor_keys` scope.
 Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   final matcher = <String, dynamic>{};
   if (args['focused_element'] == true) {
@@ -31,7 +45,22 @@ Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   if (args.containsKey('y')) {
     matcher['y'] = args['y'];
   }
+  // The VM service only carries string values, so the scope chain travels
+  // JSON-encoded rather than as a list (whose toString() is un-parseable) or
+  // a delimited string (whose delimiter could appear inside a key).
+  if (args['ancestor_keys'] case final List<dynamic> ancestorKeys
+      when ancestorKeys.isNotEmpty) {
+    matcher['ancestor_keys'] = jsonEncode(ancestorKeys);
+  }
   return matcher;
+}
+
+/// Whether [matcher] identifies an element to act on.
+///
+/// `ancestor_keys` only narrows where the search happens, so a matcher
+/// carrying nothing but a scope still selects nothing.
+bool hasSelector(Map<String, dynamic> matcher) {
+  return matcher.keys.any((field) => field != 'ancestor_keys');
 }
 
 /// Formats an element map for human-readable display.
