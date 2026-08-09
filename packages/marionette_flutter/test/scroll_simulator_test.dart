@@ -115,6 +115,66 @@ void main() {
         expect(dispatcher.dragCount, 200);
       },
     );
+
+    testWidgets(
+      'scrolls the list inside the ancestor scope, not the first one',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final firstController = ScrollController();
+        final secondController = ScrollController();
+        addTearDown(firstController.dispose);
+        addTearDown(secondController.dispose);
+
+        Widget cell(String cellKey, ScrollController controller) {
+          return Expanded(
+            child: Column(
+              key: ValueKey(cellKey),
+              children: [
+                Expanded(
+                  child: _buildItems(
+                    controller: controller,
+                    itemCount: 20,
+                    itemExtent: 80,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: [
+                  cell('grid.cell_1', firstController),
+                  cell('grid.cell_2', secondController),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final simulator = ScrollSimulator(
+          _PositionalGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await simulator.scrollUntilVisible(
+          const KeyMatcher('item_15'),
+          _configuration,
+          ancestors: const [KeyMatcher('grid.cell_2')],
+        );
+        await tester.pump();
+
+        expect(secondController.offset, greaterThan(0));
+        expect(
+          firstController.offset,
+          0,
+          reason: 'the list outside the scope must not be scrolled',
+        );
+      },
+    );
   });
 }
 
@@ -125,22 +185,48 @@ Widget _buildItemsApp({
 }) {
   return MaterialApp(
     home: Scaffold(
-      body: ListView.builder(
+      body: _buildItems(
         controller: controller,
-        physics: const ClampingScrollPhysics(),
         itemCount: itemCount,
-        itemBuilder: (BuildContext context, int index) {
-          return ListTile(
-            key: ValueKey('item_$index'),
-            leading: CircleAvatar(child: Text('${index + 1}')),
-            title: Text('Item $index'),
-            subtitle: const Text('Scroll target for marionette.scrollTo'),
-            minTileHeight: itemExtent,
-          );
-        },
+        itemExtent: itemExtent,
       ),
     ),
   );
+}
+
+Widget _buildItems({
+  required ScrollController controller,
+  required int itemCount,
+  required double itemExtent,
+}) {
+  return ListView.builder(
+    controller: controller,
+    physics: const ClampingScrollPhysics(),
+    itemCount: itemCount,
+    itemBuilder: (BuildContext context, int index) {
+      return ListTile(
+        key: ValueKey('item_$index'),
+        leading: CircleAvatar(child: Text('${index + 1}')),
+        title: Text('Item $index'),
+        subtitle: const Text('Scroll target for marionette.scrollTo'),
+        minTileHeight: itemExtent,
+      );
+    },
+  );
+}
+
+/// Drags wherever the simulator asks, so the scrollable it picked is the one
+/// that actually moves.
+class _PositionalGestureDispatcher extends GestureDispatcher {
+  _PositionalGestureDispatcher(this._tester);
+
+  final WidgetTester _tester;
+
+  @override
+  Future<void> drag(Offset from, Offset to) async {
+    await _tester.dragFrom(from, to - from);
+    await _tester.pump();
+  }
 }
 
 class _WidgetTesterGestureDispatcher extends GestureDispatcher {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
 import 'package:vm_service/vm_service.dart';
@@ -285,9 +286,17 @@ class VmServiceConnector {
 
   /// Gets the list of interactive elements in the widget tree.
   ///
+  /// When [ancestorKeys] is given, only the subtree it names is listed. The
+  /// keys nest, outermost first, and the call fails if any of them matches no
+  /// element.
+  ///
   /// Throws [NotConnectedException] if not connected.
-  Future<Map<String, dynamic>> getInteractiveElements() {
-    return _callExtension('marionette.interactiveElements', {});
+  Future<Map<String, dynamic>> getInteractiveElements({
+    List<String> ancestorKeys = const [],
+  }) {
+    return _callExtension('marionette.interactiveElements', {
+      if (ancestorKeys.isNotEmpty) 'ancestor_keys': jsonEncode(ancestorKeys),
+    });
   }
 
   /// Taps an element matching the given criteria.

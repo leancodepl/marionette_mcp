@@ -15,17 +15,28 @@ void registerInspectionTools(
     ..registerTool(
       'get_interactive_elements',
       description:
-          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Requires an active connection established via connect.',
+          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Pass ancestor_keys to list only one subtree, which cuts the output down on screens that repeat the same subtree (grid cells, repeated cards, embedded app instances); list the wrapper keys outermost first to go deeper. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Get Interactive Elements',
         readOnlyHint: true,
         idempotentHint: true,
       ),
-      inputSchema: const ToolInputSchema(properties: {}),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysListDescription,
+          ),
+        },
+      ),
       callback: (args, extra) async {
         logger.info('Getting interactive elements');
         return runTool(logger, 'get interactive elements', () async {
-          final response = await connector.getInteractiveElements();
+          final response = await connector.getInteractiveElements(
+            ancestorKeys:
+                (args['ancestor_keys'] as List<dynamic>?)?.cast<String>() ??
+                    const [],
+          );
           final elements = response['elements'] as List<dynamic>;
 
           final buffer = StringBuffer()
