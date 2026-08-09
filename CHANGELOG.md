@@ -1,5 +1,10 @@
 # Unreleased
 
+- Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route
+- Fix `scroll_to` missing a target that only comes into view on its final drag, at either end of a list
+- Fix `scroll_to` being unable to reach targets in long lists: it now scrolls by a share of the visible viewport instead of a fixed 64px, so lists past roughly 170 rows are reachable and shorter ones take far fewer gestures
+- Fix `scroll_to` on screens with more than one scrollable: when the target is not built yet it now tries each reachable scrollable in turn rather than committing to a single guess, so a chip row, tab strip or nav rail no longer swallows the gesture
+
 # 0.6.0
 
 - Promote schema-bearing custom extensions to first-class MCP tools via the new `ExtensionInputSchema`/`ExtensionParam` DSL
