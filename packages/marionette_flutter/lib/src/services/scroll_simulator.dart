@@ -12,7 +12,8 @@ class ScrollSimulator {
   final GestureDispatcher _gestureDispatcher;
   final WidgetFinder _widgetFinder;
 
-  static const _delta = 64.0;
+  static const _minDelta = 64.0;
+  static const _exposureSamples = 21;
   static const _fallbackMaxScrollAttempts = 50;
   static const _defaultMaxScrollAttemptsCap = 200;
   static const _attemptPadding = 20;
@@ -45,13 +46,14 @@ class ScrollSimulator {
     final position = _resolveScrollPosition(scrollable);
 
     // Calculate move step based on direction
+    final delta = _stepFor(scrollable, direction);
     final initialMoveStep = switch (direction) {
-      AxisDirection.up => const Offset(0, _delta),
-      AxisDirection.down => const Offset(0, -_delta),
-      AxisDirection.left => const Offset(_delta, 0),
-      AxisDirection.right => const Offset(-_delta, 0),
+      AxisDirection.up => Offset(0, delta),
+      AxisDirection.down => Offset(0, -delta),
+      AxisDirection.left => Offset(delta, 0),
+      AxisDirection.right => Offset(-delta, 0),
     };
-    final maxScrollAttempts = _calculateMaxScrollAttempts(position);
+    final maxScrollAttempts = _calculateMaxScrollAttempts(position, delta);
 
     // Scroll until visible
     await _dragUntilVisible(
@@ -307,7 +309,70 @@ class ScrollSimulator {
         _positionEpsilon;
   }
 
-  int _calculateMaxScrollAttempts(ScrollPosition position) {
+  /// The distance to drag per attempt.
+  ///
+  /// Half of the run of the viewport that can actually receive pointer events,
+  /// so consecutive attempts overlap and nothing passes through unseen. A
+  /// widget only counts as visible once its centre can be hit, and a centre
+  /// crosses that run exactly once on the way past, so a step wider than the
+  /// run could stride over a target without ever offering it for inspection.
+  ///
+  /// Scaling to the viewport rather than creeping by a fixed amount is what
+  /// makes long lists reachable at all: the attempt cap is finite, so a small
+  /// step puts a ceiling on how far a list can be traversed.
+  double _stepFor(Element scrollable, AxisDirection direction) {
+    final renderObject = scrollable.renderObject;
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      return _minDelta;
+    }
+
+    final size = renderObject.size;
+    final axis = axisDirectionToAxis(direction);
+    final extent = axis == Axis.vertical ? size.height : size.width;
+    if (!extent.isFinite || extent <= 0) {
+      return _minDelta;
+    }
+
+    return (_exposedExtent(scrollable, size, axis) * 0.5)
+        .clamp(_minDelta, double.infinity);
+  }
+
+  /// The longest uninterrupted run of the viewport along [axis] that can
+  /// receive pointer events.
+  ///
+  /// An app bar, a bottom bar, or any overlay drawn over the viewport hides
+  /// part of it from hit testing while leaving the rest usable. Sampling finds
+  /// the usable part; the whole extent is assumed when nothing is reachable,
+  /// since a scrollable covered end to end cannot be dragged at any step size.
+  double _exposedExtent(Element scrollable, Size size, Axis axis) {
+    final extent = axis == Axis.vertical ? size.height : size.width;
+    final cross = axis == Axis.vertical ? size.width / 2 : size.height / 2;
+
+    var longestRun = 0;
+    var currentRun = 0;
+    for (var i = 0; i < _exposureSamples; i++) {
+      final along = extent * (i + 0.5) / _exposureSamples;
+      final point =
+          axis == Axis.vertical ? Offset(cross, along) : Offset(along, cross);
+
+      if (isElementHittableAt(scrollable, point)) {
+        currentRun++;
+        if (currentRun > longestRun) {
+          longestRun = currentRun;
+        }
+      } else {
+        currentRun = 0;
+      }
+    }
+
+    if (longestRun == 0) {
+      return extent;
+    }
+
+    return extent * longestRun / _exposureSamples;
+  }
+
+  int _calculateMaxScrollAttempts(ScrollPosition position, double delta) {
     final scrollExtent =
         (position.maxScrollExtent - position.minScrollExtent).abs();
     if (!scrollExtent.isFinite) {
@@ -316,7 +381,7 @@ class ScrollSimulator {
           .toInt();
     }
 
-    final oneWayAttempts = (scrollExtent / _delta).ceil();
+    final oneWayAttempts = (scrollExtent / delta).ceil();
 
     // Allow one full pass in one direction and another after reverse,
     // with a small buffer for viewport alignment near edges.

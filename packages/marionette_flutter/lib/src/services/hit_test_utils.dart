@@ -13,6 +13,21 @@ bool isElementHittable(Element element) {
     return false;
   }
 
+  return isElementHittableAt(element, renderObject.size.center(Offset.zero));
+}
+
+/// Checks if the [element] can receive pointer events at [localPoint].
+///
+/// [localPoint] is in the element's own coordinate space. Use this to probe
+/// which parts of a large element are actually exposed — a viewport may be
+/// covered by an app bar or a bottom bar over part of its extent while
+/// remaining reachable elsewhere.
+bool isElementHittableAt(Element element, Offset localPoint) {
+  final renderObject = element.renderObject;
+  if (renderObject is! RenderBox || !renderObject.hasSize) {
+    return false;
+  }
+
   if (!renderObject.attached) {
     return false;
   }
@@ -25,8 +40,7 @@ bool isElementHittable(Element element) {
   }
 
   try {
-    final center = renderObject.size.center(Offset.zero);
-    final absoluteOffset = renderObject.localToGlobal(center);
+    final absoluteOffset = renderObject.localToGlobal(localPoint);
 
     final result = HitTestResult();
     WidgetsBinding.instance.hitTestInView(result, absoluteOffset, viewId);

@@ -357,6 +357,176 @@ void main() {
       },
     );
   });
+
+  group('ScrollSimulator.scrollUntilVisible over long distances', () {
+    testWidgets(
+      'reaches the end of a list far longer than the attempt cap allows '
+      'at a fixed step',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          _buildItemsApp(
+            controller: controller,
+            itemCount: 400,
+            itemExtent: 80,
+          ),
+        );
+
+        final dispatcher = _CoordinateGestureDispatcher(tester);
+        await ScrollSimulator(dispatcher, WidgetFinder()).scrollUntilVisible(
+          const KeyMatcher('item_390'),
+          _configuration,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('item_390')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'reaches a distant target under bouncing physics',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          _buildItemsApp(
+            controller: controller,
+            itemCount: 150,
+            itemExtent: 80,
+            physics: const BouncingScrollPhysics(),
+          ),
+        );
+
+        final dispatcher = _CoordinateGestureDispatcher(tester);
+        await ScrollSimulator(dispatcher, WidgetFinder()).scrollUntilVisible(
+          const KeyMatcher('item_140'),
+          _configuration,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('item_140')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'reaches a distant target in a horizontal list',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                itemCount: 150,
+                itemBuilder: (BuildContext context, int index) => SizedBox(
+                  key: ValueKey('item_$index'),
+                  width: 100,
+                  child: Center(child: Text('Item $index')),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = _CoordinateGestureDispatcher(tester);
+        await ScrollSimulator(dispatcher, WidgetFinder()).scrollUntilVisible(
+          const KeyMatcher('item_140'),
+          _configuration,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('item_140')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'scales the step to the viewport instead of creeping by a fixed amount',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // Pins the step size. Crossing an 11400px extent costs 178 drags at a
+        // fixed 64px and 38 at half of this 600px viewport, so this fails long
+        // before the attempt cap if the step stops scaling.
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          _buildItemsApp(
+            controller: controller,
+            itemCount: 150,
+            itemExtent: 80,
+          ),
+        );
+
+        final dispatcher = _CoordinateGestureDispatcher(tester);
+        await ScrollSimulator(dispatcher, WidgetFinder()).scrollUntilVisible(
+          const KeyMatcher('item_140'),
+          _configuration,
+        );
+
+        expect(dispatcher.dragCount, lessThan(60));
+      },
+    );
+
+    testWidgets(
+      'shrinks the step to the part of the viewport that is not covered',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // Overlays leave a 100px band across the middle of a 600px viewport.
+        // A target is only reported visible when its centre can be hit, so a
+        // half-viewport step would stride over rows that never get a chance to
+        // be seen.
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Stack(
+                children: <Widget>[
+                  ListView.builder(
+                    physics: const ClampingScrollPhysics(),
+                    itemCount: 150,
+                    itemBuilder: (BuildContext context, int index) => SizedBox(
+                      key: ValueKey('item_$index'),
+                      height: 40,
+                      child: Text('Item $index'),
+                    ),
+                  ),
+                  const Align(
+                    alignment: Alignment.topCenter,
+                    child: AbsorbPointer(
+                      child: SizedBox(width: double.infinity, height: 250),
+                    ),
+                  ),
+                  const Align(
+                    alignment: Alignment.bottomCenter,
+                    child: AbsorbPointer(
+                      child: SizedBox(width: double.infinity, height: 250),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        // item_100's centre is only hittable between offsets 3670 and 3770,
+        // which a 300px stride steps straight over — 3600 then 3900 — on both
+        // the forward and the reversed pass.
+        final dispatcher = _CoordinateGestureDispatcher(tester);
+        await ScrollSimulator(dispatcher, WidgetFinder()).scrollUntilVisible(
+          const KeyMatcher('item_100'),
+          _configuration,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('item_100')), findsOneWidget);
+      },
+    );
+  });
 }
 
 /// A page holding [background] under a modal bottom sheet holding [sheet].
@@ -463,12 +633,13 @@ Widget _buildItemsApp({
   required ScrollController controller,
   required int itemCount,
   required double itemExtent,
+  ScrollPhysics physics = const ClampingScrollPhysics(),
 }) {
   return MaterialApp(
     home: Scaffold(
       body: ListView.builder(
         controller: controller,
-        physics: const ClampingScrollPhysics(),
+        physics: physics,
         itemCount: itemCount,
         itemBuilder: (BuildContext context, int index) {
           return ListTile(
