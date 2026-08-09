@@ -13,6 +13,8 @@ class ScrollSimulator {
   final WidgetFinder _widgetFinder;
 
   static const _minDelta = 64.0;
+  static const _maxScrollableCandidates = 3;
+  static const _totalScrollAttemptsCap = 400;
   static const _exposureSamples = 21;
   static const _fallbackMaxScrollAttempts = 50;
   static const _defaultMaxScrollAttemptsCap = 200;
@@ -35,89 +37,109 @@ class ScrollSimulator {
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
   ) async {
-    final scrollable = _findScrollableElement(matcher, configuration);
-    if (scrollable == null) {
+    final candidates = _findScrollableCandidates(matcher, configuration);
+    if (candidates.isEmpty) {
       throw Exception('No Scrollable widget found in the tree');
     }
 
-    // Get the scroll direction
-    final scrollableWidget = scrollable.widget as Scrollable;
-    final direction = scrollableWidget.axisDirection;
-    final position = _resolveScrollPosition(scrollable);
+    var attemptsLeft = _totalScrollAttemptsCap;
 
-    // Calculate move step based on direction
-    final delta = _stepFor(scrollable, direction);
-    final initialMoveStep = switch (direction) {
-      AxisDirection.up => Offset(0, delta),
-      AxisDirection.down => Offset(0, -delta),
-      AxisDirection.left => Offset(delta, 0),
-      AxisDirection.right => Offset(-delta, 0),
-    };
-    final maxScrollAttempts = _calculateMaxScrollAttempts(position, delta);
+    for (final candidate in candidates) {
+      if (attemptsLeft <= 0) {
+        break;
+      }
 
-    // Scroll until visible
-    await _dragUntilVisible(
-      matcher,
-      scrollable,
-      position,
-      initialMoveStep,
-      maxScrollAttempts,
-      configuration,
+      // Re-resolve rather than trusting what the ranking pass saw. Scrolling
+      // one candidate builds and unbuilds widgets, and a Scrollable that has
+      // gone away since takes its ScrollPosition with it.
+      final position = _tryResolveScrollPosition(candidate);
+      if (position == null) {
+        continue;
+      }
+
+      final direction = (candidate.widget as Scrollable).axisDirection;
+      final delta = _stepFor(candidate, direction);
+      final initialMoveStep = switch (direction) {
+        AxisDirection.up => Offset(0, delta),
+        AxisDirection.down => Offset(0, -delta),
+        AxisDirection.left => Offset(delta, 0),
+        AxisDirection.right => Offset(-delta, 0),
+      };
+      final budget = _calculateMaxScrollAttempts(
+        position,
+        delta,
+      ).clamp(1, attemptsLeft);
+      final startedAt = position.pixels;
+
+      final outcome = await _dragUntilVisible(
+        matcher,
+        candidate,
+        position,
+        initialMoveStep,
+        budget,
+        configuration,
+      );
+      attemptsLeft -= outcome.attempts;
+
+      if (outcome.found) {
+        return;
+      }
+
+      // Wrong guess. Put it back, so the only lasting effect of a scroll_to is
+      // the scrolling that actually found the target.
+      _restoreScrollPosition(candidate, startedAt);
+    }
+
+    throw StateError(
+      'Widget not found after '
+      '${_totalScrollAttemptsCap - attemptsLeft} scroll attempts',
     );
   }
 
-  Element? _findScrollableElement(
+  /// The [Scrollable]s worth dragging to reveal [matcher], best guess first.
+  ///
+  /// A built match settles the question outright — whatever encloses it is
+  /// what moves it — but only when the user can reach that [Scrollable]. A
+  /// covered layer stays built and comes first in the element tree, so the
+  /// only match on screen may well be one nobody can touch.
+  ///
+  /// Without a reachable match the target simply is not built yet, which is
+  /// ordinary for a lazily built list, and nothing in the tree says which
+  /// [Scrollable] would eventually build it. Every ranking is a guess that
+  /// some layout defeats, so rank the plausible ones and let the caller try
+  /// them in turn: whether the target shows up is the only reliable signal.
+  List<Element> _findScrollableCandidates(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
   ) {
     final root = WidgetsBinding.instance.rootElement;
     if (root == null) {
-      return null;
+      return const <Element>[];
     }
 
-    final targetScrollable = _findScrollableOwningAMatch(
-      matcher,
-      root,
-      configuration,
-    );
-    if (targetScrollable != null) {
-      return targetScrollable;
+    final owners = _findScrollablesOwningAMatch(matcher, root, configuration);
+    final reachableOwner = owners.reachable;
+    if (reachableOwner != null) {
+      return <Element>[reachableOwner];
     }
 
-    // The target isn't built yet (e.g. it's off-screen in a lazily built
-    // list), so it can't be found directly. Fall back to scanning the tree
-    // for candidate Scrollables. A screen can have more than one — a
-    // horizontal chip row or tab strip alongside the main vertical list, for
-    // example — so instead of taking the first scrollable-with-range found
-    // in traversal order (which can latch onto a small auxiliary scrollable
-    // and then scroll the wrong axis entirely), prefer the one covering the
-    // most screen area: the main scroll body is almost always larger than an
-    // auxiliary strip/carousel.
-    Element? fallbackScrollable;
+    final reachableWithRange = <Element>[];
+    final reachableWithoutRange = <Element>[];
     Element? scrollableWithRange;
-    Element? reachableFallback;
-    Element? reachableWithRange;
-    var bestArea = -1.0;
+    Element? anyScrollable;
 
     void visit(Element element) {
       if (element.widget is Scrollable) {
         final position = _tryResolveScrollPosition(element);
         final hasRange = position != null && _hasScrollableRange(position);
 
-        fallbackScrollable ??= element;
+        anyScrollable ??= element;
         if (hasRange) {
           scrollableWithRange ??= element;
         }
 
         if (isElementHittable(element)) {
-          reachableFallback ??= element;
-          if (hasRange) {
-            final area = _elementArea(element);
-            if (area > bestArea) {
-              bestArea = area;
-              reachableWithRange = element;
-            }
-          }
+          (hasRange ? reachableWithRange : reachableWithoutRange).add(element);
         }
       }
 
@@ -126,15 +148,39 @@ class ScrollSimulator {
 
     visit(root);
 
-    // Most to least preferred. Reachability outranks scroll range because the
-    // drag starts at the centre of the chosen Scrollable, the exact point
-    // hittability is measured at: one that fails the check cannot be dragged
-    // at all, range or no range. The last two tiers keep the previous
-    // behaviour for trees where hittability is never established.
-    return reachableWithRange ??
-        reachableFallback ??
-        scrollableWithRange ??
-        fallbackScrollable;
+    // Reachable before out of reach, and with somewhere to go before without:
+    // the drag starts at the centre of the chosen Scrollable, the exact point
+    // hittability is measured at, so one that fails the check cannot be
+    // dragged at all.
+    //
+    // Biggest first within a tier. A chip row, a tab strip or a carousel is
+    // nearly always smaller than the body it decorates, so that is the better
+    // guess to spend the first attempt on — but it is only an ordering, and
+    // guessing wrong now costs an attempt rather than the whole call.
+    _sortByAreaDescending(reachableWithRange);
+    _sortByAreaDescending(reachableWithoutRange);
+
+    final candidates = <Element>[
+      ...reachableWithRange,
+      ...reachableWithoutRange,
+    ];
+
+    if (candidates.isEmpty) {
+      // Nothing on screen answers a hit test, so reachability cannot rank
+      // anything here. Keep the older single-pick behaviour rather than
+      // refuse to scroll at all.
+      final fallback = owners.first ?? scrollableWithRange ?? anyScrollable;
+      if (fallback != null) {
+        candidates.add(fallback);
+      }
+    }
+
+    return candidates.take(_maxScrollableCandidates).toList();
+  }
+
+  void _sortByAreaDescending(List<Element> elements) {
+    elements.sort(
+        (Element a, Element b) => _elementArea(b).compareTo(_elementArea(a)));
   }
 
   double _elementArea(Element element) {
@@ -146,13 +192,31 @@ class ScrollSimulator {
     return size.width * size.height;
   }
 
-  /// Returns the [Scrollable] containing a match that the user can reach.
+  void _restoreScrollPosition(Element scrollable, double pixels) {
+    final position = _tryResolveScrollPosition(scrollable);
+    if (position == null || !position.hasPixels) {
+      return;
+    }
+    if ((position.pixels - pixels).abs() <= _positionEpsilon) {
+      return;
+    }
+    position.jumpTo(pixels);
+  }
+
+  /// The [Scrollable]s containing a match: the first one found, and the first
+  /// one the user can reach.
   ///
   /// Every match is considered, not just the first, because a covered layer
   /// sits earlier in the element tree than the one on top. The match itself
   /// does not need to be hittable — it may still be scrolled out of view — so
   /// reachability is judged on the [Scrollable] that would move it.
-  Element? _findScrollableOwningAMatch(
+  ///
+  /// The two are reported apart because they mean different things. A
+  /// reachable owner is an answer. An unreachable one is a leftover from a
+  /// covered layer, worth keeping only as a last resort: treating it as an
+  /// answer is what made a sheet opened over a page with a same-named widget
+  /// drag the page instead.
+  ({Element? first, Element? reachable}) _findScrollablesOwningAMatch(
     WidgetMatcher matcher,
     Element root,
     MarionetteConfiguration configuration,
@@ -180,7 +244,7 @@ class ScrollSimulator {
     }
 
     visit(root);
-    return reachableScrollable ?? firstScrollable;
+    return (first: firstScrollable, reachable: reachableScrollable);
   }
 
   Element? _findScrollableAncestor(Element element) {
@@ -196,7 +260,10 @@ class ScrollSimulator {
   }
 
   /// Repeatedly drags the scrollable until the target is visible.
-  Future<void> _dragUntilVisible(
+  ///
+  /// Reports whether the target turned up and how many drags it took, so the
+  /// caller can move on to the next candidate and keep a lid on the total.
+  Future<_DragOutcome> _dragUntilVisible(
     WidgetMatcher targetMatcher,
     Element scrollable,
     ScrollPosition position,
@@ -208,6 +275,7 @@ class ScrollSimulator {
     var searchingTowardEnd = true;
     var hasReversedDirection = false;
     var stalledAttempts = 0;
+    var drags = 0;
 
     for (var i = 0; i < maxScrollAttempts; i++) {
       // Look for a match that can actually receive pointer events. Matching on
@@ -218,7 +286,7 @@ class ScrollSimulator {
         configuration,
       );
       if (target != null) {
-        return;
+        return _DragOutcome(found: true, attempts: drags);
       }
 
       final atCurrentEdgeBeforeDrag = searchingTowardEnd
@@ -246,6 +314,7 @@ class ScrollSimulator {
       final to = globalPosition + moveStep;
       final beforePosition = position.pixels;
       await _gestureDispatcher.drag(globalPosition, to);
+      drags++;
 
       final afterPosition = position.pixels;
       final moved = (afterPosition - beforePosition).abs() > _positionEpsilon;
@@ -289,34 +358,32 @@ class ScrollSimulator {
     // The loop checks for the target on entry but leaves from the middle, so
     // the position the last drag landed on has not been examined yet. Look
     // once more before giving up: the target may be sitting on screen.
-    if (_widgetFinder.findHittableElement(targetMatcher, configuration) !=
-        null) {
-      return;
-    }
-
-    // Target still not visible after max scrolls
-    throw StateError(
-      'Widget not found after $maxScrollAttempts scroll attempts',
+    final target = _widgetFinder.findHittableElement(
+      targetMatcher,
+      configuration,
     );
+    return _DragOutcome(found: target != null, attempts: drags);
   }
 
-  ScrollPosition _resolveScrollPosition(Element scrollable) {
-    final position = _tryResolveScrollPosition(scrollable);
-    if (position == null) {
-      throw Exception('Scrollable element does not expose ScrollableState');
-    }
-    return position;
-  }
-
+  /// The live [ScrollPosition] of [scrollable], or null if there is not one.
+  ///
+  /// Deliberately total. Candidates are collected before any of them is
+  /// dragged, and dragging one can unbuild another — a carousel inside a lazy
+  /// list, say — leaving an [Element] still referenced but with nothing behind
+  /// it. That has to read as a miss, not a crash.
   ScrollPosition? _tryResolveScrollPosition(Element scrollable) {
-    if (scrollable is! StatefulElement) {
+    if (!scrollable.mounted || scrollable is! StatefulElement) {
       return null;
     }
     final state = scrollable.state;
     if (state is! ScrollableState) {
       return null;
     }
-    return state.position;
+    try {
+      return state.position;
+    } catch (_) {
+      return null;
+    }
   }
 
   bool _hasScrollableRange(ScrollPosition position) {
@@ -403,4 +470,12 @@ class ScrollSimulator {
     final adaptiveAttempts = oneWayAttempts * 2 + _attemptPadding;
     return adaptiveAttempts.clamp(1, _defaultMaxScrollAttemptsCap).toInt();
   }
+}
+
+/// What one pass over a single [Scrollable] achieved.
+class _DragOutcome {
+  const _DragOutcome({required this.found, required this.attempts});
+
+  final bool found;
+  final int attempts;
 }

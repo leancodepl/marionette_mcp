@@ -591,6 +591,165 @@ void main() {
       },
     );
   });
+
+  group('ScrollSimulator.scrollUntilVisible with several scrollables', () {
+    testWidgets(
+      'reaches a target in the sheet when a covered list holds a built copy '
+      'of its name',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // A built match settles the question of which Scrollable owns the
+        // target — but only if the user can reach that Scrollable. Here the
+        // sole built match sits on the covered page, so its owner is a dead
+        // end and the search has to carry on to the sheet, where the real
+        // target is waiting to be built.
+        final sheetController = ScrollController();
+        addTearDown(sheetController.dispose);
+
+        await tester.pumpWidget(
+          _buildSheetApp(
+            background: SizedBox(
+              height: 120,
+              child: ListView(
+                children: const <Widget>[Text('Country 90')],
+              ),
+            ),
+            sheet: _lazyList(
+              controller: sheetController,
+              label: (int index) => 'Country $index',
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('open sheet'));
+        await tester.pumpAndSettle();
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await simulator.scrollUntilVisible(
+          const TextMatcher('Country 90'),
+          _configuration,
+        );
+        await tester.pumpAndSettle();
+
+        expect(sheetController.offset, greaterThan(0));
+      },
+    );
+
+    testWidgets(
+      'reaches a target inside the smaller of two side-by-side lists',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // The mirror image of the case above: here the narrow list is the one
+        // holding the target, so preferring the larger scrollable is just as
+        // wrong as preferring the first. Neither ranking can know, so both
+        // have to be tried.
+        final railController = ScrollController();
+        final contentController = ScrollController();
+        addTearDown(() {
+          railController.dispose();
+          contentController.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: <Widget>[
+                  SizedBox(
+                    width: 120,
+                    child: _lazyList(
+                      controller: railController,
+                      label: (int index) => 'Country $index',
+                    ),
+                  ),
+                  Expanded(
+                    child: _lazyList(
+                      controller: contentController,
+                      label: (int index) => 'Article $index',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await simulator.scrollUntilVisible(
+          const TextMatcher('Country 90'),
+          _configuration,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Country 90'), findsOneWidget);
+        expect(railController.offset, greaterThan(0));
+        expect(
+          contentController.offset,
+          0,
+          reason: 'a scrollable tried and abandoned should be put back',
+        );
+      },
+    );
+
+    testWidgets(
+      'fails cleanly when trying one candidate unbuilds another',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // The carousel lives in the first row of a lazily built list, so
+        // dragging the list takes the carousel out of the tree — and with it
+        // the ScrollPosition that the ranking pass saw. Reaching for it then
+        // has to be a miss, not a crash.
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ListView.builder(
+                physics: const ClampingScrollPhysics(),
+                itemCount: 100,
+                itemBuilder: (BuildContext context, int index) {
+                  if (index == 0) {
+                    return SizedBox(
+                      height: 80,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: 60,
+                        itemBuilder: (BuildContext context, int index) =>
+                            SizedBox(
+                          width: 90,
+                          child: Center(child: Text('Card $index')),
+                        ),
+                      ),
+                    );
+                  }
+                  return SizedBox(height: 120, child: Text('Row $index'));
+                },
+              ),
+            ),
+          ),
+        );
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await expectLater(
+          () => simulator.scrollUntilVisible(
+            const TextMatcher('Card 55'),
+            _configuration,
+          ),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
+  });
 }
 
 /// A page holding [background] under a modal bottom sheet holding [sheet].
