@@ -13,7 +13,8 @@ void registerNativeTextTools(
 ) {
   server.registerTool(
     'native_enter_text',
-    description: 'Types into a native / system text field. Provide text (the string '
+    description:
+        'Types into a native / system text field. Provide text (the string '
         'to type) plus exactly one target: id (Android resource-id / iOS '
         'accessibility id) OR label (exact field label text from '
         'native_get_elements). Targets only native and system text fields '
@@ -27,11 +28,13 @@ void registerNativeTextTools(
           description: 'The text to type into the native field.',
         ),
         'id': JsonSchema.string(
-          description: 'Exact Android resource-id or iOS accessibility id of the '
+          description:
+              'Exact Android resource-id or iOS accessibility id of the '
               'field, as returned in the "id" field of native_get_elements.',
         ),
         'label': JsonSchema.string(
-          description: 'Exact visible label / text of the field to type into, as '
+          description:
+              'Exact visible label / text of the field to type into, as '
               'returned by native_get_elements. Use when the field has no '
               'stable id.',
         ),

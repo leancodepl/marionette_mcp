@@ -195,14 +195,14 @@ class WebNativeConnector implements NativeConnector {
       final found = await _tryFind(
         'xpath',
         '//${tag.isNotEmpty ? tag : '*'}'
-        '[normalize-space(.)=$literal or @aria-label=$literal '
-        'or @placeholder=$literal or @value=$literal or @title=$literal]',
+            '[normalize-space(.)=$literal or @aria-label=$literal '
+            'or @placeholder=$literal or @value=$literal or @title=$literal]',
       );
       if (found != null) return found;
       return _tryFind(
         'xpath',
         '//*[normalize-space(.)=$literal or @aria-label=$literal '
-        'or @placeholder=$literal or @value=$literal]',
+            'or @placeholder=$literal or @value=$literal]',
       );
     }
     return null;

@@ -32,8 +32,8 @@ Future<String?> resolveChromeDebuggerAddress({
     return normalizeChromeDebuggerAddress(fromEnv);
   }
 
-  final fromProcess =
-      await discoverChromeDebuggerPortFromProcesses(processRunner: processRunner);
+  final fromProcess = await discoverChromeDebuggerPortFromProcesses(
+      processRunner: processRunner);
   if (fromProcess != null) {
     return '127.0.0.1:$fromProcess';
   }

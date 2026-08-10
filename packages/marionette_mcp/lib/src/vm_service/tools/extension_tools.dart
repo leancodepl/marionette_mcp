@@ -17,7 +17,8 @@ void registerExtensionTools(
   server
     ..registerTool(
       'list_custom_extensions',
-      description: 'Lists all custom VM service extensions registered by the Flutter '
+      description:
+          'Lists all custom VM service extensions registered by the Flutter '
           'app (outside of the built-in Marionette extensions). Each '
           'extension includes its name and an optional description. Use this '
           'to discover what app-specific extensions are available before '
@@ -33,7 +34,8 @@ void registerExtensionTools(
         logger.info('Listing custom extensions');
         return runTool(logger, 'list custom extensions', () async {
           final response = await connector.listExtensions();
-          final extensions = (response['extensions'] as List<dynamic>).cast<Map<String, dynamic>>();
+          final extensions = (response['extensions'] as List<dynamic>)
+              .cast<Map<String, dynamic>>();
 
           if (extensions.isEmpty) {
             return CallToolResult(
@@ -43,7 +45,8 @@ void registerExtensionTools(
             );
           }
 
-          final buffer = StringBuffer()..writeln('Found ${extensions.length} custom extension(s):\n');
+          final buffer = StringBuffer()
+            ..writeln('Found ${extensions.length} custom extension(s):\n');
 
           for (final ext in extensions) {
             final name = ext['name'] as String;
@@ -65,7 +68,8 @@ void registerExtensionTools(
     // since the behavior depends entirely on the target extension.
     ..registerTool(
       'call_custom_extension',
-      description: 'Calls a custom VM service extension registered by the Flutter app. '
+      description:
+          'Calls a custom VM service extension registered by the Flutter app. '
           'This is an escape hatch for interacting with app-specific '
           'extensions that are not part of marionette\'s built-in tools. '
           'For marionette features, use the dedicated tools instead. '

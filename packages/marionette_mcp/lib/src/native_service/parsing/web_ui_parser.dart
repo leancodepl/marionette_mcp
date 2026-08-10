@@ -67,7 +67,10 @@ List<NativeElement> parseHtmlDom(String html) {
   final elements = <NativeElement>[];
   for (final match in _htmlTagPattern.allMatches(cleaned)) {
     final tag = match.group(1)!.toLowerCase();
-    if (tag.startsWith('!') || tag == 'html' || tag == 'head' || tag == 'body') {
+    if (tag.startsWith('!') ||
+        tag == 'html' ||
+        tag == 'head' ||
+        tag == 'body') {
       continue;
     }
 
@@ -86,7 +89,8 @@ List<NativeElement> parseHtmlDom(String html) {
       continue;
     }
 
-    if (tag == 'input' && (attributes['type'] ?? '').toLowerCase() == 'hidden') {
+    if (tag == 'input' &&
+        (attributes['type'] ?? '').toLowerCase() == 'hidden') {
       continue;
     }
 

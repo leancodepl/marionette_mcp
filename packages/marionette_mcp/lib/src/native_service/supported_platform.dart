@@ -13,8 +13,7 @@ enum SupportedPlatform {
       values.map((platform) => platform.wireName).join(', ');
 
   static String get quotedWireNames {
-    final quoted =
-        values.map((platform) => '"${platform.wireName}"').toList();
+    final quoted = values.map((platform) => '"${platform.wireName}"').toList();
     if (quoted.length <= 1) return quoted.join();
     return '${quoted.sublist(0, quoted.length - 1).join(', ')}, or ${quoted.last}';
   }

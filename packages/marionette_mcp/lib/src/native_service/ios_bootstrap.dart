@@ -185,7 +185,8 @@ class IosBootstrap {
     final explicitUdid = _udid;
     if (explicitUdid != null && explicitUdid.isNotEmpty) return explicitUdid;
 
-    final result = await _run('xcrun', ['simctl', 'list', 'devices', 'booted', '-j']);
+    final result =
+        await _run('xcrun', ['simctl', 'list', 'devices', 'booted', '-j']);
     if (result.exitCode != 0) {
       throw StateError(
         'Failed to list booted simulators (exit ${result.exitCode}): '
@@ -250,8 +251,12 @@ class IosBootstrap {
     final pathOverride = _wdaPathOverride;
     final candidates = <String>[
       if (pathOverride != null && pathOverride.isNotEmpty) pathOverride,
-      if (Platform.environment['MARIONETTE_WDA_BUNDLE'] case final String b when b.isNotEmpty) b,
-      if (Platform.environment['MARIONETTE_WDA_PATH'] case final String p when p.isNotEmpty) p,
+      if (Platform.environment['MARIONETTE_WDA_BUNDLE'] case final String b
+          when b.isNotEmpty)
+        b,
+      if (Platform.environment['MARIONETTE_WDA_PATH'] case final String p
+          when p.isNotEmpty)
+        p,
     ];
 
     for (final path in candidates) {
@@ -348,7 +353,8 @@ class IosBootstrap {
     // Best-effort fallback. WDA normally must run as an XCUITest host; a
     // plain simctl launch frequently never opens the HTTP server. Prefer
     // MARIONETTE_WDA_XCTESTRUN when available.
-    final install = await _run('xcrun', ['simctl', 'install', udid, bundlePath]);
+    final install =
+        await _run('xcrun', ['simctl', 'install', udid, bundlePath]);
     if (install.exitCode != 0) {
       throw StateError(
         'simctl install failed (exit ${install.exitCode}): '

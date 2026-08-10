@@ -17,7 +17,8 @@ void registerNativeConnectionTools(
   server
     ..registerTool(
       'native_connect',
-      description: 'Starts a native automation session (UIAutomator2 on Android, '
+      description:
+          'Starts a native automation session (UIAutomator2 on Android, '
           'WebDriverAgent on iOS, ChromeDriver on web) for system / native / '
           'browser DOM UI that is NOT part of the Flutter widget tree — '
           'permission dialogs, system sheets, HTML around a Flutter web app, '
@@ -37,7 +38,8 @@ void registerNativeConnectionTools(
                 '(WebDriverAgent on simulator), or "web" (ChromeDriver).',
           ),
           'serial': JsonSchema.string(
-            description: 'Optional Android device serial (adb -s). When omitted, '
+            description:
+                'Optional Android device serial (adb -s). When omitted, '
                 'uses the default adb device.',
           ),
           'udid': JsonSchema.string(
@@ -61,7 +63,8 @@ void registerNativeConnectionTools(
         required: ['platform'],
       ),
       callback: (args, extra) async {
-        final platform = SupportedPlatform.tryParse(args['platform'] as String?);
+        final platform =
+            SupportedPlatform.tryParse(args['platform'] as String?);
         final serial = args['serial'] as String?;
         final udid = args['udid'] as String?;
         final chromeDriverUrl = args['chromeDriverUrl'] as String?;
@@ -124,7 +127,8 @@ void registerNativeConnectionTools(
     )
     ..registerTool(
       'native_disconnect',
-      description: 'Stops the native automation session started by native_connect '
+      description:
+          'Stops the native automation session started by native_connect '
           'and releases device-side processes (UIAutomator2 / WDA / ChromeDriver). '
           'Does not affect the Flutter VM-service connection. '
           '$nativeRoutingPreferFlutter',
