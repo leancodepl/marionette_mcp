@@ -64,7 +64,8 @@ class DynamicExtensionTools {
 
   /// The tools enabled by the most recent [registerAll] call that have not
   /// yet been disabled. Exposed for tests.
-  List<RegisteredTool> get registeredTools => List.unmodifiable(_active.map((name) => _pool[name]!));
+  List<RegisteredTool> get registeredTools =>
+      List.unmodifiable(_active.map((name) => _pool[name]!));
 
   /// The real extension name backing the promoted MCP tool [toolName], or
   /// null if no such tool has been pooled. The promoted tool name is
@@ -195,7 +196,8 @@ class DynamicExtensionTools {
     // The extension is always invoked by its real name; only the MCP tool
     // name is sanitized for clients that restrict the character set.
     final callback = _buildCallback(extensionName);
-    final effectiveDescription = _describe(extensionName, toolName, description);
+    final effectiveDescription =
+        _describe(extensionName, toolName, description);
 
     final pooled = _pool[toolName];
     if (pooled != null) {

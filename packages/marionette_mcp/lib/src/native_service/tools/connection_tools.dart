@@ -15,7 +15,8 @@ void registerNativeConnectionTools(
   server
     ..registerTool(
       'native_connect',
-      description: 'Starts a native automation session (UIAutomator2 on Android, '
+      description:
+          'Starts a native automation session (UIAutomator2 on Android, '
           'WebDriverAgent on iOS) for system / native UI that is NOT part of the '
           'Flutter widget tree — permission dialogs, system sheets, and other '
           'surfaces outside Marionette\'s Flutter lane. Independent of the '
@@ -31,7 +32,8 @@ void registerNativeConnectionTools(
                 '(WebDriverAgent on simulator).',
           ),
           'serial': JsonSchema.string(
-            description: 'Optional Android device serial (adb -s). When omitted, '
+            description:
+                'Optional Android device serial (adb -s). When omitted, '
                 'uses the default adb device.',
           ),
           'udid': JsonSchema.string(
@@ -96,7 +98,8 @@ void registerNativeConnectionTools(
     )
     ..registerTool(
       'native_disconnect',
-      description: 'Stops the native automation session started by native_connect '
+      description:
+          'Stops the native automation session started by native_connect '
           'and releases device-side processes (UIAutomator2 / WDA). '
           'Does not affect the Flutter VM-service connection. '
           '$nativeRoutingPreferFlutter',

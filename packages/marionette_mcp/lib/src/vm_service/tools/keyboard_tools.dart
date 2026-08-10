@@ -11,7 +11,8 @@ void registerKeyboardTools(
 ) {
   server.registerTool(
     'press_key',
-    description: 'Presses a keyboard key in the Flutter app, producing a real key event '
+    description:
+        'Presses a keyboard key in the Flutter app, producing a real key event '
         'that flows through the focus system — unlike enter_text, which only '
         'replaces a field\'s value. Use it to submit a form (enter), move focus '
         '(tab), dismiss a dialog (escape), edit within a field (backspace, '
@@ -24,13 +25,15 @@ void registerKeyboardTools(
     inputSchema: ToolInputSchema(
       properties: {
         'key': JsonSchema.string(
-          description: 'The key to press. Named keys: enter, tab, escape, backspace, '
+          description:
+              'The key to press. Named keys: enter, tab, escape, backspace, '
               'delete, space, arrowUp, arrowDown, arrowLeft, arrowRight, home, '
               'end, pageUp, pageDown. Also accepts a single character a-z or '
               '0-9 (case-insensitive).',
         ),
         'modifiers': JsonSchema.string(
-          description: 'Optional comma-separated modifier keys to hold during the '
+          description:
+              'Optional comma-separated modifier keys to hold during the '
               'press: any of control, shift, alt, meta (e.g. "control" or '
               '"control,shift"). On macOS use meta for the Command key.',
         ),

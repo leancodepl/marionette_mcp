@@ -13,7 +13,8 @@ void registerNativeScreenshotTools(
 ) {
   server.registerTool(
     'native_take_screenshot',
-    description: 'Takes a PNG screenshot of the full device screen via the native '
+    description:
+        'Takes a PNG screenshot of the full device screen via the native '
         'automation session (UIAutomator2 / WebDriverAgent). '
         'Unlike Flutter take_screenshots, this captures content outside the '
         'Flutter widget tree — embedded WebViews (e.g. webview_flutter pages) '
