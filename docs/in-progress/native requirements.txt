@@ -1,0 +1,175 @@
+Full catalog below. "Not native" cases are flagged at the end because they're the most common false positive.
+
+---
+1. Embedded platform views
+
+Hosted inside the widget tree via AndroidView / UiKitView / HtmlElementView. Four meaningfully different sub-types.
+
+1a. Plain native UI controls
+
+┌──────────────────────────────────────────────┬───────────────────────────────────────────┬─────────────────────────────────┐
+│                   Android                    │                    iOS                    │               Web               │
+├──────────────────────────────────────────────┼───────────────────────────────────────────┼─────────────────────────────────┤
+│ TextView, EditText, Button via a custom      │ UILabel, UITextField via                  │ any DOM element via             │
+│ PlatformViewFactory                          │ FlutterPlatformViewFactory                │ registerViewFactory             │
+└──────────────────────────────────────────────┴───────────────────────────────────────────┴─────────────────────────────────┘
+
+Rare in the wild as pure UI, but this is your best PoC target — fully controllable, reads perfectly, no GPU weirdness.
+
+Repro: the Flutter docs' own sample (NativeView wrapping a TextView). Write the iOS/web equivalents; ~30 lines each.
+
+1b. Surface/GPU-backed views
+
+┌─────────────────────────────────────────────┬────────────────────────────────────────────────────────┬─────────────────────┐
+│                   Android                   │                          iOS                           │         Web         │
+├─────────────────────────────────────────────┼────────────────────────────────────────────────────────┼─────────────────────┤
+│ SurfaceView / TextureView — ExoPlayer,      │ AVPlayerLayer, AVCaptureVideoPreviewLayer,             │ <video>, <canvas>,  │
+│ MapView, camera preview                     │ GMSMapView/MKMapView (Metal)                           │ Maps JS             │
+└─────────────────────────────────────────────┴────────────────────────────────────────────────────────┴─────────────────────┘
+
+Examples: google_maps_flutter, camera, video_player, flutter_map native variants.
+
+Repro: each package's example/ app runs standalone.
+
+Testing reality: one opaque node. Bounds and taps work; content reads return nothing; per-view screenshot renders blank (need PixelCopy on Android, OS-level capture everywhere else).
+
+1c. Third-party SDK views
+
+┌──────────┬──────────────────────────────────┬─────────────────────────┐
+│   Kind   │             Android              │           iOS           │
+├──────────┼──────────────────────────────────┼─────────────────────────┤
+│ Ads      │ AdView (google_mobile_ads)       │ GADBannerView           │
+├──────────┼──────────────────────────────────┼─────────────────────────┤
+│ Payments │ CardInputWidget (flutter_stripe) │ STPPaymentCardTextField │
+├──────────┼──────────────────────────────────┼─────────────────────────┤
+│ PDF      │ PdfRenderer / PDFView            │ PDFKit                  │
+└──────────┴──────────────────────────────────┴─────────────────────────┘
+
+Repro: flutter_stripe example — CardField is the single best real-world test case, because it's a native text field you must type into, so it exercises tree-read + text-entry together. Ads: google_mobile_ads has test ad unit IDs that always fill.
+
+Gotcha: payment card fields are sometimes deliberately hidden from accessibility for PCI reasons. Verify before assuming a bug in your tooling.
+
+1d. WebViews — see §2
+
+---
+2. WebViews
+
+┌──────────────────────────────────────────────────┬───────────────────────────────────────┬──────────┐
+│                     Android                      │                  iOS                  │   Web    │
+├──────────────────────────────────────────────────┼───────────────────────────────────────┼──────────┤
+│ android.webkit.WebView (webview_flutter_android) │ WKWebView (webview_flutter_wkwebview) │ <iframe> │
+└──────────────────────────────────────────────────┴───────────────────────────────────────┴──────────┘
+
+Also flutter_inappwebview, and WebViews you don't own — ad SDKs, embedded OAuth widgets, chat widgets.
+
+Repro: webview_flutter example, pointed at any page with a form.
+
+Access: needs debugging enabled on the instance — Android setWebContentsDebuggingEnabled(true) then chrome://inspect or CDP over adb forward localabstract:webview_devtools_remote_<pid>; iOS isInspectable = true (16.4+) then Safari Web Inspector or ios_webkit_debug_proxy.
+
+---
+3. Permission dialogs
+
+┌───────────────────────────────────────┬───────────────────────────────────────┬────────────────────────────────────────────┐
+│                Android                │                  iOS                  │                    Web                     │
+├───────────────────────────────────────┼───────────────────────────────────────┼────────────────────────────────────────────┤
+│ com.android.permissioncontroller      │ SpringBoard-owned system alert; ATT   │ Chrome permission bubble — browser chrome, │
+│ dialog                                │ prompt                                │  not DOM                                   │
+└───────────────────────────────────────┴───────────────────────────────────────┴────────────────────────────────────────────┘
+
+Examples: permission_handler, geolocator, camera, app_tracking_transparency.
+
+Repro / reset between runs:
+adb shell pm reset-permissions                        # all apps
+adb shell pm revoke com.example.app android.permission.CAMERA
+xcrun simctl privacy booted reset all com.example.app
+xcrun simctl privacy booted grant  location com.example.app   # skip the dialog entirely
+
+Gotcha: Android button resource IDs differ across API levels (permission_allow_button vs permission_allow_foreground_only_button). Don't hardcode. Web permission bubbles are unreachable by any DOM tool — CDP Browser.grantPermissions only.
+
+---
+4. Pickers and sheets
+
+┌────────────────┬──────────────────────┬────────────────────────────────┐
+│      Kind      │       Android        │              iOS               │
+├────────────────┼──────────────────────┼────────────────────────────────┤
+│ Files          │ SAF DocumentsUI      │ UIDocumentPickerViewController │
+├────────────────┼──────────────────────┼────────────────────────────────┤
+│ Photos         │ Android photo picker │ PHPickerViewController         │
+├────────────────┼──────────────────────┼────────────────────────────────┤
+│ Camera capture │ camera intent        │ UIImagePickerController        │
+├────────────────┼──────────────────────┼────────────────────────────────┤
+│ Share          │ intent chooser       │ UIActivityViewController       │
+└────────────────┴──────────────────────┴────────────────────────────────┘
+
+Examples: file_picker, image_picker, share_plus.
+
+Web: <input type="file"> opens an OS-native dialog no browser tool can touch. Use CDP DOM.setFileInputFiles to bypass it.
+
+---
+5. Authentication UI
+
+┌────────────────┬──────────────────────────┬──────────────────────────┐
+│      Kind      │         Android          │           iOS            │
+├────────────────┼──────────────────────────┼──────────────────────────┤
+│ Biometrics     │ BiometricPrompt          │ Face ID / Touch ID sheet │
+├────────────────┼──────────────────────────┼──────────────────────────┤
+│ Account picker │ Google one-tap / chooser │ Sign in with Apple sheet │
+├────────────────┼──────────────────────────┼──────────────────────────┤
+│ Autofill       │ autofill dropdown        │ QuickType / Keychain bar │
+└────────────────┴──────────────────────────┴──────────────────────────┘
+
+Examples: local_auth, google_sign_in, sign_in_with_apple.
+
+Repro: biometrics can't be tapped — you trigger the sensor:
+adb -e emu finger touch 1          # emulator fingerprint
+iOS Simulator: Features → Face ID → Enrolled, then Matching Face / Non-matching Face.
+
+---
+6. Payment and purchase sheets
+
+Google Pay, Apple Pay, Play Billing, StoreKit (pay, in_app_purchase, flutter_stripe).
+
+Largely not automatable. Apple Pay on a real device requires genuine biometric confirmation. Best available: Xcode StoreKit Testing with a local .storekit config (simplified, simulator-friendly sheet) and Play license testers. Treat as out of scope and say so explicitly in the ticket.
+
+---
+7. Browser handoff / OAuth
+
+┌────────────────────┬────────────────────────────────────────────────────┐
+│      Android       │                        iOS                         │
+├────────────────────┼────────────────────────────────────────────────────┤
+│ Chrome Custom Tabs │ SFSafariViewController, ASWebAuthenticationSession │
+└────────────────────┴────────────────────────────────────────────────────┘
+
+Examples: flutter_appauth, flutter_web_auth_2, url_launcher in-app mode.
+
+Gotcha worth planning for: ASWebAuthenticationSession shows a system consent alert first ("…wants to use… to Sign In"). It's SpringBoard-owned and blocks every OAuth test until handled. This one bites everybody.
+
+---
+8. Keyboard / IME
+
+Native window on both platforms. You rarely read it, but it occludes elements and changes layout, so dismissal is a required primitive: adb shell input keyevent 111 (ESC) or back; iOS via first-responder resign or a WDA tap outside.
+
+---
+9. Transient system UI
+
+┌────────────────────────────────────────────────────────────────┬──────────────────────────────────────────────────────┐
+│                            Android                             │                         iOS                          │
+├────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────┤
+│ toasts, heads-up notifications, notification shade, status bar │ notification banners, Dynamic Island, Control Center │
+└────────────────────────────────────────────────────────────────┴──────────────────────────────────────────────────────┘
+
+Examples: flutter_local_notifications, firebase_messaging.
+
+Repro: adb shell cmd statusbar expand-notifications. iOS notification testing needs a push payload or a scheduled local notification; there's no simulator shortcut as clean as Android's.
+
+---
+10. Native screens (add-to-app / hybrid)
+
+Flutter as one screen inside a native app, or a plugin launching a full Activity / UIViewController.
+
+Repro: the Flutter add-to-app samples. Also arises unintentionally — image_picker's camera UI is a full native screen, not a dialog.
+
+---
+11. Plugin-raised native dialogs
+
+Plugins that show a real AlertDialog / UIAlertController instead of a Flutter one: in-app update prompts, Firebase In-App Messaging, app_tracking_transparency, some crash-reporter consent dialogs. Easy to misclassify as Flutter UI because they look in-app.
