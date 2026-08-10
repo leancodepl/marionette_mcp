@@ -205,8 +205,9 @@ void registerNativeGestureTools(
       'native_scroll',
       description:
           'Performs a native swipe gesture. direction is the finger-swipe '
-          'direction: ${SwipeDirection.commaSeparatedWireNames} (physical pixels '
-          'from screen center). Optional distance defaults to '
+          'direction: ${SwipeDirection.commaSeparatedWireNames}. Swipes from '
+          'screen center by default; optional startX/startY set the finger '
+          'start (physical pixels). Optional distance defaults to '
           '$_defaultSwipeDistance. '
           'If text is provided, repeatedly swipes until an element with that '
           'exact text is visible (max $_maxScrollAttempts attempts) or fails. '
@@ -229,6 +230,15 @@ void registerNativeGestureTools(
             description: 'Swipe distance in physical pixels '
                 '(default: $_defaultSwipeDistance).',
           ),
+          'startX': JsonSchema.number(
+            description: 'Optional finger start X in physical pixels. '
+                'Requires startY. Default: horizontal/vertical center of '
+                'inferred viewport.',
+          ),
+          'startY': JsonSchema.number(
+            description: 'Optional finger start Y in physical pixels. '
+                'Requires startX.',
+          ),
         },
         required: ['direction'],
       ),
@@ -238,6 +248,8 @@ void registerNativeGestureTools(
         );
         final text = args['text'] as String?;
         final distance = (args['distance'] as num?)?.toInt();
+        final startX = (args['startX'] as num?)?.toInt();
+        final startY = (args['startY'] as num?)?.toInt();
 
         if (direction == null) {
           return CallToolResult(
@@ -262,16 +274,34 @@ void registerNativeGestureTools(
           );
         }
 
+        if ((startX == null) != (startY == null)) {
+          return CallToolResult(
+            isError: true,
+            content: [
+              const TextContent(
+                text: 'native_scroll requires both startX and startY when '
+                    'either is provided.',
+              ),
+            ],
+          );
+        }
+
         logger.info(
           'Native scrolling direction=${direction.wireName} text=$text '
-          'distance=$distance',
+          'distance=$distance start=($startX,$startY)',
         );
         return runTool(logger, 'native scroll', () async {
           final connector = context.requireConnector();
           final delta = distance ?? _defaultSwipeDistance;
 
           if (text == null) {
-            await _swipeInDirection(connector, direction, delta);
+            await _swipeInDirection(
+              connector,
+              direction,
+              delta,
+              startX: startX,
+              startY: startY,
+            );
             return CallToolResult(
               content: [
                 TextContent(
@@ -294,7 +324,13 @@ void registerNativeGestureTools(
                 ],
               );
             }
-            await _swipeInDirection(connector, direction, delta);
+            await _swipeInDirection(
+              connector,
+              direction,
+              delta,
+              startX: startX,
+              startY: startY,
+            );
           }
 
           throw StateError(
@@ -309,8 +345,10 @@ void registerNativeGestureTools(
 Future<void> _swipeInDirection(
   NativeConnector connector,
   SwipeDirection direction,
-  int distance,
-) async {
+  int distance, {
+  int? startX,
+  int? startY,
+}) async {
   final elements = await connector.getNativeElements();
   var maxX = 0;
   var maxY = 0;
@@ -323,22 +361,34 @@ Future<void> _swipeInDirection(
   if (maxX <= 0) maxX = 1080;
   if (maxY <= 0) maxY = 1920;
 
-  final centerX = maxX ~/ 2;
-  final centerY = maxY ~/ 2;
-  final half = cappedSwipeHalf(
-    direction: direction,
-    half: distance ~/ 2,
-    centerX: centerX,
-    centerY: centerY,
-    maxX: maxX,
-    maxY: maxY,
-  );
+  final ({int startX, int startY, int endX, int endY}) endpoints;
+  if (startX != null && startY != null) {
+    endpoints = swipeFromStart(
+      direction: direction,
+      startX: startX,
+      startY: startY,
+      distance: distance,
+      maxX: maxX,
+      maxY: maxY,
+    );
+  } else {
+    final centerX = maxX ~/ 2;
+    final centerY = maxY ~/ 2;
+    final half = cappedSwipeHalf(
+      direction: direction,
+      half: distance ~/ 2,
+      centerX: centerX,
+      centerY: centerY,
+      maxX: maxX,
+      maxY: maxY,
+    );
 
-  final endpoints = direction.swipeEndpoints(
-    centerX: centerX,
-    centerY: centerY,
-    half: half,
-  );
+    endpoints = direction.swipeEndpoints(
+      centerX: centerX,
+      centerY: centerY,
+      half: half,
+    );
+  }
 
   await connector.swipe(
     startX: endpoints.startX,
@@ -346,6 +396,70 @@ Future<void> _swipeInDirection(
     endX: endpoints.endX,
     endY: endpoints.endY,
   );
+}
+
+/// Swipe [distance] pixels from an explicit finger start, clamped to viewport.
+({int startX, int startY, int endX, int endY}) swipeFromStart({
+  required SwipeDirection direction,
+  required int startX,
+  required int startY,
+  required int distance,
+  required int maxX,
+  required int maxY,
+}) {
+  final effectiveDistance = cappedSwipeDistanceFromStart(
+    direction: direction,
+    distance: distance,
+    startX: startX,
+    startY: startY,
+    maxX: maxX,
+    maxY: maxY,
+  );
+
+  return switch (direction) {
+    SwipeDirection.up => (
+        startX: startX,
+        startY: startY,
+        endX: startX,
+        endY: startY - effectiveDistance,
+      ),
+    SwipeDirection.down => (
+        startX: startX,
+        startY: startY,
+        endX: startX,
+        endY: startY + effectiveDistance,
+      ),
+    SwipeDirection.left => (
+        startX: startX,
+        startY: startY,
+        endX: startX - effectiveDistance,
+        endY: startY,
+      ),
+    SwipeDirection.right => (
+        startX: startX,
+        startY: startY,
+        endX: startX + effectiveDistance,
+        endY: startY,
+      ),
+  };
+}
+
+/// Limits swipe distance so the finger end stays within the viewport.
+int cappedSwipeDistanceFromStart({
+  required SwipeDirection direction,
+  required int distance,
+  required int startX,
+  required int startY,
+  required int maxX,
+  required int maxY,
+}) {
+  final maxDistance = switch (direction) {
+    SwipeDirection.up => startY,
+    SwipeDirection.down => maxY - startY,
+    SwipeDirection.left => startX,
+    SwipeDirection.right => maxX - startX,
+  };
+  return min(distance, maxDistance);
 }
 
 /// Limits swipe distance so finger endpoints stay within the viewport.

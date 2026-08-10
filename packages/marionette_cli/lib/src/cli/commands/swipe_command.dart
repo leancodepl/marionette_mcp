@@ -22,10 +22,16 @@ class SwipeCommand extends InstanceCommand {
         help: 'Swipe distance in pixels for element-based mode.',
         defaultsTo: '200',
       )
-      ..addOption('start-x',
-          help: 'Start X coordinate for coordinate-based swipe.')
-      ..addOption('start-y',
-          help: 'Start Y coordinate for coordinate-based swipe.')
+      ..addOption(
+        'start-x',
+        help: 'Start X. With --end-x/--end-y: full coordinate swipe. '
+            'With --direction: finger start (requires --start-y).',
+      )
+      ..addOption(
+        'start-y',
+        help: 'Start Y. With --end-x/--end-y: full coordinate swipe. '
+            'With --direction: finger start (requires --start-x).',
+      )
       ..addOption('end-x', help: 'End X coordinate for coordinate-based swipe.')
       ..addOption('end-y',
           help: 'End Y coordinate for coordinate-based swipe.');
@@ -52,28 +58,10 @@ class SwipeCommand extends InstanceCommand {
     final endX = argResults?['end-x'] as String?;
     final endY = argResults?['end-y'] as String?;
 
-    final anyCoordinate =
-        startX != null || startY != null || endX != null || endY != null;
-
-    final anyElement = argResults?['key'] != null ||
-        argResults?['identifier'] != null ||
-        argResults?['text'] != null ||
-        argResults?['type'] != null ||
-        argResults?['direction'] != null ||
-        (argResults?.wasParsed('distance') ?? false);
-
-    if (anyCoordinate && anyElement) {
-      usageException(
-        'Cannot mix coordinate-based options '
-        '(--start-x/--start-y/--end-x/--end-y) with element-based options '
-        '(--key/--identifier/--text/--type/--direction/--distance). '
-        'Use one mode.',
-      );
-    }
-
+    final coordinateMode = endX != null || endY != null;
     final swipeArgs = <String, dynamic>{};
 
-    if (anyCoordinate) {
+    if (coordinateMode) {
       if (startX == null || startY == null || endX == null || endY == null) {
         usageException(
           'Coordinate-based swipe requires all of: '
@@ -114,10 +102,25 @@ class SwipeCommand extends InstanceCommand {
       final distance = argResults?['distance'] as String;
       _ensureNumber('--distance', distance);
 
+      if ((startX == null) != (startY == null)) {
+        usageException(
+          'Element-based swipe requires both --start-x and --start-y when '
+          'either is provided.',
+        );
+      }
+      if (startX != null && startY != null) {
+        _ensureNumber('--start-x', startX);
+        _ensureNumber('--start-y', startY);
+      }
+
       swipeArgs
         ..addAll(matcher)
         ..['direction'] = direction
         ..['distance'] = distance;
+      if (startX != null && startY != null) {
+        swipeArgs['startX'] = startX;
+        swipeArgs['startY'] = startY;
+      }
     }
 
     final response = await connector.swipe(swipeArgs);

@@ -71,4 +71,52 @@ void main() {
       expect(endpoints.endY, lessThanOrEqualTo(maxY));
     });
   });
+
+  group('cappedSwipeDistanceFromStart', () {
+    test('limits upward swipe from startY', () {
+      expect(
+        cappedSwipeDistanceFromStart(
+          direction: SwipeDirection.up,
+          distance: 200,
+          startX: 50,
+          startY: 80,
+          maxX: 100,
+          maxY: 200,
+        ),
+        80,
+      );
+    });
+
+    test('keeps requested distance when viewport allows', () {
+      expect(
+        cappedSwipeDistanceFromStart(
+          direction: SwipeDirection.right,
+          distance: 100,
+          startX: 10,
+          startY: 50,
+          maxX: 200,
+          maxY: 100,
+        ),
+        100,
+      );
+    });
+  });
+
+  group('swipeFromStart', () {
+    test('swipes right from explicit start', () {
+      final endpoints = swipeFromStart(
+        direction: SwipeDirection.right,
+        startX: 100,
+        startY: 200,
+        distance: 50,
+        maxX: 300,
+        maxY: 400,
+      );
+
+      expect(endpoints.startX, 100);
+      expect(endpoints.startY, 200);
+      expect(endpoints.endX, 150);
+      expect(endpoints.endY, 200);
+    });
+  });
 }

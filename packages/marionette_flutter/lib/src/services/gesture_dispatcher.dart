@@ -277,14 +277,15 @@ class GestureDispatcher {
   /// Simulates a swipe gesture on an element matching [matcher] in the given
   /// [direction] for [distance] pixels.
   ///
-  /// The swipe starts from the center of the matched element and moves in the
-  /// specified direction.
+  /// The swipe starts from the center of the matched element (or [startOffset]
+  /// when provided) and moves in the specified direction.
   Future<void> swipe(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     required String direction,
     double distance = 200.0,
+    Offset? startOffset,
   }) async {
     final element = widgetFinder.findElement(matcher, configuration);
 
@@ -292,7 +293,7 @@ class GestureDispatcher {
       throw Exception('Element matching ${matcher.toJson()} not found');
     }
 
-    final start = _globalCenterOf(element);
+    final start = startOffset ?? _globalCenterOf(element);
 
     final end = switch (direction) {
       'left' => start + Offset(-distance, 0),

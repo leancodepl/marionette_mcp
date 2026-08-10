@@ -91,7 +91,9 @@ void registerGestureExtensions({
   registerInternalMarionetteExtension(
     name: 'marionette.swipe',
     callback: (params) async {
-      if (params.containsKey('startX')) {
+      final coordinateMode =
+          params.containsKey('endX') || params.containsKey('endY');
+      if (coordinateMode) {
         final startXStr = params['startX'];
         final startYStr = params['startY'];
         final endXStr = params['endX'];
@@ -153,12 +155,33 @@ void registerGestureExtensions({
         distance = 200.0;
       }
 
+      Offset? startOffset;
+      final startXStr = params['startX'];
+      final startYStr = params['startY'];
+      if (startXStr != null || startYStr != null) {
+        if (startXStr == null || startYStr == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Element-based swipe requires both startX and startY when either '
+            'is provided.',
+          );
+        }
+        final startX = double.tryParse(startXStr);
+        final startY = double.tryParse(startYStr);
+        if (startX == null || startY == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Invalid startX/startY values. Must be valid numbers.',
+          );
+        }
+        startOffset = Offset(startX, startY);
+      }
+
       await gestureDispatcher.swipe(
         matcher,
         widgetFinder,
         configuration,
         direction: direction,
         distance: distance,
+        startOffset: startOffset,
       );
 
       return MarionetteExtensionResult.success({

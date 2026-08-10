@@ -172,3 +172,28 @@ Flutter `TextField`s are in `get_interactive_elements`; the **IME is outside the
 Dismiss: Android — Back or tap outside; iOS — Done / tap outside / key via native lane.
 
 ---
+
+## Swipe gesture changes
+
+Previously, `startX`/`startY` only worked in **full coordinate mode** (all four of `startX`, `startY`, `endX`, `endY` required). There was no way to say *“start here, swipe this direction for N pixels”* — and the CLI blocked mixing coordinates with element matchers.
+
+**What changed:**
+
+| Tool | New behavior |
+| ---- | ------------ |
+| `swipe` (Flutter) | Element mode accepts optional **`startX`/`startY`** with `direction` + `distance` (default start: matched widget center) |
+| `native_scroll` | Optional **`startX`/`startY`** with `direction` + `distance` (default start: viewport center) |
+
+**Why:** Scrollable regions are often **not at screen center** — swiping from the widget’s edge (e.g. top of a list) works better than a fixed center point. **System gestures** (notification shade, pull-from-top) need a native swipe **starting at the screen edge**, which `native_scroll` now supports. Full start→end coordinates still work unchanged when all four values are provided.
+
+See [MCP tools — swipe / native_scroll](../docs/mcp-tools.md).
+
+---
+
+## `marionette_cli` gap
+
+**`marionette_cli` has no native-lane commands today** — only Flutter-lane tools (`connect`, `tap`, `swipe`, `enter_text`, etc.). All native tools (`native_connect`, `native_get_elements`, `native_tap`, `native_scroll`, `native_enter_text`, `native_take_screenshot`) are **MCP-only**.
+
+Manual native-lane testing currently requires an MCP client (e.g. Cursor). **`marionette_cli` should be extended** with native commands mirroring the MCP surface so shell/CI workflows can drive system UI without an IDE.
+
+---

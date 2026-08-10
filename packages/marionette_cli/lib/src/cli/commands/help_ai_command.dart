@@ -278,6 +278,8 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
     --type <string>       Match by widget type name (e.g., PageView)
     --direction <dir>     left, right, up, or down (required for this mode)
     --distance <number>   Swipe distance in pixels (default: 200)
+    --start-x <number>    Optional finger start X (requires --start-y)
+    --start-y <number>    Optional finger start Y (requires --start-x)
 
   Coordinate-based options (all required together):
     --start-x <number>    Start X coordinate
@@ -288,6 +290,7 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
   Examples:
     marionette -i my-app swipe --type PageView --direction left
     marionette -i my-app swipe --key carousel --direction right --distance 300
+    marionette -i my-app swipe --text Notes --direction up --start-x 200 --start-y 800
     marionette -i my-app swipe --start-x 300 --start-y 400 --end-x 50 --end-y 400
 
   Output (stdout):

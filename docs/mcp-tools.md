@@ -27,7 +27,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 | `secondary_tap` | Right mouse button click on a matching element (**desktop only**); triggers `onSecondaryTap`, e.g. context menus. Match by `key`, `identifier`, `text`, `type`, or `coordinates`. |
 | `double_tap` | Double tap an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `delay` between taps, default 100 ms). |
 | `long_press` | Long press an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `duration`, default 600 ms) — context menus, reorderable lists. |
-| `swipe` | Swipe/drag. Element-based (`key`/`identifier`/`text` + `direction` + optional `distance`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
+| `swipe` | Swipe/drag. Element-based (`key`/`identifier`/`text` + `direction` + optional `distance` + optional `startX`/`startY`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
 | `pinch_zoom` | Pinch to zoom an element matched by `key`, `identifier`, `text`, `type`, or `coordinates`. `scale > 1.0` zooms in, `< 1.0` zooms out. For maps, images, PDFs. |
 | `press_back_button` | Simulate the system back button (Android back / iOS swipe-back). Works with Navigator, GoRouter, etc. |
 | `scroll_to` | Scroll until an element matching `key`, `identifier`, or `text` becomes visible. |
@@ -60,7 +60,7 @@ Tools for system / native UI outside the Flutter widget tree (permission dialogs
 | `native_disconnect` | Stop the native session and release device-side processes. |
 | `native_get_elements` | Return the native UI hierarchy as JSON (`elements`, optional `foregroundApp`). |
 | `native_tap` | Tap by exact `text`, `id`, or physical-pixel `x`/`y`. |
-| `native_scroll` | Swipe in a `direction`; optionally scroll until `text` is visible. |
+| `native_scroll` | Swipe in a `direction` from screen center (default) or optional `startX`/`startY`; optionally scroll until `text` is visible. |
 | `native_enter_text` | Type into a native field by `id` or `label`. |
 | `native_take_screenshot` | Returns a base64 inline PNG of the full device screen via the native session (system UI, WebViews). When `MARIONETTE_SCREENSHOTS_DIR` is set, also saves the PNG to that directory and includes the absolute path alongside the inline image. |
 

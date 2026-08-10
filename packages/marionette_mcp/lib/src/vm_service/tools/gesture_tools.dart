@@ -239,7 +239,7 @@ void registerGestureTools(
     ..registerTool(
       'swipe',
       description: 'Simulates a swipe/drag gesture on the Flutter app. Supports two modes: '
-          '1. Element-based: provide key, identifier, or text to identify the element, plus a direction (left, right, up, down) and optional distance in pixels (default 200). '
+          '1. Element-based: provide key, identifier, or text to identify the element, plus a direction (left, right, up, down) and optional distance in pixels (default 200). Optional startX/startY set the finger start (default: element center). '
           '2. Coordinate-based: provide startX, startY, endX, endY for precise control. '
           'Useful for interacting with PageView, Dismissible, Drawer, Slider, and other swipe-based widgets. '
           'Requires an active connection established via connect.',
@@ -264,10 +264,12 @@ void registerGestureTools(
             description: 'Swipe distance in pixels for element-based mode (default: 200).',
           ),
           'startX': JsonSchema.number(
-            description: 'Start X coordinate for coordinate-based swipe.',
+            description: 'Start X coordinate. With endX/endY: full coordinate swipe. '
+                'With direction (+ matcher): finger start point (requires startY).',
           ),
           'startY': JsonSchema.number(
-            description: 'Start Y coordinate for coordinate-based swipe.',
+            description: 'Start Y coordinate. With endX/endY: full coordinate swipe. '
+                'With direction (+ matcher): finger start point (requires startX).',
           ),
           'endX': JsonSchema.number(
             description: 'End X coordinate for coordinate-based swipe.',
@@ -282,8 +284,13 @@ void registerGestureTools(
 
         final swipeArgs = <String, dynamic>{};
 
-        if (args.containsKey('startX')) {
-          if (!args.containsKey('startY') || !args.containsKey('endX') || !args.containsKey('endY')) {
+        final coordinateMode =
+            args.containsKey('endX') || args.containsKey('endY');
+        if (coordinateMode) {
+          if (!args.containsKey('startX') ||
+              !args.containsKey('startY') ||
+              !args.containsKey('endX') ||
+              !args.containsKey('endY')) {
             return CallToolResult(
               isError: true,
               content: [
@@ -314,6 +321,21 @@ void registerGestureTools(
           swipeArgs['direction'] = args['direction'] as String;
           if (args.containsKey('distance')) {
             swipeArgs['distance'] = args['distance'].toString();
+          }
+          if (args.containsKey('startX') || args.containsKey('startY')) {
+            if (!args.containsKey('startX') || !args.containsKey('startY')) {
+              return CallToolResult(
+                isError: true,
+                content: [
+                  const TextContent(
+                    text: 'Element-based swipe requires both startX and startY '
+                        'when either is provided.',
+                  ),
+                ],
+              );
+            }
+            swipeArgs['startX'] = args['startX'].toString();
+            swipeArgs['startY'] = args['startY'].toString();
           }
         }
 
