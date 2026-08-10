@@ -6,7 +6,6 @@ Handoff doc for validating Marionette against UI **outside** the Flutter widget 
 
 All native-lane test cases live in the **example app** under the bottom-nav **Testing** tab:
 
-
 | Screen               | Route                                     | Requirement                  |
 | -------------------- | ----------------------------------------- | ---------------------------- |
 | Testing (hub)        | `/testing`                                | Entry point                  |
@@ -18,26 +17,21 @@ All native-lane test cases live in the **example app** under the bottom-nav **Te
 | Video player         | `/testing/platform-views/video-player`    | §1b GPU-backed platform view |
 | Permission dialogs   | `/testing/permission-dialogs`             | §3 Permission dialogs        |
 | Pickers & sheets     | `/testing/pickers-and-sheets`             | §4 Pickers and sheets        |
-
+| Keyboard / IME       | `/testing/keyboard`                       | §8 Keyboard / IME            |
 
 **Prerequisites:** Flutter lane — `connect` + VM service URI. Native lane — `native_connect` with `platform: android` | `ios` (see [README — Native lane requirements](../README.md#native-lane-requirements-android)).
 
 ---
 
-
-
 ## §1a — Plain native UI controls
-
 
 |                        | Android | iOS |
 | ---------------------- | ------- | --- |
 | Implemented & verified | ✓       | ✓   |
 
-
 Embedded `AndroidView` / `UiKitView` hosting native widgets (Android: `TextView`, `EditText`, `Button`; iOS: `UILabel`, `UITextField`, `UIButton`). Implementation: `example/lib/widgets/native_controls_platform_view.dart` + platform factories in `example/android/…/NativeControlsViewFactory.kt` and `example/ios/Runner/NativeControlsViewFactory.swift`.
 
 ### Expected Marionette behavior
-
 
 | Tool                              | Lane    | Result                                                                                                                              |
 | --------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -46,20 +40,17 @@ Embedded `AndroidView` / `UiKitView` hosting native widgets (Android: `TextView`
 | `native_tap`, `native_enter_text` | Native  | Can interact with those elements.                                                                                                   |
 | `tap`, `enter_text` (Flutter)     | Flutter | Cannot target inner native widgets (not in Flutter tree).                                                                           |
 
-
 Native UI inside a platform view is **not part of the Flutter element tree**; it is only exposed through the native lane after `native_connect`.
 
 ### Flutter `take_screenshots` vs platform views (Android ≠ iOS)
 
 Marionette `take_screenshots` rasterizes Flutter’s **Skia layer tree** (`RenderView` → `toImage`). Platform views are embedded differently per OS:
 
-
 |                                         | Android                                                                                        | iOS                                                                              |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Embedding                               | Often **Virtual Display** — native view is copied into a Flutter **texture** in the layer tree | **Hybrid composition only** — `UIView` is a real UIKit subview alongside Flutter |
 | `take_screenshots` shows platform view? | **Usually yes** (texture is in the tree)                                                       | **No** — UIKit subviews are not in Skia; area appears empty / wrong in the PNG   |
 | Use instead                             | —                                                                                              | `native_take_screenshot` (OS-level capture)                                      |
-
 
 So on **iOS**, rely on `native_get_elements` + `native_take_screenshot` for platform-view content; Flutter screenshot + vision is misleading for that region. On **Android**, Flutter screenshot may still be enough for a quick visual check, but automation remains **native lane only**.
 
@@ -74,36 +65,34 @@ So on **iOS**, rely on `native_get_elements` + `native_take_screenshot` for plat
 
 ---
 
-
-
 ## §1b — GPU-backed platform views
 
 Platform-view **interactive elements** only (page chrome omitted — always **Both**).
 
-| Symbol | Meaning |
-| ------ | ------- |
-| **Both** | `get_interactive_elements` and `native_get_elements` |
-| **Flutter** | `get_interactive_elements` only |
-| **Native** | `native_get_elements` only |
-| **—** | Neither tool |
+| Symbol      | Meaning                                              |
+| ----------- | ---------------------------------------------------- |
+| **Both**    | `get_interactive_elements` and `native_get_elements` |
+| **Flutter** | `get_interactive_elements` only                      |
+| **Native**  | `native_get_elements` only                           |
+| **—**       | Neither tool                                         |
 
 ### Camera preview
 
-| Platform-view element | Android | iOS |
-| --------------------- | :-------: | :-: |
-| Preview surface | **—** | *not tested* |
+| Platform-view element | Android |     iOS      |
+| --------------------- | :-----: | :----------: |
+| Preview surface       |  **—**  | _not tested_ |
 
 **Android:** feed renders visually but neither lane lists the preview.
 
-**iOS:** not tested on device — Simulator has no camera. On Simulator only, init fails with *"No cameras found on this device"* and both lanes expose that error text (**Both**); this is not representative of real-device behavior.
+**iOS:** not tested on device — Simulator has no camera. On Simulator only, init fails with _"No cameras found on this device"_ and both lanes expose that error text (**Both**); this is not representative of real-device behavior.
 
 ### Google Maps
 
-| Platform-view element | Android | iOS |
-| --------------------- | :-------: | :-: |
-| Map pan area | **Native** (TextureView) | **Native** (`platform_view[1]`) |
-| Zoom in / Zoom out | **Native** | **—** |
-| Google logo button | **—** | **Native** |
+| Platform-view element |         Android          |               iOS               |
+| --------------------- | :----------------------: | :-----------------------------: |
+| Map pan area          | **Native** (TextureView) | **Native** (`platform_view[1]`) |
+| Zoom in / Zoom out    |        **Native**        |              **—**              |
+| Google logo button    |          **—**           |           **Native**            |
 
 Flutter lane misses the map on **both** platforms.
 
@@ -111,11 +100,11 @@ Flutter lane misses the map on **both** platforms.
 
 One visible Dart overlay; native player mirrors playback state in the accessibility tree. Same on Android & iOS — **different nodes, same controls**:
 
-| Control | Flutter lane | Native lane |
-| ------- | :----------: | :-----------: |
-| Seek / progress | ✓ | ✓ |
-| Play / pause | ✓ | ✓ |
-| Time | ✓ | ✓ |
+| Control         | Flutter lane | Native lane |
+| --------------- | :----------: | :---------: |
+| Seek / progress |      ✓       |      ✓      |
+| Play / pause    |      ✓       |      ✓      |
+| Time            |      ✓       |      ✓      |
 
 iOS: Maps registers a `platform_view[…]` node; video_player does not (texture/hybrid composition vs true platform view).
 
@@ -125,17 +114,17 @@ iOS: Maps registers a `platform_view[…]` node; video_player does not (texture/
 
 |                        | Android | iOS |
 | ---------------------- | :-----: | :-: |
-| Implemented & verified | ✓       | ✓   |
+| Implemented & verified |    ✓    |  ✓  |
 
 Screen: **Testing → Permission dialogs** (`/testing/permission-dialogs`). Triggers system prompts via `permission_handler` (notifications switch, camera/photos request buttons).
 
-| Tool | Lane | Result |
-| ---- | ---- | ------ |
-| `native_get_elements` | Native | **Allow / Don’t allow** (or equivalent) on the OS dialog — works on **both** platforms |
-| `native_tap` | Native | Can accept or deny the dialog |
-| `get_interactive_elements` | Flutter | App UI only — **does not** list the system dialog |
-| `take_screenshots` | Flutter | **Does not** show the dialog (drawn above Flutter by the OS) |
-| `native_take_screenshot` | Native | **Does** show the dialog |
+| Tool                       | Lane    | Result                                                                                 |
+| -------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `native_get_elements`      | Native  | **Allow / Don’t allow** (or equivalent) on the OS dialog — works on **both** platforms |
+| `native_tap`               | Native  | Can accept or deny the dialog                                                          |
+| `get_interactive_elements` | Flutter | App UI only — **does not** list the system dialog                                      |
+| `take_screenshots`         | Flutter | **Does not** show the dialog (drawn above Flutter by the OS)                           |
+| `native_take_screenshot`   | Native  | **Does** show the dialog                                                               |
 
 Reset between runs: `adb shell pm reset-permissions` (Android) or `xcrun simctl privacy booted reset all <bundle id>` (iOS).
 
@@ -143,31 +132,43 @@ Reset between runs: `adb shell pm reset-permissions` (Android) or `xcrun simctl 
 
 ## §4 — Pickers and sheets
 
-|                        | Android | iOS |
-| ---------------------- | :-----: | :-: |
-| Implemented            | ✓       | ✓   |
-| Tested                 | ✓ (smoke) | *not tested* |
+|             |  Android  |     iOS      |
+| ----------- | :-------: | :----------: |
+| Implemented |     ✓     |      ✓       |
+| Tested      | ✓ (smoke) | _not tested_ |
 
 Screen: **Testing → Pickers & sheets** (`/testing/pickers-and-sheets`). Each button opens an OS-owned UI outside the Flutter tree:
 
-| Case | Plugin | Native UI (Android / iOS) |
-| ---- | ------ | ------------------------- |
-| **Files** | `file_picker` | SAF DocumentsUI / `UIDocumentPickerViewController` |
-| **Photos** | `image_picker` (gallery) | Android photo picker / `PHPickerViewController` |
-| **Camera capture** | `image_picker` (camera) | Camera intent / `UIImagePickerController` |
-| **Share** | `share_plus` | Intent chooser / `UIActivityViewController` |
-
-Same pattern as §3 permission dialogs:
-
-| Tool | Lane | Result |
-| ---- | ---- | ------ |
-| `native_get_elements` | Native | Lists controls inside the open picker/sheet (e.g. Cancel, file rows, share targets) |
-| `native_tap` | Native | Can interact with picker/sheet UI |
-| `get_interactive_elements` | Flutter | App buttons only — **does not** list the open picker/sheet |
-| `take_screenshots` | Flutter | **Does not** show the picker/sheet |
-| `native_take_screenshot` | Native | **Does** show the picker/sheet |
+| Case               | Plugin                   | Native UI (Android / iOS)                          |
+| ------------------ | ------------------------ | -------------------------------------------------- |
+| **Files**          | `file_picker`            | SAF DocumentsUI / `UIDocumentPickerViewController` |
+| **Photos**         | `image_picker` (gallery) | Android photo picker / `PHPickerViewController`    |
+| **Camera capture** | `image_picker` (camera)  | Camera intent / `UIImagePickerController`          |
+| **Share**          | `share_plus`             | Intent chooser / `UIActivityViewController`        |
 
 **Testing note:** Smoke-tested on **Android only** — all four cases open the expected native UI and respond to `native_get_elements` / `native_tap`. Not tested deeply (edge cases, every control, dismiss paths). **iOS not tested yet.**
 
 ---
 
+## §8 — Keyboard / IME
+
+| | Android | iOS |
+| --- | :-----: | :-: |
+| Example screen | ✓ | ✓ |
+| **`native_get_elements` + `native_tap` on keyboard keys** | **✗** | **✓** |
+
+Screen: **Testing → Keyboard / IME** (`/testing/keyboard`). Three fields: **Amount** (numeric), **Notes** (multiline / Return), **Title** (Done).
+
+Flutter `TextField`s are in `get_interactive_elements`; the **IME is outside the Flutter tree**. `native_take_screenshot` shows the keyboard on **both** platforms — but only **iOS** exposes key buttons to the native lane.
+
+| | Android | iOS |
+| --- | --- | --- |
+| `native_get_elements` lists key buttons | **No** | **Yes** |
+| `native_tap` by key label | **No** | **Yes** |
+| Android workarounds | `native_tap` **x/y**; Flutter `tap` + `enter_text` | — |
+
+**Android limitation:** UIAutomator2 only sees the app window — Gboard does not publish keys to accessibility. **Not a quick Marionette fix**; would need a new primitive (e.g. `adb input text` / keyevent).
+
+Dismiss: Android — Back or tap outside; iOS — Done / tap outside / key via native lane.
+
+---

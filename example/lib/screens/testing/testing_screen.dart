@@ -44,6 +44,14 @@ class TestingScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/testing/pickers-and-sheets'),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.keyboard_outlined),
+            title: const Text('Keyboard / IME'),
+            subtitle: const Text('Numeric, return, done keyboards (§8)'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/keyboard'),
+          ),
         ],
       ),
     );
