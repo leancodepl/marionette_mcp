@@ -97,7 +97,8 @@ class ElementTreeFinder {
               p.runtimeType != DiagnosticsProperty &&
               p.name != null &&
               p.value != null &&
-              (!compact || _isPrimitive(p.value)))
+              (!compact ||
+                  (_isPrimitive(p.value) && !_isLayoutDetail(p.name!))))
           .map(
             (p) => MapEntry(p.name!, p.value.toString()),
           ),
@@ -111,6 +112,11 @@ class ElementTreeFinder {
 
     if (discoverableText != null) {
       data['text'] = discoverableText;
+      // `Text` also declares its string as `data`, so an element would carry
+      // the same words twice.
+      if (compact && data['data'] == discoverableText) {
+        data.remove('data');
+      }
     }
 
     // The InputDecoration blob is dropped in compact mode, but it carries a
@@ -130,19 +136,35 @@ class ElementTreeFinder {
       try {
         final offset = renderObject.localToGlobal(Offset.zero);
         final size = renderObject.size;
-        data['bounds'] = {
-          'x': offset.dx,
-          'y': offset.dy,
-          'width': size.width,
-          'height': size.height,
-        };
+        // Logical pixels, and the agent uses them to reason about position and
+        // to tap by coordinate — neither needs the sixteen significant digits a
+        // double prints (`411.42857142857144`). Rounded only in compact mode,
+        // so the default payload stays byte-for-byte what it was.
+        data['bounds'] = compact
+            ? {
+                'x': offset.dx.round(),
+                'y': offset.dy.round(),
+                'width': size.width.round(),
+                'height': size.height.round(),
+              }
+            : {
+                'x': offset.dx,
+                'y': offset.dy,
+                'width': size.width,
+                'height': size.height,
+              };
       } catch (_) {
         // Ignore if we can't get bounds
       }
     }
 
-    // Check visibility
-    data['visible'] = _isElementVisible(renderObject);
+    // Check visibility. Every element in the list is on screen in the ordinary
+    // case, so in compact mode this is reported only when it is not — absence
+    // means visible, and the exception stays impossible to miss.
+    final visible = _isElementVisible(renderObject);
+    if (!compact || !visible) {
+      data['visible'] = visible;
+    }
 
     return data;
   }
@@ -150,6 +172,27 @@ class ElementTreeFinder {
   /// Whether [value] is a primitive worth keeping in compact mode.
   static bool _isPrimitive(Object? value) =>
       value is bool || value is num || value is String || value is Enum;
+
+  /// Properties that survive the primitive filter but say nothing an agent can
+  /// act on: they describe how text or gestures are laid out and rendered, and
+  /// no interaction tool reads them (`tap`/`enter_text`/`scroll_to`/`swipe`
+  /// match on key, text, type or coordinates). They are also the ones that
+  /// dominate what is left once the object blobs are gone — every `Text` in a
+  /// list carries five of them.
+  static const _layoutDetails = {
+    'startBehavior',
+    'textAlign',
+    'textDirection',
+    'softWrap',
+    'overflow',
+    'textScaler',
+    'textWidthBasis',
+    'textHeightBehavior',
+    'locale',
+    'selectionColor',
+  };
+
+  static bool _isLayoutDetail(String name) => _layoutDetails.contains(name);
 
   String? _extractKeyValue(Key? key) {
     if (key is ValueKey<String>) {

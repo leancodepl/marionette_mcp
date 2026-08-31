@@ -146,6 +146,83 @@ void main() {
     });
   });
 
+  group('ElementTreeFinder compact mode, second pass', () {
+    testWidgets('drops layout details that survive the primitive filter',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Text(
+                'Agenda',
+                textAlign: TextAlign.center,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final verbose =
+          _finder.findInteractiveElements().firstWhere((e) => e['type'] == 'Text');
+      expect(verbose.containsKey('textAlign'), isTrue,
+          reason: 'default output is unchanged');
+
+      final compact = _finder
+          .findInteractiveElements(compact: true)
+          .firstWhere((e) => e['type'] == 'Text');
+      for (final name in [
+        'textAlign',
+        'textDirection',
+        'softWrap',
+        'overflow',
+        'textScaler',
+        'textWidthBasis',
+      ]) {
+        expect(compact.containsKey(name), isFalse,
+            reason: '$name is a rendering detail no interaction tool reads');
+      }
+      expect(compact['text'], 'Agenda',
+          reason: 'the words themselves stay');
+      expect(compact.containsKey('data'), isFalse,
+          reason: "Text declares its string twice; compact keeps one");
+    });
+
+    testWidgets('rounds bounds and omits visible when the element is visible',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: ElevatedButton(onPressed: () {}, child: const Text('Go')),
+            ),
+          ),
+        ),
+      );
+
+      final verbose = _finder
+          .findInteractiveElements()
+          .firstWhere((e) => e['type'] == 'ElevatedButton');
+      final verboseBounds = verbose['bounds']! as Map<String, dynamic>;
+      expect(verboseBounds['x'], isA<double>(),
+          reason: 'default output keeps the raw doubles');
+      expect(verbose['visible'], isTrue,
+          reason: 'default output always states visibility');
+
+      final compact = _finder
+          .findInteractiveElements(compact: true)
+          .firstWhere((e) => e['type'] == 'ElevatedButton');
+      final compactBounds = compact['bounds']! as Map<String, dynamic>;
+      for (final key in ['x', 'y', 'width', 'height']) {
+        expect(compactBounds[key], isA<int>(),
+            reason: 'compact rounds $key to a whole logical pixel');
+      }
+      expect(compactBounds['x'], (verboseBounds['x']! as double).round());
+      expect(compact.containsKey('visible'), isFalse);
+    });
+  });
+
   group('ElementTreeFinder compact mode', () {
     testWidgets('drops style/object blobs but keeps primitive state and bounds',
         (tester) async {
@@ -181,7 +258,8 @@ void main() {
       expect(compactButton['enabled'], isNotNull,
           reason: 'compact keeps the primitive enabled flag');
       expect(compactButton.containsKey('bounds'), isTrue);
-      expect(compactButton['visible'], isTrue);
+      expect(compactButton.containsKey('visible'), isFalse,
+          reason: 'compact reports visibility only when it is false');
     });
 
     testWidgets(
