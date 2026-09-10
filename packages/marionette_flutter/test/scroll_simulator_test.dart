@@ -854,6 +854,86 @@ void main() {
         expect(targetController.offset, greaterThan(0));
       },
     );
+
+    testWidgets(
+      'gives two full-length candidates their whole budget and offers none '
+      'to a third',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // Each list here is long enough to need a full pass in both
+        // directions, so each one legitimately asks for its whole
+        // per-candidate budget. Two of those account for the total, which is
+        // why the candidate list stops at two: a third could only ever be
+        // handed the leftovers, and a budget too small to cross a list buys
+        // nothing but drags.
+        final firstController = ScrollController();
+        final secondController = ScrollController();
+        final thirdController = ScrollController();
+        addTearDown(() {
+          firstController.dispose();
+          secondController.dispose();
+          thirdController.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: <Widget>[
+                  SizedBox(
+                    width: 300,
+                    child: _lazyList(
+                      controller: firstController,
+                      label: (int index) => 'Article $index',
+                      itemCount: 345,
+                      minTileHeight: 80,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 260,
+                    child: _lazyList(
+                      controller: secondController,
+                      label: (int index) => 'Country $index',
+                      itemCount: 345,
+                      minTileHeight: 80,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: _lazyList(
+                      controller: thirdController,
+                      label: (int index) => 'Note $index',
+                      itemCount: 345,
+                      minTileHeight: 80,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = _CoordinateGestureDispatcher(tester);
+        final simulator = ScrollSimulator(dispatcher, WidgetFinder());
+
+        await expectLater(
+          () => simulator.scrollUntilVisible(
+            const TextMatcher('Missing row'),
+            _configuration,
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        // A drag starts at the centre of the scrollable it aims at, so the
+        // columns dragged name the candidates attempted: 150 and 430 are the
+        // two widest lists, 670 the third.
+        expect(
+          dispatcher.dragOrigins.map((Offset origin) => origin.dx).toSet(),
+          <double>{150, 430},
+        );
+        expect(dispatcher.dragCount, lessThanOrEqualTo(400));
+      },
+    );
   });
 }
 
@@ -892,13 +972,17 @@ Widget _buildSheetApp({required Widget sheet, Widget? background}) {
 Widget _lazyList({
   required ScrollController controller,
   required String Function(int index) label,
+  int itemCount = _listItemCount,
+  double? minTileHeight,
 }) {
   return ListView.builder(
     controller: controller,
     physics: const ClampingScrollPhysics(),
-    itemCount: _listItemCount,
-    itemBuilder: (BuildContext context, int index) =>
-        ListTile(title: Text(label(index))),
+    itemCount: itemCount,
+    itemBuilder: (BuildContext context, int index) => ListTile(
+      title: Text(label(index)),
+      minTileHeight: minTileHeight,
+    ),
   );
 }
 
@@ -1023,11 +1107,13 @@ class _CoordinateGestureDispatcher extends GestureDispatcher {
   _CoordinateGestureDispatcher(this._tester);
 
   final WidgetTester _tester;
-  int dragCount = 0;
+  final List<Offset> dragOrigins = <Offset>[];
+
+  int get dragCount => dragOrigins.length;
 
   @override
   Future<void> drag(Offset from, Offset to) async {
-    dragCount++;
+    dragOrigins.add(from);
     await _tester.dragFrom(from, to - from);
     await _tester.pump();
   }

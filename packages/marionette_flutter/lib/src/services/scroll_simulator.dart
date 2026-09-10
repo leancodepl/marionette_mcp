@@ -13,7 +13,13 @@ class ScrollSimulator {
   final WidgetFinder _widgetFinder;
 
   static const _minDelta = 64.0;
-  static const _maxScrollableCandidates = 3;
+
+  // Two, and no more, because of the caps below: one candidate may spend
+  // _defaultMaxScrollAttemptsCap attempts and the whole call may spend
+  // _totalScrollAttemptsCap, so two is the most that can each be given a full
+  // budget. A third would get only what the first two left over, which is too
+  // little to cross the list it was picked for.
+  static const _maxScrollableCandidates = 2;
   static const _totalScrollAttemptsCap = 400;
   static const _exposureSamples = 21;
   static const _fallbackMaxScrollAttempts = 50;
