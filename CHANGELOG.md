@@ -5,6 +5,7 @@
 - Fix `scroll_to` missing a target that only comes into view on its final drag, at either end of a list
 - Fix `scroll_to` being unable to reach targets in long lists: it now scrolls by a share of the visible viewport instead of a fixed 64px, so lists past roughly 170 rows are reachable and shorter ones take far fewer gestures
 - Fix `scroll_to` on screens with more than one scrollable: when the target is not built yet it now tries each reachable scrollable in turn rather than committing to a single guess, so a chip row, tab strip or nav rail no longer swallows the gesture
+- Fix the `scroll_to` failure reading `Widget not found after 0 scroll attempts` when no scrollable could be dragged at all, which hid the real cause
 
 # 0.6.0
 

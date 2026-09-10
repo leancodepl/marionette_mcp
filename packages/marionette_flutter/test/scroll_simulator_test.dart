@@ -118,6 +118,44 @@ void main() {
     );
 
     testWidgets(
+      'says nothing could be scrolled when no drag was ever possible',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // A list with nowhere to go spends no attempts, so the failure used to
+        // read "after 0 scroll attempts" and hide why it gave up.
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+
+        await tester.pumpWidget(
+          _buildItemsApp(
+            controller: controller,
+            itemCount: 2,
+            itemExtent: 80,
+          ),
+        );
+
+        final dispatcher = _CoordinateGestureDispatcher(tester);
+        final simulator = ScrollSimulator(dispatcher, WidgetFinder());
+
+        await expectLater(
+          () => simulator.scrollUntilVisible(
+            const KeyMatcher('item_90'),
+            _configuration,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (StateError error) => error.message,
+              'message',
+              contains('no Scrollable could be scrolled'),
+            ),
+          ),
+        );
+
+        expect(dispatcher.dragCount, 0);
+      },
+    );
+
+    testWidgets(
       'picks the main list over a smaller auxiliary scrollable that '
       'appears first in the tree',
       timeout: _timeout,
@@ -749,6 +787,73 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'tries the next candidate when the one being dragged loses its layout',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        // A layer that dismisses itself on a drag leaves the tree between two
+        // turns of the drag loop. Its Element is still referenced but has no
+        // RenderBox behind it, which used to abort the whole call instead of
+        // moving on to the next candidate.
+        final dismissed = ValueNotifier<bool>(false);
+        final targetController = ScrollController();
+        addTearDown(() {
+          dismissed.dispose();
+          targetController.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: <Widget>[
+                  SizedBox(
+                    width: 500,
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: dismissed,
+                      builder: (
+                        BuildContext context,
+                        bool gone,
+                        Widget? child,
+                      ) =>
+                          gone ? const SizedBox.shrink() : child!,
+                      child: ListView.builder(
+                        physics: const ClampingScrollPhysics(),
+                        itemCount: _listItemCount,
+                        itemBuilder: (BuildContext context, int index) =>
+                            ListTile(title: Text('Article $index')),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 280,
+                    child: _lazyList(
+                      controller: targetController,
+                      label: (int index) => 'Country $index',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final simulator = ScrollSimulator(
+          _DismissingGestureDispatcher(tester, dismissed),
+          WidgetFinder(),
+        );
+
+        await simulator.scrollUntilVisible(
+          const TextMatcher('Country 90'),
+          _configuration,
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Country 90'), findsOneWidget);
+        expect(targetController.offset, greaterThan(0));
+      },
+    );
   });
 }
 
@@ -889,6 +994,24 @@ class _WidgetTesterGestureDispatcher extends GestureDispatcher {
   Future<void> drag(Offset from, Offset to) async {
     dragCount++;
     await _tester.drag(_scrollableFinder, to - from);
+    await _tester.pump();
+  }
+}
+
+/// Drags from the exact coordinates the simulator asked for, then drops the
+/// dismissing layer out of the tree, the way a sheet closed by a drag does.
+class _DismissingGestureDispatcher extends GestureDispatcher {
+  _DismissingGestureDispatcher(this._tester, this._dismissed);
+
+  final WidgetTester _tester;
+  final ValueNotifier<bool> _dismissed;
+  int dragCount = 0;
+
+  @override
+  Future<void> drag(Offset from, Offset to) async {
+    dragCount++;
+    await _tester.dragFrom(from, to - from);
+    _dismissed.value = true;
     await _tester.pump();
   }
 }

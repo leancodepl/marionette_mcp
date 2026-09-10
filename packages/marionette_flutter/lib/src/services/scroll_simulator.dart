@@ -43,6 +43,7 @@ class ScrollSimulator {
     }
 
     var attemptsLeft = _totalScrollAttemptsCap;
+    var draggedSomething = false;
 
     for (final candidate in candidates) {
       if (attemptsLeft <= 0) {
@@ -80,6 +81,7 @@ class ScrollSimulator {
         configuration,
       );
       attemptsLeft -= outcome.attempts;
+      draggedSomething |= outcome.attempts > 0;
 
       if (outcome.found) {
         return;
@@ -88,6 +90,15 @@ class ScrollSimulator {
       // Wrong guess. Put it back, so the only lasting effect of a scroll_to is
       // the scrolling that actually found the target.
       _restoreScrollPosition(candidate, startedAt);
+    }
+
+    if (!draggedSomething) {
+      // Nothing ever moved, so an attempt count names the count rather than
+      // the cause: every candidate either had nowhere to go or was gone by the
+      // time its turn came.
+      throw StateError(
+        'Widget not found: no Scrollable could be scrolled to reveal it',
+      );
     }
 
     throw StateError(
@@ -305,7 +316,11 @@ class ScrollSimulator {
 
       final renderObject = scrollable.renderObject;
       if (renderObject is! RenderBox) {
-        throw Exception('Scrollable does not have a RenderBox');
+        // Total for the same reason _tryResolveScrollPosition is: a candidate
+        // can lose its layout while the loop is running, so reaching for what
+        // is left has to read as a miss rather than a crash. Give this one up
+        // and let the caller carry on to the next.
+        break;
       }
 
       final center = renderObject.size.center(Offset.zero);
