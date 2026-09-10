@@ -1,12 +1,17 @@
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/binding/marionette_widget_adapter.dart';
 
 /// Abstract base class for matching widgets in the Flutter widget tree.
 sealed class WidgetMatcher {
   const WidgetMatcher();
 
   /// Checks if the given [element] matches this matcher's criteria.
-  bool matches(Element element, MarionetteConfiguration configuration);
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  });
 
   /// Creates a matcher from a JSON map.
   /// If multiple fields are present, precedence is:
@@ -45,7 +50,11 @@ class FocusedElementMatcher extends WidgetMatcher {
   const FocusedElementMatcher();
 
   @override
-  bool matches(Element element, MarionetteConfiguration configuration) {
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
     return false;
   }
 
@@ -79,7 +88,11 @@ class CoordinatesMatcher extends WidgetMatcher {
   Offset get offset => Offset(x, y);
 
   @override
-  bool matches(Element element, MarionetteConfiguration configuration) {
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
     // CoordinatesMatcher doesn't match widgets - it's handled specially
     // in GestureDispatcher.tap() as a fast path.
     return false;
@@ -102,12 +115,21 @@ class KeyMatcher extends WidgetMatcher {
   final String keyValue;
 
   @override
-  bool matches(Element element, MarionetteConfiguration configuration) {
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
     final key = element.widget.key;
     if (key is ValueKey<String>) {
-      return key.value == keyValue;
+      if (key.value == keyValue) {
+        return true;
+      }
     }
-    return false;
+    final effectiveDescriptor = describeWidget == null
+        ? configuration.describeWidget(element)
+        : describeWidget();
+    return effectiveDescriptor?.key == keyValue;
   }
 
   @override
@@ -142,7 +164,11 @@ class IdentifierMatcher extends WidgetMatcher {
   final String identifierValue;
 
   @override
-  bool matches(Element element, MarionetteConfiguration configuration) {
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
     if (identifierValue.isEmpty) {
       return false;
     }
@@ -170,8 +196,15 @@ class TextMatcher extends WidgetMatcher {
   final String text;
 
   @override
-  bool matches(Element element, MarionetteConfiguration configuration) {
-    final extractedText = configuration.extractTextFromWidget(element);
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
+    final extractedText = configuration.extractTextFromWidget(
+      element,
+      describeWidget: describeWidget,
+    );
     return extractedText == text;
   }
 
@@ -188,7 +221,11 @@ class TypeMatcher extends WidgetMatcher {
   final Type type;
 
   @override
-  bool matches(Element element, MarionetteConfiguration configuration) {
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
     return element.widget.runtimeType == type;
   }
 
@@ -209,8 +246,16 @@ class TypeStringMatcher extends WidgetMatcher {
   final String typeName;
 
   @override
-  bool matches(Element element, MarionetteConfiguration configuration) {
-    return element.widget.runtimeType.toString() == typeName;
+  bool matches(
+    Element element,
+    MarionetteConfiguration configuration, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
+    if (element.widget.runtimeType.toString() == typeName) return true;
+    final effectiveDescriptor = describeWidget == null
+        ? configuration.describeWidget(element)
+        : describeWidget();
+    return effectiveDescriptor?.type == typeName;
   }
 
   @override

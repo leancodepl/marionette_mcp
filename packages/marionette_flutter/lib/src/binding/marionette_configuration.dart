@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:marionette_flutter/src/binding/marionette_widget_adapter.dart';
 import 'package:marionette_flutter/src/services/log_collector.dart';
 
 /// Configuration for the Marionette extensions.
@@ -19,6 +20,7 @@ class MarionetteConfiguration {
     this.isInteractiveWidget,
     this.shouldStopTraversal,
     this.extractText,
+    this.widgetAdapters = const <MarionetteWidgetAdapter>[],
     this.maxScreenshotSize = const Size(2000, 2000),
     this.logCollector,
   });
@@ -63,6 +65,22 @@ class MarionetteConfiguration {
   /// )
   /// ```
   final String? Function(Element element)? extractText;
+
+  /// Ordered adapters for application and design-system widgets.
+  ///
+  /// The first adapter that returns a descriptor owns the element.
+  final List<MarionetteWidgetAdapter> widgetAdapters;
+
+  /// Returns the first descriptor provided for [element].
+  MarionetteWidgetDescriptor? describeWidget(Element element) {
+    for (final adapter in widgetAdapters) {
+      final descriptor = adapter.describe(element);
+      if (descriptor != null) {
+        return descriptor;
+      }
+    }
+    return null;
+  }
 
   /// Maximum size for screenshots in physical pixels.
   ///
@@ -126,9 +144,16 @@ class MarionetteConfiguration {
   }
 
   /// Extracts text from a widget (built-in + custom).
-  String? extractTextFromWidget(Element element) {
-    final builtInText = _extractBuiltInText(element.widget);
-    return builtInText ?? extractText?.call(element);
+  String? extractTextFromWidget(
+    Element element, {
+    MarionetteWidgetDescriptor? Function()? describeWidget,
+  }) {
+    final effectiveDescriptor = describeWidget == null
+        ? this.describeWidget(element)
+        : describeWidget();
+    return effectiveDescriptor?.text ??
+        _extractBuiltInText(element.widget) ??
+        extractText?.call(element);
   }
 
   // Built-in Flutter widget support
