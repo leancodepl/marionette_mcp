@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/src/binding/extensions/device_config_extensions.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
@@ -108,6 +108,13 @@ void main() {
       final result = setDeviceConfig({'textScale': 'big'}, service);
 
       expect(invalidParamsDetail(result), contains('positive number'));
+    });
+
+    test('rejects a non-finite text scale', () {
+      final result = setDeviceConfig({'textScale': 'NaN'}, service);
+
+      expect(invalidParamsDetail(result), contains('positive number'));
+      expect(service.current.hasOverrides, isFalse);
     });
 
     test('rejects a non-boolean boldText', () {

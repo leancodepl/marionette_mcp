@@ -35,9 +35,9 @@ import 'package:marionette_flutter/src/binding/marionette_extension_result.dart'
 /// Parses a positive double parameter.
 ///
 /// Returns the parsed value (or [defaultValue] if the parameter is absent)
-/// in `value`. On parse failure or non-positive value, returns `error`
-/// populated with a [MarionetteExtensionResult.invalidParams]; callers should
-/// return that result immediately.
+/// in `value`. On parse failure or a non-finite or non-positive value, returns
+/// `error` populated with a [MarionetteExtensionResult.invalidParams]; callers
+/// should return that result immediately.
 ///
 /// Pass a `null` [defaultValue] for an optional parameter — `value` is then
 /// `null` exactly when the caller omitted it.
@@ -51,7 +51,7 @@ import 'package:marionette_flutter/src/binding/marionette_extension_result.dart'
     return (value: defaultValue, error: null);
   }
   final parsed = double.tryParse(raw);
-  if (parsed == null || parsed <= 0) {
+  if (parsed == null || !parsed.isFinite || parsed <= 0) {
     return (
       value: null,
       error: MarionetteExtensionResult.invalidParams(

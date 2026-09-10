@@ -110,6 +110,16 @@ void main() {
       expect(connector.calls, isEmpty);
     });
 
+    test('rejects a non-finite text scale', () async {
+      final result = await setDeviceConfig(connector, logger, {
+        'text_scale': double.nan,
+      });
+
+      expect(result.isError, isTrue);
+      expect(textOf(result), contains('greater than 0'));
+      expect(connector.calls, isEmpty);
+    });
+
     test('rejects an unknown brightness', () async {
       final result = await setDeviceConfig(connector, logger, {
         'platform_brightness': 'sepia',

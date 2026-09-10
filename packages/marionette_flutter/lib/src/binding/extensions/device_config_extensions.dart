@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:marionette_flutter/src/binding/extensions/extension_helpers.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';

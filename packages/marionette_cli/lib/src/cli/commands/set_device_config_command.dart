@@ -63,7 +63,7 @@ class SetDeviceConfigCommand extends InstanceCommand {
     double? textScale;
     if (rawTextScale != null) {
       textScale = double.tryParse(rawTextScale);
-      if (textScale == null || textScale <= 0) {
+      if (textScale == null || !textScale.isFinite || textScale <= 0) {
         usageException(
           '--text-scale must be a positive number, got "$rawTextScale".',
         );

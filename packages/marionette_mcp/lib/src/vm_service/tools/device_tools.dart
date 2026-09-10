@@ -73,7 +73,7 @@ Future<CallToolResult> setDeviceConfig(
     );
   }
 
-  if (rawTextScale != null && rawTextScale <= 0) {
+  if (rawTextScale != null && (!rawTextScale.isFinite || rawTextScale <= 0)) {
     return _invalid('text_scale must be greater than 0.');
   }
 
