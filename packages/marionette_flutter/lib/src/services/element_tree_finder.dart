@@ -10,20 +10,36 @@ class ElementTreeFinder {
   final MarionetteConfiguration configuration;
 
   /// Returns a list of interactive elements from the current widget tree.
-  List<Map<String, dynamic>> findInteractiveElements() {
+  ///
+  /// [compaction] reduces the per-element payload further (see
+  /// [CompactionMode]). It overrides
+  /// [MarionetteConfiguration.compaction] in both directions; pass null to use
+  /// the app's configured default.
+  List<Map<String, dynamic>> findInteractiveElements({
+    CompactionMode? compaction,
+  }) {
     final elements = <Map<String, dynamic>>[];
     final rootElement = WidgetsBinding.instance.rootElement;
 
     if (rootElement != null) {
-      _visitElement(rootElement, elements);
+      _visitElement(
+        rootElement,
+        elements,
+        compaction: compaction ?? configuration.compaction,
+      );
     }
 
     return elements;
   }
 
-  void _visitElement(Element element, List<Map<String, dynamic>> result) {
+  void _visitElement(
+    Element element,
+    List<Map<String, dynamic>> result, {
+    required CompactionMode compaction,
+  }) {
     final widget = element.widget;
-    final elementData = _extractElementData(element, widget);
+    final elementData =
+        _extractElementData(element, widget, compaction: compaction);
 
     if (elementData != null) {
       result.add(elementData);
@@ -34,11 +50,15 @@ class ElementTreeFinder {
     }
 
     element.visitChildren((child) {
-      _visitElement(child, result);
+      _visitElement(child, result, compaction: compaction);
     });
   }
 
-  Map<String, dynamic>? _extractElementData(Element element, Widget widget) {
+  Map<String, dynamic>? _extractElementData(
+    Element element,
+    Widget widget, {
+    required CompactionMode compaction,
+  }) {
     // Only process elements with render objects
     final renderObject = element.renderObject;
     if (renderObject == null) {
@@ -73,14 +93,23 @@ class ElementTreeFinder {
       return null;
     }
 
+    final compact = compaction == CompactionMode.compact;
     final properties = DiagnosticPropertiesBuilder();
     widget.debugFillProperties(properties);
+    // Keep only primitive-valued properties, dropping the object blobs
+    // (ButtonStyle, TextStyle, InputDecoration, Color, controllers, FocusNode)
+    // and callbacks that dominate the payload. Filtering by value type —
+    // rather than by DiagnosticsNode subtype — is necessary because widgets are
+    // inconsistent: e.g. TextField declares `enabled`/`obscureText` as generic
+    // DiagnosticsProperty<bool> while ElevatedButton uses FlagProperty. Exact
+    // retained fields therefore vary per widget.
     final data = Map<String, Object>.fromEntries(
       properties.properties
           .where((p) =>
-              p.runtimeType != DiagnosticsProperty &&
               p.name != null &&
-              p.value != null)
+              p.value != null &&
+              _isPrimitive(p.value) &&
+              !(compact && _isCompactNoise(p.name!)))
           .map(
             (p) => MapEntry(p.name!, p.value.toString()),
           ),
@@ -98,6 +127,23 @@ class ElementTreeFinder {
 
     if (discoverableText != null) {
       data['text'] = discoverableText;
+      // `Text` also declares its string as `data`, so an element would carry
+      // the same words twice.
+      if (compact && data['data'] == discoverableText) {
+        data.remove('data');
+      }
+    }
+
+    // The InputDecoration blob never survives the primitive filter, but it
+    // carries a keyless text field's only human-readable handle (`text` holds
+    // the entered value, empty for a blank field). Surface the label/hint so
+    // such fields stay identifiable. TextFormField has no public `decoration`,
+    // so this only applies to TextField.
+    if (widget is TextField) {
+      final label = widget.decoration?.labelText ?? widget.decoration?.hintText;
+      if (label != null && label.isNotEmpty) {
+        data['label'] = label;
+      }
     }
 
     // Get position and size if available
@@ -105,22 +151,73 @@ class ElementTreeFinder {
       try {
         final offset = renderObject.localToGlobal(Offset.zero);
         final size = renderObject.size;
-        data['bounds'] = {
-          'x': offset.dx,
-          'y': offset.dy,
-          'width': size.width,
-          'height': size.height,
-        };
+        // Logical pixels, and the agent uses them to reason about position and
+        // to tap by coordinate — neither needs the sixteen significant digits a
+        // double prints (`411.42857142857144`).
+        data['bounds'] = compact
+            ? {
+                'x': offset.dx.round(),
+                'y': offset.dy.round(),
+                'width': size.width.round(),
+                'height': size.height.round(),
+              }
+            : {
+                'x': offset.dx,
+                'y': offset.dy,
+                'width': size.width,
+                'height': size.height,
+              };
       } catch (_) {
         // Ignore if we can't get bounds
       }
     }
 
-    // Check visibility
-    data['visible'] = _isElementVisible(element);
+    // Check visibility. Every element in the list is on screen in the ordinary
+    // case, so in compact mode this is reported only when it is not — absence
+    // means visible, and the exception stays impossible to miss.
+    final visible = _isElementVisible(element);
+    if (!compact || !visible) {
+      data['visible'] = visible;
+    }
 
     return data;
   }
+
+  /// Whether [value] is a primitive worth keeping in the property dump.
+  static bool _isPrimitive(Object? value) =>
+      value is bool || value is num || value is String || value is Enum;
+
+  /// Properties that survive the primitive filter but say nothing an agent can
+  /// act on: they describe how text or gestures are laid out and rendered, and
+  /// no interaction tool reads them (`tap`/`enter_text`/`scroll_to`/`swipe`
+  /// match on key, identifier, text, type or coordinates). They are also the
+  /// ones that dominate what is left once the object blobs are gone — every
+  /// `Text` in a list carries several of them.
+  static const _renderingDetails = {
+    'startBehavior',
+    'textAlign',
+    'textDirection',
+    'softWrap',
+    'overflow',
+    'textWidthBasis',
+  };
+
+  /// Text-style primitives that leak into a `Text` element unprefixed, because
+  /// `Text` forwards its `style` to the same [DiagnosticPropertiesBuilder]. The
+  /// rest of `TextStyle` is object-valued and never survives the primitive
+  /// filter, so only these need naming.
+  static const _textStylePrimitives = {
+    'inherit',
+    'family',
+    'size',
+    'letterSpacing',
+    'height',
+    'baseline',
+    'leadingDistribution',
+  };
+
+  static bool _isCompactNoise(String name) =>
+      _renderingDetails.contains(name) || _textStylePrimitives.contains(name);
 
   String? _extractKeyValue(Key? key) {
     if (key is ValueKey<String>) {

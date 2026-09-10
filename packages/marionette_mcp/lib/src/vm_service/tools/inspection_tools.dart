@@ -15,17 +15,34 @@ void registerInspectionTools(
     ..registerTool(
       'get_interactive_elements',
       description:
-          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Requires an active connection established via connect.',
+          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Style, decoration and colour blobs are never reported. Set compaction to "compact" (the default for most apps) to also drop rendering details no interaction tool reads (textAlign, softWrap, overflow, font metrics, …), report visible only when an element is not visible, round bounds to whole logical pixels, and drop a Text element\'s duplicated data field — much more token-efficient for agent loops. Set compaction to "none" to force the full payload. Omit compaction to use the app\'s MarionetteConfiguration.compaction default. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Get Interactive Elements',
         readOnlyHint: true,
         idempotentHint: true,
       ),
-      inputSchema: const ToolInputSchema(properties: {}),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'compaction': JsonSchema.string(
+            description:
+                'How much to reduce the payload. "compact" drops rendering details, font metrics, a Text element\'s duplicated data, rounds bounds to whole logical pixels, and reports visible only when false. "none" forces the full payload. Omit to use the app\'s MarionetteConfiguration.compaction default.',
+            enumValues: supportedCompactionModes.toList(),
+          ),
+        },
+      ),
       callback: (args, extra) async {
-        logger.info('Getting interactive elements');
+        final compaction = args['compaction'] as String?;
+        if (invalidCompactionError(compaction) case final error?) {
+          return CallToolResult(
+            isError: true,
+            content: [TextContent(text: error)],
+          );
+        }
+
+        logger.info('Getting interactive elements (compaction: $compaction)');
         return runTool(logger, 'get interactive elements', () async {
-          final response = await connector.getInteractiveElements();
+          final response =
+              await connector.getInteractiveElements(compaction: compaction);
           final elements = response['elements'] as List<dynamic>;
 
           final buffer = StringBuffer()

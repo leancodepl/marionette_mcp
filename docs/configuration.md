@@ -39,6 +39,7 @@ If your widgets wrap or replace these — e.g. a `MyPrimaryButton` built on a `G
 | `logCollector` | `LogCollector?` | `null` | Capture app logs for `get_logs`. See [Logging](./logging.md). |
 | `shouldStopTraversal` | `bool Function(Type type)?` | `null` | Stop descending below given widget types. **Rarely needed** — see below. |
 | `maxScreenshotSize` | `Size?` | `Size(2000, 2000)` | Downscale screenshots to fit; `null` disables resizing. |
+| `compaction` | `CompactionMode` | `CompactionMode.compact` | How much `get_interactive_elements` reduces its payload by default. |
 
 Your callbacks run **after** the built-in checks — you're extending the defaults, not replacing them.
 
@@ -189,6 +190,26 @@ By default screenshots are downscaled to fit within `2000 × 2000` physical pixe
 MarionetteConfiguration(maxScreenshotSize: Size(1280, 1280))
 ```
 
+### `compaction`
+
+`get_interactive_elements` always reports only primitive-valued properties — `ButtonStyle`, `TextStyle`, `InputDecoration` and colour blobs never reach the agent. `compaction` decides how much of what is left is reported.
+
+`CompactionMode.compact` is the default. It additionally drops:
+
+- Rendering details no interaction tool reads: `textAlign`, `textDirection`, `softWrap`, `overflow`, `textWidthBasis`, `startBehavior`.
+- The text-style primitives a `Text` inlines from its `style`: `inherit`, `family`, `size`, `letterSpacing`, `height`, `baseline`, `leadingDistribution`.
+- A `Text` element's `data`, when it repeats the `text` field.
+- `bounds` is rounded to whole logical pixels.
+- `visible` is reported only when an element is **not** visible.
+
+`CompactionMode.none` reports every primitive property. Set it when you need the full property dump for debugging:
+
+```dart
+MarionetteConfiguration(compaction: CompactionMode.none)
+```
+
+The `compaction` parameter of `get_interactive_elements` (`--compaction=<none|compact>` in the CLI) overrides this in both directions, so an agent can ask for the full payload on an app that keeps the default.
+
 ## Complete production `main.dart`
 
 A copy-pasteable starting point that wires every callback plus a log hook. Adapt the widget types to your design system.
@@ -230,6 +251,10 @@ void main() {
 
         // 5. (Optional) tune screenshot size.
         // maxScreenshotSize: const Size(1280, 1280),
+
+        // 6. (Optional) report every primitive property, not the compact
+        //    element payload.
+        // compaction: CompactionMode.none,
       ),
     );
 
