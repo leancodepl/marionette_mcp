@@ -19,6 +19,7 @@ class MarionetteConfiguration {
     this.isInteractiveWidget,
     this.shouldStopTraversal,
     this.extractText,
+    this.contextProvider,
     this.maxScreenshotSize = const Size(2000, 2000),
     this.logCollector,
   });
@@ -63,6 +64,14 @@ class MarionetteConfiguration {
   /// )
   /// ```
   final String? Function(Element element)? extractText;
+
+  /// Supplies small, application-owned context alongside interactive elements.
+  ///
+  /// The callback is evaluated for every `get_interactive_elements` request,
+  /// so it can expose current navigation state such as a route or screen name.
+  /// The returned map must be JSON-encodable and must not contain secrets.
+  /// Invalid context is omitted without failing element discovery.
+  final Map<String, Object?> Function()? contextProvider;
 
   /// Maximum size for screenshots in physical pixels.
   ///
