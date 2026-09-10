@@ -402,6 +402,45 @@ Retrieve collected application logs.
 
 ---
 
+### set-device-config
+
+Override the device configuration the running app sees — text scale, bold text,
+light/dark appearance — without touching real device settings. Use it to sweep
+a screen under accessibility or appearance conditions.
+
+Requires the app to wrap its root widget in MarionetteDeviceConfig:
+
+    runApp(const MarionetteDeviceConfig(child: MyApp()));
+
+  Requires: -i <instance> or --uri <ws-uri>
+  At least one of: --text-scale, --bold-text, --platform-brightness, --reset
+
+  Options:
+    --text-scale <n>              Linear text scale, > 0 (1.0 default, 2.0 very
+                                  large; real devices top out around 3.0)
+    --bold-text <true|false>      System bold-text setting
+    --platform-brightness <light|dark>
+                                  System light/dark appearance
+    --reset                       Clear every override; applied before the
+                                  other options in the same call
+
+  Examples:
+    marionette -i my-app set-device-config --text-scale 2.0
+    marionette -i my-app set-device-config --platform-brightness dark
+    marionette -i my-app set-device-config --reset --text-scale 1.5
+    marionette -i my-app set-device-config --reset
+
+  Output (stdout, exit 0):
+    Device config updated
+
+  Output if the app did not opt in (stderr, exit 1):
+    Error: Device config overrides are not available in this app. ...
+
+  Omitted options keep their current override. Reverting a single field means
+  --reset plus the fields worth keeping.
+
+---
+
 ### hot-reload
 
 Perform a hot reload of the Flutter app.

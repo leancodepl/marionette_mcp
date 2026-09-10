@@ -1,6 +1,7 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
+import 'package:marionette_mcp/src/vm_service/tools/device_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/inspection_tools.dart';
@@ -41,6 +42,7 @@ final class VmServiceContext {
     registerGestureTools(server, connector, _logger);
     registerTextTools(server, connector, _logger);
     registerKeyboardTools(server, connector, _logger);
+    registerDeviceTools(server, connector, _logger);
     registerExtensionTools(server, connector, _logger);
     registerSystemTools(server, connector, _logger);
   }

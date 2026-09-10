@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add `set_device_config` tool and `set-device-config` CLI command for overriding text scale, bold text, and platform brightness in a running app — opt in by wrapping your root widget in the new `MarionetteDeviceConfig`
 - Fix extension errors being reported as the generic `Server error` instead of the detail the extension returned — this silently swallowed every validation message and setup instruction, including the `get_logs` log-collector onboarding help
 - Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route
 - Fix `scroll_to` missing a target that only comes into view on its final drag, at either end of a list
