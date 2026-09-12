@@ -7,6 +7,7 @@
 - Fix `scroll_to` being unable to reach targets in long lists: it now scrolls by a share of the visible viewport instead of a fixed 64px, so lists past roughly 170 rows are reachable and shorter ones take far fewer gestures
 - Fix `scroll_to` on screens with more than one scrollable: when the target is not built yet it now tries the two best-ranked reachable scrollables in turn rather than committing to a single guess, so a chip row, tab strip or nav rail no longer swallows the gesture
 - Fix the `scroll_to` failure reading `Widget not found after 0 scroll attempts` when no scrollable could be dragged at all, which hid the real cause
+- Fix every pointer gesture (`tap`, `double_tap`, `long_press`, `secondary_tap`, `swipe`, `pinch_zoom`, `scroll_to`) silently doing nothing, and every element being reported `visible: false`, in an app whose content is not in the implicit view — as with the desktop windowing API: gestures are now dispatched to, and visibility measured against, the view the element is actually in
 
 # 0.6.0
 

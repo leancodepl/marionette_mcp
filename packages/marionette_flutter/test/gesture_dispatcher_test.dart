@@ -5,6 +5,8 @@ import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 
+import 'multi_view_test_helpers.dart';
+
 const _timeout = Timeout(Duration(seconds: 10));
 
 void main() {
@@ -858,4 +860,306 @@ void main() {
       },
     );
   });
+
+  group('GestureDispatcher - multi-view', () {
+    testWidgets(
+      'tap by coordinates reaches the rendered view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var tapped = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(onTap: () => tapped = true),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.tap(
+              const CoordinatesMatcher(400, 300),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(
+          tapped,
+          isTrue,
+          reason: 'A coordinate tap must reach the widget in the rendered '
+              'view, not the implicit view that renders nothing',
+        );
+      },
+    );
+
+    testWidgets(
+      'tap by key reaches the element\'s own view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var tapped = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(
+            key: const ValueKey('target'),
+            onTap: () => tapped = true,
+          ),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.tap(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(
+          tapped,
+          isTrue,
+          reason: 'An element tap must be dispatched into the view the '
+              'element is mounted in',
+        );
+      },
+    );
+
+    testWidgets(
+      'doubleTap reaches the element\'s own view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var doubleTapped = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(
+            key: const ValueKey('target'),
+            onDoubleTap: () => doubleTapped = true,
+          ),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.doubleTap(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(doubleTapped, isTrue);
+      },
+    );
+
+    testWidgets(
+      'longPress reaches the element\'s own view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var longPressed = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(
+            key: const ValueKey('target'),
+            onLongPress: () => longPressed = true,
+          ),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.longPress(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              duration: const Duration(milliseconds: 600),
+            ));
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(longPressed, isTrue);
+      },
+    );
+
+    testWidgets(
+      'secondaryTap reaches the element\'s own view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var secondaryTapped = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(
+            key: const ValueKey('target'),
+            onSecondaryTap: () => secondaryTapped = true,
+          ),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.secondaryTap(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+            ));
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(secondaryTapped, isTrue);
+      },
+    );
+
+    testWidgets(
+      'pinchZoom reaches the element\'s own view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var scaled = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(
+            key: const ValueKey('target'),
+            onScaleUpdate: (details) => scaled = true,
+          ),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.pinchZoom(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              scale: 2,
+            ));
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(
+          scaled,
+          isTrue,
+          reason: 'The pinch must be recognised by the widget in the '
+              'non-implicit view, not merely be tagged with its view id',
+        );
+      },
+    );
+
+    testWidgets(
+      'swipe reaches the element\'s own view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var panned = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(
+            key: const ValueKey('target'),
+            onPanUpdate: (details) => panned = true,
+          ),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(() => dispatcher.swipe(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              direction: 'up',
+              distance: 100,
+            ));
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(
+          panned,
+          isTrue,
+          reason: 'The swipe must be recognised by the widget in the '
+              'non-implicit view, not merely be tagged with its view id',
+        );
+      },
+    );
+
+    testWidgets(
+      'drag by coordinates reaches the rendered view',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var panned = false;
+        final fakeView = await _pumpInFakeView(
+          tester,
+          _gestureTarget(onPanUpdate: (details) => panned = true),
+        );
+        final events = _recordPointerEvents();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.drag(const Offset(400, 350), const Offset(400, 250)),
+        );
+        await tester.pump();
+
+        _expectAllInView(events, fakeView);
+        expect(
+          panned,
+          isTrue,
+          reason: 'A coordinate drag must be recognised by the widget in the '
+              'rendered view, not merely be tagged with its view id',
+        );
+      },
+    );
+  });
+}
+
+/// Mounts [child] as the whole content of a non-implicit view.
+///
+/// `wrapWithView: false` leaves the implicit view without a `RenderView`, which
+/// is the shape of an app rendering through the desktop windowing API.
+Future<FakeView> _pumpInFakeView(WidgetTester tester, Widget child) async {
+  final fakeView = FakeView(tester.view);
+  await tester.pumpWidget(
+    wrapWithView: false,
+    View(view: fakeView, child: child),
+  );
+  return fakeView;
+}
+
+/// A centered gesture target that is hit-testable on its own.
+Widget _gestureTarget({
+  Key? key,
+  VoidCallback? onTap,
+  VoidCallback? onDoubleTap,
+  VoidCallback? onLongPress,
+  VoidCallback? onSecondaryTap,
+  GestureDragUpdateCallback? onPanUpdate,
+  GestureScaleUpdateCallback? onScaleUpdate,
+}) {
+  return Center(
+    child: GestureDetector(
+      key: key,
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      onDoubleTap: onDoubleTap,
+      onLongPress: onLongPress,
+      onSecondaryTap: onSecondaryTap,
+      onPanUpdate: onPanUpdate,
+      onScaleUpdate: onScaleUpdate,
+      child: const SizedBox(width: 200, height: 200),
+    ),
+  );
+}
+
+/// Collects every pointer event the binding routes, for the length of the test.
+List<PointerEvent> _recordPointerEvents() {
+  final events = <PointerEvent>[];
+  void record(PointerEvent event) => events.add(event);
+
+  GestureBinding.instance.pointerRouter.addGlobalRoute(record);
+  addTearDown(
+    () => GestureBinding.instance.pointerRouter.removeGlobalRoute(record),
+  );
+  return events;
+}
+
+void _expectAllInView(List<PointerEvent> events, FakeView view) {
+  expect(events, isNotEmpty, reason: 'Should have dispatched events');
+  for (final event in events) {
+    expect(
+      event.viewId,
+      equals(view.viewId),
+      reason: '${event.runtimeType} should carry the view id of the view it '
+          'is meant for, otherwise it hit-tests against a view that renders '
+          'nothing',
+    );
+  }
 }

@@ -1,5 +1,38 @@
+import 'dart:ui' show FlutterView;
+
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+
+/// Returns the view the [element] is mounted in.
+///
+/// The single place the element-to-view question is answered, so discovery,
+/// dispatch and the visibility check cannot drift apart. Falls back to the
+/// implicit view for an element that is not below a [View] of its own, and
+/// returns null when there is no view to resolve at all.
+FlutterView? viewOf(Element element) {
+  final view = element.findAncestorWidgetOfExactType<View>();
+  return view?.view ?? WidgetsBinding.instance.platformDispatcher.implicitView;
+}
+
+/// Returns the id of the view the [element] is mounted in.
+int? viewIdOf(Element element) => viewOf(element)?.viewId;
+
+/// Returns the id of the view to use when there is no element to ask.
+///
+/// Prefers the first rendered view: in an ordinary app that is the implicit
+/// view, and in an app driven by the desktop windowing API the implicit view
+/// exists but is never rendered, so the first rendered view is the window the
+/// user sees. Returns null when nothing is rendered and there is no implicit
+/// view either.
+int? defaultViewId() {
+  // Not `firstOrNull`: that lives in package:collection, which this package
+  // does not depend on.
+  final renderViews = WidgetsBinding.instance.renderViews;
+  if (renderViews.isNotEmpty) {
+    return renderViews.first.flutterView.viewId;
+  }
+  return WidgetsBinding.instance.platformDispatcher.implicitView?.viewId;
+}
 
 /// Checks if the [element] can receive pointer events.
 ///
@@ -32,9 +65,7 @@ bool isElementHittableAt(Element element, Offset localPoint) {
     return false;
   }
 
-  final view = element.findAncestorWidgetOfExactType<View>();
-  final viewId = view?.view.viewId ??
-      WidgetsBinding.instance.platformDispatcher.implicitView?.viewId;
+  final viewId = viewIdOf(element);
   if (viewId == null) {
     return false;
   }
