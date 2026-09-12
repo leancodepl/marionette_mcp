@@ -5,6 +5,8 @@ import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/scroll_simulator.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 
+import 'multi_view_test_helpers.dart';
+
 const _timeout = Timeout(Duration(seconds: 30));
 const _configuration = MarionetteConfiguration();
 const _listItemCount = 100;
@@ -935,6 +937,48 @@ void main() {
       },
     );
   });
+
+  group('ScrollSimulator.scrollUntilVisible in a non-implicit view', () {
+    testWidgets(
+      'drags the scrollable in the view it is mounted in',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final controller = ScrollController();
+        addTearDown(controller.dispose);
+
+        final fakeView = FakeView(tester.view);
+        await tester.pumpWidget(
+          wrapWithView: false,
+          View(
+            view: fakeView,
+            child: _buildItemsApp(
+              controller: controller,
+              itemCount: 40,
+              itemExtent: 80,
+            ),
+          ),
+        );
+
+        final dispatcher = _ScrollingGestureDispatcher(tester, controller);
+        final simulator = ScrollSimulator(dispatcher, WidgetFinder());
+
+        await simulator.scrollUntilVisible(
+          const KeyMatcher('item_30'),
+          _configuration,
+        );
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('item_30')), findsOneWidget);
+        expect(dispatcher.viewIds, isNotEmpty);
+        expect(
+          dispatcher.viewIds,
+          everyElement(equals(fakeView.viewId)),
+          reason: 'Each drag must be aimed at the view the scrollable lives '
+              'in, otherwise it hit-tests against a view that renders nothing',
+        );
+      },
+    );
+  });
 }
 
 /// A page holding [background] under a modal bottom sheet holding [sheet].
@@ -1075,7 +1119,7 @@ class _WidgetTesterGestureDispatcher extends GestureDispatcher {
   int dragCount = 0;
 
   @override
-  Future<void> drag(Offset from, Offset to) async {
+  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
     dragCount++;
     await _tester.drag(_scrollableFinder, to - from);
     await _tester.pump();
@@ -1092,10 +1136,35 @@ class _DismissingGestureDispatcher extends GestureDispatcher {
   int dragCount = 0;
 
   @override
-  Future<void> drag(Offset from, Offset to) async {
+  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
     dragCount++;
     await _tester.dragFrom(from, to - from);
     _dismissed.value = true;
+    await _tester.pump();
+  }
+}
+
+/// Records the view each drag was aimed at and moves the list by the drag's
+/// own delta.
+///
+/// Scrolling through the controller keeps the test about the view the
+/// simulator picks; that the pointer events themselves land in that view is
+/// covered by the gesture dispatcher's own multi-view tests.
+class _ScrollingGestureDispatcher extends GestureDispatcher {
+  _ScrollingGestureDispatcher(this._tester, this._controller);
+
+  final WidgetTester _tester;
+  final ScrollController _controller;
+  final List<int?> viewIds = <int?>[];
+
+  @override
+  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
+    viewIds.add(viewId);
+
+    final target = _controller.offset - (to.dy - from.dy);
+    _controller.jumpTo(
+      target.clamp(0.0, _controller.position.maxScrollExtent).toDouble(),
+    );
     await _tester.pump();
   }
 }
@@ -1112,7 +1181,7 @@ class _CoordinateGestureDispatcher extends GestureDispatcher {
   int get dragCount => dragOrigins.length;
 
   @override
-  Future<void> drag(Offset from, Offset to) async {
+  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
     dragOrigins.add(from);
     await _tester.dragFrom(from, to - from);
     await _tester.pump();
