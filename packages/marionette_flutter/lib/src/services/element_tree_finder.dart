@@ -117,7 +117,7 @@ class ElementTreeFinder {
     }
 
     // Check visibility
-    data['visible'] = _isElementVisible(renderObject);
+    data['visible'] = _isElementVisible(element);
 
     return data;
   }
@@ -169,8 +169,14 @@ class ElementTreeFinder {
     return null;
   }
 
-  /// Checks if the element is currently visible on screen.
-  bool _isElementVisible(RenderObject? renderObject) {
+  /// Checks if the element is currently visible in the view it is mounted in.
+  ///
+  /// Measures against that view rather than the first one the platform knows
+  /// about: an app driven by the desktop windowing API renders into a view
+  /// other than the implicit one, and [RenderObject.localToGlobal] is relative
+  /// to the owning view anyway.
+  bool _isElementVisible(Element element) {
+    final renderObject = element.renderObject;
     if (renderObject == null || !renderObject.attached) {
       return false;
     }
@@ -187,10 +193,11 @@ class ElementTreeFinder {
 
       try {
         final offset = renderObject.localToGlobal(Offset.zero);
-        final screenSize = WidgetsBinding
-                .instance.platformDispatcher.views.first.physicalSize /
-            WidgetsBinding
-                .instance.platformDispatcher.views.first.devicePixelRatio;
+        final view = viewOf(element);
+        if (view == null) {
+          return true;
+        }
+        final screenSize = view.physicalSize / view.devicePixelRatio;
 
         final isOnScreen = offset.dx + size.width >= 0 &&
             offset.dy + size.height >= 0 &&
