@@ -87,7 +87,7 @@ Some real-world prompts:
 
 `marionette_flutter` ships an [Agent Skill](https://agentskills.io) — a `SKILL.md` file that teaches
 an agent how to prepare an app for Marionette and drive it, so it doesn't need this README in
-context: [`marionette_flutter-drive-app`](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette_flutter-drive-app/SKILL.md)
+context: [`marionette-flutter-drive-app`](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette-flutter-drive-app/SKILL.md)
 covers adding the dependency, initializing `MarionetteBinding`, `MarionetteConfiguration` for a
 custom design system, log collection, and device-config opt-in, then the full tool/CLI reference,
 when (and when not) to reach for Marionette, and custom extensions.
@@ -117,7 +117,7 @@ npx skills add leancodepl/marionette_mcp
 ```
 
 Or copy the file above directly into your agent's skills folder — e.g.
-`.claude/skills/marionette_flutter-drive-app/SKILL.md` for Claude Code.
+`.claude/skills/marionette-flutter-drive-app/SKILL.md` for Claude Code.
 
 ## Documentation
 

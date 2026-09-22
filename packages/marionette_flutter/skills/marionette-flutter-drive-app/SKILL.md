@@ -1,6 +1,6 @@
 ---
-name: marionette_flutter-drive-app
-description: Set up and drive a running Flutter app (debug or profile mode) with Marionette — the AI agent's hands and eyes for the app. Covers adding marionette_flutter, initializing MarionetteBinding, teaching MarionetteConfiguration about a custom design system, wiring a LogCollector, and opting in to MarionetteDeviceConfig — then inspecting the widget tree, tapping/swiping/typing, screenshots, logs, hot reload/restart, text-scale/dark-mode sweeps, and app-specific extensions, via the marionette_mcp tools or the marionette CLI. Use this whenever the user asks to test, click through, smoke-test, automate, QA, or otherwise interact with a Flutter app; whenever integrating marionette_flutter into an app for the first time or registering a custom extension; after implementing a feature or a UI/design-system change; to reproduce a bug from a ticket or verify a bugfix; to walk a "behaviour-neutral" refactor for regressions; to sweep a screen for accessibility issues; to exercise form/validation error states; or to capture before/after screenshots as evidence for a PR or ticket comment. Also load this whenever a Marionette tool call fails, can't see a custom widget, can't find text it can clearly see on screen, reports "not connected" or a version mismatch, or hits a WidgetsBinding/single-binding assertion (especially one mentioning flutter test or Sentry). Do NOT use for a CI/repeatable regression suite, a release build, or performance profiling — see "When not to use", below.
+name: marionette-flutter-drive-app
+description: Set up and drive a running Flutter app (debug or profile) with Marionette — an AI agent's hands and eyes for the app. Covers adding marionette_flutter, MarionetteBinding, MarionetteConfiguration for custom widgets, a LogCollector, and MarionetteDeviceConfig — then tapping/typing/scrolling, screenshots, logs, hot reload/restart, device sweeps, and custom extensions, via marionette_mcp or the marionette CLI. Use whenever asked to test, click through, smoke-test, automate, QA, or interact with a Flutter app; when integrating marionette_flutter or registering a custom extension; after a feature or UI/design-system change; to reproduce or verify a bug; to walk a behaviour-neutral refactor; to sweep for accessibility; to exercise form validation; or to capture before/after evidence for a PR. Also load whenever a Marionette call fails, can't see a widget, reports not connected or a version mismatch, or hits a single-binding assertion. Not for CI suites, release builds, or performance work — see When not to use.
 ---
 
 # marionette_flutter: drive an app
@@ -13,14 +13,16 @@ screenshot, read logs, hot reload. It has two halves:
   service extension per action (`ext.flutter.marionette.*`).
 - **The bridge** — either **`marionette_mcp`** (MCP tools, e.g. `connect`,
   `tap`, `get_interactive_elements`) or **`marionette_cli`** (shell commands,
-  e.g. `marionette tap --key ...`). Same capabilities, different transport.
-  Prefer the MCP tools when they're in your tool list; fall back to the CLI in
-  restricted environments (enterprise policy, a shell-only agent) — run
-  `marionette help-ai` once at the start of such a session and follow its
-  reference for exact syntax.
+  e.g. `marionette tap --key ...`). Nearly the same capabilities, different
+  transport — the CLI additionally offers `record-video`, with no MCP
+  equivalent (see the capability table, below). Prefer the MCP tools when
+  they're in your tool list; fall back to the CLI in restricted environments
+  (enterprise policy, a shell-only agent) — run `marionette help-ai` once at
+  the start of such a session and follow its reference for exact syntax.
 
-Everything below applies to either transport — action names differ only in
-casing (`get_interactive_elements` vs `get-interactive-elements`).
+Everything shared between the two applies to either transport — action names
+differ only in casing (`get_interactive_elements` vs
+`get-interactive-elements`).
 
 ## Preparing the app
 
@@ -83,9 +85,11 @@ of design-system introspection helpers even before the compiler strips them.
 
 `extractText` receives the `Element`, not just the `Widget`, so it can walk
 the subtree when a label is itself a widget rather than a plain string.
-Custom-painted text, badges, or anything rendered via `WidgetSpan` never
-reaches a `Text` widget at all — for those, annotate with
-`Semantics(label: ..., value: ...)` instead; Marionette surfaces that as a
+Custom-painted text and badges reach no `Text` widget at all, and a
+`WidgetSpan` is only a problem when its embedded content isn't itself built
+from `Text`/`RichText` (an icon, a custom-painted chip) — plain text nested
+inside one is still its own discoverable element. For genuinely non-text
+content, annotate with `Semantics(label: ..., value: ...)` instead; Marionette surfaces that as a
 `Semantics` element with the joined `'label: value'` string, and it costs
 nothing if `label`/`value` are absent (unlabeled `Semantics` nodes are
 silently skipped).
@@ -126,7 +130,7 @@ one rather than actual logs. Pick whichever matches how the app already logs:
 `take_screenshots` downscales captures to fit within 2000×2000 physical
 pixels by default, to keep base64 payloads manageable. Override
 `maxScreenshotSize` on `MarionetteConfiguration` if a screen needs more
-detail (`Size(1200, 1200)`, say), or set it to `null` to disable resizing
+detail (`Size(3000, 3000)`, say), or set it to `null` to disable resizing
 entirely — but keep the default unless there's a concrete reason to raise it,
 since larger screenshots mean larger payloads on every call.
 
@@ -181,12 +185,15 @@ error — except with one real offender, where it doesn't:
 
 ### Version alignment
 
-`connect` checks that the bridge (`marionette_mcp`/`marionette_cli`) and the
-app's `marionette_flutter` are on the same version, and fails with a clear
-message rather than a confusing runtime error if they aren't. If that
-happens, don't retry — align the versions: `flutter pub add marionette_flutter`
+The MCP `connect` tool checks that `marionette_mcp` and the app's
+`marionette_flutter` are on the same version, and fails with a clear message
+rather than a confusing runtime error if they aren't. The CLI does not
+perform this check — a stale `marionette_flutter` there can fail in less
+obvious ways instead of a clear mismatch error. Either way, don't chase a
+mismatch by retrying — align the versions: `flutter pub add marionette_flutter`
 in the app, and `dart pub global activate marionette_mcp`/`marionette_cli`
-(or the `dev:` variant) for the bridge.
+for the bridge (or `dart pub add dev:marionette_mcp`/`dev:marionette_cli` if
+you'd rather pin it as a dev dependency instead of a global tool).
 
 ## When to use this
 
@@ -266,6 +273,7 @@ easy to act on a stale connection later without noticing.
 | Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                  |
 | Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                             |
 | Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first.                                                                                                                                                                                                             |
+| Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                  |
 
 ## Good practices
 
@@ -323,7 +331,7 @@ args.
 | Symptom                                                                                            | Likely cause                                                                      | Fix                                                      |
 |----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|----------------------------------------------------------|
 | "Not connected to any app"                                                                         | No successful `connect` yet in this session                                       | `connect` before anything else — see *Connecting*, above |
-| `connect` fails with a version mismatch                                                            | `marionette_mcp`/`marionette_cli` and `marionette_flutter` are different versions | See *Version alignment*, above                           |
+| MCP `connect` fails with a version mismatch                                                        | `marionette_mcp` and `marionette_flutter` are different versions (the CLI doesn't check this) | See *Version alignment*, above                           |
 | Custom buttons/fields don't show up, or `tap(text:)`/`scroll_to(text:)` can't find a visible label | Widget type or text isn't recognized                                              | See *Custom design system?*, above                       |
 | `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                        | See *Logs for `get_logs`*, above                         |
 | `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                               | See *Device-config sweeps*, above, then hot restart      |
@@ -344,7 +352,8 @@ That prints every command's syntax, expected output, and exit codes — treat
 it as the authoritative low-level reference; everything in the capability
 table above maps onto it one-for-one (`tap` ↔
 `tap --key/--identifier/--text/--type/--x/--y`, `get_interactive_elements` ↔
-`get-interactive-elements`, etc.). Use `--uri <ws-uri>` for a one-off session
+`get-interactive-elements`, etc.), plus `record-video`, which only exists on
+this side. Use `--uri <ws-uri>` for a one-off session
 and `register <name> <uri>` + `-i <name>` for repeated interaction with the
 same app; `marionette doctor` checks connectivity of every registered
 instance and `unregister` cleans up stale ones.
