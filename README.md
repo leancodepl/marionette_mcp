@@ -96,6 +96,7 @@ Some real-world prompts:
 | [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) | Expose app-specific actions as agent tools via `registerMarionetteExtension`. |
 | [CLI](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md) | Drive Marionette from any shell-capable agent. |
 | [Troubleshooting](https://github.com/leancodepl/marionette_mcp/blob/main/docs/troubleshooting.md) | Common gotchas and limitations. |
+| [Agent Skill](https://github.com/leancodepl/marionette_mcp/blob/main/skills/marionette-drive-flutter-apps/SKILL.md) | Drop-in `SKILL.md` teaching an agent the full toolset and best practices. |
 
 ## Packages
 
