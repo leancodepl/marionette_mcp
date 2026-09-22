@@ -266,17 +266,24 @@ commands against the same app in a row. When you're done for the session
 `connect` implicitly replaces it), but leaving a session dangling makes it
 easy to act on a stale connection later without noticing.
 
+Give `connect` a `session_title` (a short description of what you're
+testing, e.g. `"profile validation"`) — it opens a session directory that
+carries the run's step log and screenshots, and resuming it later (after a
+compaction, an interruption, or a deliberate pause) is as simple as passing
+the same title again. See *Reporting what you found* for what that directory
+is for and what you're expected to do with it before disconnecting.
+
 ## What you can do once connected
 
 | Category          | Actions                                                                                                      | Notes                                                                                                                                                                                                                                                                                                            |
 |-------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `get_logs` needs a `LogCollector` wired up app-side (see *Logs for `get_logs`*, above); otherwise it returns setup instructions instead of an error. |
+| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `take_screenshots` returns images inline by default; pass `inline: false` once a screenshot is evidence to cite rather than something you need to look at now — see *Reporting what you found*. `get_logs` needs a `LogCollector` wired up app-side (see *Logs for `get_logs`*, above); otherwise it returns setup instructions instead of an error. |
 | Gestures          | `tap`, `secondary_tap`, `double_tap`, `long_press`, `swipe`, `pinch_zoom`, `scroll_to`, `press_back_button`  | Match by `key` › `identifier` › `text` › `type` › coordinates, in that preference order — see *Good practices*. `secondary_tap` is desktop-only.                                                                                                                                                                 |
 | Text input        | `enter_text`, `press_key`                                                                                    | `enter_text` overwrites a field's value directly. `press_key` sends a real key event (submit on `enter`, shortcuts via `modifiers`) but only edits in-place on desktop/web — on mobile, field editing still needs `enter_text`.                                                                                  |
 | Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see *Device-config sweeps*, above — otherwise it returns setup instructions rather than failing.                                                                            |
 | Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                  |
 | Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                             |
-| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first.                                                                                                                                                                                                             |
+| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens (or resumes, via `session_title`) a session directory that owns the step log and screenshots — see *Reporting what you found*.                                                        |
 | Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                  |
 
 ## Good practices
@@ -318,6 +325,84 @@ easy to act on a stale connection later without noticing.
   deeply nested `GestureDetector` hit target, or extend
   `MarionetteConfiguration` — not to retry harder.
 
+## Reporting what you found
+
+`connect` opens (or resumes) a session directory under
+`.marionette/sessions/` — the server's own record of the run, kept separate
+from your own context so it survives a compaction or an interruption.
+`disconnect`'s response repeats that directory's path with a reminder to
+write `report.md`: treat that as a requirement, not a suggestion — it's the
+enforcement mechanism precisely because an instruction here, on its own,
+gets skipped.
+
+Two files in that directory are appended by the server, not you — don't
+write to them yourself:
+
+- **`steps.md`** — one line per tool call: the tool, a short selector, and
+  the outcome. No payloads (`enter_text` values are redacted).
+- **`screenshots/`** — populated only when you call `take_screenshots` with
+  `inline: false`, which is what you want once a screenshot is evidence
+  you're citing rather than something you need to look at right now (each
+  inline image costs real visual tokens).
+
+You own two more files there, which the server never writes:
+
+- **`report.md`** — written once, at the end, from your own context, not by
+  re-reading `report-full.md`. Write it on either of two triggers: the run
+  completed, or you're stopping early (a blocking failure, a budget/time
+  limit, an ambiguous requirement you can't resolve alone). An interrupted
+  run's report states *why* it stopped and what was left untested, instead
+  of silently reporting only what got covered.
+- **`report-full.md`** — a working log, appended *during* a longer run at
+  moments that matter (a check starts, an observation lands, a finding
+  appears) — not one entry per tap. Skip it for a short run: a single-screen
+  check that finishes in one pass just writes `report.md` directly, nothing
+  else materializes. It exists so a run survives a compaction, an
+  interruption, or an explicit resume (`connect` again with the same
+  `session_title`) — read it back only in those cases, to recover context
+  you'd otherwise lose, never as a matter of course before writing
+  `report.md`.
+
+### The report contract
+
+- **The `Tested:` line is rendered from `steps.md`, never from memory or
+  your own sense of what you did.** This is the anti-overstatement mechanism
+  — read the step count and the actions taken back out of the file the
+  server wrote, don't estimate.
+- **Every finding cites evidence** — a step, a `get_logs` line, or a
+  screenshot path. No evidence means it's a suspicion, not a finding: say so
+  explicitly rather than upgrading a hunch.
+- **Under six lines per finding, no prose paragraphs.** A severity tag,
+  one-line summary, a repro path, and the evidence citation — that's the
+  shape; if it doesn't fit, cut the finding down rather than making room.
+- **The chat message after disconnecting is a TL;DR derived from
+  `report.md`**, not a separate narrative composed from scratch.
+
+Two shapes — an app with findings, and a clean run:
+
+```
+Marionette report — 2 findings · User Profile
+Tested: profile view, edit form, save flow (14 steps, 3 screenshots)
+
+1. [bug] Date of birth accepts future dates — no validation
+   Repro: Profile → Edit → DOB = 2099-01-01 → Save
+   Evidence: step 9, log "saved dob=2099-01-01"
+
+2. [bug] Save does not persist — changes lost after restart
+   Repro: Profile → Edit → Name = "X" → Save → hot_restart → Profile
+   Evidence: step 14, screenshots/02-after-restart.png
+```
+
+```
+Marionette report — no issues · Checkout
+Tested: cart, address form, payment, confirmation (18 steps)
+Checks: field validation, back navigation, dark mode, text scale 2.0
+```
+
+`.marionette/` is gitignored by default. Committing a session directory —
+attaching a report to a PR, say — is a deliberate choice you make
+explicitly, never something to do as a matter of course.
+
 ## Custom extensions
 
 Apps can expose their own actions via `registerMarionetteExtension` (route
@@ -340,6 +425,7 @@ args.
 | `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                        | See *Logs for `get_logs`*, above                         |
 | `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                               | See *Device-config sweeps*, above, then hot restart      |
 | Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                 | See *The single-binding rule*, above                     |
+| Session directory lands somewhere unexpected (e.g. not the project root)                           | No `MARIONETTE_SESSION_DIR` set and the server's own working directory isn't reliably the repo root | Pass `session_dir` to `connect` (`--session-dir` on the CLI) explicitly — see *Reporting what you found*, above |
 | Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                   | Not supported by design — see *When not to use*          |
 
 ## CLI fallback
@@ -360,7 +446,11 @@ table above maps onto it one-for-one (`tap` ↔
 this side. Use `--uri <ws-uri>` for a one-off session
 and `register <name> <uri>` + `-i <name>` for repeated interaction with the
 same app; `marionette doctor` checks connectivity of every registered
-instance and `unregister` cleans up stale ones.
+instance and `unregister` cleans up stale ones. Session reports work the same
+way here: pass `--session <title>` (the CLI's equivalent of `session_title`)
+consistently across a script's invocations to log a multi-step run into one
+session directory instead of a fresh, untitled one per command — see
+*Reporting what you found*, above.
 
 ## Keeping this skill in sync
 
