@@ -83,6 +83,42 @@ Some real-world prompts:
 
 > "Investigate the unresponsive 'Clear Cache' button on Settings — find it via `get_interactive_elements`, tap it, and analyze the logs."
 
+## Agent Skill
+
+`marionette_flutter` ships an [Agent Skill](https://agentskills.io) — a `SKILL.md` file that teaches
+an agent how to prepare an app for Marionette and drive it, so it doesn't need this README in
+context: [`marionette_flutter-drive-app`](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette_flutter-drive-app/SKILL.md)
+covers adding the dependency, initializing `MarionetteBinding`, `MarionetteConfiguration` for a
+custom design system, log collection, and device-config opt-in, then the full tool/CLI reference,
+when (and when not) to reach for Marionette, and custom extensions.
+
+It lives inside the `marionette_flutter` package itself, following Dart's
+[package skills](https://dart.dev/tools/pub/package-skills) convention, so once the package is a
+dependency of your app, Dart's own tooling can install it:
+
+```bash
+flutter pub add marionette_flutter  # if not already a dependency
+dart run skills@ get
+```
+
+`skills@` runs straight from pub.dev — nothing to add to your `pubspec.yaml`. It detects the agent
+from your project and installs into the folder that agent reads (`.claude/skills/` for Claude
+Code, `.cursor/skills/` for Cursor, `.github/skills/` for GitHub Copilot, `.agents/skills/` for
+Codex and other agents that follow the same convention); pass `--agent <name>` to force one. After
+upgrading `marionette_flutter`, run `dart run skills@ get` again to pick up any changes.
+
+No Dart CLI in your workflow, or want the skill without adding the package? Install it straight
+from this repo with [`skills`](https://github.com/vercel-labs/skills), which reads the file
+directly off GitHub — no Flutter/Dart toolchain, and no need for `marionette_flutter` to be a
+dependency yet:
+
+```bash
+npx skills add leancodepl/marionette_mcp
+```
+
+Or copy the file above directly into your agent's skills folder — e.g.
+`.claude/skills/marionette_flutter-drive-app/SKILL.md` for Claude Code.
+
 ## Documentation
 
 | Guide | What's inside |
@@ -96,7 +132,6 @@ Some real-world prompts:
 | [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) | Expose app-specific actions as agent tools via `registerMarionetteExtension`. |
 | [CLI](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md) | Drive Marionette from any shell-capable agent. |
 | [Troubleshooting](https://github.com/leancodepl/marionette_mcp/blob/main/docs/troubleshooting.md) | Common gotchas and limitations. |
-| [Agent Skill](https://github.com/leancodepl/marionette_mcp/blob/main/skills/marionette-drive-flutter-apps/SKILL.md) | Drop-in `SKILL.md` teaching an agent the full toolset and best practices. |
 
 ## Packages
 
