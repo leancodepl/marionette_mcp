@@ -58,10 +58,14 @@ class SessionManager {
   }
 
   /// The most recently modified directory named exactly [slug] or prefixed
-  /// with `$slug-` (a slug followed by a creation timestamp).
+  /// with `$slug-` (a slug followed by a creation timestamp), compared
+  /// case-insensitively — [slug] is always lowercase (see [_slugify]), but a
+  /// directory name embeds a timestamp with an uppercase `T` (see
+  /// [_timestamp]), so passing back a previous connect's exact returned name
+  /// must still match it.
   Directory? _mostRecentMatch(Directory sessionsDir, String slug) {
     final matches = sessionsDir.listSync().whereType<Directory>().where((d) {
-      final name = p.basename(d.path);
+      final name = p.basename(d.path).toLowerCase();
       return name == slug || name.startsWith('$slug-');
     }).toList()
       ..sort(
