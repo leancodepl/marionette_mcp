@@ -49,6 +49,19 @@ class MarionetteCommandRunner extends CommandRunner<int> {
         'timeout',
         help: 'Connection timeout in seconds.',
         defaultsTo: '5',
+      )
+      ..addOption(
+        'session',
+        help: 'Title for the session directory this command\'s step is '
+            'logged into (see .marionette/sessions/). Reusing the same '
+            'title across invocations resumes the same session. Falls back '
+            'to a fresh, untitled session per command when omitted.',
+      )
+      ..addOption(
+        'session-dir',
+        help: 'Base directory .marionette/sessions/ is created under. '
+            'Overrides the MARIONETTE_SESSION_DIR environment variable and '
+            'defaults to the current directory when neither is set.',
       );
 
     addCommand(RegisterCommand(_registry));

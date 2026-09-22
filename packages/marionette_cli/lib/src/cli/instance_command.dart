@@ -3,13 +3,19 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_mcp/src/session/session.dart';
+import 'package:marionette_mcp/src/session/session_manager.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 /// Base class for commands that operate on a connected Flutter app instance.
 ///
 /// Handles resolving the instance name from the global `--instance` flag,
 /// looking up the URI from the registry, connecting, executing, and
-/// disconnecting.
+/// disconnecting. Also opens (or resumes) the same session directory the MCP
+/// server uses and logs one steps.md line per invocation — CLI parity with
+/// the MCP server's per-tool-call logging, since one CLI invocation runs
+/// exactly one command.
 abstract class InstanceCommand extends Command<int> {
   InstanceRegistry get registry;
 
@@ -63,6 +69,11 @@ abstract class InstanceCommand extends Command<int> {
     }
     final connector = VmServiceConnector();
 
+    final session = SessionManager().createOrResume(
+      title: globalResults?['session'] as String?,
+      baseDirOverride: globalResults?['session-dir'] as String?,
+    );
+
     try {
       await connector.connect(uri).timeout(
             Duration(seconds: timeoutSeconds),
@@ -71,22 +82,42 @@ abstract class InstanceCommand extends Command<int> {
               'after ${timeoutSeconds}s. Is the app still running?',
             ),
           );
-      return await execute(connector);
+      final exitCode = await execute(connector);
+      _logStep(session,
+          outcome: exitCode == 0 ? 'ok' : 'error: exit $exitCode');
+      return exitCode;
     } on SocketException catch (e) {
       final hint = isStateless
           ? 'Check the URI and ensure the app is still running.'
           : 'The app may have stopped. '
               'Try "marionette doctor" or "marionette unregister $displayName".';
       stderr.writeln('Could not connect to "$displayName" at $uri: $e\n$hint');
+      _logStep(session, outcome: 'error: $e');
       return 1;
     } on TimeoutException catch (e) {
       stderr.writeln(e.message);
+      _logStep(session, outcome: 'error: ${e.message}');
       return 1;
     } catch (e) {
       stderr.writeln('Error: $e');
+      _logStep(session, outcome: 'error: $e');
       return 1;
     } finally {
       await connector.disconnect();
     }
+  }
+
+  /// Appends this invocation's steps.md line: the command name, a selector
+  /// summary built from whichever options the user actually passed, and
+  /// [outcome]. Mirrors the MCP server's step logging (see [StepLogger]) so
+  /// a session started via one transport reads the same way from the other.
+  void _logStep(Session session, {required String outcome}) {
+    final args = <String, dynamic>{
+      for (final option in argResults?.options ?? const <String>[])
+        if (argResults!.wasParsed(option)) option: argResults![option],
+    };
+    final selector = describeStepSelector(name, args);
+    final line = formatStepLine(name, selector, outcome);
+    session.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
   }
 }
