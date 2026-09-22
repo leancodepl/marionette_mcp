@@ -351,7 +351,7 @@ instance and `unregister` cleans up stale ones.
 
 ## Keeping this skill in sync
 
-This file is meant to track releases (written against `0.6.0`), and the
+This file must track the package release it ships with, and the
 capability table above should never disagree with `marionette help-ai`'s own
 output — both are generated from the same command set. If a tool or CLI
 command is added, renamed, or changes behavior, update the table and any
