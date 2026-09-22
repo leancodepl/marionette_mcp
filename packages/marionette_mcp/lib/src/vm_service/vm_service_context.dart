@@ -1,4 +1,6 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/session/session_manager.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/device_tools.dart';
@@ -15,10 +17,14 @@ import 'package:mcp_dart/mcp_dart.dart';
 final class VmServiceContext {
   VmServiceContext()
       : connector = VmServiceConnector(),
-        _logger = logging.Logger('VmServiceContext');
+        _logger = logging.Logger('VmServiceContext'),
+        _sessionManager = SessionManager(),
+        _stepLogger = StepLogger();
 
   final VmServiceConnector connector;
   final logging.Logger _logger;
+  final SessionManager _sessionManager;
+  final StepLogger _stepLogger;
 
   /// Owns the registry of dynamic extension tools across the lifetime of
   /// this context. Reused across connect/disconnect cycles so a previously
@@ -27,38 +33,58 @@ final class VmServiceContext {
 
   /// Registers all VM service related tools with the MCP server.
   ///
+  /// Every tool is registered through [LoggedMcpServer] so each call is
+  /// recorded to the active session's steps.md (see [StepLogger]).
   /// Connection lifecycle tools (`connect`, `disconnect`) are registered here
-  /// because they own the version-compatibility handshake with the binding
-  /// and don't fit the standard tool error-handling shape. Everything else
-  /// is delegated to themed registration functions.
+  /// because they own the version-compatibility handshake with the binding,
+  /// the session lifecycle, and don't fit the standard tool error-handling
+  /// shape. Everything else is delegated to themed registration functions.
   void registerTools(McpServer server) {
+    final loggedServer = LoggedMcpServer(server, _stepLogger);
     _dynamicTools = DynamicExtensionTools(
       server: server,
       connector: connector,
       logger: _logger,
+      stepLogger: _stepLogger,
     );
-    _registerConnectionTools(server);
-    registerInspectionTools(server, connector, _logger);
-    registerGestureTools(server, connector, _logger);
-    registerTextTools(server, connector, _logger);
-    registerKeyboardTools(server, connector, _logger);
-    registerDeviceTools(server, connector, _logger);
-    registerExtensionTools(server, connector, _logger);
-    registerSystemTools(server, connector, _logger);
+    _registerConnectionTools(loggedServer);
+    registerInspectionTools(loggedServer, connector, _logger);
+    registerGestureTools(loggedServer, connector, _logger);
+    registerTextTools(loggedServer, connector, _logger);
+    registerKeyboardTools(loggedServer, connector, _logger);
+    registerDeviceTools(loggedServer, connector, _logger);
+    registerExtensionTools(loggedServer, connector, _logger);
+    registerSystemTools(loggedServer, connector, _logger);
   }
 
-  void _registerConnectionTools(McpServer server) {
+  void _registerConnectionTools(LoggedMcpServer server) {
     server
       ..registerTool(
         'connect',
         description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode.',
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. On success this also opens (or resumes) a session directory under .marionette/sessions/ where the step log and screenshots for this run are kept — pass session_title again on a later connect to resume the same one.',
         annotations: const ToolAnnotations(title: 'Connect to App'),
         inputSchema: ToolInputSchema(
           properties: {
             'uri': JsonSchema.string(
               description:
                   'VM service URI (e.g., ws://127.0.0.1:8181/ws). This is printed in the Flutter app console when running in debug mode.',
+            ),
+            'session_title': JsonSchema.string(
+              description:
+                  'A short title for this run, e.g. "profile validation". '
+                  'Slugified and timestamped into the session directory name. '
+                  'Pass the exact directory name a previous connect returned '
+                  'to resume that session (e.g. after a compaction or an '
+                  'interruption) instead of starting a new one. Falls back to '
+                  '"run-<timestamp>" when omitted.',
+            ),
+            'session_dir': JsonSchema.string(
+              description:
+                  'Base directory .marionette/sessions/ is created under. '
+                  'Overrides the MARIONETTE_SESSION_DIR environment variable. '
+                  'Only needed when the MCP client hasn\'t set that variable '
+                  'and the process\'s working directory isn\'t the project root.',
             ),
           },
           required: ['uri'],
@@ -108,9 +134,19 @@ final class VmServiceContext {
             // the generic call_custom_extension fallback keeps working.
             await _registerDynamicTools();
 
+            final session = _sessionManager.createOrResume(
+              title: args['session_title'] as String?,
+              baseDirOverride: args['session_dir'] as String?,
+            );
+            _stepLogger.session = session;
+
             return CallToolResult(
               content: [
-                TextContent(text: 'Successfully connected to app at $uri'),
+                TextContent(
+                  text: 'Successfully connected to app at $uri\n'
+                      '${session.resumed ? 'Resumed' : 'Opened'} session: '
+                      '${session.directory.path}',
+                ),
               ],
             );
           } catch (err) {
@@ -136,9 +172,16 @@ final class VmServiceContext {
             // mid-disconnect tools/list reflects only what's still callable.
             _disableDynamicTools();
             await connector.disconnect();
+
+            final session = _stepLogger.session;
+            final nudge = session == null
+                ? ''
+                : '\nSession: ${session.directory.path}\nWrite report.md now.';
             return CallToolResult(
               content: [
-                const TextContent(text: 'Successfully disconnected from app'),
+                TextContent(
+                  text: 'Successfully disconnected from app$nudge',
+                ),
               ],
             );
           } catch (err) {

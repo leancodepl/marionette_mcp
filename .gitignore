@@ -15,3 +15,7 @@ build/
 *.log
 
 tool/marionette
+
+# Marionette session reports — committing one is a deliberate opt-in (e.g.
+# attaching a report to a PR), not the default.
+.marionette/

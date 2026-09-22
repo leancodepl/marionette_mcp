@@ -1,11 +1,12 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers keyboard MCP tools: `press_key`.
 void registerKeyboardTools(
-  McpServer server,
+  LoggedMcpServer server,
   VmServiceConnector connector,
   logging.Logger logger,
 ) {

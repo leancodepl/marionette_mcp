@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -7,7 +8,7 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// Registers gesture-based MCP tools: tap, secondary_tap, double_tap,
 /// long_press, swipe, pinch_zoom, scroll_to, press_back_button.
 void registerGestureTools(
-  McpServer server,
+  LoggedMcpServer server,
   VmServiceConnector connector,
   logging.Logger logger,
 ) {

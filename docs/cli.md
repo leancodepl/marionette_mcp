@@ -77,7 +77,7 @@ marionette doctor              # Check connectivity of all instances
 
 ## Command reference
 
-Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds>` (default 5).
+Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds>` (default 5), `--session <title>`, `--session-dir <path>`. Every invocation appends one line to a [session directory](./session-reports.md)'s `steps.md`; pass `--session` with the same title across invocations to log a multi-step run into the same session instead of a fresh one-off per command.
 
 | Command | Purpose |
 | --- | --- |
