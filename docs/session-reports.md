@@ -90,7 +90,9 @@ reminder to write `report.md`, since a tool result is a much more reliable
 enforcement mechanism than an instruction the agent might skip.
 
 The report *format* — what counts as a finding, how it cites evidence, the
-"Tested" line, and so on — lives in the Marionette drive skill, not here.
+"Tested" line, and so on — lives in the Marionette drive skill, not here: see
+["Reporting what you found"](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette-flutter-drive-app/SKILL.md#reporting-what-you-found)
+in `marionette-flutter-drive-app`.
 
 ## CLI parity
 
