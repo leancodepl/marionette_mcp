@@ -55,6 +55,27 @@ void main() {
       expect(second.directory.path, first.directory.path);
     });
 
+    test('resumes when passed back its own exact returned name', () {
+      // Regression test: the timestamp suffix embeds an uppercase "T"
+      // (see _timestamp), but slugifying the title lowercases it — the
+      // match must still succeed case-insensitively, or passing back
+      // exactly what a previous connect returned (as documented) silently
+      // creates a new session instead of resuming.
+      final manager = SessionManager();
+      final first = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+
+      final second = manager.createOrResume(
+        title: first.name,
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(second.resumed, isTrue);
+      expect(second.directory.path, first.directory.path);
+    });
+
     test('a fresh title never resumes an untitled run', () {
       final manager = SessionManager();
       manager.createOrResume(baseDirOverride: tempDir.path);
