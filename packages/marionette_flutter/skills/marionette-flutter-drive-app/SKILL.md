@@ -464,14 +464,14 @@ A run with only a suspicion (no hard evidence of a real bug) gets `⚠️`
 instead, on both the headline and the finding itself:
 
 ```
-⚠️ Marionette report — no confirmed issues, 1 suspicion · Login screen
-Tested: login screen inspection, email + password entry, screenshot (6 steps, 2 screenshots)
+⚠️ Marionette report — no confirmed issues, 1 suspicion · Settings
+Tested: notification toggles, language picker, theme toggle (9 steps, 2 screenshots)
 
-1. ⚠️ [suspicion] "Or continue with" divider has no social login buttons below it
-   Repro: open Login screen
-   Evidence: screenshots/01.png; step 2 lists no elements below "Or continue with"
+1. ⚠️ [suspicion] Dark mode toggle reverts to light after hot_restart
+   Repro: Settings → enable Dark mode → hot_restart → Settings
+   Evidence: screenshots/02-after-restart.png shows light theme again
 
-➖ Not covered: submitting the form (Log in not tapped), get_logs (permission denied)
+➖ Not covered: account deletion, data export — out of scope for this run
 ```
 
 The chat message for those three, plus a `BLOCKED` case none of them
@@ -494,19 +494,19 @@ Marionette · Checkout — PASS: no issues
 ```
 
 ```
-Marionette · Login screen — SUSPECT: divider with no buttons below it
-✓ Email + password entry, layout
-✗ [suspicion] "Or continue with" divider has no social login buttons below it
-∅ Not covered: submitting the form, get_logs — permission denied
-→ .marionette/sessions/login-form-20260923T0016/report.md · 6 steps, 2 screenshots
+Marionette · Settings — SUSPECT: theme toggle may not persist
+✓ Notification toggles, language picker
+✗ [suspicion] Dark mode toggle reverts to light after hot_restart
+∅ Not covered: account deletion, data export — out of scope for this run
+→ .marionette/sessions/settings-20260922T1601/report.md · 9 steps, 2 screenshots
 ```
 
 ```
-Marionette · Appointment booking — BLOCKED: no available slots
-✓ Login, salon list, salon cards, date picker
-✗ [blocker] 4 salons × 5 dates: always "No appointments available" (test data?)
-∅ Not covered: service, staff, time, confirmation — flow is stuck at slot selection
-→ .marionette/sessions/appointment-booking-20260923T1426/report.md · 42 steps, 1 screenshot
+Marionette · Password reset — BLOCKED: reset email never arrives
+✓ Request form, validation messages
+✗ [blocker] "Send reset link" succeeds but no email logged or received after 3 attempts
+∅ Not covered: setting a new password, confirmation screen — flow can't proceed past the email step
+→ .marionette/sessions/password-reset-20260922T1601/report.md · 11 steps, 1 screenshot
 ```
 
 `.marionette/` is gitignored by default. Committing a session directory —
