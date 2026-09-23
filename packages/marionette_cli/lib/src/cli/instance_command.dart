@@ -12,10 +12,10 @@ import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 ///
 /// Handles resolving the instance name from the global `--instance` flag,
 /// looking up the URI from the registry, connecting, executing, and
-/// disconnecting. Also opens (or resumes) the same session directory the MCP
-/// server uses and logs one steps.md line per invocation — CLI parity with
-/// the MCP server's per-tool-call logging, since one CLI invocation runs
-/// exactly one command.
+/// disconnecting. Also opens a fresh session directory, the same kind the
+/// MCP server uses, and logs one steps.md line per invocation — CLI parity
+/// with the MCP server's per-tool-call logging, since one CLI invocation
+/// runs exactly one command.
 abstract class InstanceCommand extends Command<int> {
   InstanceRegistry get registry;
 
@@ -71,7 +71,7 @@ abstract class InstanceCommand extends Command<int> {
 
     final Session session;
     try {
-      session = SessionManager().createOrResume(
+      session = SessionManager().create(
         title: globalResults?['session'] as String?,
         baseDirOverride: globalResults?['session-dir'] as String?,
       );

@@ -267,20 +267,19 @@ commands against the same app in a row. When you're done for the session
 easy to act on a stale connection later without noticing.
 
 Give `connect` a `session_title` (a short description of what you're
-testing, e.g. `"profile validation"`) — it opens a session directory that
-carries the run's step log and screenshots, and resuming it later (after a
-compaction or an interruption *of this same run*) is as simple as passing
-the same title again. That resume only works while the session is still
-open, though: once it's disconnected or has a `report.md`, it's concluded
-for good — a later `connect` with a matching title opens a brand new
-session instead, never reopens a finished one. One Marionette run is one
-session directory; don't rely on reusing a title to link separate runs
-together on purpose. **Always give it in English**, regardless of the
-prompt's own language (see *The report contract*, below) — it gets
-slugified straight into the session directory's name, and that name should
-stay predictable and filesystem-friendly rather than following the run's
-language. See *Reporting what you found* for what that directory is for and
-what you're expected to do with it before disconnecting.
+testing, e.g. `"profile validation"`) — it opens a fresh session directory
+that carries this run's step log and screenshots. One Marionette run is one
+session directory, always: there's no resuming, even if you pass the same
+title again on a later `connect` — that just opens another, separate
+directory. If a run gets interrupted partway through (a compaction, a
+dropped connection), its session is simply abandoned; don't try to pick up
+where it left off, and don't reuse its title. **Always give it in
+English**, regardless of the prompt's own language (see *The report
+contract*, below) — it gets slugified straight into the session directory's
+name, and that name should stay predictable and filesystem-friendly rather
+than following the run's language. See *Reporting what you found* for what
+that directory is for and what you're expected to do with it before
+disconnecting.
 
 ## What you can do once connected
 
@@ -292,7 +291,7 @@ what you're expected to do with it before disconnecting.
 | Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see *Device-config sweeps*, above — otherwise it returns setup instructions rather than failing.                                                                                                                                                                                                                                                                            |
 | Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                                                                                                                                                                                                                             |
-| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens (or resumes, via `session_title`) a session directory that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                         |
+| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens a fresh session directory (`session_title`) that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                         |
 | Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                                                                                                                                                                                                                  |
 
 ## Good practices
@@ -336,9 +335,8 @@ what you're expected to do with it before disconnecting.
 
 ## Reporting what you found
 
-`connect` opens (or resumes) a session directory under
-`.marionette/sessions/` — the server's own record of the run, kept separate
-from your own context so it survives a compaction or an interruption.
+`connect` opens a fresh session directory under `.marionette/sessions/` —
+the server's own record of the run, kept separate from your own context.
 `disconnect`'s response repeats that directory's path with a reminder to
 write `report.md`: treat that as a requirement, not a suggestion — it's the
 enforcement mechanism precisely because an instruction here, on its own,
@@ -359,9 +357,11 @@ You own one more file there, which the server never writes:
 - **`report.md`** — written once, at the end, from your own context. Write
   it on either of two triggers: the run completed, or you're stopping early
   (a blocking failure, a budget/time limit, an ambiguous requirement you
-  can't resolve alone). An interrupted run's report states *why* it stopped
-  and what was left untested, instead of silently reporting only what got
-  covered. Before drafting a single line, name the report language
+  can't resolve alone). A report for a run stopped early states *why* it
+  stopped and what was left untested, instead of silently reporting only
+  what got covered — there's no resuming to pick it back up later, so this
+  is the only record of what happened. Before drafting a single line, name
+  the report language
   explicitly: the language of the prompt that started this session (the
   message that led to the first `connect` call) — not English by default,
   not the language of the app's UI under test, not whatever language your

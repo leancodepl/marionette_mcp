@@ -8,7 +8,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `connect` | Connect to a Flutter app via its VM service URI (e.g. `ws://127.0.0.1:8181/ws`). Must be called before any other tool. Verifies the `marionette_flutter` binding version matches the server, then opens (or resumes) a [session directory](./session-reports.md) — optional `session_title` and `session_dir`. |
+| `connect` | Connect to a Flutter app via its VM service URI (e.g. `ws://127.0.0.1:8181/ws`). Must be called before any other tool. Verifies the `marionette_flutter` binding version matches the server, then opens a fresh [session directory](./session-reports.md) — optional `session_title` and `session_dir`. |
 | `disconnect` | Disconnect from the currently connected app. Reports the session directory and prompts the agent to write `report.md`. |
 
 ### Inspection

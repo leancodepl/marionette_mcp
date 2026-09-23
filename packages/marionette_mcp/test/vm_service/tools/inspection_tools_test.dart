@@ -68,10 +68,7 @@ void main() {
 
     test('saves to the session screenshots directory when inline: false',
         () async {
-      final session = Session.open(
-        Directory(p.join(tempDir.path, 'session')),
-        resumed: false,
-      );
+      final session = Session.open(Directory(p.join(tempDir.path, 'session')));
 
       final result =
           await takeScreenshots(connector, session, const {'inline': false});
@@ -84,10 +81,7 @@ void main() {
     });
 
     test('numbers subsequent saves after what is already there', () async {
-      final session = Session.open(
-        Directory(p.join(tempDir.path, 'session')),
-        resumed: false,
-      );
+      final session = Session.open(Directory(p.join(tempDir.path, 'session')));
       await takeScreenshots(connector, session, const {'inline': false});
       await takeScreenshots(connector, session, const {'inline': false});
 
@@ -104,10 +98,7 @@ void main() {
       // 02.png is deleted, two files (01.png, 03.png) remain, and a
       // count-based index of 3 would overwrite 03.png instead of writing
       // 04.png.
-      final session = Session.open(
-        Directory(p.join(tempDir.path, 'session')),
-        resumed: false,
-      );
+      final session = Session.open(Directory(p.join(tempDir.path, 'session')));
       final screenshotsDir = session.screenshotsDir;
       File(p.join(screenshotsDir.path, '01.png')).writeAsBytesSync([1]);
       final existingThree = File(p.join(screenshotsDir.path, '03.png'))

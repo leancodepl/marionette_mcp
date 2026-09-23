@@ -1,9 +1,12 @@
 # Session Reports
 
-Every `connect` opens (or resumes) a **session directory** — a persistent
-workspace for the run, separate from the agent's own conversation context.
-The server owns the directory, the step log, and the screenshot sink; the
-connected agent owns the narrative report written into it.
+Every `connect` opens a fresh **session directory** — a persistent workspace
+for the run, separate from the agent's own conversation context. The server
+owns the directory, the step log, and the screenshot sink; the connected
+agent owns the narrative report written into it. One `connect` always
+produces exactly one session directory — there is no resuming, so if a run
+gets interrupted partway through, it's simply abandoned: the next `connect`
+starts a new one.
 
 ## Session directory
 
@@ -33,23 +36,19 @@ The directory's location is resolved from, in order:
 
 `.marionette/sessions/<name>/` is created under whichever of these applies.
 
-### Naming and resuming a session
+### Naming a session
 
 `connect` accepts an optional `session_title` (the CLI: `--session <title>`).
 The title is slugified and a creation timestamp appended, e.g.
-`profile-validation-20260922T1412`. Passing the **same title again** resumes
-the most recently used *open* session with that title instead of creating a
-new one — `steps.md` keeps growing in the same file rather than starting
-over. Omitting the title falls back to `run-<timestamp>`, which is never
-resumed.
+`profile-validation-20260922T1412`. It's purely a human-readable label —
+passing the same title again does **not** reopen the earlier directory; it
+always creates a new one. Omitting the title falls back to `run-<timestamp>`.
 
-A session is only resumed while it's still open. Once it's **concluded** —
-`disconnect` logged its own step, or `report.md` exists — a matching title
-(or even the exact directory name) opens a brand new session instead. This
-is deliberate: one Marionette run is meant to produce one session directory.
-Without this guard, a later, completely independent invocation that happens
-to reuse the same title would silently reopen a finished session and its
-`report.md` could get overwritten by an unrelated run.
+One Marionette run is meant to produce one session directory, with no
+exceptions: this keeps a run's `report.md` from ever being reopened and
+overwritten by a later, unrelated invocation. The tradeoff is that an
+interrupted run's session is simply abandoned — there's nothing to resume it
+into.
 
 Old session directories are pruned automatically, keeping the most recently
 used 20 per project.
@@ -113,8 +112,9 @@ in `marionette-flutter-drive-app`.
 
 ## CLI parity
 
-`marionette` commands open (or resume) the same kind of session directory
-and append the same style of `steps.md` line per invocation — pass
-`--session <title>` consistently across a script's invocations to log a
-multi-step run into one session rather than a fresh, untitled one per
-command. See the [CLI reference](./cli.md#command-reference).
+`marionette` commands open the same kind of session directory and append
+the same style of `steps.md` line per invocation. Since each CLI invocation
+is its own process, and there is no resuming, every command gets its own
+session directory — pass `--session <title>` for a readable label, but it
+won't group several invocations into one. See the
+[CLI reference](./cli.md#command-reference).
