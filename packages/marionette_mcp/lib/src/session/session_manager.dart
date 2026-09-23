@@ -12,6 +12,14 @@ const sessionDirEnvVar = 'MARIONETTE_SESSION_DIR';
 /// older ones are deleted the next time a session is created.
 const defaultMaxSessions = 20;
 
+/// Name of the marker file a titled session directory carries, recording the
+/// exact slug it was created under. Resuming by title reads this back rather
+/// than guessing from the directory name — a bare prefix match on the name
+/// would let a title of "checkout" resume an unrelated "checkout-flow-..."
+/// session, or a title of "run" collide with every untitled fallback
+/// session (which also names its directory `run-<timestamp>`).
+const _slugMarkerFileName = '.session-slug';
+
 /// Creates and resumes session directories under `.marionette/sessions/`,
 /// and prunes old ones so the directory doesn't grow without bound.
 class SessionManager {
@@ -20,9 +28,9 @@ class SessionManager {
   final int maxSessions;
 
   /// Creates a fresh session directory, or resumes the most recently used
-  /// one whose name matches the slugified [title] — this is how a run
-  /// survives a compaction, an interruption, or an explicit resume: pass the
-  /// same `session_title` again.
+  /// one matching the slugified [title] — this is how a run survives a
+  /// compaction, an interruption, or an explicit resume: pass the same
+  /// `session_title` again.
   ///
   /// [baseDirOverride] (a `connect` argument) takes priority over the
   /// [sessionDirEnvVar] environment variable; if neither is set, the base
@@ -35,14 +43,21 @@ class SessionManager {
     final slug = _slugify(title);
     final existing = slug == null ? null : _mostRecentMatch(sessionsDir, slug);
 
-    final session = existing != null
-        ? Session.open(existing, resumed: true)
-        : Session.open(
-            Directory(
-              p.join(sessionsDir.path, '${slug ?? 'run'}-${_timestamp()}'),
-            ),
-            resumed: false,
-          );
+    final Session session;
+    if (existing != null) {
+      session = Session.open(existing, resumed: true);
+    } else {
+      final directory = _freshDirectory(
+        sessionsDir,
+        '${slug ?? 'run'}-${_timestamp()}',
+      );
+      session = Session.open(directory, resumed: false);
+      if (slug != null) {
+        File(
+          p.join(directory.path, _slugMarkerFileName),
+        ).writeAsStringSync(slug);
+      }
+    }
 
     _prune(sessionsDir, keep: session.directory.path);
     return session;
@@ -57,34 +72,69 @@ class SessionManager {
     return Directory.current.path;
   }
 
-  /// The most recently modified directory named exactly [slug] or prefixed
-  /// with `$slug-` (a slug followed by a creation timestamp), compared
-  /// case-insensitively — [slug] is always lowercase (see [_slugify]), but a
-  /// directory name embeds a timestamp with an uppercase `T` (see
-  /// [_timestamp]), so passing back a previous connect's exact returned name
-  /// must still match it.
+  /// The most recently used directory matching [slug]: either its own name
+  /// equals [slug] (resuming by the exact directory name a previous connect
+  /// returned), or it carries a [_slugMarkerFileName] recording it was
+  /// created under [slug] (resuming by the same short title). Never a bare
+  /// prefix match on the directory name — see [_slugMarkerFileName].
   Directory? _mostRecentMatch(Directory sessionsDir, String slug) {
-    final matches = sessionsDir.listSync().whereType<Directory>().where((d) {
-      final name = p.basename(d.path).toLowerCase();
-      return name == slug || name.startsWith('$slug-');
-    }).toList()
-      ..sort(
-        (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
-      );
+    final matches = sessionsDir
+        .listSync()
+        .whereType<Directory>()
+        .where((d) => _matchesSlug(d, slug))
+        .toList()
+      ..sort((a, b) => _lastUsed(b).compareTo(_lastUsed(a)));
     return matches.isEmpty ? null : matches.first;
   }
 
+  bool _matchesSlug(Directory dir, String slug) {
+    if (p.basename(dir.path).toLowerCase() == slug) return true;
+    return _readSlugMarker(dir) == slug;
+  }
+
+  String? _readSlugMarker(Directory dir) {
+    final marker = File(p.join(dir.path, _slugMarkerFileName));
+    if (!marker.existsSync()) return null;
+    final slug = marker.readAsStringSync().trim();
+    return slug.isEmpty ? null : slug;
+  }
+
+  /// A directory named [baseName] under [sessionsDir], disambiguated with a
+  /// numeric suffix if that name is already taken — e.g. two untitled
+  /// sessions created within the same timestamp-resolution window (minute
+  /// granularity), which would otherwise silently share one directory while
+  /// both report `resumed: false`.
+  Directory _freshDirectory(Directory sessionsDir, String baseName) {
+    var candidate = Directory(p.join(sessionsDir.path, baseName));
+    var suffix = 2;
+    while (candidate.existsSync()) {
+      candidate = Directory(p.join(sessionsDir.path, '$baseName-$suffix'));
+      suffix++;
+    }
+    return candidate;
+  }
+
+  /// The most recent activity in [dir]: steps.md's own mtime once the
+  /// session has logged anything — appending to a file never bumps its
+  /// parent directory's mtime on any common filesystem, so sorting on the
+  /// directory's own mtime would treat a heavily-used, resumed session as
+  /// stale — falling back to the directory's mtime for one that hasn't
+  /// logged a step yet.
+  DateTime _lastUsed(Directory dir) {
+    final stepsFile = File(p.join(dir.path, 'steps.md'));
+    if (stepsFile.existsSync()) return stepsFile.statSync().modified;
+    return dir.statSync().modified;
+  }
+
   /// Deletes every session directory beyond the [maxSessions] most recently
-  /// modified, never the directory at [keep].
+  /// used (see [_lastUsed]), never the directory at [keep].
   void _prune(Directory sessionsDir, {required String keep}) {
     final dirs = sessionsDir
         .listSync()
         .whereType<Directory>()
         .where((d) => d.path != keep)
         .toList()
-      ..sort(
-        (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
-      );
+      ..sort((a, b) => _lastUsed(b).compareTo(_lastUsed(a)));
     final keepOthers = maxSessions > 0 ? maxSessions - 1 : 0;
     for (final dir in dirs.skip(keepOthers)) {
       dir.deleteSync(recursive: true);

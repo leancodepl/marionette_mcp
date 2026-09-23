@@ -84,6 +84,102 @@ void main() {
       expect(second.resumed, isFalse);
     });
 
+    test('two untitled sessions created back-to-back get distinct '
+        'directories', () {
+      // Regression test: untitled runs are only unique to the minute
+      // (_timestamp has no seconds). Without disambiguation, two untitled
+      // connects within the same minute would resolve to the identical
+      // directory name and — since Directory.createSync doesn't error on an
+      // already-existing directory — the second would silently share (and
+      // corrupt) the first's steps.md while still reporting resumed: false.
+      final manager = SessionManager();
+      final first = manager.createOrResume(baseDirOverride: tempDir.path);
+      final second = manager.createOrResume(baseDirOverride: tempDir.path);
+
+      expect(second.directory.path, isNot(equals(first.directory.path)));
+      expect(second.resumed, isFalse);
+    });
+
+    test('a title never resumes an unrelated session that merely shares '
+        'its slug as a prefix', () {
+      // Regression test: a bare prefix match on the directory name would
+      // let "checkout" resume an unrelated "checkout flow" session (its
+      // slug "checkout-flow" starts with "checkout-"), and would let a
+      // title of "run" collide with every untitled run-<timestamp>
+      // fallback session.
+      final manager = SessionManager();
+      final unrelated = manager.createOrResume(
+        title: 'Checkout flow',
+        baseDirOverride: tempDir.path,
+      );
+
+      final result = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(result.resumed, isFalse);
+      expect(result.directory.path, isNot(equals(unrelated.directory.path)));
+
+      final untitled = manager.createOrResume(baseDirOverride: tempDir.path);
+      final titledRun = manager.createOrResume(
+        title: 'run',
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(titledRun.resumed, isFalse);
+      expect(
+        titledRun.directory.path,
+        isNot(equals(untitled.directory.path)),
+      );
+    });
+
+    test('resuming a slug prefers the candidate with the most recent step '
+        'over one with a merely newer directory mtime', () async {
+      // Regression test: appending to steps.md never bumps its parent
+      // directory's own mtime on any common filesystem, so sorting
+      // candidates on the directory's mtime treats a heavily-used session
+      // as stale the moment a newer, otherwise-idle directory with the same
+      // slug marker appears — wrongly resuming (or pruning) the wrong one.
+      // Two directories can only carry the same slug marker by fabricating
+      // one by hand here — createOrResume itself always resumes rather than
+      // duplicate a slug it already knows about.
+      final active = Directory(p.join(sessionsDir().path, 'active-first'))
+        ..createSync(recursive: true);
+      File(p.join(active.path, '.session-slug')).writeAsStringSync('active');
+      File(
+        p.join(active.path, 'steps.md'),
+      ).writeAsStringSync('- [00:00:00] connect -> ok\n');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // A directory created *after* `active`'s last step, but never used
+      // itself. Its own mtime is later than `active`'s directory mtime,
+      // even though `active` is the one that's actually still in use.
+      final idle = Directory(p.join(sessionsDir().path, 'active-second'))
+        ..createSync(recursive: true);
+      File(p.join(idle.path, '.session-slug')).writeAsStringSync('active');
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // `active` logs another step — later in wall-clock time than
+      // `idle`'s directory was created, even though `active`'s own
+      // directory mtime (unaffected by the append) still predates it.
+      File(p.join(active.path, 'steps.md')).writeAsStringSync(
+        '- [00:00:01] tap key=x -> ok\n',
+        mode: FileMode.append,
+      );
+
+      final manager = SessionManager();
+      final resumed = manager.createOrResume(
+        title: 'active',
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(resumed.resumed, isTrue);
+      expect(resumed.directory.path, active.path);
+    });
+
     test('resolves the base directory from the env-var-free override first',
         () {
       final manager = SessionManager();

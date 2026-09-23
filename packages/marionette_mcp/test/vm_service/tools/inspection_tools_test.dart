@@ -96,5 +96,31 @@ void main() {
         isTrue,
       );
     });
+
+    test('numbers past a gap without overwriting an existing screenshot',
+        () async {
+      // Regression test: counting PNG files (rather than looking at their
+      // names) computes the wrong next index once a gap exists — e.g. after
+      // 02.png is deleted, two files (01.png, 03.png) remain, and a
+      // count-based index of 3 would overwrite 03.png instead of writing
+      // 04.png.
+      final session = Session.open(
+        Directory(p.join(tempDir.path, 'session')),
+        resumed: false,
+      );
+      final screenshotsDir = session.screenshotsDir;
+      File(p.join(screenshotsDir.path, '01.png')).writeAsBytesSync([1]);
+      final existingThree = File(p.join(screenshotsDir.path, '03.png'))
+        ..writeAsBytesSync([3]);
+      final existingThreeBytesBefore = existingThree.readAsBytesSync();
+
+      await takeScreenshots(connector, session, const {'inline': false});
+
+      expect(
+        File(p.join(screenshotsDir.path, '04.png')).existsSync(),
+        isTrue,
+      );
+      expect(existingThree.readAsBytesSync(), existingThreeBytesBefore);
+    });
   });
 }

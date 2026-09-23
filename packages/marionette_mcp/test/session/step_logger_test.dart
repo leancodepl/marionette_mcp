@@ -35,6 +35,35 @@ void main() {
       expect(selector, 'x=10 y=20');
     });
 
+    test('redacts a connect uri to scheme://host:port', () {
+      // Regression test: Flutter VM service URIs commonly embed an auth
+      // token as a path segment (ws://host:PORT/TOKEN=/ws) — logging the
+      // raw uri would persist that token to steps.md.
+      final selector = describeStepSelector('connect', {
+        'uri': 'ws://127.0.0.1:8181/AbCdEf123=/ws',
+      });
+
+      expect(selector, 'uri=ws://127.0.0.1:8181');
+      expect(selector, isNot(contains('AbCdEf123')));
+    });
+
+    test('falls back to a placeholder for an unparsable uri', () {
+      final selector = describeStepSelector('connect', {'uri': 'not a uri'});
+
+      expect(selector, isNot(contains('not a uri')));
+    });
+
+    test('collapses a multiline selector value onto one physical line', () {
+      // Regression test: an unnormalized multiline value would break
+      // steps.md's one-line-per-call format.
+      final selector = describeStepSelector('tap', {
+        'text': 'Multi\nLine\n  Label',
+      });
+
+      expect(selector, 'text=Multi Line Label');
+      expect(selector, isNot(contains('\n')));
+    });
+
     group('enter_text redaction', () {
       test('records only the length for a non-sensitive field', () {
         final selector = describeStepSelector('enter_text', {
@@ -151,6 +180,72 @@ void main() {
 
       final content = session.stepsFile.readAsStringSync();
       expect(content, contains('-> error: Element not found'));
+    });
+
+    test('does not persist a data-listing tool\'s payload on success', () {
+      // Regression test: get_interactive_elements, get_logs, and
+      // call_custom_extension can return arbitrary application data —
+      // echoing the first 200 characters of that into steps.md contradicts
+      // the no-payload design and can retain application secrets.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger.logStep(
+        'get_interactive_elements',
+        {},
+        const CallToolResult(
+          content: [
+            TextContent(text: 'Found 1 element(s):\nType: TextField, '
+                'Text: "user@example.com"'),
+          ],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, contains('get_interactive_elements -> ok'));
+      expect(content, isNot(contains('user@example.com')));
+    });
+
+    test('still reports the full error message for a data-listing tool',
+        () {
+      // Errors are diagnostic context the report contract explicitly wants
+      // (steps.md's "the error returned... the 'element not found'
+      // detail"), unlike a successful payload — this applies regardless of
+      // which tool produced it.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger.logStep(
+        'get_logs',
+        {},
+        const CallToolResult(
+          isError: true,
+          content: [TextContent(text: 'No log collector configured')],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, contains('-> error: No log collector configured'));
+    });
+
+    test('does not persist a custom/dynamic extension tool\'s payload', () {
+      // Dynamically-promoted custom extension tools aren't known by name
+      // ahead of time, so they must default to the safe, generic outcome
+      // rather than being explicitly allowlisted one by one.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger.logStep(
+        'app_navigation_go_to_page',
+        {},
+        const CallToolResult(
+          content: [TextContent(text: '{"userToken":"abc123","ok":true}')],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, contains('app_navigation_go_to_page -> ok'));
+      expect(content, isNot(contains('abc123')));
     });
 
     test('appends multiple calls as separate lines', () {
