@@ -98,15 +98,15 @@ abstract class InstanceCommand extends Command<int> {
           : 'The app may have stopped. '
               'Try "marionette doctor" or "marionette unregister $displayName".';
       stderr.writeln('Could not connect to "$displayName" at $uri: $e\n$hint');
-      _logStep(session, outcome: 'error: $e');
+      _logStep(session, outcome: describeStepError(e.toString()));
       return 1;
     } on TimeoutException catch (e) {
       stderr.writeln(e.message);
-      _logStep(session, outcome: 'error: ${e.message}');
+      _logStep(session, outcome: describeStepError(e.message ?? 'timed out'));
       return 1;
     } catch (e) {
       stderr.writeln('Error: $e');
-      _logStep(session, outcome: 'error: $e');
+      _logStep(session, outcome: describeStepError(e.toString()));
       return 1;
     } finally {
       await connector.disconnect();

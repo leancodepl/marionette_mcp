@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/session/session.dart';
@@ -180,6 +181,91 @@ void main() {
 
       final content = session.stepsFile.readAsStringSync();
       expect(content, contains('-> error: Element not found'));
+    });
+
+    test('extracts the exception message and a few stack frames from a '
+        'structured app-side error, instead of truncating the raw JSON',
+        () {
+      // This is the real shape marionette_flutter sends for an uncaught
+      // exception (see registerInternalMarionetteExtension's catch-all):
+      // VmServiceExtensionException.toString() produces
+      // "Extension X failed\nError: {"exception":...,"stack":...}". Blindly
+      // truncating that at 200 chars used to cut the JSON apart mid-
+      // structure, often losing the exception message on a long selector.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      final errorJson = jsonEncode({
+        'exception': 'Exception: Element matching '
+            '{identifier: 25, Friday, September 25, 2026} not found',
+        'stack': '#0      GestureDispatcher.tap '
+            '(package:marionette_flutter/src/gestures/dispatcher.dart:45:7)\n'
+            '#1      MarionetteExtensions.tap.<anonymous closure> '
+            '(package:marionette_flutter/src/binding/extensions.dart:120:5)\n'
+            '#2      registerInternalMarionetteExtension.<anonymous closure> '
+            '(package:marionette_flutter/src/binding/register.dart:40:29)\n'
+            '#3      _rootRunUnary (dart:async/zone.dart:1436:47)\n'
+            '#4      _CustomZone.runUnary (dart:async/zone.dart:1335:19)\n'
+            '#5      _FutureListener.handleValue '
+            '(dart:async/future_impl.dart:151:18)',
+        'method': 'ext.flutter.marionette.tap',
+      });
+
+      logger.logStep(
+        'tap',
+        {'identifier': '25, Friday, September 25, 2026'},
+        CallToolResult(
+          isError: true,
+          content: [
+            TextContent(
+              text: 'Extension marionette.tap failed\nError: $errorJson',
+            ),
+          ],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(
+        content,
+        contains(
+          'error: Exception: Element matching '
+          '{identifier: 25, Friday, September 25, 2026} not found [',
+        ),
+      );
+      // Exactly 4 frames (the configured cap), package: stripped, no column.
+      expect(
+        content,
+        contains(
+          'GestureDispatcher.tap '
+          '(marionette_flutter/src/gestures/dispatcher.dart:45) › '
+          'MarionetteExtensions.tap.<anonymous closure> '
+          '(marionette_flutter/src/binding/extensions.dart:120) › '
+          'registerInternalMarionetteExtension.<anonymous closure> '
+          '(marionette_flutter/src/binding/register.dart:40) › '
+          '_rootRunUnary (dart:async/zone.dart:1436)',
+        ),
+      );
+      expect(content, isNot(contains('_CustomZone.runUnary')));
+      expect(content, isNot(contains('"exception"')));
+      expect(content, isNot(contains('"stack"')));
+    });
+
+    test('falls back to the plain message for a deliberate, non-JSON '
+        'error', () {
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger.logStep(
+        'get_logs',
+        {},
+        const CallToolResult(
+          isError: true,
+          content: [TextContent(text: 'No log collector configured.')],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, contains('-> error: No log collector configured.'));
     });
 
     test('redacts a uri embedded in a success message, not just the '
