@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/session/session.dart';
@@ -12,6 +13,20 @@ final _sensitiveSelectorPattern = RegExp(
 );
 
 const _maxOutcomeLength = 200;
+
+/// A longer budget for an error outcome that carries a summarized stack
+/// trace (see [describeStepError]) — a bare message fits the normal budget
+/// comfortably, but a message plus a few compact frames often doesn't.
+const _maxErrorOutcomeLength = 500;
+
+/// Stack frames kept when an error carries a structured exception/stack
+/// (see [describeStepError]) — enough to usually show where the failure
+/// actually happened, without pasting the whole trace.
+const _maxStackFrames = 4;
+
+/// Matches one Dart stack trace frame, e.g.
+/// `#0      GestureDispatcher.tap (package:marionette_flutter/src/x.dart:45:7)`.
+final _stackFrameLine = RegExp(r'^#\d+\s+(.+?)\s+\((.+?):(\d+)(?::\d+)?\)$');
 
 /// Arg names shown in a step's selector summary. Deliberately excludes
 /// free-text payload fields (e.g. `enter_text`'s `input`) — steps.md
@@ -75,13 +90,12 @@ class StepLogger {
 
   String _describeOutcome(String toolName, CallToolResult result) {
     if (result.isError) {
-      final text = _firstNonEmptyText(result);
-      return 'error: ${text.isEmpty ? 'failed' : _truncate(_oneLine(_redactUrisIn(text)))}';
+      return describeStepError(_firstNonEmptyText(result));
     }
 
     if (_shortConfirmationTools.contains(toolName)) {
       final text = _firstNonEmptyText(result);
-      if (text.isNotEmpty) return _truncate(_oneLine(_redactUrisIn(text)));
+      if (text.isNotEmpty) return _truncateText(_oneLine(_redactUrisIn(text)));
     }
 
     final imageCount = result.content.whereType<ImageContent>().length;
@@ -92,11 +106,75 @@ class StepLogger {
       .whereType<TextContent>()
       .map((c) => c.text)
       .firstWhere((t) => t.isNotEmpty, orElse: () => '');
-
-  String _truncate(String text) => text.length <= _maxOutcomeLength
-      ? text
-      : '${text.substring(0, _maxOutcomeLength)}…';
 }
+
+/// Builds an error outcome (prefixed `error: `) from raw error text — either
+/// an MCP tool result's own message or a CLI command's caught exception's
+/// `toString()`. Both transports can surface the same
+/// `VmServiceExtensionException`-shaped text
+/// (`"Extension X failed\nError: {"exception": "...", "stack": "...", "method": "..."}"`
+/// — see `VmServiceExtensionException.toString()` and
+/// `registerInternalMarionetteExtension`'s catch-all in
+/// `marionette_flutter`), so both get the same treatment: the exception
+/// message plus a few compact stack frames when that shape is present,
+/// instead of blindly truncating raw JSON apart mid-structure and losing the
+/// message entirely on a long selector. A deliberate, expected error (e.g.
+/// "no log collector configured") isn't JSON-wrapped and falls back to the
+/// plain, redacted, truncated message.
+String describeStepError(String text) {
+  if (text.isEmpty) return 'error: failed';
+
+  final exceptionData = _tryParseExceptionJson(text);
+  if (exceptionData != null) {
+    final exception =
+        _oneLine(_redactUrisIn(exceptionData['exception'] as String));
+    final frames = _summarizeStackTrace(exceptionData['stack'] as String);
+    final body = frames.isEmpty ? exception : '$exception [$frames]';
+    return 'error: ${_truncateText(body, _maxErrorOutcomeLength)}';
+  }
+
+  return 'error: ${_truncateText(_oneLine(_redactUrisIn(text)))}';
+}
+
+/// Looks for the `Error: {...}` suffix `VmServiceExtensionException` appends
+/// (see [describeStepError]) and parses it as JSON. Returns null for any
+/// text that isn't in exactly this shape — a deliberate error message, a
+/// locally-thrown exception's plain `toString()`, or anything else — rather
+/// than guessing.
+Map<String, dynamic>? _tryParseExceptionJson(String text) {
+  const marker = 'Error: ';
+  final index = text.indexOf('$marker{');
+  if (index == -1) return null;
+  try {
+    final decoded = jsonDecode(text.substring(index + marker.length));
+    if (decoded is! Map<String, dynamic>) return null;
+    return decoded['exception'] is String && decoded['stack'] is String
+        ? decoded
+        : null;
+  } on FormatException {
+    return null;
+  }
+}
+
+/// The first [_maxStackFrames] frames of [stackTrace], each reduced to
+/// `Symbol (path:line)` (path package-relative, column dropped) and joined
+/// onto one physical line.
+String _summarizeStackTrace(String stackTrace) {
+  final frames = <String>[];
+  for (final line in const LineSplitter().convert(stackTrace)) {
+    final match = _stackFrameLine.firstMatch(line.trim());
+    if (match == null) continue;
+    final symbol = match.group(1)!;
+    final uri = match.group(2)!.replaceFirst('package:', '');
+    final lineNumber = match.group(3)!;
+    frames.add('$symbol ($uri:$lineNumber)');
+    if (frames.length >= _maxStackFrames) break;
+  }
+  return frames.join(' › ');
+}
+
+String _truncateText(String text, [int maxLength = _maxOutcomeLength]) =>
+    text.length <= maxLength ? text : '${text.substring(0, maxLength)}…';
 
 /// Collapses whitespace (including newlines) into single spaces and trims
 /// the ends — keeps a value that might itself span multiple lines (a
