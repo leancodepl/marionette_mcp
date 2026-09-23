@@ -182,6 +182,60 @@ void main() {
       expect(content, contains('-> error: Element not found'));
     });
 
+    test('redacts a uri embedded in a success message, not just the '
+        'selector', () {
+      // Regression test: redacting only the uri= selector left the same
+      // token reachable through the outcome — connect's own success text
+      // ("Successfully connected to app at $uri...") repeats the full uri,
+      // and connect is in the short-confirmation allowlist so that text is
+      // echoed into steps.md verbatim.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger.logStep(
+        'connect',
+        {'uri': 'ws://127.0.0.1:8181/AbCdEf123=/ws'},
+        const CallToolResult(
+          content: [
+            TextContent(
+              text: 'Successfully connected to app at '
+                  'ws://127.0.0.1:8181/AbCdEf123=/ws\n'
+                  'Opened session: /tmp/x',
+            ),
+          ],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, isNot(contains('AbCdEf123')));
+      expect(content, contains('ws://127.0.0.1:8181'));
+    });
+
+    test('redacts a uri embedded in an error message', () {
+      // A reconnect attempt that fails while a prior session is still open
+      // (no disconnect in between) still logs into that session — and a
+      // thrown connection error's message commonly echoes the uri it tried.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger.logStep(
+        'connect',
+        {'uri': 'ws://127.0.0.1:8181/AbCdEf123=/ws'},
+        const CallToolResult(
+          isError: true,
+          content: [
+            TextContent(
+              text: 'Failed to connect to app: SocketException: '
+                  'Connection refused (uri: ws://127.0.0.1:8181/AbCdEf123=/ws)',
+            ),
+          ],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, isNot(contains('AbCdEf123')));
+    });
+
     test('does not persist a data-listing tool\'s payload on success', () {
       // Regression test: get_interactive_elements, get_logs, and
       // call_custom_extension can return arbitrary application data —

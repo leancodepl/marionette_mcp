@@ -76,12 +76,12 @@ class StepLogger {
   String _describeOutcome(String toolName, CallToolResult result) {
     if (result.isError) {
       final text = _firstNonEmptyText(result);
-      return 'error: ${text.isEmpty ? 'failed' : _truncate(_oneLine(text))}';
+      return 'error: ${text.isEmpty ? 'failed' : _truncate(_oneLine(_redactUrisIn(text)))}';
     }
 
     if (_shortConfirmationTools.contains(toolName)) {
       final text = _firstNonEmptyText(result);
-      if (text.isNotEmpty) return _truncate(_oneLine(text));
+      if (text.isNotEmpty) return _truncate(_oneLine(_redactUrisIn(text)));
     }
 
     final imageCount = result.content.whereType<ImageContent>().length;
@@ -104,15 +104,28 @@ class StepLogger {
 /// steps.md's one-physical-line-per-call format.
 String _oneLine(String text) => text.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-/// A VM service URI stripped to `scheme://host:port`. Flutter's VM service
-/// URIs commonly embed an auth token as a path segment
-/// (`ws://127.0.0.1:PORT/TOKEN=/ws`) — logging it verbatim would persist a
+/// Matches a `ws(s)://`/`http(s)://` URI so one can be found and redacted
+/// wherever it appears in free-form text — not just in the `uri` selector
+/// field. `connect`'s own success/error text embeds the full uri a second
+/// time (`"Successfully connected to app at $uri..."`, and a thrown
+/// connection error's message commonly does too), so redacting only the
+/// selector still left that same credential reaching steps.md through the
+/// outcome.
+final _uriPattern = RegExp(r'(?:wss?|https?)://\S+');
+
+/// A VM service (or DevTools) URI stripped to `scheme://host:port`.
+/// Flutter's VM service URIs commonly embed an auth token as a path segment
+/// (`ws://127.0.0.1:PORT/TOKEN=/ws`) — logging one verbatim would persist a
 /// live credential to steps.md.
 String _redactUri(String raw) {
   final parsed = Uri.tryParse(raw);
   if (parsed == null || parsed.host.isEmpty) return '[uri]';
   return '${parsed.scheme}://${parsed.host}:${parsed.port}';
 }
+
+/// Redacts (see [_redactUri]) every URI found anywhere within [text].
+String _redactUrisIn(String text) =>
+    text.replaceAllMapped(_uriPattern, (m) => _redactUri(m[0]!));
 
 /// Builds the selector portion of a step line from [args] — the small set
 /// of curated fields (key, identifier, text, etc.) that describe what a call
