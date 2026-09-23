@@ -46,14 +46,18 @@ class InstanceRegistry {
 
   final String _baseDir;
 
-  static final _namePattern = RegExp(r'^[a-zA-Z0-9_-]+$');
+  /// Characters that would let [name] escape [_baseDir] once it becomes part
+  /// of a file path (`/`, `\`), or that can't appear in a file name at all
+  /// (NUL). Everything else — including device identifiers like
+  /// `192.168.1.1:5555` — is a valid instance name.
+  static final _unsafeCharsPattern = RegExp(r'[/\\\x00]');
 
   /// Validates that [name] is a safe instance name.
   static void validateName(String name) {
-    if (!_namePattern.hasMatch(name)) {
+    if (name.isEmpty || _unsafeCharsPattern.hasMatch(name)) {
       throw FormatException(
         'Invalid instance name "$name". '
-        'Names must match [a-zA-Z0-9_-]+.',
+        'Names must not be empty and must not contain "/", "\\", or NUL.',
       );
     }
   }

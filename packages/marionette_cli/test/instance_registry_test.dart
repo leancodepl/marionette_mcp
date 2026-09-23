@@ -39,7 +39,17 @@ void main() {
 
   group('InstanceRegistry.validateName', () {
     test('accepts valid names', () {
-      for (final name in ['my-app', 'app_1', 'ABC123', 'a', 'test-app-2']) {
+      for (final name in [
+        'my-app',
+        'app_1',
+        'ABC123',
+        'a',
+        'test-app-2',
+        'my app',
+        'app@1',
+        '192.168.240.112:5555',
+        'my.device.local',
+      ]) {
         expect(
           () => InstanceRegistry.validateName(name),
           returnsNormally,
@@ -49,7 +59,13 @@ void main() {
     });
 
     test('rejects invalid names', () {
-      for (final name in ['my app', 'app/bad', '', 'app@1', '../../etc']) {
+      for (final name in [
+        '',
+        'app/bad',
+        '../../etc',
+        'a\\b',
+        'app\u0000name',
+      ]) {
         expect(
           () => InstanceRegistry.validateName(name),
           throwsA(isA<FormatException>()),
