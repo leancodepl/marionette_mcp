@@ -15,7 +15,7 @@ void main() {
 
   testWidgets(
     'a gesture refuses to dispatch when no view can be resolved',
-    timeout: const Timeout(Duration(seconds: 30)),
+    timeout: const Timeout(Duration(seconds: 5)),
     (WidgetTester tester) async {
       final events = <PointerEvent>[];
       void record(PointerEvent event) => events.add(event);

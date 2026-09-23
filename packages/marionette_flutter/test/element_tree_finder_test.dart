@@ -284,7 +284,10 @@ Widget _probeAt(Offset offset) {
 }
 
 Map<String, dynamic> _findProbe() {
-  final elements = _finder.findInteractiveElements();
+  // CompactionMode.none so `visible` is present to assert on: the compact
+  // payload omits it when the element is visible.
+  final elements =
+      _finder.findInteractiveElements(compaction: CompactionMode.none);
   return elements.firstWhere(
     (e) => e['key'] == 'probe',
     orElse: () => throw StateError(
