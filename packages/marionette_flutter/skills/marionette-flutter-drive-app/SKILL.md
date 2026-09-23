@@ -270,8 +270,12 @@ Give `connect` a `session_title` (a short description of what you're
 testing, e.g. `"profile validation"`) — it opens a session directory that
 carries the run's step log and screenshots, and resuming it later (after a
 compaction, an interruption, or a deliberate pause) is as simple as passing
-the same title again. See *Reporting what you found* for what that directory
-is for and what you're expected to do with it before disconnecting.
+the same title again. **Always give it in English**, regardless of the
+prompt's own language (see *The report contract*, below) — it gets
+slugified straight into the session directory's name, and that name should
+stay predictable and filesystem-friendly rather than following the run's
+language. See *Reporting what you found* for what that directory is for and
+what you're expected to do with it before disconnecting.
 
 ## What you can do once connected
 
@@ -379,6 +383,9 @@ You own two more files there, which the server never writes:
   `steps.md`, `screenshots/01.png`), and widget keys/identifiers
   (`login_emailTextField`) are never translated. Check this before writing,
   not after — see the reminder in *Reporting what you found*, above.
+  **`session_title` is the one thing that's exempt in the other direction:
+  give it in English always**, whatever language the prompt itself is in —
+  see *Connecting*, above.
 - **The `Tested:` line is rendered from `steps.md`, never from memory or
   your own sense of what you did.** This is the anti-overstatement mechanism
   — read the step count and the actions taken back out of the file the
