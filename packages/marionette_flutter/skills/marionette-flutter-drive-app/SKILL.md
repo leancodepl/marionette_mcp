@@ -377,8 +377,14 @@ You own two more files there, which the server never writes:
   shape; if it doesn't fit, cut the finding down rather than making room.
 - **The chat message after disconnecting is a TL;DR derived from
   `report.md`**, not a separate narrative composed from scratch.
+- **Write `report.md` — and the chat TL;DR derived from it — in the
+  language the prompt that started the run was written in.** Proper nouns
+  stay exactly as they are regardless of that language: tool names, file
+  paths (`report.md`, `steps.md`, `screenshots/01.png`), and widget
+  keys/identifiers (`login_emailTextField`) are never translated.
 
-Two shapes — an app with findings, and a clean run:
+Two shapes — an app with findings, and a clean run (shown in English here;
+write yours in whatever language the prompt used):
 
 ```
 Marionette report — 2 findings · User Profile
