@@ -334,7 +334,11 @@ class ScrollSimulator {
 
       final to = globalPosition + moveStep;
       final beforePosition = position.pixels;
-      await _gestureDispatcher.drag(globalPosition, to);
+      await _gestureDispatcher.drag(
+        globalPosition,
+        to,
+        viewId: viewIdOf(scrollable),
+      );
       drags++;
 
       final afterPosition = position.pixels;
