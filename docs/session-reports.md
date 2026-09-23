@@ -54,18 +54,29 @@ The server appends one line per tool call — no agent involvement, so it
 can't be skipped or embellished:
 
 ```
-- [14:12:03] connect uri=ws://127.0.0.1:8181/ws -> Successfully connected to app at ws://127.0.0.1:8181/ws
+- [14:12:03] connect uri=ws://127.0.0.1:8181 -> Successfully connected to app at ws://127.0.0.1:8181
 - [14:12:07] tap key=dob_field -> Successfully tapped
 - [14:12:09] enter_text key=dob_field input_len=10 -> Successfully entered text
 - [14:12:11] tap key=save_button -> Successfully tapped
-- [14:12:12] get_logs -> error: Element not found
+- [14:12:12] get_interactive_elements -> ok
+- [14:12:14] tap key=missing_button -> error: Exception: Element matching {key: missing_button} not found [GestureDispatcher.tap (marionette_flutter/src/services/gesture_dispatcher.dart:36) › ...]
 ```
 
 Each line has the tool name, a short selector summary (key/identifier/text/
-coordinates — never the full argument payload), and the outcome (truncated
-to ~200 characters). This is also what a report's **Tested** line should be
-rendered from, not the agent's own claim of what it did — steps.md is the
-anti-overstatement mechanism.
+coordinates — never the full argument payload — and any `ws://`/`http://` URI
+redacted to `scheme://host:port`, since a Flutter VM service URI embeds a
+live debug-access token in its path), and the outcome. On success, only a
+fixed set of tools whose message is a short, hand-written confirmation
+("Successfully tapped") get it echoed verbatim (truncated to ~200
+characters); a tool that returns application data
+(`get_interactive_elements`, `get_logs`, a custom extension) gets a generic
+`ok` instead, so a payload never ends up on disk. On failure, an app-side
+crash is detected and unpacked into the exception message plus up to 4
+compact stack frames (truncated to ~500 characters) rather than the raw,
+JSON-wrapped error text; anything else (a deliberate, expected error) keeps
+the plain, truncated (~200 character) message. This is also what a report's
+**Tested** line should be rendered from, not the agent's own claim of what
+it did — steps.md is the anti-overstatement mechanism.
 
 `enter_text`'s entered value is never written in full: by default only its
 length is recorded (`input_len=10`); when the target field's key or
