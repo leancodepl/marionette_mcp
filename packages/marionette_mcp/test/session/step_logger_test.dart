@@ -232,22 +232,77 @@ void main() {
           '{identifier: 25, Friday, September 25, 2026} not found [',
         ),
       );
-      // Exactly 4 frames (the configured cap), package: stripped, no column.
+      // The 3 application frames survive, package: stripped, no column, and
+      // anonymous closures spelled <fn> (stack_trace's own convention). The
+      // trailing dart:async/zone.dart run — pure SDK plumbing, not
+      // application code — is folded and then dropped entirely by
+      // Trace.terse because it's the outermost (trailing) part of the
+      // trace, rather than eating 1 of the 4 frames in the budget for noise.
       expect(
         content,
         contains(
           'GestureDispatcher.tap '
           '(marionette_flutter/src/gestures/dispatcher.dart:45) › '
-          'MarionetteExtensions.tap.<anonymous closure> '
+          'MarionetteExtensions.tap.<fn> '
           '(marionette_flutter/src/binding/extensions.dart:120) › '
-          'registerInternalMarionetteExtension.<anonymous closure> '
-          '(marionette_flutter/src/binding/register.dart:40) › '
-          '_rootRunUnary (dart:async/zone.dart:1436)',
+          'registerInternalMarionetteExtension.<fn> '
+          '(marionette_flutter/src/binding/register.dart:40)',
         ),
       );
+      expect(content, isNot(contains('_rootRunUnary')));
       expect(content, isNot(contains('_CustomZone.runUnary')));
       expect(content, isNot(contains('"exception"')));
       expect(content, isNot(contains('"stack"')));
+    });
+
+    test('folds SDK frames in the middle of the trace into one instead of '
+        'losing an application frame to the budget', () {
+      // Regression test for the value of using package:stack_trace's
+      // Trace.terse instead of naively taking the first N raw lines: when
+      // SDK noise sits between two application frames (not just trailing),
+      // it's folded into a single frame rather than either being kept
+      // verbatim (wasting budget) or naively counted against the 4-frame
+      // cap the same as a real application frame.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      final errorJson = jsonEncode({
+        'exception': 'Exception: boom',
+        'stack': '#0      AppCode.first (package:marionette_flutter/a.dart:1:1)\n'
+            '#1      _rootRunUnary (dart:async/zone.dart:1436:47)\n'
+            '#2      _CustomZone.runUnary (dart:async/zone.dart:1335:19)\n'
+            '#3      _FutureListener.handleValue (dart:async/future_impl.dart:151:18)\n'
+            '#4      AppCode.second (package:marionette_flutter/b.dart:2:2)',
+      });
+
+      logger.logStep(
+        'tap',
+        {},
+        CallToolResult(
+          isError: true,
+          content: [TextContent(text: 'Extension x failed\nError: $errorJson')],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, contains('AppCode.first (marionette_flutter/a.dart:1)'));
+      expect(content, contains('AppCode.second (marionette_flutter/b.dart:2)'));
+      // The 3 middle SDK frames are folded into a single representative
+      // frame — not kept verbatim (3 separate entries eating the 4-frame
+      // cap on pure noise), and not silently dropped either (unlike a
+      // trailing/outermost fold, a fold in the middle of the trace is kept,
+      // just simplified: no line/column, "-patch" and library path
+      // stripped).
+      expect(content, isNot(contains('_rootRunUnary')));
+      expect(content, isNot(contains('_CustomZone.runUnary')));
+      expect(
+        content,
+        contains(
+          'AppCode.first (marionette_flutter/a.dart:1) › '
+          '_FutureListener.handleValue (dart:async) › '
+          'AppCode.second (marionette_flutter/b.dart:2)',
+        ),
+      );
     });
 
     test('falls back to the plain message for a deliberate, non-JSON '

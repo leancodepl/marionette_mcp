@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:stack_trace/stack_trace.dart';
 
 /// Field names that hint at a sensitive value (a password, PIN, token,
 /// etc.) — matched against `enter_text`'s selector (key/identifier) to
@@ -23,10 +24,6 @@ const _maxErrorOutcomeLength = 500;
 /// (see [describeStepError]) — enough to usually show where the failure
 /// actually happened, without pasting the whole trace.
 const _maxStackFrames = 4;
-
-/// Matches one Dart stack trace frame, e.g.
-/// `#0      GestureDispatcher.tap (package:marionette_flutter/src/x.dart:45:7)`.
-final _stackFrameLine = RegExp(r'^#\d+\s+(.+?)\s+\((.+?):(\d+)(?::\d+)?\)$');
 
 /// Arg names shown in a step's selector summary. Deliberately excludes
 /// free-text payload fields (e.g. `enter_text`'s `input`) — steps.md
@@ -156,21 +153,35 @@ Map<String, dynamic>? _tryParseExceptionJson(String text) {
   }
 }
 
-/// The first [_maxStackFrames] frames of [stackTrace], each reduced to
-/// `Symbol (path:line)` (path package-relative, column dropped) and joined
-/// onto one physical line.
+/// The first [_maxStackFrames] frames of [stackTrace] after [Trace.terse]
+/// folds together consecutive Dart-core/SDK frames — so `dart:async`/
+/// `dart:developer-patch` zone plumbing collapses to at most one frame (and
+/// is dropped entirely if it's trailing, i.e. outermost) instead of eating
+/// the whole budget on frames that don't point at application code. Falls
+/// back to the raw text, one-lined, if it doesn't parse as a Dart stack
+/// trace at all (defensive — the text always comes from a real
+/// `StackTrace.toString()` on the app side, but a parse failure here
+/// shouldn't break error logging).
 String _summarizeStackTrace(String stackTrace) {
-  final frames = <String>[];
-  for (final line in const LineSplitter().convert(stackTrace)) {
-    final match = _stackFrameLine.firstMatch(line.trim());
-    if (match == null) continue;
-    final symbol = match.group(1)!;
-    final uri = match.group(2)!.replaceFirst('package:', '');
-    final lineNumber = match.group(3)!;
-    frames.add('$symbol ($uri:$lineNumber)');
-    if (frames.length >= _maxStackFrames) break;
+  final Trace trace;
+  try {
+    trace = Trace.parse(stackTrace).terse;
+  } on FormatException {
+    return _truncateText(_oneLine(stackTrace), _maxErrorOutcomeLength);
   }
-  return frames.join(' › ');
+  return trace.frames.take(_maxStackFrames).map(_formatFrame).join(' › ');
+}
+
+/// `member (path:line)` — `path` package-relative (falling back to
+/// [Frame.library]'s pretty-printed form for anything else, e.g. a lone,
+/// unfolded `dart:` frame), column dropped. More compact than
+/// [Frame.location] (which keeps the full `package:` scheme and the
+/// column), which matters against [_maxErrorOutcomeLength].
+String _formatFrame(Frame frame) {
+  final path = frame.uri.scheme == 'package' ? frame.uri.path : frame.library;
+  return frame.line == null
+      ? '${frame.member} ($path)'
+      : '${frame.member} ($path:${frame.line})';
 }
 
 String _truncateText(String text, [int maxLength = _maxOutcomeLength]) =>
