@@ -396,6 +396,14 @@ You own two more files there, which the server never writes:
 - **Under six lines per finding, no prose paragraphs.** A severity tag,
   one-line summary, a repro path, and the evidence citation — that's the
   shape; if it doesn't fit, cut the finding down rather than making room.
+- **Prefix the headline and every finding with a status icon**, so severity
+  is scannable without reading a word: `✅` clean (no findings), `⚠️` only
+  suspicions, `🐛` at least one confirmed bug — on the headline, the worst
+  severity present; on a finding, its own. `➖` marks something explicitly
+  skipped (a `Not covered:` line, or an individual check you didn't run).
+  Icons decorate the existing tags/wording — `[bug]`, `[suspicion]`,
+  `Not covered:` — they never replace them: keep both, so the report still
+  greps cleanly and reads fine wherever emoji don't render.
 - **The chat message after disconnecting is short and points at
   `report.md` — it does not restate it.** Give the same headline
   (`Marionette report — N findings · <feature>`) plus the file's path, not
@@ -405,34 +413,48 @@ You own two more files there, which the server never writes:
   available. The point of writing `report.md` at all is so the full detail
   lives in one place, not in both the file and the chat.
 
-This is what `report.md` itself looks like — two shapes, an app with
-findings and a clean run (shown in English here; write yours in whatever
-language the prompt used):
+This is what `report.md` itself looks like (shown in English here; write
+yours in whatever language the prompt used) — a confirmed bug, a clean run,
+then a suspicion:
 
 ```
-Marionette report — 2 findings · User Profile
+🐛 Marionette report — 2 findings · User Profile
 Tested: profile view, edit form, save flow (14 steps, 3 screenshots)
 
-1. [bug] Date of birth accepts future dates — no validation
+1. 🐛 [bug] Date of birth accepts future dates — no validation
    Repro: Profile → Edit → DOB = 2099-01-01 → Save
    Evidence: step 9, log "saved dob=2099-01-01"
 
-2. [bug] Save does not persist — changes lost after restart
+2. 🐛 [bug] Save does not persist — changes lost after restart
    Repro: Profile → Edit → Name = "X" → Save → hot_restart → Profile
    Evidence: step 14, screenshots/02-after-restart.png
 ```
 
 ```
-Marionette report — no issues · Checkout
+✅ Marionette report — no issues · Checkout
 Tested: cart, address form, payment, confirmation (18 steps)
 Checks: field validation, back navigation, dark mode, text scale 2.0
+```
+
+A run with only a suspicion (no hard evidence of a real bug) gets `⚠️`
+instead, on both the headline and the finding itself:
+
+```
+⚠️ Marionette report — no confirmed issues, 1 suspicion · Login screen
+Tested: login screen inspection, email + password entry, screenshot (6 steps, 2 screenshots)
+
+1. ⚠️ [suspicion] "Or continue with" divider has no social login buttons below it
+   Repro: open Login screen
+   Evidence: screenshots/01.png; step 2 lists no elements below "Or continue with"
+
+➖ Not covered: submitting the form (Log in not tapped), get_logs (permission denied)
 ```
 
 The chat message for that first one is the headline and the path, nothing
 more:
 
 ```
-Marionette report — 2 findings · User Profile
+🐛 Marionette report — 2 findings · User Profile
 .marionette/sessions/user-profile-20260922T1412/report.md
 ```
 
