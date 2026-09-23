@@ -404,14 +404,38 @@ You own two more files there, which the server never writes:
   Icons decorate the existing tags/wording — `[bug]`, `[suspicion]`,
   `Not covered:` — they never replace them: keep both, so the report still
   greps cleanly and reads fine wherever emoji don't render.
-- **The chat message after disconnecting is short and points at
-  `report.md` — it does not restate it.** Give the same headline
-  (`Marionette report — N findings · <feature>`) plus the file's path, not
-  a second copy of every finding's repro and evidence in prose. If there's
-  nothing to add beyond the headline and the path, that's the whole
-  message — don't pad it into a narrative just because there's more detail
-  available. The point of writing `report.md` at all is so the full detail
-  lives in one place, not in both the file and the chat.
+- **The chat message after disconnecting follows a fixed, compact template
+  — not free-form prose, and not a second copy of `report.md`:**
+
+  ```
+  Marionette · <flow/feature> — <VERDICT>: <reason, a few words>
+  ✓ <what worked, comma-separated>
+  ✗ [<type>] <finding, one line>       (up to 5; beyond that: "+N more in report.md")
+  ∅ Not covered: <what> — <why>
+  → <session path>/report.md · <N> steps, <M> screenshots
+  ```
+
+  `<VERDICT>` is a fixed, four-word vocabulary — like `[bug]`/`[suspicion]`,
+  never translated regardless of the prompt's language: `PASS` (nothing
+  found, full coverage), `SUSPECT` (only suspicion(s), no confirmed bug),
+  `FAIL` (at least one confirmed bug), `BLOCKED` (coverage was cut short by
+  something that stopped you continuing — bad test data, a stuck flow, a
+  missing prerequisite; use this over `FAIL`/`PASS` when *that's* the
+  story, even if you also found a bug along the way). Each `✗` line's
+  `[type]` is `bug`, `blocker`, `ux`, or `suspicion` — `bug`/`blocker`/`ux`
+  corresponds to a `[bug]`-tagged finding in `report.md` (evidence-backed);
+  `suspicion` corresponds to a `[suspicion]`-tagged one.
+  Rows are optional beyond the headline and the `→` line: skip `✓` if
+  nothing worked, skip `✗`/`∅` for a `PASS`. The step/screenshot counts on
+  the `→` line come from `steps.md`, same as `Tested:` in `report.md` — not
+  a re-estimate.
+  This uses `✓`/`✗`/`∅`/`→`, not the `✅`/`⚠️`/`🐛`/`➖` from `report.md`,
+  deliberately: this message prints as raw terminal text, where a plain
+  Unicode symbol renders as one predictable, monochrome character
+  everywhere, while a full-color emoji can render at an inconsistent width
+  or not at all depending on the terminal. `report.md` is a file usually
+  opened in an editor or on GitHub, where colored emoji render cleanly —
+  different consumption context, different choice; don't mix the two sets.
 
 This is what `report.md` itself looks like (shown in English here; write
 yours in whatever language the prompt used) — a confirmed bug, a clean run,
@@ -450,12 +474,39 @@ Tested: login screen inspection, email + password entry, screenshot (6 steps, 2 
 ➖ Not covered: submitting the form (Log in not tapped), get_logs (permission denied)
 ```
 
-The chat message for that first one is the headline and the path, nothing
-more:
+The chat message for those three, plus a `BLOCKED` case none of them
+happen to show (this has a different shape from `report.md`'s own
+headline — denser, with a verdict word, since it has to stand alone as
+the whole message):
 
 ```
-🐛 Marionette report — 2 findings · User Profile
-.marionette/sessions/user-profile-20260922T1412/report.md
+Marionette · User Profile — FAIL: 2 bugs
+✓ Profile view, edit form
+✗ [bug] Date of birth accepts future dates — no validation
+✗ [bug] Save does not persist — changes lost after restart
+→ .marionette/sessions/user-profile-20260922T1412/report.md · 14 steps, 3 screenshots
+```
+
+```
+Marionette · Checkout — PASS: no issues
+✓ Cart, address form, payment, confirmation, dark mode, text scale 2.0
+→ .marionette/sessions/checkout-20260922T1801/report.md · 18 steps
+```
+
+```
+Marionette · Login screen — SUSPECT: divider with no buttons below it
+✓ Email + password entry, layout
+✗ [suspicion] "Or continue with" divider has no social login buttons below it
+∅ Not covered: submitting the form, get_logs — permission denied
+→ .marionette/sessions/login-form-20260923T0016/report.md · 6 steps, 2 screenshots
+```
+
+```
+Marionette · Appointment booking — BLOCKED: no available slots
+✓ Login, salon list, salon cards, date picker
+✗ [blocker] 4 salons × 5 dates: always "No appointments available" (test data?)
+∅ Not covered: service, staff, time, confirmation — flow is stuck at slot selection
+→ .marionette/sessions/appointment-booking-20260923T1426/report.md · 42 steps, 1 screenshot
 ```
 
 `.marionette/` is gitignored by default. Committing a session directory —
