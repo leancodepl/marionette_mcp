@@ -190,12 +190,18 @@ List<String> _saveScreenshots(
   List<String> screenshots,
 ) {
   screenshotsDir.createSync(recursive: true);
-  var nextIndex = screenshotsDir
-          .listSync()
-          .whereType<File>()
-          .where((f) => p.extension(f.path) == '.png')
-          .length +
-      1;
+  // The next index is one past the highest existing numeric name, not a
+  // count of PNGs present — a gap (e.g. 01.png and 03.png after 02.png was
+  // deleted) would otherwise make a count-based index collide with, and
+  // overwrite, the existing 03.png.
+  final highestExisting = screenshotsDir
+      .listSync()
+      .whereType<File>()
+      .where((f) => p.extension(f.path) == '.png')
+      .map((f) => int.tryParse(p.basenameWithoutExtension(f.path)))
+      .whereType<int>()
+      .fold(0, (highest, n) => n > highest ? n : highest);
+  var nextIndex = highestExisting + 1;
 
   final paths = <String>[];
   for (final screenshot in screenshots) {

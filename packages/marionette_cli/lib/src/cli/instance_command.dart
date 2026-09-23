@@ -69,10 +69,16 @@ abstract class InstanceCommand extends Command<int> {
     }
     final connector = VmServiceConnector();
 
-    final session = SessionManager().createOrResume(
-      title: globalResults?['session'] as String?,
-      baseDirOverride: globalResults?['session-dir'] as String?,
-    );
+    final Session session;
+    try {
+      session = SessionManager().createOrResume(
+        title: globalResults?['session'] as String?,
+        baseDirOverride: globalResults?['session-dir'] as String?,
+      );
+    } catch (e) {
+      stderr.writeln('Could not open a session directory: $e');
+      return 1;
+    }
 
     try {
       await connector.connect(uri).timeout(

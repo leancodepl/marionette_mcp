@@ -34,11 +34,14 @@ final class VmServiceContext {
   /// Registers all VM service related tools with the MCP server.
   ///
   /// Every tool is registered through [LoggedMcpServer] so each call is
-  /// recorded to the active session's steps.md (see [StepLogger]).
-  /// Connection lifecycle tools (`connect`, `disconnect`) are registered here
-  /// because they own the version-compatibility handshake with the binding,
-  /// the session lifecycle, and don't fit the standard tool error-handling
-  /// shape. Everything else is delegated to themed registration functions.
+  /// recorded to the active session's steps.md (see [StepLogger]) — except
+  /// `connect`/`disconnect`, registered on the raw server: they own the
+  /// version-compatibility handshake with the binding and the session
+  /// lifecycle itself (creating it, and — for `disconnect` — clearing it
+  /// right after logging its own step, which the generic wrapper has no
+  /// hook for), so they log manually instead of going through
+  /// [LoggedMcpServer]. Everything else is delegated to themed registration
+  /// functions.
   void registerTools(McpServer server) {
     final loggedServer = LoggedMcpServer(server, _stepLogger);
     _dynamicTools = DynamicExtensionTools(
@@ -47,7 +50,7 @@ final class VmServiceContext {
       logger: _logger,
       stepLogger: _stepLogger,
     );
-    _registerConnectionTools(loggedServer);
+    _registerConnectionTools(server);
     registerInspectionTools(loggedServer, connector, _logger);
     registerGestureTools(loggedServer, connector, _logger);
     registerTextTools(loggedServer, connector, _logger);
@@ -57,7 +60,7 @@ final class VmServiceContext {
     registerSystemTools(loggedServer, connector, _logger);
   }
 
-  void _registerConnectionTools(LoggedMcpServer server) {
+  void _registerConnectionTools(McpServer server) {
     server
       ..registerTool(
         'connect',
@@ -89,7 +92,7 @@ final class VmServiceContext {
           },
           required: ['uri'],
         ),
-        callback: (args, extra) async {
+        callback: withStepLogging(_stepLogger, 'connect', (args, extra) async {
           final uri = args['uri'] as String;
           _logger.info('Connecting to app at $uri');
 
@@ -134,21 +137,39 @@ final class VmServiceContext {
             // the generic call_custom_extension fallback keeps working.
             await _registerDynamicTools();
 
-            final session = _sessionManager.createOrResume(
-              title: args['session_title'] as String?,
-              baseDirOverride: args['session_dir'] as String?,
-            );
-            _stepLogger.session = session;
+            try {
+              final session = _sessionManager.createOrResume(
+                title: args['session_title'] as String?,
+                baseDirOverride: args['session_dir'] as String?,
+              );
+              _stepLogger.session = session;
 
-            return CallToolResult(
-              content: [
-                TextContent(
-                  text: 'Successfully connected to app at $uri\n'
-                      '${session.resumed ? 'Resumed' : 'Opened'} session: '
-                      '${session.directory.path}',
-                ),
-              ],
-            );
+              return CallToolResult(
+                content: [
+                  TextContent(
+                    text: 'Successfully connected to app at $uri\n'
+                        '${session.resumed ? 'Resumed' : 'Opened'} session: '
+                        '${session.directory.path}',
+                  ),
+                ],
+              );
+            } catch (err) {
+              // Session setup failed after the connection (and dynamic
+              // tools) were already live — roll both back rather than
+              // report a failed connect while leaving the server connected.
+              _logger.severe('Failed to open session directory', err);
+              _disableDynamicTools();
+              await connector.disconnect();
+              return CallToolResult(
+                isError: true,
+                content: [
+                  TextContent(
+                    text: 'Connected to app, but failed to open a session '
+                        'directory: $err',
+                  ),
+                ],
+              );
+            }
           } catch (err) {
             _logger.severe('Failed to connect to app', err);
             return CallToolResult(
@@ -156,7 +177,7 @@ final class VmServiceContext {
               content: [TextContent(text: 'Failed to connect to app: $err')],
             );
           }
-        },
+        }),
       )
       ..registerTool(
         'disconnect',
@@ -177,19 +198,31 @@ final class VmServiceContext {
             final nudge = session == null
                 ? ''
                 : '\nSession: ${session.directory.path}\nWrite report.md now.';
-            return CallToolResult(
+            final result = CallToolResult(
               content: [
                 TextContent(
                   text: 'Successfully disconnected from app$nudge',
                 ),
               ],
             );
+            // Registered on the raw server (not LoggedMcpServer), so this
+            // step is logged manually here — and only now, right after, is
+            // the session cleared. That order matters: clearing it first
+            // would mean disconnect's own line never lands anywhere, and a
+            // stray call made after disconnecting — or a later failed
+            // reconnect — would otherwise silently append to a session
+            // whose report may already be written.
+            _stepLogger.logStep('disconnect', args, result);
+            _stepLogger.session = null;
+            return result;
           } catch (err) {
             _logger.severe('Error during disconnect', err);
-            return CallToolResult(
+            final result = CallToolResult(
               isError: true,
               content: [TextContent(text: 'Error during disconnect: $err')],
             );
+            _stepLogger.logStep('disconnect', args, result);
+            return result;
           }
         },
       );
