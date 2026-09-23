@@ -76,6 +76,92 @@ void main() {
       expect(second.directory.path, first.directory.path);
     });
 
+    test('never resumes a session that already has a report.md', () {
+      // Regression test: a session left over from a completed, independent
+      // run must never be silently reopened (and its report.md overwritten)
+      // just because a later, unrelated invocation happens to reuse the
+      // same title.
+      final manager = SessionManager();
+      final first = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+      File(p.join(first.directory.path, 'report.md'))
+          .writeAsStringSync('Marionette report — no issues · Checkout');
+
+      final second = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(second.resumed, isFalse);
+      expect(second.directory.path, isNot(equals(first.directory.path)));
+    });
+
+    test('never resumes a session that already logged a disconnect step',
+        () {
+      // A run can be stopped early (no report.md yet at the point checked,
+      // e.g. the agent hasn't written it) but still have cleanly
+      // disconnected — that alone marks it concluded too.
+      final manager = SessionManager();
+      final first = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+      first.stepsFile.writeAsStringSync(
+        '- [14:12:12] disconnect -> Successfully disconnected from app\n',
+      );
+
+      final second = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(second.resumed, isFalse);
+      expect(second.directory.path, isNot(equals(first.directory.path)));
+    });
+
+    test('a concluded session cannot be resumed even by its exact returned '
+        'name', () {
+      // The "pass back the exact directory name" resume path (documented on
+      // the connect tool) is subject to the same rule — a concluded session
+      // stays concluded regardless of which matching path found it.
+      final manager = SessionManager();
+      final first = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+      File(p.join(first.directory.path, 'report.md')).writeAsStringSync('x');
+
+      final second = manager.createOrResume(
+        title: first.name,
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(second.resumed, isFalse);
+      expect(second.directory.path, isNot(equals(first.directory.path)));
+    });
+
+    test('still resumes a session with no report.md and no disconnect yet',
+        () {
+      // The common, legitimate case: the run was cut short (compaction,
+      // interruption) before reaching either conclusion signal.
+      final manager = SessionManager();
+      final first = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+      first.stepsFile.writeAsStringSync('- [14:12:03] connect -> ok\n');
+
+      final second = manager.createOrResume(
+        title: 'Checkout',
+        baseDirOverride: tempDir.path,
+      );
+
+      expect(second.resumed, isTrue);
+      expect(second.directory.path, first.directory.path);
+    });
+
     test('a fresh title never resumes an untitled run', () {
       final manager = SessionManager();
       manager.createOrResume(baseDirOverride: tempDir.path);

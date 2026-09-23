@@ -79,8 +79,12 @@ final class VmServiceContext {
                   'Slugified and timestamped into the session directory name. '
                   'Pass the exact directory name a previous connect returned '
                   'to resume that session (e.g. after a compaction or an '
-                  'interruption) instead of starting a new one. Falls back to '
-                  '"run-<timestamp>" when omitted.',
+                  'interruption) instead of starting a new one — but only if '
+                  'that session is still open: once it has disconnected or '
+                  'has a report.md, it\'s considered concluded and a fresh '
+                  'session is opened instead, even with a matching title, so '
+                  'a later, unrelated run can never overwrite an already-'
+                  'finished one. Falls back to "run-<timestamp>" when omitted.',
             ),
             'session_dir': JsonSchema.string(
               description:

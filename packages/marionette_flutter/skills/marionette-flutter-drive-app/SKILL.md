@@ -269,8 +269,13 @@ easy to act on a stale connection later without noticing.
 Give `connect` a `session_title` (a short description of what you're
 testing, e.g. `"profile validation"`) — it opens a session directory that
 carries the run's step log and screenshots, and resuming it later (after a
-compaction, an interruption, or a deliberate pause) is as simple as passing
-the same title again. **Always give it in English**, regardless of the
+compaction or an interruption *of this same run*) is as simple as passing
+the same title again. That resume only works while the session is still
+open, though: once it's disconnected or has a `report.md`, it's concluded
+for good — a later `connect` with a matching title opens a brand new
+session instead, never reopens a finished one. One Marionette run is one
+session directory; don't rely on reusing a title to link separate runs
+together on purpose. **Always give it in English**, regardless of the
 prompt's own language (see *The report contract*, below) — it gets
 slugified straight into the session directory's name, and that name should
 stay predictable and filesystem-friendly rather than following the run's
