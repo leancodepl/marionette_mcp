@@ -38,9 +38,18 @@ The directory's location is resolved from, in order:
 `connect` accepts an optional `session_title` (the CLI: `--session <title>`).
 The title is slugified and a creation timestamp appended, e.g.
 `profile-validation-20260922T1412`. Passing the **same title again** resumes
-the most recently used session with that title instead of creating a new
-one — `steps.md` keeps growing in the same file rather than starting over.
-Omitting the title falls back to `run-<timestamp>`, which is never resumed.
+the most recently used *open* session with that title instead of creating a
+new one — `steps.md` keeps growing in the same file rather than starting
+over. Omitting the title falls back to `run-<timestamp>`, which is never
+resumed.
+
+A session is only resumed while it's still open. Once it's **concluded** —
+`disconnect` logged its own step, or `report.md` exists — a matching title
+(or even the exact directory name) opens a brand new session instead. This
+is deliberate: one Marionette run is meant to produce one session directory.
+Without this guard, a later, completely independent invocation that happens
+to reuse the same title would silently reopen a finished session and its
+`report.md` could get overwritten by an unrelated run.
 
 Old session directories are pruned automatically, keeping the most recently
 used 20 per project.

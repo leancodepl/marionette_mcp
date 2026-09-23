@@ -20,6 +20,12 @@ const defaultMaxSessions = 20;
 /// session (which also names its directory `run-<timestamp>`).
 const _slugMarkerFileName = '.session-slug';
 
+/// Matches a `disconnect` line in `steps.md`, e.g.
+/// `- [14:12:12] disconnect -> Successfully disconnected from app...` —
+/// `disconnect` never has a selector (see `describeStepSelector`), so this
+/// is always the exact shape a logged disconnect step takes.
+final _disconnectStepLine = RegExp(r'^- \[\d\d:\d\d:\d\d\] disconnect -> ');
+
 /// Creates and resumes session directories under `.marionette/sessions/`,
 /// and prunes old ones so the directory doesn't grow without bound.
 class SessionManager {
@@ -30,7 +36,12 @@ class SessionManager {
   /// Creates a fresh session directory, or resumes the most recently used
   /// one matching the slugified [title] — this is how a run survives a
   /// compaction, an interruption, or an explicit resume: pass the same
-  /// `session_title` again.
+  /// `session_title` again. A session that's already concluded (see
+  /// [_isConcluded]) is never resumed, even by an exact title or directory-
+  /// name match: a fresh directory is created instead, so a later,
+  /// unrelated invocation that happens to reuse the same title can never
+  /// silently append to — or worse, have its own later `report.md` shadow —
+  /// an already-finished run's session.
   ///
   /// [baseDirOverride] (a `connect` argument) takes priority over the
   /// [sessionDirEnvVar] environment variable; if neither is set, the base
@@ -76,12 +87,13 @@ class SessionManager {
   /// equals [slug] (resuming by the exact directory name a previous connect
   /// returned), or it carries a [_slugMarkerFileName] recording it was
   /// created under [slug] (resuming by the same short title). Never a bare
-  /// prefix match on the directory name — see [_slugMarkerFileName].
+  /// prefix match on the directory name — see [_slugMarkerFileName]. Skips
+  /// any candidate that's already concluded — see [_isConcluded].
   Directory? _mostRecentMatch(Directory sessionsDir, String slug) {
     final matches = sessionsDir
         .listSync()
         .whereType<Directory>()
-        .where((d) => _matchesSlug(d, slug))
+        .where((d) => _matchesSlug(d, slug) && !_isConcluded(d))
         .toList()
       ..sort((a, b) => _lastUsed(b).compareTo(_lastUsed(a)));
     return matches.isEmpty ? null : matches.first;
@@ -90,6 +102,22 @@ class SessionManager {
   bool _matchesSlug(Directory dir, String slug) {
     if (p.basename(dir.path).toLowerCase() == slug) return true;
     return _readSlugMarker(dir) == slug;
+  }
+
+  /// Whether [dir] has already reached a conclusion: `disconnect` logged its
+  /// own step in `steps.md` (the server's own, tamper-proof record that this
+  /// run was cleanly closed), or `report.md` exists (the agent's own sign
+  /// that it considered the run — or an early stop — final; the contract
+  /// requires writing it on either trigger). Either one means there's a
+  /// finished artifact here worth protecting, so this directory is never
+  /// offered as a resume candidate again — a later, independent invocation
+  /// that happens to reuse the same title gets its own fresh directory
+  /// instead of silently reopening and overwriting a closed one.
+  bool _isConcluded(Directory dir) {
+    if (File(p.join(dir.path, 'report.md')).existsSync()) return true;
+    final stepsFile = File(p.join(dir.path, 'steps.md'));
+    if (!stepsFile.existsSync()) return false;
+    return stepsFile.readAsLinesSync().any(_disconnectStepLine.hasMatch);
   }
 
   String? _readSlugMarker(Directory dir) {
