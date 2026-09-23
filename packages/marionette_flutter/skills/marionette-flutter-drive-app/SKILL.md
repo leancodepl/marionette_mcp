@@ -375,16 +375,23 @@ You own two more files there, which the server never writes:
 - **Under six lines per finding, no prose paragraphs.** A severity tag,
   one-line summary, a repro path, and the evidence citation — that's the
   shape; if it doesn't fit, cut the finding down rather than making room.
-- **The chat message after disconnecting is a TL;DR derived from
-  `report.md`**, not a separate narrative composed from scratch.
-- **Write `report.md` — and the chat TL;DR derived from it — in the
-  language the prompt that started the run was written in.** Proper nouns
-  stay exactly as they are regardless of that language: tool names, file
-  paths (`report.md`, `steps.md`, `screenshots/01.png`), and widget
-  keys/identifiers (`login_emailTextField`) are never translated.
+- **The chat message after disconnecting is short and points at
+  `report.md` — it does not restate it.** Give the same headline
+  (`Marionette report — N findings · <feature>`) plus the file's path, not
+  a second copy of every finding's repro and evidence in prose. If there's
+  nothing to add beyond the headline and the path, that's the whole
+  message — don't pad it into a narrative just because there's more detail
+  available. The point of writing `report.md` at all is so the full detail
+  lives in one place, not in both the file and the chat.
+- **Write `report.md` — and the chat message — in the language the prompt
+  that started the run was written in.** Proper nouns stay exactly as they
+  are regardless of that language: tool names, file paths (`report.md`,
+  `steps.md`, `screenshots/01.png`), and widget keys/identifiers
+  (`login_emailTextField`) are never translated.
 
-Two shapes — an app with findings, and a clean run (shown in English here;
-write yours in whatever language the prompt used):
+This is what `report.md` itself looks like — two shapes, an app with
+findings and a clean run (shown in English here; write yours in whatever
+language the prompt used):
 
 ```
 Marionette report — 2 findings · User Profile
@@ -403,6 +410,14 @@ Tested: profile view, edit form, save flow (14 steps, 3 screenshots)
 Marionette report — no issues · Checkout
 Tested: cart, address form, payment, confirmation (18 steps)
 Checks: field validation, back navigation, dark mode, text scale 2.0
+```
+
+The chat message for that first one is the headline and the path, nothing
+more:
+
+```
+Marionette report — 2 findings · User Profile
+.marionette/sessions/user-profile-20260922T1412/report.md
 ```
 
 `.marionette/` is gitignored by default. Committing a session directory —
