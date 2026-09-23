@@ -1,6 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/services/log_collector.dart';
 
+/// How much `get_interactive_elements` reduces its per-element payload.
+///
+/// Every level reports only primitive-valued properties — `ButtonStyle`,
+/// `TextStyle`, `InputDecoration` and colour blobs never reach the agent,
+/// because no interaction tool can act on them.
+///
+/// Only the two levels below exist. A third, `ultra` — per-snapshot element
+/// refs in place of `bounds`, and one row per control — is planned, but none
+/// of that behaviour is written yet. Shipping a value that silently behaves
+/// like [compact] would mislead, and adding a value to an enum later is
+/// additive.
+enum CompactionMode {
+  /// Report every primitive property the widget declares.
+  none,
+
+  /// Additionally drop rendering details no interaction tool reads
+  /// (`textAlign`, `softWrap`, `overflow`, …) and the text-style primitives a
+  /// `Text` inlines, drop `Text`'s `data` when it repeats `text`, round
+  /// `bounds` to whole logical pixels, and report `visible` only when an
+  /// element is not visible.
+  compact,
+}
+
 /// Configuration for the Marionette extensions.
 ///
 /// Provides support for custom app-specific widgets.
@@ -20,6 +43,7 @@ class MarionetteConfiguration {
     this.shouldStopTraversal,
     this.extractText,
     this.maxScreenshotSize = const Size(2000, 2000),
+    this.compaction = CompactionMode.compact,
     this.logCollector,
   });
 
@@ -69,6 +93,16 @@ class MarionetteConfiguration {
   /// If set, captured screenshots will be downscaled to fit within this size
   /// while preserving aspect ratio. Set to null to disable resizing.
   final Size? maxScreenshotSize;
+
+  /// How much `get_interactive_elements` reduces its payload by default.
+  ///
+  /// Defaults to [CompactionMode.compact]; see [CompactionMode] for what each
+  /// level drops.
+  ///
+  /// The `compaction` parameter of `get_interactive_elements` overrides this
+  /// in both directions, so an agent can still ask for the full payload on an
+  /// app that keeps the default.
+  final CompactionMode compaction;
 
   /// Optional log collector for capturing application logs.
   ///

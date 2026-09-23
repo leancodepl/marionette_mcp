@@ -115,8 +115,20 @@ List interactive UI elements in the app's widget tree.
 
   Requires: -i <instance> or --uri <ws-uri>
 
+  Options:
+    --compaction=compact   Reduce the payload further: drop rendering details
+                           (textAlign, softWrap, overflow, ...) and text font
+                           metrics, drop a Text element's duplicated data
+                           field, round bounds to whole logical pixels, and
+                           report visible only when an element is not visible.
+                           This is the default for most apps.
+    --compaction=none      Force the full payload.
+
+  Omit the option to use the app's MarionetteConfiguration.compaction default.
+
   Examples:
     marionette -i my-app get-interactive-elements
+    marionette -i my-app get-interactive-elements --compaction=none
     marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 
   Output (stdout), one line per element:

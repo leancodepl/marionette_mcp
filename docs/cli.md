@@ -81,7 +81,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 
 | Command | Purpose |
 | --- | --- |
-| `get-interactive-elements` | List interactive UI elements. |
+| `get-interactive-elements` | List interactive UI elements (`--compaction=<none\|compact>` to override the app's [`compaction`](./configuration.md#compaction) default). |
 | `tap` | Tap an element (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`). |
 | `secondary-tap` | Right-click a matching element (desktop only) (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`). |
 | `double-tap` | Double tap (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--delay`). |

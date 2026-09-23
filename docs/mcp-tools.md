@@ -15,7 +15,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, identifier (Semantics identifier), and other identifying properties. The agent's primary way to "see" the screen. |
+| `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, identifier (Semantics identifier), and other identifying properties. The agent's primary way to "see" the screen. Only primitive-valued properties are reported; style, decoration and colour blobs are always omitted. `compaction: "compact"` — the default — also drops rendering details no interaction tool reads (`textAlign`, `softWrap`, `overflow`, font metrics, …), drops a `Text` element's duplicated `data`, rounds `bounds` to whole logical pixels, and reports `visible` only when an element is **not** visible. Pass `compaction: "none"` to force the full payload. Omit `compaction` to use the app's [`compaction`](./configuration.md#compaction) default. |
 | `take_screenshots` | Capture screenshots of all active views, returned as base64 PNGs. |
 | `get_logs` | Retrieve app logs collected since start or the last hot reload. Requires a [`LogCollector`](./logging.md). |
 
