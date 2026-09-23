@@ -10,23 +10,20 @@ import 'package:path/path.dart' as p;
 /// its own file tools, not by this class — [Session] only owns the
 /// directory layout and the paths.
 class Session {
-  Session._({required this.directory, required this.resumed});
+  Session._({required this.directory});
 
-  /// Creates the session directory (and its `screenshots/` subdirectory) if
-  /// they don't already exist, and returns a [Session] for it.
-  factory Session.open(Directory directory, {required bool resumed}) {
+  /// Creates the session directory (and its `screenshots/` subdirectory),
+  /// and returns a [Session] for it.
+  factory Session.open(Directory directory) {
     directory.createSync(recursive: true);
     Directory(
       p.join(directory.path, 'screenshots'),
     ).createSync(recursive: true);
-    return Session._(directory: directory, resumed: resumed);
+    return Session._(directory: directory);
   }
 
   /// The session directory, e.g. `.marionette/sessions/profile-validation-20260922T1412`.
   final Directory directory;
-
-  /// Whether an existing session directory was reused rather than created.
-  final bool resumed;
 
   /// The session's directory name, e.g. `profile-validation-20260922T1412`.
   String get name => p.basename(directory.path);
@@ -37,7 +34,4 @@ class Session {
   /// Where `take_screenshots` (with `inline: false`) saves captures.
   Directory get screenshotsDir =>
       Directory(p.join(directory.path, 'screenshots'));
-
-  /// Written once at the end by the connected agent.
-  File get reportFile => File(p.join(directory.path, 'report.md'));
 }

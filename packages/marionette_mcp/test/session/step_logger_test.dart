@@ -137,8 +137,7 @@ void main() {
     });
 
     Session openSession() =>
-        Session.open(Directory(p.join(tempDir.path, 'session')),
-            resumed: false);
+        Session.open(Directory(p.join(tempDir.path, 'session')));
 
     test('is a no-op without an active session', () {
       final logger = StepLogger();
@@ -183,9 +182,9 @@ void main() {
       expect(content, contains('-> error: Element not found'));
     });
 
-    test('extracts the exception message and a few stack frames from a '
-        'structured app-side error, instead of truncating the raw JSON',
-        () {
+    test(
+        'extracts the exception message and a few stack frames from a '
+        'structured app-side error, instead of truncating the raw JSON', () {
       // This is the real shape marionette_flutter sends for an uncaught
       // exception (see registerInternalMarionetteExtension's catch-all):
       // VmServiceExtensionException.toString() produces
@@ -255,7 +254,8 @@ void main() {
       expect(content, isNot(contains('"stack"')));
     });
 
-    test('folds SDK frames in the middle of the trace into one instead of '
+    test(
+        'folds SDK frames in the middle of the trace into one instead of '
         'losing an application frame to the budget', () {
       // Regression test for the value of using package:stack_trace's
       // Trace.terse instead of naively taking the first N raw lines: when
@@ -305,7 +305,8 @@ void main() {
       );
     });
 
-    test('falls back to the plain message for a deliberate, non-JSON '
+    test(
+        'falls back to the plain message for a deliberate, non-JSON '
         'error', () {
       final session = openSession();
       final logger = StepLogger()..session = session;
@@ -323,7 +324,8 @@ void main() {
       expect(content, contains('-> error: No log collector configured.'));
     });
 
-    test('redacts a uri embedded in a success message, not just the '
+    test(
+        'redacts a uri embedded in a success message, not just the '
         'selector', () {
       // Regression test: redacting only the uri= selector left the same
       // token reachable through the outcome — connect's own success text
@@ -390,8 +392,9 @@ void main() {
         {},
         const CallToolResult(
           content: [
-            TextContent(text: 'Found 1 element(s):\nType: TextField, '
-                'Text: "user@example.com"'),
+            TextContent(
+                text: 'Found 1 element(s):\nType: TextField, '
+                    'Text: "user@example.com"'),
           ],
         ),
       );
@@ -401,8 +404,7 @@ void main() {
       expect(content, isNot(contains('user@example.com')));
     });
 
-    test('still reports the full error message for a data-listing tool',
-        () {
+    test('still reports the full error message for a data-listing tool', () {
       // Errors are diagnostic context the report contract explicitly wants
       // (steps.md's "the error returned... the 'element not found'
       // detail"), unlike a successful payload — this applies regardless of
@@ -504,8 +506,7 @@ void main() {
       addTearDown(() {
         if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
       });
-      final session =
-          Session.open(Directory(p.join(tempDir.path, 's')), resumed: false);
+      final session = Session.open(Directory(p.join(tempDir.path, 's')));
       final stepLogger = StepLogger()..session = session;
 
       final wrapped = withStepLogging(

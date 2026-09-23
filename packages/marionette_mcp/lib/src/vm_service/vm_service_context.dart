@@ -65,7 +65,7 @@ final class VmServiceContext {
       ..registerTool(
         'connect',
         description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. On success this also opens (or resumes) a session directory under .marionette/sessions/ where the step log and screenshots for this run are kept — pass session_title again on a later connect to resume the same one.',
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. On success this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
         annotations: const ToolAnnotations(title: 'Connect to App'),
         inputSchema: ToolInputSchema(
           properties: {
@@ -76,15 +76,11 @@ final class VmServiceContext {
             'session_title': JsonSchema.string(
               description:
                   'A short title for this run, e.g. "profile validation". '
-                  'Slugified and timestamped into the session directory name. '
-                  'Pass the exact directory name a previous connect returned '
-                  'to resume that session (e.g. after a compaction or an '
-                  'interruption) instead of starting a new one — but only if '
-                  'that session is still open: once it has disconnected or '
-                  'has a report.md, it\'s considered concluded and a fresh '
-                  'session is opened instead, even with a matching title, so '
-                  'a later, unrelated run can never overwrite an already-'
-                  'finished one. Falls back to "run-<timestamp>" when omitted.',
+                  'Slugified and timestamped into the session directory '
+                  'name. Purely a human-readable label — every connect '
+                  'opens its own fresh session directory, even if this '
+                  'matches an earlier title. Falls back to "run-<timestamp>" '
+                  'when omitted.',
             ),
             'session_dir': JsonSchema.string(
               description:
@@ -142,7 +138,7 @@ final class VmServiceContext {
             await _registerDynamicTools();
 
             try {
-              final session = _sessionManager.createOrResume(
+              final session = _sessionManager.create(
                 title: args['session_title'] as String?,
                 baseDirOverride: args['session_dir'] as String?,
               );
@@ -152,8 +148,7 @@ final class VmServiceContext {
                 content: [
                   TextContent(
                     text: 'Successfully connected to app at $uri\n'
-                        '${session.resumed ? 'Resumed' : 'Opened'} session: '
-                        '${session.directory.path}',
+                        'Opened session: ${session.directory.path}',
                   ),
                 ],
               );

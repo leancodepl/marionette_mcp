@@ -40,9 +40,8 @@ URI connections for fully stateless operation.
 2. Interact directly: `marionette --uri <ws-uri> <command> [args]`
 
 No registration, no cleanup. Each command opens a fresh WebSocket connection,
-executes, and disconnects — but every invocation does append one line to a
-session directory's steps.md (see --session below); pass no --session and
-each command gets its own untitled, un-resumable session.
+executes, and disconnects — and every invocation gets its own fresh session
+directory, appending one line to its steps.md (see --session below).
 
 ## Global Options
 
@@ -50,10 +49,9 @@ each command gets its own untitled, un-resumable session.
       --uri <ws-uri>       VM service WebSocket URI — bypasses registry,
                            mutually exclusive with --instance
       --timeout <seconds>  Connection timeout (default: 5)
-      --session <title>    Session title. Reusing the same title across
-                           invocations resumes the same session directory
-                           (.marionette/sessions/<title>-<timestamp>/)
-                           instead of starting a fresh one per command.
+      --session <title>    Session title for this command's directory
+                           (.marionette/sessions/<title>-<timestamp>/).
+                           Every invocation gets its own fresh directory.
       --session-dir <path> Base directory .marionette/sessions/ is created
                            under (default: current directory, or
                            $MARIONETTE_SESSION_DIR if set)
