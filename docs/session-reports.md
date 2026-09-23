@@ -12,7 +12,6 @@ connected agent owns the narrative report written into it.
   sessions/
     profile-validation-20260922T1412/
       report.md          written once at the end, by the agent
-      report-full.md      appended by the agent during longer runs
       steps.md            machine-appended, one line per tool call
       screenshots/
         01.png
@@ -38,12 +37,10 @@ The directory's location is resolved from, in order:
 
 `connect` accepts an optional `session_title` (the CLI: `--session <title>`).
 The title is slugified and a creation timestamp appended, e.g.
-`profile-validation-20260922T1412`. Passing the **same title again** — after
-a compaction, an interruption, or simply a later step of the same task —
-resumes the most recently used session with that title instead of creating a
-new one, which is why `report-full.md` exists: it's what a resumed run reads
-back to pick up where it left off. Omitting the title falls back to
-`run-<timestamp>`, which is never resumed.
+`profile-validation-20260922T1412`. Passing the **same title again** resumes
+the most recently used session with that title instead of creating a new
+one — `steps.md` keeps growing in the same file rather than starting over.
+Omitting the title falls back to `run-<timestamp>`, which is never resumed.
 
 Old session directories are pruned automatically, keeping the most recently
 used 20 per project.
@@ -92,9 +89,9 @@ paths — useful when a screenshot is evidence you plan to cite in a report but
 don't need to look at right now, since each inline image costs real visual
 tokens.
 
-## report.md and report-full.md
+## report.md
 
-These are **not** written by the server — the connected agent writes them
+This is **not** written by the server — the connected agent writes it
 directly with its own file tools, using the session directory path returned
 by `connect`/`disconnect`. `disconnect`'s response includes that path and a
 reminder to write `report.md`, since a tool result is a much more reliable

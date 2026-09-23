@@ -349,31 +349,21 @@ write to them yourself:
   you're citing rather than something you need to look at right now (each
   inline image costs real visual tokens).
 
-You own two more files there, which the server never writes:
+You own one more file there, which the server never writes:
 
-- **`report.md`** — written once, at the end, from your own context, not by
-  re-reading `report-full.md`. Write it on either of two triggers: the run
-  completed, or you're stopping early (a blocking failure, a budget/time
-  limit, an ambiguous requirement you can't resolve alone). An interrupted
-  run's report states *why* it stopped and what was left untested, instead
-  of silently reporting only what got covered. Before drafting a single
-  line, name the report language explicitly: the language of the prompt
-  that started this session (the message that led to the first `connect`
-  call) — not English by default, not the language of the app's UI under
-  test, not whatever language your own tool-call narration has been in.
-  This check is easy to skip because it's just a rule sitting in the
-  contract below; doing it now, as a deliberate step before writing,
-  is what actually prevents defaulting to English. See *The report
-  contract* for the full rule.
-- **`report-full.md`** — a working log, appended *during* a longer run at
-  moments that matter (a check starts, an observation lands, a finding
-  appears) — not one entry per tap. Skip it for a short run: a single-screen
-  check that finishes in one pass just writes `report.md` directly, nothing
-  else materializes. It exists so a run survives a compaction, an
-  interruption, or an explicit resume (`connect` again with the same
-  `session_title`) — read it back only in those cases, to recover context
-  you'd otherwise lose, never as a matter of course before writing
-  `report.md`.
+- **`report.md`** — written once, at the end, from your own context. Write
+  it on either of two triggers: the run completed, or you're stopping early
+  (a blocking failure, a budget/time limit, an ambiguous requirement you
+  can't resolve alone). An interrupted run's report states *why* it stopped
+  and what was left untested, instead of silently reporting only what got
+  covered. Before drafting a single line, name the report language
+  explicitly: the language of the prompt that started this session (the
+  message that led to the first `connect` call) — not English by default,
+  not the language of the app's UI under test, not whatever language your
+  own tool-call narration has been in. This check is easy to skip because
+  it's just a rule sitting in the contract below; doing it now, as a
+  deliberate step before writing, is what actually prevents defaulting to
+  English. See *The report contract* for the full rule.
 
 ### The report contract
 

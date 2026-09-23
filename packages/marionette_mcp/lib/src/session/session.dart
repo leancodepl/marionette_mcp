@@ -6,9 +6,9 @@ import 'package:path/path.dart' as p;
 /// `.marionette/sessions/` holding the machine-appended step log and any
 /// saved screenshots.
 ///
-/// `report.md` and `report-full.md` live here too but are written by the
-/// connected agent using its own file tools, not by this class — [Session]
-/// only owns the directory layout and the paths.
+/// `report.md` lives here too but is written by the connected agent using
+/// its own file tools, not by this class — [Session] only owns the
+/// directory layout and the paths.
 class Session {
   Session._({required this.directory, required this.resumed});
 
@@ -40,8 +40,4 @@ class Session {
 
   /// Written once at the end by the connected agent.
   File get reportFile => File(p.join(directory.path, 'report.md'));
-
-  /// Appended by the agent during the run once past the materialization
-  /// threshold (a pause, a resume, or more than one check).
-  File get reportFullFile => File(p.join(directory.path, 'report-full.md'));
 }
