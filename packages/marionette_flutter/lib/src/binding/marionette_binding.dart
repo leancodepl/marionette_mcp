@@ -5,10 +5,9 @@ import 'package:marionette_flutter/src/binding/extensions/gesture_extensions.dar
 import 'package:marionette_flutter/src/binding/extensions/info_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/keyboard_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/media_extensions.dart';
+import 'package:marionette_flutter/src/binding/extensions/navigation_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/text_extensions.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
-import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
-import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 import 'package:marionette_flutter/src/services/create_screencast_server.dart';
 import 'package:marionette_flutter/src/services/device_config_service.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
@@ -177,23 +176,9 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     registerDeviceConfigExtensions(
       deviceConfigService: _deviceConfigService,
     );
-
-    // pressBackButton stays inline because it calls handlePopRoute(), which
-    // is an instance method on the binding itself.
-    registerInternalMarionetteExtension(
-      name: 'marionette.pressBackButton',
-      callback: (params) async {
-        // This acts like a normal, non-predictive back.
-        // For details, see https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
-        final didPop = await handlePopRoute();
-        return MarionetteExtensionResult.success({
-          'didPop': didPop,
-          'message': didPop
-              ? 'Back button pressed, route was popped'
-              : 'Back button pressed, no route to pop (app may exit)',
-        });
-      },
-    );
+    // This acts like a normal, non-predictive back. For details, see
+    // https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
+    registerNavigationExtensions(handlePopRoute: handlePopRoute);
   }
 
   @override
