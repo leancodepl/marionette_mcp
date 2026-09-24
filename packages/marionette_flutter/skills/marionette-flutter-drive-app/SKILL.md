@@ -225,7 +225,11 @@ is to actually run the app and look, rather than reason about the code:
   a validator returns an error code.
 - **Evidence for a PR or ticket comment.** A quick before/after
   `take_screenshots` pair is often more convincing, and faster to produce,
-  than a written description of a UI change.
+  than a written description of a UI change. For a multi-step flow rather
+  than a single static change, `record-video` (CLI-only, no MCP equivalent —
+  see the capability table) captures the whole interaction as a short clip,
+  which shows off a new feature or a fixed flow better than a screenshot
+  pair can.
 
 ## When not to use this
 
