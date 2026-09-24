@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
@@ -39,7 +40,17 @@ void main() {
 
   group('InstanceRegistry.validateName', () {
     test('accepts valid names', () {
-      for (final name in ['my-app', 'app_1', 'ABC123', 'a', 'test-app-2']) {
+      for (final name in [
+        'my-app',
+        'app_1',
+        'ABC123',
+        'a',
+        'test-app-2',
+        'my app',
+        'app@1',
+        '192.168.240.112:5555',
+        'my.device.local',
+      ]) {
         expect(
           () => InstanceRegistry.validateName(name),
           returnsNormally,
@@ -49,13 +60,61 @@ void main() {
     });
 
     test('rejects invalid names', () {
-      for (final name in ['my app', 'app/bad', '', 'app@1', '../../etc']) {
+      for (final name in [
+        '',
+        'app/bad',
+        '../../etc',
+        'a\\b',
+        'app\u0000name',
+        'app\nname',
+        'app\rname',
+        'app\tname',
+        'app\u001Bname', // ESC
+        'app\u007Fname', // DEL
+      ]) {
         expect(
           () => InstanceRegistry.validateName(name),
           throwsA(isA<FormatException>()),
           reason: 'Expected "$name" to be invalid',
         );
       }
+    });
+  });
+
+  group('InstanceRegistry file name encoding', () {
+    List<String> fileNames() =>
+        tempDir.listSync().map((f) => p.basename(f.path)).toList();
+
+    test('names matching the old strict pattern use a plain file name',
+        () async {
+      await registry.register('my-app_1', 'ws://127.0.0.1:8181/ws');
+      expect(fileNames(), equals(['my-app_1.json']));
+    });
+
+    test('names with Windows-unsafe characters round-trip', () async {
+      for (final name in [
+        '192.168.240.112:5555',
+        'a*b?c"d<e>f|g',
+        'weird name',
+      ]) {
+        await registry.register(name, 'ws://127.0.0.1:8181/ws');
+        expect(registry.get(name)?.name, equals(name));
+      }
+    });
+
+    test('does not create a file matching a Windows-reserved device name',
+        () async {
+      await registry.register('NUL', 'ws://127.0.0.1:8181/ws');
+
+      expect(fileNames(), isNot(contains('NUL.json')));
+      expect(registry.get('NUL')?.name, equals('NUL'));
+    });
+
+    test('does not create a file name ending in a dot', () async {
+      await registry.register('trailing.', 'ws://127.0.0.1:8181/ws');
+
+      expect(fileNames(), isNot(contains('trailing..json')));
+      expect(registry.get('trailing.')?.name, equals('trailing.'));
     });
   });
 

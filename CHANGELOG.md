@@ -1,5 +1,6 @@
 # Unreleased
 
+- Fix `register`/`unregister` rejecting instance names with dots or colons, such as device IDs like `192.168.1.1:5555` — only `/`, `\`, and control characters are disallowed now, and names are encoded into portable, Windows-safe file names on disk
 - Add `set_device_config` tool and `set-device-config` CLI command for overriding text scale, bold text, and platform brightness in a running app — opt in by wrapping your root widget in the new `MarionetteDeviceConfig`
 - Fix extension errors being reported as the generic `Server error` instead of the detail the extension returned — this silently swallowed every validation message and setup instruction, including the `get_logs` log-collector onboarding help
 - Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route
