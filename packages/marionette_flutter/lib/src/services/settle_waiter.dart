@@ -23,11 +23,15 @@ Future<bool> waitForNoTransientCallbacks({required Duration timeout}) async {
     return true;
   }
 
-  var timedOut = false;
-  final timer = Timer(timeout, () => timedOut = true);
+  final timedOut = Completer<void>();
+  final timer = Timer(timeout, timedOut.complete);
 
-  while (!settled() && !timedOut) {
-    await scheduler.endOfFrame;
+  // Raced against timedOut.future because endOfFrame never completes if the
+  // engine stops producing frames entirely (e.g. the app is backgrounded)
+  // while transient callbacks are still queued -- awaiting it alone would
+  // hang past the timeout.
+  while (!settled() && !timedOut.isCompleted) {
+    await Future.any([scheduler.endOfFrame, timedOut.future]);
   }
   timer.cancel();
 
