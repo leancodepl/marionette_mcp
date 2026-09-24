@@ -1,6 +1,6 @@
 # Unreleased
 
-- Fix `press_back_button` on a page-based `Navigator` (as produced by `go_router`) that refuses the pop while a route is still animating in — it now waits for the transition to settle before popping instead of tripping `navigator.dart`'s internal route-lifecycle assertion, which used to fail every navigation for the rest of the session ([#113](https://github.com/leancodepl/marionette_mcp/issues/113))
+- Fix `press_back_button` on a page-based `Navigator` (as produced by `go_router`) that refuses the pop while a route is still animating in — it now waits for the route transition to finish before popping (other animations, such as a loading spinner, don't hold it up) instead of tripping `navigator.dart`'s internal route-lifecycle assertion, which used to fail every navigation for the rest of the session ([#113](https://github.com/leancodepl/marionette_mcp/issues/113))
 - Add `set_device_config` tool and `set-device-config` CLI command for overriding text scale, bold text, and platform brightness in a running app — opt in by wrapping your root widget in the new `MarionetteDeviceConfig`
 - Fix extension errors being reported as the generic `Server error` instead of the detail the extension returned — this silently swallowed every validation message and setup instruction, including the `get_logs` log-collector onboarding help
 - Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route

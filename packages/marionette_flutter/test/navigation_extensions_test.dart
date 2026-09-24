@@ -4,74 +4,111 @@ import 'package:marionette_flutter/src/binding/extensions/navigation_extensions.
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 
 void main() {
+  /// A page-based Navigator that always refuses the pop, the same shape
+  /// go_router produces when the route has local history or declares
+  /// `onExit`. The returned `pushSecondPage` adds [secondPage] on top.
+  Future<({GlobalKey<NavigatorState> key, void Function() pushSecondPage})>
+      pumpRefusingNavigator(
+    WidgetTester tester, {
+    Widget secondPage = const SizedBox(),
+  }) async {
+    final key = GlobalKey<NavigatorState>();
+    var pages = <Page<void>>[
+      const MaterialPage<void>(key: ValueKey('page1'), child: SizedBox()),
+    ];
+    late StateSetter rebuild;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return Navigator(
+              key: key,
+              pages: pages,
+              // ignore: deprecated_member_use
+              onPopPage: (route, result) => false,
+            );
+          },
+        ),
+      ),
+    );
+
+    return (
+      key: key,
+      pushSecondPage: () => rebuild(() {
+            pages = [
+              ...pages,
+              MaterialPage<void>(
+                  key: const ValueKey('page2'), child: secondPage),
+            ];
+          }),
+    );
+  }
+
   testWidgets(
-    'waits for a running push transition to settle before popping, so a '
+    'waits for a running push transition to finish before popping, so a '
     'page-based Navigator that refuses the pop (the shape go_router '
     'produces) does not trip the mid-transition lifecycle assertion from '
     'https://github.com/leancodepl/marionette_mcp/issues/113',
     (tester) async {
-      final navigatorKey = GlobalKey<NavigatorState>();
-      var pages = <Page<void>>[
-        const MaterialPage<void>(
-          key: ValueKey('page1'),
-          child: SizedBox(key: Key('page1-content')),
-        ),
-      ];
+      final navigator = await pumpRefusingNavigator(tester);
 
-      late StateSetter rebuild;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: StatefulBuilder(
-            builder: (context, setState) {
-              rebuild = setState;
-              return Navigator(
-                key: navigatorKey,
-                pages: pages,
-                // A page-based Navigator that always refuses the pop, the
-                // same shape go_router produces when the route has local
-                // history or declares `onExit`.
-                // ignore: deprecated_member_use
-                onPopPage: (route, result) => false,
-              );
-            },
-          ),
-        ),
-      );
-
-      rebuild(() {
-        pages = [
-          ...pages,
-          const MaterialPage<void>(
-            key: ValueKey('page2'),
-            child: SizedBox(key: Key('page2-content')),
-          ),
-        ];
-      });
+      navigator.pushSecondPage();
       await tester.pump();
       // Mid-transition: the default push animation runs for ~300ms, so the
       // pushed route's entry is still `pushing`, not `idle`, here.
       await tester.pump(const Duration(milliseconds: 50));
 
       final resultFuture = pressBackButton(
-        handlePopRoute: navigatorKey.currentState!.maybePop,
+        handlePopRoute: navigator.key.currentState!.maybePop,
       );
-
-      // Let the push transition finish so the settle wait inside
-      // pressBackButton can complete.
       await tester.pumpAndSettle();
 
-      final result = await resultFuture;
-
-      expect(result, isA<MarionetteExtensionSuccess>());
+      expect(await resultFuture, isA<MarionetteExtensionSuccess>());
     },
   );
 
   testWidgets(
-    'returns an error instead of popping when the app never settles',
+    'pops a settled route even while an unrelated animation keeps running',
     (tester) async {
+      final navigator = await pumpRefusingNavigator(
+        tester,
+        secondPage: const Center(child: CircularProgressIndicator()),
+      );
+
+      navigator.pushSecondPage();
+      await tester.pump();
+      // Past the push transition; only the spinner is still animating.
+      await tester.pump(const Duration(seconds: 1));
+
+      var popCalled = false;
+      final resultFuture = pressBackButton(
+        handlePopRoute: () async {
+          popCalled = true;
+          return navigator.key.currentState!.maybePop();
+        },
+      );
+      await tester.pump(const Duration(milliseconds: 16));
+
+      expect(await resultFuture, isA<MarionetteExtensionSuccess>());
+      expect(popCalled, isTrue);
+    },
+  );
+
+  testWidgets(
+    'returns an error instead of popping when a transition outlives the '
+    'timeout',
+    (tester) async {
+      final navigatorKey = GlobalKey<NavigatorState>();
       await tester.pumpWidget(
-        const MaterialApp(home: Center(child: CircularProgressIndicator())),
+        MaterialApp(navigatorKey: navigatorKey, home: const SizedBox()),
+      );
+      navigatorKey.currentState!.push(
+        PageRouteBuilder<void>(
+          transitionDuration: const Duration(seconds: 10),
+          pageBuilder: (_, __, ___) => const SizedBox(),
+        ),
       );
       await tester.pump();
 
@@ -81,19 +118,15 @@ void main() {
           popCalled = true;
           return true;
         },
-        settleTimeout: const Duration(milliseconds: 100),
+        transitionTimeout: const Duration(milliseconds: 100),
       );
-
-      // The indicator's animation controller repeats forever, so the app
-      // never settles no matter how long we keep pumping.
       for (var i = 0; i < 20; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
 
-      final result = await resultFuture;
-
-      expect(result, isA<MarionetteExtensionError>());
+      expect(await resultFuture, isA<MarionetteExtensionError>());
       expect(popCalled, isFalse);
+      await tester.pumpAndSettle();
     },
   );
 }

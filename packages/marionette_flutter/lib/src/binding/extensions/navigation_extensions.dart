@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
-import 'package:marionette_flutter/src/services/settle_waiter.dart';
+import 'package:marionette_flutter/src/services/route_transition_waiter.dart';
 
-/// How long [pressBackButton] waits for a running transition to finish
-/// before giving up.
-const defaultSettleTimeout = Duration(seconds: 5);
+/// How long [pressBackButton] waits for a route transition to finish before
+/// giving up.
+const defaultTransitionTimeout = Duration(seconds: 5);
 
 /// Registers navigation-related `marionette.*` extensions: pressBackButton.
 ///
@@ -22,8 +22,8 @@ void registerNavigationExtensions({
   );
 }
 
-/// Presses the back button, waiting for any running transition to finish
-/// first.
+/// Presses the back button, first waiting for any route transition in flight
+/// to finish.
 ///
 /// Calling [handlePopRoute] mid-transition is what
 /// https://github.com/leancodepl/marionette_mcp/issues/113 hit: a
@@ -34,28 +34,24 @@ void registerNavigationExtensions({
 /// the assertion throws before `Navigator`'s internal lock resets, so every
 /// later navigation fails too — there's no recovering by retrying.
 ///
-/// Waiting via [waitForNoTransientCallbacks] avoids that: once no animation
-/// or other ticker is running, the route has already settled into its
-/// stable lifecycle state, so the pop — refused or not — can't land
-/// mid-transition. A fixed delay can't stand in for this, since it would
-/// either fire too early for slow/custom transitions or needlessly slow
-/// down fast ones.
+/// [waitForRouteTransitions] avoids that without being held up by
+/// animations unrelated to navigation, such as a loading spinner on the
+/// current screen.
 ///
-/// If the app never settles within [settleTimeout] — a persistent
-/// animation such as a spinner or looping video — returns an error instead
-/// of popping anyway, which would reintroduce the bug.
+/// If a transition is still running after [transitionTimeout], returns an
+/// error instead of popping anyway, which would reintroduce the bug.
 @visibleForTesting
 Future<MarionetteExtensionResult> pressBackButton({
   required Future<bool> Function() handlePopRoute,
-  Duration settleTimeout = defaultSettleTimeout,
+  Duration transitionTimeout = defaultTransitionTimeout,
 }) async {
-  final settled = await waitForNoTransientCallbacks(timeout: settleTimeout);
+  final settled = await waitForRouteTransitions(timeout: transitionTimeout);
   if (!settled) {
     return MarionetteExtensionResult.error(
       0,
-      'The app never settled (an animation or other ticker kept running) '
-      'within ${settleTimeout.inMilliseconds}ms. The back button press was '
-      'not delivered, to avoid popping the route mid-transition.',
+      'A route transition was still running after '
+      '${transitionTimeout.inMilliseconds}ms. The back button press was not '
+      'delivered, to avoid popping the route mid-transition.',
     );
   }
 
