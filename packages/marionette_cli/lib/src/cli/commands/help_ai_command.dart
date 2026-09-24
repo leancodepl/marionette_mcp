@@ -56,7 +56,7 @@ WebSocket connection, executes, and disconnects.
 Register a Flutter app instance.
 
   Arguments:
-    name   Any identifier without "/", "\", or NUL (e.g. my-app, 192.168.1.1:5555)
+    name   Any identifier without "/", "\", or control characters (e.g. my-app, 192.168.1.1:5555)
     uri    VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws)
 
   Example:
@@ -535,6 +535,6 @@ If a command fails with a connection error, the app may have stopped.
 - --identifier (Semantics identifier) is an equally stable alternative to --key
   when a widget has no ValueKey but does set an accessibility identifier
 - Run `get-interactive-elements` first to discover what's on screen before interacting
-- Instance names allow any characters except "/", "\", or NUL (e.g. device IDs like 192.168.1.1:5555)
+- Instance names allow any characters except "/", "\", or control characters (e.g. device IDs like 192.168.1.1:5555)
 - Commands are stateless — each opens a fresh connection, so no session management needed
 ''';
