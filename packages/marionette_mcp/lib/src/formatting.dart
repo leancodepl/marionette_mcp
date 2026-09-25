@@ -1,5 +1,28 @@
 import 'dart:convert';
 
+/// Formats a versioned interactive-elements response for text-only clients.
+///
+/// Legacy responses containing only `elements` retain their previous output.
+String formatInteractiveElementsResponse(Map<String, dynamic> response) {
+  final elements = response['elements'] as List<dynamic>;
+  final buffer = StringBuffer();
+  if (response['schemaVersion'] != null) {
+    buffer.writeln('Schema version: ${response['schemaVersion']}');
+  }
+  if (response['context'] case final Map<dynamic, dynamic> context
+      when context.isNotEmpty) {
+    buffer.writeln('Context: ${jsonEncode(context)}');
+  }
+  if (buffer.isNotEmpty) {
+    buffer.writeln();
+  }
+  buffer.writeln('Found ${elements.length} interactive element(s):\n');
+  for (final element in elements) {
+    buffer.writeln(formatElement(element as Map<String, dynamic>));
+  }
+  return buffer.toString();
+}
+
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
 /// Supports matching by key, identifier, text, type, and coordinates.
