@@ -267,7 +267,9 @@ commands against the same app in a row. When you're done for the session
 easy to act on a stale connection later without noticing.
 
 Give `connect` a `session_title` (a short description of what you're
-testing, e.g. `"profile validation"`) — it opens a fresh session directory
+testing, e.g. `"profile validation"`) — if the app enables session reports
+(`MarionetteConfiguration(enableSessionReports: true)`), it opens a fresh
+session directory
 that carries this run's step log and screenshots. One Marionette run is one
 session directory, always: there's no resuming, even if you pass the same
 title again on a later `connect` — that just opens another, separate
@@ -334,6 +336,12 @@ disconnecting.
   `MarionetteConfiguration` — not to retry harder.
 
 ## Reporting what you found
+
+This section applies only when the app enables session reports
+(`MarionetteConfiguration(enableSessionReports: true)`) — `connect`'s
+response then includes an `Opened session:` path. Without it there's no
+session directory and no `report.md` to write; don't turn it on yourself
+unless the user asks for a report.
 
 `connect` opens a fresh session directory under `.marionette/sessions/` —
 the server's own record of the run, kept separate from your own context.

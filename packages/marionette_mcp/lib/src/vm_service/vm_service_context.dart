@@ -65,7 +65,7 @@ final class VmServiceContext {
       ..registerTool(
         'connect',
         description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. On success this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
         annotations: const ToolAnnotations(title: 'Connect to App'),
         inputSchema: ToolInputSchema(
           properties: {
@@ -76,6 +76,7 @@ final class VmServiceContext {
             'session_title': JsonSchema.string(
               description:
                   'A short title for this run, e.g. "profile validation". '
+                  'Ignored unless the app enabled session reports. '
                   'Slugified and timestamped into the session directory '
                   'name. Purely a human-readable label — every connect '
                   'opens its own fresh session directory, even if this '
@@ -136,6 +137,36 @@ final class VmServiceContext {
             // MCP tool. Failures here are logged but don't fail the connect —
             // the generic call_custom_extension fallback keeps working.
             await _registerDynamicTools();
+
+            // Session reports are opt-in app-side
+            // (MarionetteConfiguration.enableSessionReports): with them off,
+            // connect writes nothing to disk and steps go unlogged.
+            final bool sessionReportsEnabled;
+            try {
+              sessionReportsEnabled =
+                  await connector.getSessionReportsEnabled();
+            } catch (err) {
+              _logger.warning('Failed to read binding configuration', err);
+              _disableDynamicTools();
+              await connector.disconnect();
+              return CallToolResult(
+                isError: true,
+                content: [
+                  TextContent(
+                    text: 'Failed to read marionette_flutter configuration: '
+                        '$err',
+                  ),
+                ],
+              );
+            }
+            if (!sessionReportsEnabled) {
+              _stepLogger.session = null;
+              return CallToolResult(
+                content: [
+                  TextContent(text: 'Successfully connected to app at $uri'),
+                ],
+              );
+            }
 
             try {
               final session = _sessionManager.create(

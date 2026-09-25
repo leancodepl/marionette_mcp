@@ -39,6 +39,7 @@ If your widgets wrap or replace these — e.g. a `MyPrimaryButton` built on a `G
 | `logCollector` | `LogCollector?` | `null` | Capture app logs for `get_logs`. See [Logging](./logging.md). |
 | `shouldStopTraversal` | `bool Function(Type type)?` | `null` | Stop descending below given widget types. **Rarely needed** — see below. |
 | `maxScreenshotSize` | `Size?` | `Size(2000, 2000)` | Downscale screenshots to fit; `null` disables resizing. |
+| `enableSessionReports` | `bool` | `false` | Record a per-run session directory (`steps.md`, screenshots, `report.md`). See [Session Reports](./session-reports.md). |
 
 Your callbacks run **after** the built-in checks — you're extending the defaults, not replacing them.
 
@@ -189,6 +190,14 @@ By default screenshots are downscaled to fit within `2000 × 2000` physical pixe
 MarionetteConfiguration(maxScreenshotSize: Size(1280, 1280))
 ```
 
+### `enableSessionReports`
+
+Off by default. When `true`, every `connect` (and every `marionette` CLI command) opens a fresh session directory under `.marionette/sessions/` with a machine-written `steps.md`, a `screenshots/` sink for `take_screenshots(inline: false)`, and a `report.md` the agent writes at the end of the run. See [Session Reports](./session-reports.md).
+
+```dart
+MarionetteConfiguration(enableSessionReports: true)
+```
+
 ## Complete production `main.dart`
 
 A copy-pasteable starting point that wires every callback plus a log hook. Adapt the widget types to your design system.
@@ -230,6 +239,9 @@ void main() {
 
         // 5. (Optional) tune screenshot size.
         // maxScreenshotSize: const Size(1280, 1280),
+
+        // 6. (Optional) record a session report for each agent run.
+        // enableSessionReports: true,
       ),
     );
 

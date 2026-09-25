@@ -12,10 +12,10 @@ import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 ///
 /// Handles resolving the instance name from the global `--instance` flag,
 /// looking up the URI from the registry, connecting, executing, and
-/// disconnecting. Also opens a fresh session directory, the same kind the
-/// MCP server uses, and logs one steps.md line per invocation — CLI parity
-/// with the MCP server's per-tool-call logging, since one CLI invocation
-/// runs exactly one command.
+/// disconnecting. When the app enables session reports, also opens a fresh
+/// session directory, the same kind the MCP server uses, and logs one
+/// steps.md line per invocation — CLI parity with the MCP server's
+/// per-tool-call logging, since one CLI invocation runs exactly one command.
 abstract class InstanceCommand extends Command<int> {
   InstanceRegistry get registry;
 
@@ -69,17 +69,7 @@ abstract class InstanceCommand extends Command<int> {
     }
     final connector = VmServiceConnector();
 
-    final Session session;
-    try {
-      session = SessionManager().create(
-        title: globalResults?['session'] as String?,
-        baseDirOverride: globalResults?['session-dir'] as String?,
-      );
-    } catch (e) {
-      stderr.writeln('Could not open a session directory: $e');
-      return 1;
-    }
-
+    Session? session;
     try {
       await connector.connect(uri).timeout(
             Duration(seconds: timeoutSeconds),
@@ -88,6 +78,19 @@ abstract class InstanceCommand extends Command<int> {
               'after ${timeoutSeconds}s. Is the app still running?',
             ),
           );
+
+      if (await _sessionReportsEnabled(connector)) {
+        try {
+          session = SessionManager().create(
+            title: globalResults?['session'] as String?,
+            baseDirOverride: globalResults?['session-dir'] as String?,
+          );
+        } catch (e) {
+          stderr.writeln('Could not open a session directory: $e');
+          return 1;
+        }
+      }
+
       final exitCode = await execute(connector);
       _logStep(session,
           outcome: exitCode == 0 ? 'ok' : 'error: exit $exitCode');
@@ -113,11 +116,26 @@ abstract class InstanceCommand extends Command<int> {
     }
   }
 
+  /// Whether the app opted into session reports
+  /// (`MarionetteConfiguration.enableSessionReports`). Treated as off when
+  /// the binding can't answer — the CLI doesn't enforce a version match, so
+  /// an older binding without `marionette.getConfiguration` must still work.
+  Future<bool> _sessionReportsEnabled(VmServiceConnector connector) async {
+    try {
+      return await connector.getSessionReportsEnabled();
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Appends this invocation's steps.md line: the command name, a selector
   /// summary built from whichever options the user actually passed, and
   /// [outcome]. Mirrors the MCP server's step logging (see [StepLogger]) so
   /// a session started via one transport reads the same way from the other.
-  void _logStep(Session session, {required String outcome}) {
+  /// No-op when [session] is null, i.e. session reports are disabled or the
+  /// connection failed before the app's configuration could be read.
+  void _logStep(Session? session, {required String outcome}) {
+    if (session == null) return;
     final args = <String, dynamic>{
       for (final option in argResults?.options ?? const <String>[])
         if (argResults!.wasParsed(option)) option: argResults![option],

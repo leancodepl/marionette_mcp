@@ -155,6 +155,8 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     registerInfoExtensions(
       elementTreeFinder: _elementTreeFinder,
       logStoreProvider: () => _logStore,
+      // TODO(KrzysztofMamak): Consider flag
+      enableSessionReports: configuration.enableSessionReports,
     );
     registerGestureExtensions(
       gestureDispatcher: _gestureDispatcher,
