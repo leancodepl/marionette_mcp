@@ -1,17 +1,16 @@
 import 'dart:convert';
 
 /// Shared description of the `ancestor_keys` field across every matcher-based
-/// tool, so agents read the same contract wherever they discover it.
+/// tool.
+///
+/// Kept short on purpose: it is repeated in every schema, so its length is
+/// paid on every connection. The full contract — strict nesting, the failure
+/// rule, the `scroll_to` timing, what ignores the field — is stated once in
+/// the server instructions.
 const ancestorKeysDescription =
-    'Optional. Restricts the search to the subtree of the element whose key '
-    '(a ValueKey<String>) is this value. Use it when the same inner key '
-    'appears in several identical subtrees — grid cells, repeated cards, '
-    'embedded app instances — to pick the one you mean, e.g. '
-    '{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}. List the '
-    'keys outermost first to go deeper: each one is looked up inside the '
-    'subtree of the previous, so ["session_2", "grid.cell_3"] reaches a cell '
-    'whose own key also repeats in other sessions. Fails if any of these keys '
-    'has no element; ignored when matching by coordinates or focused_element.';
+    'Optional wrapper keys (ValueKey<String>), outermost first; each is '
+    'looked up inside the previous one. Limits the search to that subtree. '
+    'Fails if a key has no element.';
 
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
