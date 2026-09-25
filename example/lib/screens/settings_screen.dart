@@ -61,6 +61,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/mouse-tap'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.account_tree_outlined),
+            title: const Text('Scoped Matching'),
+            subtitle: const Text('Repeated keys scoped with ancestor_keys'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/scoped-matching'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),
