@@ -1,6 +1,19 @@
 # Session Reports
 
-Every `connect` opens a fresh **session directory** — a persistent workspace
+Session reports are **opt-in**. Enable them in the app's Marionette
+configuration:
+
+```dart
+MarionetteBinding.ensureInitialized(
+  const MarionetteConfiguration(enableSessionReports: true),
+);
+```
+
+With it off (the default), `connect` and CLI commands write nothing to disk:
+there's no session directory, no `steps.md`, and `take_screenshots` only
+returns images inline. Everything below assumes it's on.
+
+With session reports enabled, every `connect` opens a fresh **session directory** — a persistent workspace
 for the run, separate from the agent's own conversation context. The server
 owns the directory, the step log, and the screenshot sink; the connected
 agent owns the narrative report written into it. One `connect` always
@@ -112,7 +125,7 @@ in `marionette-flutter-drive-app`.
 
 ## CLI parity
 
-`marionette` commands open the same kind of session directory and append
+When the app enables session reports, `marionette` commands open the same kind of session directory and append
 the same style of `steps.md` line per invocation. Since each CLI invocation
 is its own process, and there is no resuming, every command gets its own
 session directory — pass `--session <title>` for a readable label, but it

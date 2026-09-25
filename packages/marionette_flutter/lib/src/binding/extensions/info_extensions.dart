@@ -42,11 +42,21 @@ See https://pub.dev/packages/marionette_flutter for more details.''';
 void registerInfoExtensions({
   required ElementTreeFinder elementTreeFinder,
   required LogStore? Function() logStoreProvider,
+  required bool enableSessionReports,
 }) {
   registerInternalMarionetteExtension(
     name: 'marionette.getVersion',
     callback: (params) async {
       return MarionetteExtensionResult.success({'version': v.version});
+    },
+  );
+
+  registerInternalMarionetteExtension(
+    name: 'marionette.getConfiguration',
+    callback: (params) async {
+      return MarionetteExtensionResult.success({
+        'enableSessionReports': enableSessionReports,
+      });
     },
   );
 

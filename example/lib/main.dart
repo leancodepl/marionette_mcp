@@ -9,7 +9,10 @@ import 'router.dart';
 void main() {
   if (!kReleaseMode) {
     MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: LoggingLogCollector()),
+      MarionetteConfiguration(
+        logCollector: LoggingLogCollector(),
+        enableSessionReports: true,
+      ),
     );
     _registerNavigationExtensions();
   }

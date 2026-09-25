@@ -102,7 +102,7 @@ void registerInspectionTools(
     ..registerTool(
       'take_screenshots',
       description:
-          'Takes screenshots of all views in the Flutter app. By default returns base64-encoded PNG images inline, which can be decoded and saved. Set inline: false to instead save the screenshots straight into the active session directory and get back their paths — evidence you plan to cite in a report but don\'t need to look at right now, since each inline screenshot costs real visual tokens. Requires an active connection established via connect.',
+          'Takes screenshots of all views in the Flutter app. By default returns base64-encoded PNG images inline, which can be decoded and saved. Set inline: false to instead save the screenshots straight into the active session directory (only available when the app enables session reports) and get back their paths — evidence you plan to cite in a report but don\'t need to look at right now, since each inline screenshot costs real visual tokens. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Take Screenshots',
         readOnlyHint: true,
@@ -166,7 +166,9 @@ Future<CallToolResult> takeScreenshots(
       content: [
         const TextContent(
           text: 'inline: false requires an active session, which is '
-              'only created once connect succeeds.',
+              'only created once connect succeeds and only when the app '
+              'enables session reports '
+              '(MarionetteConfiguration.enableSessionReports).',
         ),
       ],
     );

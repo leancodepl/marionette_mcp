@@ -40,8 +40,10 @@ URI connections for fully stateless operation.
 2. Interact directly: `marionette --uri <ws-uri> <command> [args]`
 
 No registration, no cleanup. Each command opens a fresh WebSocket connection,
-executes, and disconnects — and every invocation gets its own fresh session
-directory, appending one line to its steps.md (see --session below).
+executes, and disconnects. If the app enables session reports
+(MarionetteConfiguration(enableSessionReports: true)), every invocation also
+gets its own fresh session directory, appending one line to its steps.md (see
+--session below).
 
 ## Global Options
 
