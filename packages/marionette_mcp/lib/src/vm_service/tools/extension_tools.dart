@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/tools/arg_coercion.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
@@ -10,7 +11,7 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// extensions registered by the Flutter app:
 /// `list_custom_extensions`, `call_custom_extension`.
 void registerExtensionTools(
-  McpServer server,
+  LoggedMcpServer server,
   VmServiceConnector connector,
   logging.Logger logger,
 ) {

@@ -266,18 +266,35 @@ commands against the same app in a row. When you're done for the session
 `connect` implicitly replaces it), but leaving a session dangling makes it
 easy to act on a stale connection later without noticing.
 
+Give `connect` a `session_title` (a short description of what you're
+testing, e.g. `"profile validation"`) — if the app enables session reports
+(`MarionetteConfiguration(enableSessionReports: true)`), it opens a fresh
+session directory
+that carries this run's step log and screenshots. One Marionette run is one
+session directory, always: there's no resuming, even if you pass the same
+title again on a later `connect` — that just opens another, separate
+directory. If a run gets interrupted partway through (a compaction, a
+dropped connection), its session is simply abandoned; don't try to pick up
+where it left off, and don't reuse its title. **Always give it in
+English**, regardless of the prompt's own language (see *The report
+contract*, below) — it gets slugified straight into the session directory's
+name, and that name should stay predictable and filesystem-friendly rather
+than following the run's language. See *Reporting what you found* for what
+that directory is for and what you're expected to do with it before
+disconnecting.
+
 ## What you can do once connected
 
-| Category          | Actions                                                                                                      | Notes                                                                                                                                                                                                                                                                                                            |
-|-------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `get_logs` needs a `LogCollector` wired up app-side (see *Logs for `get_logs`*, above); otherwise it returns setup instructions instead of an error. |
-| Gestures          | `tap`, `secondary_tap`, `double_tap`, `long_press`, `swipe`, `pinch_zoom`, `scroll_to`, `press_back_button`  | Match by `key` › `identifier` › `text` › `type` › coordinates, in that preference order — see *Good practices*. `secondary_tap` is desktop-only.                                                                                                                                                                 |
-| Text input        | `enter_text`, `press_key`                                                                                    | `enter_text` overwrites a field's value directly. `press_key` sends a real key event (submit on `enter`, shortcuts via `modifiers`) but only edits in-place on desktop/web — on mobile, field editing still needs `enter_text`.                                                                                  |
-| Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see *Device-config sweeps*, above — otherwise it returns setup instructions rather than failing.                                                                            |
-| Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                  |
-| Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                             |
-| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first.                                                                                                                                                                                                             |
-| Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                  |
+| Category          | Actions                                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+|-------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `take_screenshots` returns images inline by default; pass `inline: false` once a screenshot is evidence to cite rather than something you need to look at now — see *Reporting what you found*. `get_logs` needs a `LogCollector` wired up app-side (see *Logs for `get_logs`*, above); otherwise it returns setup instructions instead of an error. |
+| Gestures          | `tap`, `secondary_tap`, `double_tap`, `long_press`, `swipe`, `pinch_zoom`, `scroll_to`, `press_back_button`  | Match by `key` › `identifier` › `text` › `type` › coordinates, in that preference order — see *Good practices*. `secondary_tap` is desktop-only.                                                                                                                                                                                                                                                                                                                                                                 |
+| Text input        | `enter_text`, `press_key`                                                                                    | `enter_text` overwrites a field's value directly. `press_key` sends a real key event (submit on `enter`, shortcuts via `modifiers`) but only edits in-place on desktop/web — on mobile, field editing still needs `enter_text`.                                                                                                                                                                                                                                                                                  |
+| Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see *Device-config sweeps*, above — otherwise it returns setup instructions rather than failing.                                                                                                                                                                                                                                                                            |
+| Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                                                                                                                                                                                                                             |
+| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens a fresh session directory (`session_title`) that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                         |
+| Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                                                                                                                                                                                                                  |
 
 ## Good practices
 
@@ -318,6 +335,187 @@ easy to act on a stale connection later without noticing.
   deeply nested `GestureDetector` hit target, or extend
   `MarionetteConfiguration` — not to retry harder.
 
+## Reporting what you found
+
+This section applies only when the app enables session reports
+(`MarionetteConfiguration(enableSessionReports: true)`) — `connect`'s
+response then includes an `Opened session:` path. Without it there's no
+session directory and no `report.md` to write; don't turn it on yourself
+unless the user asks for a report.
+
+`connect` opens a fresh session directory under `.marionette/sessions/` —
+the server's own record of the run, kept separate from your own context.
+`disconnect`'s response repeats that directory's path with a reminder to
+write `report.md`: treat that as a requirement, not a suggestion — it's the
+enforcement mechanism precisely because an instruction here, on its own,
+gets skipped.
+
+Two files in that directory are appended by the server, not you — don't
+write to them yourself:
+
+- **`steps.md`** — one line per tool call: the tool, a short selector, and
+  the outcome. No payloads (`enter_text` values are redacted).
+- **`screenshots/`** — populated only when you call `take_screenshots` with
+  `inline: false`, which is what you want once a screenshot is evidence
+  you're citing rather than something you need to look at right now (each
+  inline image costs real visual tokens).
+
+You own one more file there, which the server never writes:
+
+- **`report.md`** — written once, at the end, from your own context. Write
+  it on either of two triggers: the run completed, or you're stopping early
+  (a blocking failure, a budget/time limit, an ambiguous requirement you
+  can't resolve alone). A report for a run stopped early states *why* it
+  stopped and what was left untested, instead of silently reporting only
+  what got covered — there's no resuming to pick it back up later, so this
+  is the only record of what happened. Before drafting a single line, name
+  the report language
+  explicitly: the language of the prompt that started this session (the
+  message that led to the first `connect` call) — not English by default,
+  not the language of the app's UI under test, not whatever language your
+  own tool-call narration has been in. This check is easy to skip because
+  it's just a rule sitting in the contract below; doing it now, as a
+  deliberate step before writing, is what actually prevents defaulting to
+  English. See *The report contract* for the full rule.
+
+### The report contract
+
+- **Write `report.md` — and the chat message — in the language the prompt
+  that started the run was written in.** Proper nouns stay exactly as they
+  are regardless of that language: tool names, file paths (`report.md`,
+  `steps.md`, `screenshots/01.png`), and widget keys/identifiers
+  (`login_emailTextField`) are never translated. Check this before writing,
+  not after — see the reminder in *Reporting what you found*, above.
+  **`session_title` is the one thing that's exempt in the other direction:
+  give it in English always**, whatever language the prompt itself is in —
+  see *Connecting*, above.
+- **The `Tested:` line is rendered from `steps.md`, never from memory or
+  your own sense of what you did.** This is the anti-overstatement mechanism
+  — read the step count and the actions taken back out of the file the
+  server wrote, don't estimate.
+- **Every finding cites evidence** — a step, a `get_logs` line, or a
+  screenshot path. No evidence means it's a suspicion, not a finding: say so
+  explicitly rather than upgrading a hunch.
+- **Under six lines per finding, no prose paragraphs.** A severity tag,
+  one-line summary, a repro path, and the evidence citation — that's the
+  shape; if it doesn't fit, cut the finding down rather than making room.
+- **Prefix the headline and every finding with a status icon**, so severity
+  is scannable without reading a word: `✅` clean (no findings), `⚠️` only
+  suspicions, `🐛` at least one confirmed bug — on the headline, the worst
+  severity present; on a finding, its own. `➖` marks something explicitly
+  skipped (a `Not covered:` line, or an individual check you didn't run).
+  Icons decorate the existing tags/wording — `[bug]`, `[suspicion]`,
+  `Not covered:` — they never replace them: keep both, so the report still
+  greps cleanly and reads fine wherever emoji don't render.
+- **The chat message after disconnecting follows a fixed, compact template
+  — not free-form prose, and not a second copy of `report.md`:**
+
+  ```
+  Marionette · <flow/feature> — <VERDICT>: <reason, a few words>
+  ✓ <what worked, comma-separated>
+  ✗ [<type>] <finding, one line>       (up to 5; beyond that: "+N more in report.md")
+  ∅ Not covered: <what> — <why>
+  → <session path>/report.md · <N> steps, <M> screenshots
+  ```
+
+  `<VERDICT>` is a fixed, four-word vocabulary — like `[bug]`/`[suspicion]`,
+  never translated regardless of the prompt's language: `PASS` (nothing
+  found, full coverage), `SUSPECT` (only suspicion(s), no confirmed bug),
+  `FAIL` (at least one confirmed bug), `BLOCKED` (coverage was cut short by
+  something that stopped you continuing — bad test data, a stuck flow, a
+  missing prerequisite; use this over `FAIL`/`PASS` when *that's* the
+  story, even if you also found a bug along the way). Each `✗` line's
+  `[type]` is `bug`, `blocker`, `ux`, or `suspicion` — `bug`/`blocker`/`ux`
+  corresponds to a `[bug]`-tagged finding in `report.md` (evidence-backed);
+  `suspicion` corresponds to a `[suspicion]`-tagged one.
+  Rows are optional beyond the headline and the `→` line: skip `✓` if
+  nothing worked, skip `✗`/`∅` for a `PASS`. The step/screenshot counts on
+  the `→` line come from `steps.md`, same as `Tested:` in `report.md` — not
+  a re-estimate.
+  This uses `✓`/`✗`/`∅`/`→`, not the `✅`/`⚠️`/`🐛`/`➖` from `report.md`,
+  deliberately: this message prints as raw terminal text, where a plain
+  Unicode symbol renders as one predictable, monochrome character
+  everywhere, while a full-color emoji can render at an inconsistent width
+  or not at all depending on the terminal. `report.md` is a file usually
+  opened in an editor or on GitHub, where colored emoji render cleanly —
+  different consumption context, different choice; don't mix the two sets.
+
+This is what `report.md` itself looks like (shown in English here; write
+yours in whatever language the prompt used) — a confirmed bug, a clean run,
+then a suspicion:
+
+```
+🐛 Marionette report — 2 findings · User Profile
+Tested: profile view, edit form, save flow (14 steps, 3 screenshots)
+
+1. 🐛 [bug] Date of birth accepts future dates — no validation
+   Repro: Profile → Edit → DOB = 2099-01-01 → Save
+   Evidence: step 9, log "saved dob=2099-01-01"
+
+2. 🐛 [bug] Save does not persist — changes lost after restart
+   Repro: Profile → Edit → Name = "X" → Save → hot_restart → Profile
+   Evidence: step 14, screenshots/02-after-restart.png
+```
+
+```
+✅ Marionette report — no issues · Checkout
+Tested: cart, address form, payment, confirmation (18 steps)
+Checks: field validation, back navigation, dark mode, text scale 2.0
+```
+
+A run with only a suspicion (no hard evidence of a real bug) gets `⚠️`
+instead, on both the headline and the finding itself:
+
+```
+⚠️ Marionette report — no confirmed issues, 1 suspicion · Settings
+Tested: notification toggles, language picker, theme toggle (9 steps, 2 screenshots)
+
+1. ⚠️ [suspicion] Dark mode toggle reverts to light after hot_restart
+   Repro: Settings → enable Dark mode → hot_restart → Settings
+   Evidence: screenshots/02-after-restart.png shows light theme again
+
+➖ Not covered: account deletion, data export — out of scope for this run
+```
+
+The chat message for those three, plus a `BLOCKED` case none of them
+happen to show (this has a different shape from `report.md`'s own
+headline — denser, with a verdict word, since it has to stand alone as
+the whole message):
+
+```
+Marionette · User Profile — FAIL: 2 bugs
+✓ Profile view, edit form
+✗ [bug] Date of birth accepts future dates — no validation
+✗ [bug] Save does not persist — changes lost after restart
+→ .marionette/sessions/user-profile-20260922T1412/report.md · 14 steps, 3 screenshots
+```
+
+```
+Marionette · Checkout — PASS: no issues
+✓ Cart, address form, payment, confirmation, dark mode, text scale 2.0
+→ .marionette/sessions/checkout-20260922T1801/report.md · 18 steps
+```
+
+```
+Marionette · Settings — SUSPECT: theme toggle may not persist
+✓ Notification toggles, language picker
+✗ [suspicion] Dark mode toggle reverts to light after hot_restart
+∅ Not covered: account deletion, data export — out of scope for this run
+→ .marionette/sessions/settings-20260922T1601/report.md · 9 steps, 2 screenshots
+```
+
+```
+Marionette · Password reset — BLOCKED: reset email never arrives
+✓ Request form, validation messages
+✗ [blocker] "Send reset link" succeeds but no email logged or received after 3 attempts
+∅ Not covered: setting a new password, confirmation screen — flow can't proceed past the email step
+→ .marionette/sessions/password-reset-20260922T1601/report.md · 11 steps, 1 screenshot
+```
+
+`.marionette/` is gitignored by default. Committing a session directory —
+attaching a report to a PR, say — is a deliberate choice you make
+explicitly, never something to do as a matter of course.
+
 ## Custom extensions
 
 Apps can expose their own actions via `registerMarionetteExtension` (route
@@ -332,15 +530,16 @@ args.
 
 ## Troubleshooting
 
-| Symptom                                                                                            | Likely cause                                                                      | Fix                                                      |
-|----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|----------------------------------------------------------|
-| "Not connected to any app"                                                                         | No successful `connect` yet in this session                                       | `connect` before anything else — see *Connecting*, above |
-| MCP `connect` fails with a version mismatch                                                        | `marionette_mcp` and `marionette_flutter` are different versions (the CLI doesn't check this) | See *Version alignment*, above                           |
-| Custom buttons/fields don't show up, or `tap(text:)`/`scroll_to(text:)` can't find a visible label | Widget type or text isn't recognized                                              | See *Custom design system?*, above                       |
-| `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                        | See *Logs for `get_logs`*, above                         |
-| `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                               | See *Device-config sweeps*, above, then hot restart      |
-| Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                 | See *The single-binding rule*, above                     |
-| Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                   | Not supported by design — see *When not to use*          |
+| Symptom                                                                                            | Likely cause                                                                                        | Fix                                                                                                             |
+|----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| "Not connected to any app"                                                                         | No successful `connect` yet in this session                                                         | `connect` before anything else — see *Connecting*, above                                                        |
+| MCP `connect` fails with a version mismatch                                                        | `marionette_mcp` and `marionette_flutter` are different versions (the CLI doesn't check this)       | See *Version alignment*, above                                                                                  |
+| Custom buttons/fields don't show up, or `tap(text:)`/`scroll_to(text:)` can't find a visible label | Widget type or text isn't recognized                                                                | See *Custom design system?*, above                                                                              |
+| `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                                          | See *Logs for `get_logs`*, above                                                                                |
+| `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                                                 | See *Device-config sweeps*, above, then hot restart                                                             |
+| Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                                   | See *The single-binding rule*, above                                                                            |
+| Session directory lands somewhere unexpected (e.g. not the project root)                           | No `MARIONETTE_SESSION_DIR` set and the server's own working directory isn't reliably the repo root | Pass `session_dir` to `connect` (`--session-dir` on the CLI) explicitly — see *Reporting what you found*, above |
+| Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                                     | Not supported by design — see *When not to use*                                                                 |
 
 ## CLI fallback
 
@@ -360,7 +559,11 @@ table above maps onto it one-for-one (`tap` ↔
 this side. Use `--uri <ws-uri>` for a one-off session
 and `register <name> <uri>` + `-i <name>` for repeated interaction with the
 same app; `marionette doctor` checks connectivity of every registered
-instance and `unregister` cleans up stale ones.
+instance and `unregister` cleans up stale ones. Session reports work the same
+way here: pass `--session <title>` (the CLI's equivalent of `session_title`)
+consistently across a script's invocations to log a multi-step run into one
+session directory instead of a fresh, untitled one per command — see
+*Reporting what you found*, above.
 
 ## Keeping this skill in sync
 

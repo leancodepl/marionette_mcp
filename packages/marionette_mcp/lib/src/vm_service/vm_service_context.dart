@@ -1,4 +1,6 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/session/session_manager.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/device_tools.dart';
@@ -15,10 +17,14 @@ import 'package:mcp_dart/mcp_dart.dart';
 final class VmServiceContext {
   VmServiceContext()
       : connector = VmServiceConnector(),
-        _logger = logging.Logger('VmServiceContext');
+        _logger = logging.Logger('VmServiceContext'),
+        _sessionManager = SessionManager(),
+        _stepLogger = StepLogger();
 
   final VmServiceConnector connector;
   final logging.Logger _logger;
+  final SessionManager _sessionManager;
+  final StepLogger _stepLogger;
 
   /// Owns the registry of dynamic extension tools across the lifetime of
   /// this context. Reused across connect/disconnect cycles so a previously
@@ -27,24 +33,31 @@ final class VmServiceContext {
 
   /// Registers all VM service related tools with the MCP server.
   ///
-  /// Connection lifecycle tools (`connect`, `disconnect`) are registered here
-  /// because they own the version-compatibility handshake with the binding
-  /// and don't fit the standard tool error-handling shape. Everything else
-  /// is delegated to themed registration functions.
+  /// Every tool is registered through [LoggedMcpServer] so each call is
+  /// recorded to the active session's steps.md (see [StepLogger]) — except
+  /// `connect`/`disconnect`, registered on the raw server: they own the
+  /// version-compatibility handshake with the binding and the session
+  /// lifecycle itself (creating it, and — for `disconnect` — clearing it
+  /// right after logging its own step, which the generic wrapper has no
+  /// hook for), so they log manually instead of going through
+  /// [LoggedMcpServer]. Everything else is delegated to themed registration
+  /// functions.
   void registerTools(McpServer server) {
+    final loggedServer = LoggedMcpServer(server, _stepLogger);
     _dynamicTools = DynamicExtensionTools(
       server: server,
       connector: connector,
       logger: _logger,
+      stepLogger: _stepLogger,
     );
     _registerConnectionTools(server);
-    registerInspectionTools(server, connector, _logger);
-    registerGestureTools(server, connector, _logger);
-    registerTextTools(server, connector, _logger);
-    registerKeyboardTools(server, connector, _logger);
-    registerDeviceTools(server, connector, _logger);
-    registerExtensionTools(server, connector, _logger);
-    registerSystemTools(server, connector, _logger);
+    registerInspectionTools(loggedServer, connector, _logger);
+    registerGestureTools(loggedServer, connector, _logger);
+    registerTextTools(loggedServer, connector, _logger);
+    registerKeyboardTools(loggedServer, connector, _logger);
+    registerDeviceTools(loggedServer, connector, _logger);
+    registerExtensionTools(loggedServer, connector, _logger);
+    registerSystemTools(loggedServer, connector, _logger);
   }
 
   void _registerConnectionTools(McpServer server) {
@@ -52,7 +65,7 @@ final class VmServiceContext {
       ..registerTool(
         'connect',
         description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode.',
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
         annotations: const ToolAnnotations(title: 'Connect to App'),
         inputSchema: ToolInputSchema(
           properties: {
@@ -60,10 +73,27 @@ final class VmServiceContext {
               description:
                   'VM service URI (e.g., ws://127.0.0.1:8181/ws). This is printed in the Flutter app console when running in debug mode.',
             ),
+            'session_title': JsonSchema.string(
+              description:
+                  'A short title for this run, e.g. "profile validation". '
+                  'Ignored unless the app enabled session reports. '
+                  'Slugified and timestamped into the session directory '
+                  'name. Purely a human-readable label — every connect '
+                  'opens its own fresh session directory, even if this '
+                  'matches an earlier title. Falls back to "run-<timestamp>" '
+                  'when omitted.',
+            ),
+            'session_dir': JsonSchema.string(
+              description:
+                  'Base directory .marionette/sessions/ is created under. '
+                  'Overrides the MARIONETTE_SESSION_DIR environment variable. '
+                  'Only needed when the MCP client hasn\'t set that variable '
+                  'and the process\'s working directory isn\'t the project root.',
+            ),
           },
           required: ['uri'],
         ),
-        callback: (args, extra) async {
+        callback: withStepLogging(_stepLogger, 'connect', (args, extra) async {
           final uri = args['uri'] as String;
           _logger.info('Connecting to app at $uri');
 
@@ -108,11 +138,68 @@ final class VmServiceContext {
             // the generic call_custom_extension fallback keeps working.
             await _registerDynamicTools();
 
-            return CallToolResult(
-              content: [
-                TextContent(text: 'Successfully connected to app at $uri'),
-              ],
-            );
+            // Session reports are opt-in app-side
+            // (MarionetteConfiguration.enableSessionReports): with them off,
+            // connect writes nothing to disk and steps go unlogged.
+            final bool sessionReportsEnabled;
+            try {
+              sessionReportsEnabled =
+                  await connector.getSessionReportsEnabled();
+            } catch (err) {
+              _logger.warning('Failed to read binding configuration', err);
+              _disableDynamicTools();
+              await connector.disconnect();
+              return CallToolResult(
+                isError: true,
+                content: [
+                  TextContent(
+                    text: 'Failed to read marionette_flutter configuration: '
+                        '$err',
+                  ),
+                ],
+              );
+            }
+            if (!sessionReportsEnabled) {
+              _stepLogger.session = null;
+              return CallToolResult(
+                content: [
+                  TextContent(text: 'Successfully connected to app at $uri'),
+                ],
+              );
+            }
+
+            try {
+              final session = _sessionManager.create(
+                title: args['session_title'] as String?,
+                baseDirOverride: args['session_dir'] as String?,
+              );
+              _stepLogger.session = session;
+
+              return CallToolResult(
+                content: [
+                  TextContent(
+                    text: 'Successfully connected to app at $uri\n'
+                        'Opened session: ${session.directory.path}',
+                  ),
+                ],
+              );
+            } catch (err) {
+              // Session setup failed after the connection (and dynamic
+              // tools) were already live — roll both back rather than
+              // report a failed connect while leaving the server connected.
+              _logger.severe('Failed to open session directory', err);
+              _disableDynamicTools();
+              await connector.disconnect();
+              return CallToolResult(
+                isError: true,
+                content: [
+                  TextContent(
+                    text: 'Connected to app, but failed to open a session '
+                        'directory: $err',
+                  ),
+                ],
+              );
+            }
           } catch (err) {
             _logger.severe('Failed to connect to app', err);
             return CallToolResult(
@@ -120,7 +207,7 @@ final class VmServiceContext {
               content: [TextContent(text: 'Failed to connect to app: $err')],
             );
           }
-        },
+        }),
       )
       ..registerTool(
         'disconnect',
@@ -136,17 +223,36 @@ final class VmServiceContext {
             // mid-disconnect tools/list reflects only what's still callable.
             _disableDynamicTools();
             await connector.disconnect();
-            return CallToolResult(
+
+            final session = _stepLogger.session;
+            final nudge = session == null
+                ? ''
+                : '\nSession: ${session.directory.path}\nWrite report.md now.';
+            final result = CallToolResult(
               content: [
-                const TextContent(text: 'Successfully disconnected from app'),
+                TextContent(
+                  text: 'Successfully disconnected from app$nudge',
+                ),
               ],
             );
+            // Registered on the raw server (not LoggedMcpServer), so this
+            // step is logged manually here — and only now, right after, is
+            // the session cleared. That order matters: clearing it first
+            // would mean disconnect's own line never lands anywhere, and a
+            // stray call made after disconnecting — or a later failed
+            // reconnect — would otherwise silently append to a session
+            // whose report may already be written.
+            _stepLogger.logStep('disconnect', args, result);
+            _stepLogger.session = null;
+            return result;
           } catch (err) {
             _logger.severe('Error during disconnect', err);
-            return CallToolResult(
+            final result = CallToolResult(
               isError: true,
               content: [TextContent(text: 'Error during disconnect: $err')],
             );
+            _stepLogger.logStep('disconnect', args, result);
+            return result;
           }
         },
       );

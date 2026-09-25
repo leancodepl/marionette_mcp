@@ -21,6 +21,7 @@ class MarionetteConfiguration {
     this.extractText,
     this.maxScreenshotSize = const Size(2000, 2000),
     this.logCollector,
+    this.enableSessionReports = false,
   });
 
   /// Determines if an app-specific widget type is interactive.
@@ -107,6 +108,23 @@ class MarionetteConfiguration {
   /// // Call collector.addLog(message) from your logging listener
   /// ```
   final LogCollector? logCollector;
+
+  /// Whether a connected agent should record a session report for its run.
+  ///
+  /// When true, every `connect` (and every `marionette` CLI command) opens a
+  /// fresh session directory under `.marionette/sessions/`, holding a
+  /// machine-appended `steps.md` log, any screenshots saved with
+  /// `take_screenshots(inline: false)`, and the agent-written `report.md`.
+  /// Off by default, so nothing is written to disk unless you opt in.
+  ///
+  /// ```dart
+  /// MarionetteBinding.ensureInitialized(
+  ///   const MarionetteConfiguration(enableSessionReports: true),
+  /// );
+  /// ```
+  ///
+  /// See https://github.com/leancodepl/marionette_mcp/blob/main/docs/session-reports.md
+  final bool enableSessionReports;
 
   /// Checks if a widget type is interactive (built-in + custom).
   bool isInteractiveWidgetType(Type type) {

@@ -77,7 +77,7 @@ marionette doctor              # Check connectivity of all instances
 
 ## Command reference
 
-Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds>` (default 5).
+Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds>` (default 5), `--session <title>`, `--session-dir <path>`. When the app enables [session reports](./session-reports.md) (`MarionetteConfiguration(enableSessionReports: true)`), every invocation opens its own fresh session directory and appends one line to its `steps.md`; `--session` only sets that directory's title.
 
 | Command | Purpose |
 | --- | --- |

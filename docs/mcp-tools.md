@@ -8,15 +8,15 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 
 | Tool | Description |
 | --- | --- |
-| `connect` | Connect to a Flutter app via its VM service URI (e.g. `ws://127.0.0.1:8181/ws`). Must be called before any other tool. Verifies the `marionette_flutter` binding version matches the server. |
-| `disconnect` | Disconnect from the currently connected app. |
+| `connect` | Connect to a Flutter app via its VM service URI (e.g. `ws://127.0.0.1:8181/ws`). Must be called before any other tool. Verifies the `marionette_flutter` binding version matches the server, then — if the app enables [session reports](./session-reports.md) — opens a fresh session directory (optional `session_title` and `session_dir`). |
+| `disconnect` | Disconnect from the currently connected app. With session reports enabled, reports the session directory and prompts the agent to write `report.md`. |
 
 ### Inspection
 
 | Tool | Description |
 | --- | --- |
 | `get_interactive_elements` | List the interactive elements currently visible — each with its type, text, key, identifier (Semantics identifier), and other identifying properties. The agent's primary way to "see" the screen. |
-| `take_screenshots` | Capture screenshots of all active views, returned as base64 PNGs. |
+| `take_screenshots` | Capture screenshots of all active views, returned as base64 PNGs. With session reports enabled, pass `inline: false` to save them into the [session directory](./session-reports.md) instead and get back their paths — cheaper when you're citing evidence, not looking at it. |
 | `get_logs` | Retrieve app logs collected since start or the last hot reload. Requires a [`LogCollector`](./logging.md). |
 
 ### Gestures

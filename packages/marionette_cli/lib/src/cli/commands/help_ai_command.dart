@@ -39,8 +39,11 @@ URI connections for fully stateless operation.
 1. Start your Flutter app in debug mode and note the VM service URI.
 2. Interact directly: `marionette --uri <ws-uri> <command> [args]`
 
-No registration, no cleanup, no files on disk. Each command opens a fresh
-WebSocket connection, executes, and disconnects.
+No registration, no cleanup. Each command opens a fresh WebSocket connection,
+executes, and disconnects. If the app enables session reports
+(MarionetteConfiguration(enableSessionReports: true)), every invocation also
+gets its own fresh session directory, appending one line to its steps.md (see
+--session below).
 
 ## Global Options
 
@@ -48,6 +51,12 @@ WebSocket connection, executes, and disconnects.
       --uri <ws-uri>       VM service WebSocket URI — bypasses registry,
                            mutually exclusive with --instance
       --timeout <seconds>  Connection timeout (default: 5)
+      --session <title>    Session title for this command's directory
+                           (.marionette/sessions/<title>-<timestamp>/).
+                           Every invocation gets its own fresh directory.
+      --session-dir <path> Base directory .marionette/sessions/ is created
+                           under (default: current directory, or
+                           $MARIONETTE_SESSION_DIR if set)
 
 ## Commands
 

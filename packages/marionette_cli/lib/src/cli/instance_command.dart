@@ -3,13 +3,19 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_mcp/src/session/session.dart';
+import 'package:marionette_mcp/src/session/session_manager.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 /// Base class for commands that operate on a connected Flutter app instance.
 ///
 /// Handles resolving the instance name from the global `--instance` flag,
 /// looking up the URI from the registry, connecting, executing, and
-/// disconnecting.
+/// disconnecting. When the app enables session reports, also opens a fresh
+/// session directory, the same kind the MCP server uses, and logs one
+/// steps.md line per invocation — CLI parity with the MCP server's
+/// per-tool-call logging, since one CLI invocation runs exactly one command.
 abstract class InstanceCommand extends Command<int> {
   InstanceRegistry get registry;
 
@@ -63,6 +69,7 @@ abstract class InstanceCommand extends Command<int> {
     }
     final connector = VmServiceConnector();
 
+    Session? session;
     try {
       await connector.connect(uri).timeout(
             Duration(seconds: timeoutSeconds),
@@ -71,22 +78,70 @@ abstract class InstanceCommand extends Command<int> {
               'after ${timeoutSeconds}s. Is the app still running?',
             ),
           );
-      return await execute(connector);
+
+      if (await _sessionReportsEnabled(connector)) {
+        try {
+          session = SessionManager().create(
+            title: globalResults?['session'] as String?,
+            baseDirOverride: globalResults?['session-dir'] as String?,
+          );
+        } catch (e) {
+          stderr.writeln('Could not open a session directory: $e');
+          return 1;
+        }
+      }
+
+      final exitCode = await execute(connector);
+      _logStep(session,
+          outcome: exitCode == 0 ? 'ok' : 'error: exit $exitCode');
+      return exitCode;
     } on SocketException catch (e) {
       final hint = isStateless
           ? 'Check the URI and ensure the app is still running.'
           : 'The app may have stopped. '
               'Try "marionette doctor" or "marionette unregister $displayName".';
       stderr.writeln('Could not connect to "$displayName" at $uri: $e\n$hint');
+      _logStep(session, outcome: describeStepError(e.toString()));
       return 1;
     } on TimeoutException catch (e) {
       stderr.writeln(e.message);
+      _logStep(session, outcome: describeStepError(e.message ?? 'timed out'));
       return 1;
     } catch (e) {
       stderr.writeln('Error: $e');
+      _logStep(session, outcome: describeStepError(e.toString()));
       return 1;
     } finally {
       await connector.disconnect();
     }
+  }
+
+  /// Whether the app opted into session reports
+  /// (`MarionetteConfiguration.enableSessionReports`). Treated as off when
+  /// the binding can't answer — the CLI doesn't enforce a version match, so
+  /// an older binding without `marionette.getConfiguration` must still work.
+  Future<bool> _sessionReportsEnabled(VmServiceConnector connector) async {
+    try {
+      return await connector.getSessionReportsEnabled();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Appends this invocation's steps.md line: the command name, a selector
+  /// summary built from whichever options the user actually passed, and
+  /// [outcome]. Mirrors the MCP server's step logging (see [StepLogger]) so
+  /// a session started via one transport reads the same way from the other.
+  /// No-op when [session] is null, i.e. session reports are disabled or the
+  /// connection failed before the app's configuration could be read.
+  void _logStep(Session? session, {required String outcome}) {
+    if (session == null) return;
+    final args = <String, dynamic>{
+      for (final option in argResults?.options ?? const <String>[])
+        if (argResults!.wasParsed(option)) option: argResults![option],
+    };
+    final selector = describeStepSelector(name, args);
+    final line = formatStepLine(name, selector, outcome);
+    session.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
   }
 }

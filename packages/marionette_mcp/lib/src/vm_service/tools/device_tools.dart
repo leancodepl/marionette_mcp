@@ -1,4 +1,5 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -6,7 +7,7 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// Registers MCP tools that change the device configuration the app runs
 /// under: `set_device_config`.
 void registerDeviceTools(
-  McpServer server,
+  LoggedMcpServer server,
   VmServiceConnector connector,
   logging.Logger logger,
 ) {
