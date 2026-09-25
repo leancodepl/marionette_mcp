@@ -9,7 +9,8 @@ class WidgetFinder {
   ///
   /// Traverses the widget tree starting from the root element and returns
   /// the first element whose widget matches the provided matcher. When
-  /// [ancestors] is given, only the subtree it resolves to is traversed.
+  /// [ancestors] is given, only the descendants of the element it resolves
+  /// to are searched — never that element itself.
   ///
   /// Returns null if no matching element is found.
   ///
@@ -21,11 +22,13 @@ class WidgetFinder {
     MarionetteConfiguration configuration, {
     List<KeyMatcher> ancestors = const [],
   }) {
-    return findElementFrom(
-      matcher,
-      resolveScopeRoot(ancestors, configuration),
-      configuration,
-    );
+    final scope = resolveScopeRoot(ancestors, configuration);
+    return ancestors.isEmpty
+        ? findElementFrom(matcher, scope, configuration)
+        : _firstBelow(
+            scope,
+            (child) => findElementFrom(matcher, child, configuration),
+          );
   }
 
   /// Finds the first element that matches the given [matcher] within the subtree
@@ -66,7 +69,8 @@ class WidgetFinder {
   /// Use [findElement] where a match the user cannot currently reach is still
   /// a valid answer.
   ///
-  /// When [ancestors] is given, only the subtree it resolves to is traversed.
+  /// When [ancestors] is given, only the descendants of the element it
+  /// resolves to are searched — never that element itself.
   ///
   /// Returns null if no matching element is found, and throws when
   /// [ancestors] is given but cannot be resolved — a missing scope is a
@@ -77,11 +81,13 @@ class WidgetFinder {
     MarionetteConfiguration configuration, {
     List<KeyMatcher> ancestors = const [],
   }) {
-    return _findHittableElementFrom(
-      matcher,
-      resolveScopeRoot(ancestors, configuration),
-      configuration,
-    );
+    final scope = resolveScopeRoot(ancestors, configuration);
+    return ancestors.isEmpty
+        ? _findHittableElementFrom(matcher, scope, configuration)
+        : _firstBelow(
+            scope,
+            (child) => _findHittableElementFrom(matcher, child, configuration),
+          );
   }
 
   /// Resolves the element that an `ancestor_keys` chain limits a search to.
