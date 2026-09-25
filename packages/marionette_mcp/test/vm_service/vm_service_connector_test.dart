@@ -1,7 +1,54 @@
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:test/test.dart';
+import 'package:vm_service/vm_service.dart';
 
 void main() {
+  group('VmServiceExtensionException.fromRpcError', () {
+    test('preserves application-side extension details', () {
+      final exception = VmServiceExtensionException.fromRpcError(
+        'custom.failure',
+        RPCError.withDetails(
+          'ext.flutter.custom.failure',
+          -32000,
+          'Server error',
+          details: 'callback failed\napplication stack',
+        ),
+      );
+
+      expect(exception.message, 'Extension custom.failure failed');
+      expect(exception.errorCode, -32000);
+      expect(exception.error, contains('callback failed'));
+      expect(exception.error, contains('application stack'));
+    });
+
+    test('falls back to the protocol message without details', () {
+      final exception = VmServiceExtensionException.fromRpcError(
+        'custom.failure',
+        RPCError('ext.flutter.custom.failure', -32000, 'Server error'),
+      );
+
+      expect(exception.error, 'Server error');
+    });
+
+    test('stringifies structured application-side details', () {
+      final exception = VmServiceExtensionException.fromRpcError(
+        'custom.failure',
+        RPCError.withDetails(
+          'ext.flutter.custom.failure',
+          -32000,
+          'Server error',
+          details: <String, Object?>{
+            'reason': 'callback failed',
+            'retryable': false,
+          },
+        ),
+      );
+
+      expect(exception.error, contains('callback failed'));
+      expect(exception.error, contains('retryable: false'));
+    });
+  });
+
   group('VmServiceConnector.callCustomExtension', () {
     late VmServiceConnector connector;
 

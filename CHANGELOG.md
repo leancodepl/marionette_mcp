@@ -1,5 +1,15 @@
 # Unreleased
 
+- Add `marionette-flutter-drive-app`, an Agent Skill shipped inside the `marionette_flutter` package, installable via `dart run skills@ get` (Dart's [package skills](https://dart.dev/tools/pub/package-skills) convention) or `npx skills add leancodepl/marionette_mcp` — see the new "Agent Skill" section in the README
+- Add `set_device_config` tool and `set-device-config` CLI command for overriding text scale, bold text, and platform brightness in a running app — opt in by wrapping your root widget in the new `MarionetteDeviceConfig`
+- Fix extension errors being reported as the generic `Server error` instead of the detail the extension returned — this silently swallowed every validation message and setup instruction, including the `get_logs` log-collector onboarding help
+- Fix `scroll_to` on layered UIs: scroll the list the user can reach and stop at the reachable copy of the target, instead of dragging a screen covered by a bottom sheet, dialog, or pushed route
+- Fix `scroll_to` missing a target that only comes into view on its final drag, at either end of a list
+- Fix `scroll_to` being unable to reach targets in long lists: it now scrolls by a share of the visible viewport instead of a fixed 64px, so lists past roughly 170 rows are reachable and shorter ones take far fewer gestures
+- Fix `scroll_to` on screens with more than one scrollable: when the target is not built yet it now tries the two best-ranked reachable scrollables in turn rather than committing to a single guess, so a chip row, tab strip or nav rail no longer swallows the gesture
+- Fix the `scroll_to` failure reading `Widget not found after 0 scroll attempts` when no scrollable could be dragged at all, which hid the real cause
+- Fix every pointer gesture (`tap`, `double_tap`, `long_press`, `secondary_tap`, `swipe`, `pinch_zoom`, `scroll_to`) silently doing nothing, and every element being reported `visible: false`, in an app whose content is not in the implicit view — as with the desktop windowing API: gestures are now dispatched to, and visibility measured against, the view the element is actually in
+
 # 0.6.0
 
 - Promote schema-bearing custom extensions to first-class MCP tools via the new `ExtensionInputSchema`/`ExtensionParam` DSL

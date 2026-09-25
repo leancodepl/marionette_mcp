@@ -35,20 +35,23 @@ import 'package:marionette_flutter/src/binding/marionette_extension_result.dart'
 /// Parses a positive double parameter.
 ///
 /// Returns the parsed value (or [defaultValue] if the parameter is absent)
-/// in `value`. On parse failure or non-positive value, returns `error`
-/// populated with a [MarionetteExtensionResult.invalidParams]; callers should
-/// return that result immediately.
+/// in `value`. On parse failure or a non-finite or non-positive value, returns
+/// `error` populated with a [MarionetteExtensionResult.invalidParams]; callers
+/// should return that result immediately.
+///
+/// Pass a `null` [defaultValue] for an optional parameter — `value` is then
+/// `null` exactly when the caller omitted it.
 ({double? value, MarionetteExtensionResult? error}) parsePositiveDouble(
   Map<String, String> params,
   String key, {
-  required double defaultValue,
+  required double? defaultValue,
 }) {
   final raw = params[key];
   if (raw == null) {
     return (value: defaultValue, error: null);
   }
   final parsed = double.tryParse(raw);
-  if (parsed == null || parsed <= 0) {
+  if (parsed == null || !parsed.isFinite || parsed <= 0) {
     return (
       value: null,
       error: MarionetteExtensionResult.invalidParams(
@@ -57,4 +60,31 @@ import 'package:marionette_flutter/src/binding/marionette_extension_result.dart'
     );
   }
   return (value: parsed, error: null);
+}
+
+/// Parses an optional boolean parameter.
+///
+/// Params arrive as strings, so `true`/`false` are matched literally. Returns
+/// `null` in `value` when the parameter is absent. On any other spelling,
+/// returns `error` populated with a
+/// [MarionetteExtensionResult.invalidParams]; callers should return that
+/// result immediately.
+({bool? value, MarionetteExtensionResult? error}) parseOptionalBool(
+  Map<String, String> params,
+  String key,
+) {
+  final raw = params[key];
+  if (raw == null) {
+    return (value: null, error: null);
+  }
+  return switch (raw) {
+    'true' => (value: true, error: null),
+    'false' => (value: false, error: null),
+    _ => (
+        value: null,
+        error: MarionetteExtensionResult.invalidParams(
+          'Parameter "$key" must be "true" or "false", got "$raw"',
+        ),
+      ),
+  };
 }

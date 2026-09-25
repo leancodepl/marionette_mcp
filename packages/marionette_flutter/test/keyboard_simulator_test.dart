@@ -30,6 +30,110 @@ void main() {
     );
 
     testWidgets(
+      'submits a focused text field when enter is pressed',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var submittedText = '';
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: TextField(
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (value) => submittedText = value,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.enterText(find.byType(TextField), 'TEST-1234567');
+
+        await KeyboardSimulator().pressKey('enter');
+        await tester.pump();
+
+        expect(submittedText, 'TEST-1234567');
+      },
+    );
+
+    testWidgets(
+      'uses the default done action for a single-line field',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var submittedText = '';
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: TextField(
+                autofocus: true,
+                onSubmitted: (value) => submittedText = value,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.enterText(find.byType(TextField), 'TEST-1234567');
+
+        await KeyboardSimulator().pressKey('enter');
+        await tester.pump();
+
+        expect(submittedText, 'TEST-1234567');
+      },
+    );
+
+    testWidgets(
+      'uses the default newline action for a multiline field',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var submittedText = '';
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: TextField(
+                autofocus: true,
+                keyboardType: TextInputType.multiline,
+                maxLines: 3,
+                onSubmitted: (value) => submittedText = value,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.enterText(find.byType(TextField), 'TEST-1234567');
+
+        await KeyboardSimulator().pressKey('enter');
+        await tester.pump();
+
+        expect(submittedText, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'does not submit a focused text field for modified enter',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var submittedText = '';
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: TextField(
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (value) => submittedText = value,
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.enterText(find.byType(TextField), 'TEST-1234567');
+
+        await KeyboardSimulator().pressKey('enter', modifiers: {'shift'});
+        await tester.pump();
+
+        expect(submittedText, isEmpty);
+      },
+    );
+
+    testWidgets(
       'delivers a character for an unmodified printable key',
       timeout: _timeout,
       (WidgetTester tester) async {

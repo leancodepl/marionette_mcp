@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
+import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 import 'package:marionette_flutter/src/services/widget_matcher.dart';
 
@@ -28,7 +29,7 @@ class GestureDispatcher {
   }) async {
     // Fast path for coordinate-based tapping
     if (matcher is CoordinatesMatcher) {
-      await _dispatchTapAtPosition(matcher.offset);
+      await _dispatchTapAtPosition(matcher.offset, viewId: _defaultViewId());
       return;
     }
 
@@ -46,7 +47,38 @@ class GestureDispatcher {
   }
 
   Future<void> _dispatchTapAtElement(Element element) async {
-    await _dispatchTapAtPosition(_globalCenterOf(element));
+    await _dispatchTapAtPosition(
+      _globalCenterOf(element),
+      viewId: _viewIdOfElement(element),
+    );
+  }
+
+  /// Returns the id of the view [element] is mounted in.
+  ///
+  /// Pointer events carry the view they are meant for; without it they are
+  /// hit-tested against the implicit view, which renders nothing in an app
+  /// driven by the desktop windowing API.
+  int _viewIdOfElement(Element element) {
+    final viewId = viewIdOf(element);
+    if (viewId == null) {
+      throw StateError(
+        'Cannot dispatch a gesture: the element is not mounted in a View and '
+        'there is no implicit view to fall back to',
+      );
+    }
+    return viewId;
+  }
+
+  /// Returns the id of the view coordinate-based gestures are dispatched to.
+  int _defaultViewId() {
+    final viewId = defaultViewId();
+    if (viewId == null) {
+      throw StateError(
+        'Cannot dispatch a gesture: no view is being rendered and there is no '
+        'implicit view to fall back to',
+      );
+    }
+    return viewId;
   }
 
   /// Returns the global position of the center of [element]'s [RenderBox].
@@ -67,22 +99,41 @@ class GestureDispatcher {
     return renderObject.localToGlobal(center);
   }
 
-  Future<void> _dispatchTapAtPosition(Offset globalPosition) async {
+  Future<void> _dispatchTapAtPosition(
+    Offset globalPosition, {
+    required int viewId,
+  }) async {
     final pointerId = _nextPointerId++;
 
     // Build the event records
     final records = [
       // Pointer down immediately
       [
-        PointerAddedEvent(position: globalPosition, device: _kDeviceId),
+        PointerAddedEvent(
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
         PointerDownEvent(
-            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+          pointer: pointerId,
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
       ],
       // Pointer up after a short delay, then remove the device
       [
         PointerUpEvent(
-            pointer: pointerId, position: globalPosition, device: _kDeviceId),
-        PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
+          pointer: pointerId,
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
+        PointerRemovedEvent(
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
       ],
     ];
 
@@ -112,7 +163,11 @@ class GestureDispatcher {
     List<KeyMatcher> ancestors = const [],
   }) async {
     if (matcher is CoordinatesMatcher) {
-      await _dispatchMouseTapAtPosition(matcher.offset, buttons);
+      await _dispatchMouseTapAtPosition(
+        matcher.offset,
+        buttons,
+        viewId: _defaultViewId(),
+      );
       return;
     }
 
@@ -125,13 +180,18 @@ class GestureDispatcher {
     if (element == null) {
       throw Exception('Element matching ${matcher.toJson()} not found');
     }
-    await _dispatchMouseTapAtPosition(_globalCenterOf(element), buttons);
+    await _dispatchMouseTapAtPosition(
+      _globalCenterOf(element),
+      buttons,
+      viewId: _viewIdOfElement(element),
+    );
   }
 
   Future<void> _dispatchMouseTapAtPosition(
     Offset globalPosition,
-    int buttons,
-  ) async {
+    int buttons, {
+    required int viewId,
+  }) async {
     final pointerId = _nextPointerId++;
 
     final records = [
@@ -141,6 +201,7 @@ class GestureDispatcher {
           position: globalPosition,
           kind: PointerDeviceKind.mouse,
           device: _kMouseDeviceId,
+          viewId: viewId,
         ),
         PointerDownEvent(
           pointer: pointerId,
@@ -148,6 +209,7 @@ class GestureDispatcher {
           kind: PointerDeviceKind.mouse,
           buttons: buttons,
           device: _kMouseDeviceId,
+          viewId: viewId,
         ),
       ],
       // Button released (buttons: 0), then the device is removed.
@@ -158,11 +220,13 @@ class GestureDispatcher {
           kind: PointerDeviceKind.mouse,
           buttons: 0,
           device: _kMouseDeviceId,
+          viewId: viewId,
         ),
         PointerRemovedEvent(
           position: globalPosition,
           kind: PointerDeviceKind.mouse,
           device: _kMouseDeviceId,
+          viewId: viewId,
         ),
       ],
     ];
@@ -187,7 +251,11 @@ class GestureDispatcher {
     }
 
     if (matcher is CoordinatesMatcher) {
-      await _dispatchDoubleTapAtPosition(matcher.offset, delay);
+      await _dispatchDoubleTapAtPosition(
+        matcher.offset,
+        delay,
+        viewId: _defaultViewId(),
+      );
       return;
     }
 
@@ -208,21 +276,26 @@ class GestureDispatcher {
     Element element,
     Duration delay,
   ) async {
-    await _dispatchDoubleTapAtPosition(_globalCenterOf(element), delay);
+    await _dispatchDoubleTapAtPosition(
+      _globalCenterOf(element),
+      delay,
+      viewId: _viewIdOfElement(element),
+    );
   }
 
   Future<void> _dispatchDoubleTapAtPosition(
     Offset globalPosition,
-    Duration delay,
-  ) async {
+    Duration delay, {
+    required int viewId,
+  }) async {
     // First tap
-    await _dispatchTapAtPosition(globalPosition);
+    await _dispatchTapAtPosition(globalPosition, viewId: viewId);
 
     // Wait between taps for double-tap recognition
     await Future<void>.delayed(delay);
 
     // Second tap
-    await _dispatchTapAtPosition(globalPosition);
+    await _dispatchTapAtPosition(globalPosition, viewId: viewId);
   }
 
   /// Simulates a long press on an element that matches the given [matcher].
@@ -242,7 +315,11 @@ class GestureDispatcher {
     }
 
     if (matcher is CoordinatesMatcher) {
-      await _dispatchLongPressAtPosition(matcher.offset, duration);
+      await _dispatchLongPressAtPosition(
+        matcher.offset,
+        duration,
+        viewId: _defaultViewId(),
+      );
       return;
     }
 
@@ -263,20 +340,33 @@ class GestureDispatcher {
     Element element,
     Duration duration,
   ) async {
-    await _dispatchLongPressAtPosition(_globalCenterOf(element), duration);
+    await _dispatchLongPressAtPosition(
+      _globalCenterOf(element),
+      duration,
+      viewId: _viewIdOfElement(element),
+    );
   }
 
   Future<void> _dispatchLongPressAtPosition(
     Offset globalPosition,
-    Duration duration,
-  ) async {
+    Duration duration, {
+    required int viewId,
+  }) async {
     final pointerId = _nextPointerId++;
 
     final records = [
       [
-        PointerAddedEvent(position: globalPosition, device: _kDeviceId),
+        PointerAddedEvent(
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
         PointerDownEvent(
-            pointer: pointerId, position: globalPosition, device: _kDeviceId),
+          pointer: pointerId,
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
       ],
     ];
 
@@ -290,8 +380,16 @@ class GestureDispatcher {
     await _handlePointerEventRecord([
       [
         PointerUpEvent(
-            pointer: pointerId, position: globalPosition, device: _kDeviceId),
-        PointerRemovedEvent(position: globalPosition, device: _kDeviceId),
+          pointer: pointerId,
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
+        PointerRemovedEvent(
+          position: globalPosition,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
       ],
     ]);
   }
@@ -330,7 +428,7 @@ class GestureDispatcher {
           'Must be one of: left, right, up, down'),
     };
 
-    await drag(start, end);
+    await drag(start, end, viewId: _viewIdOfElement(element));
   }
 
   /// Simulates a pinch zoom gesture centered on an element matching [matcher].
@@ -360,6 +458,7 @@ class GestureDispatcher {
         matcher.offset,
         scale: scale,
         startDistance: startDistance,
+        viewId: _defaultViewId(),
       );
       return;
     }
@@ -380,6 +479,7 @@ class GestureDispatcher {
       globalCenter,
       scale: scale,
       startDistance: startDistance,
+      viewId: _viewIdOfElement(element),
     );
   }
 
@@ -387,6 +487,7 @@ class GestureDispatcher {
     Offset center, {
     required double scale,
     required double startDistance,
+    required int viewId,
   }) async {
     final pointer1Id = _nextPointerId++;
     final pointer2Id = _nextPointerId++;
@@ -404,19 +505,29 @@ class GestureDispatcher {
     // Phase 1: Both fingers down
     final records = <List<PointerEvent>>[
       [
-        PointerAddedEvent(position: start1, device: _kDeviceId),
+        PointerAddedEvent(
+          position: start1,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
         PointerDownEvent(
           pointer: pointer1Id,
           position: start1,
           device: _kDeviceId,
+          viewId: viewId,
         ),
       ],
       [
-        PointerAddedEvent(position: start2, device: _kSecondDeviceId),
+        PointerAddedEvent(
+          position: start2,
+          device: _kSecondDeviceId,
+          viewId: viewId,
+        ),
         PointerDownEvent(
           pointer: pointer2Id,
           position: start2,
           device: _kSecondDeviceId,
+          viewId: viewId,
         ),
       ],
     ];
@@ -433,11 +544,13 @@ class GestureDispatcher {
           pointer: pointer1Id,
           position: pos1,
           device: _kDeviceId,
+          viewId: viewId,
         ),
         PointerMoveEvent(
           pointer: pointer2Id,
           position: pos2,
           device: _kSecondDeviceId,
+          viewId: viewId,
         ),
       ]);
     }
@@ -452,16 +565,26 @@ class GestureDispatcher {
           pointer: pointer1Id,
           position: end1,
           device: _kDeviceId,
+          viewId: viewId,
         ),
         PointerUpEvent(
           pointer: pointer2Id,
           position: end2,
           device: _kSecondDeviceId,
+          viewId: viewId,
         ),
       ],
       [
-        PointerRemovedEvent(position: end1, device: _kDeviceId),
-        PointerRemovedEvent(position: end2, device: _kSecondDeviceId),
+        PointerRemovedEvent(
+          position: end1,
+          device: _kDeviceId,
+          viewId: viewId,
+        ),
+        PointerRemovedEvent(
+          position: end2,
+          device: _kSecondDeviceId,
+          viewId: viewId,
+        ),
       ],
     ]);
 
@@ -469,7 +592,12 @@ class GestureDispatcher {
   }
 
   /// Simulates a drag gesture from [from] to [to].
-  Future<void> drag(Offset from, Offset to) async {
+  ///
+  /// [viewId] is the view the drag is dispatched to; it defaults to the first
+  /// rendered view. Callers that start from an element should pass that
+  /// element's view instead.
+  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
+    final resolvedViewId = viewId ?? _defaultViewId();
     final pointerId = _nextPointerId++;
 
     final delta = to - from;
@@ -491,20 +619,38 @@ class GestureDispatcher {
           position: position,
           delta: stepDelta,
           device: _kDeviceId,
+          viewId: resolvedViewId,
         ),
       ]);
     }
 
     final records = [
       [
-        PointerAddedEvent(position: from, device: _kDeviceId),
+        PointerAddedEvent(
+          position: from,
+          device: _kDeviceId,
+          viewId: resolvedViewId,
+        ),
         PointerDownEvent(
-            pointer: pointerId, position: from, device: _kDeviceId),
+          pointer: pointerId,
+          position: from,
+          device: _kDeviceId,
+          viewId: resolvedViewId,
+        ),
       ],
       ...moveRecords,
       [
-        PointerUpEvent(pointer: pointerId, position: to, device: _kDeviceId),
-        PointerRemovedEvent(position: to, device: _kDeviceId),
+        PointerUpEvent(
+          pointer: pointerId,
+          position: to,
+          device: _kDeviceId,
+          viewId: resolvedViewId,
+        ),
+        PointerRemovedEvent(
+          position: to,
+          device: _kDeviceId,
+          viewId: resolvedViewId,
+        ),
       ],
     ];
 
