@@ -225,9 +225,15 @@ void main() {
           isA<Exception>().having(
             (e) => e.toString(),
             'message',
-            allOf(contains('grid.cell_2'), contains('ancestor_keys[0]')),
+            allOf(
+              contains('grid.cell_2'),
+              contains('ancestor_keys[0]'),
+              contains('in the widget tree'),
+            ),
           ),
         ),
+        reason: 'the first link must say where it was looked for, like '
+            'every later one does',
       );
     });
 

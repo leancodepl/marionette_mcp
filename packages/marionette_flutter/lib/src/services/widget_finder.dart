@@ -112,7 +112,9 @@ class WidgetFinder {
         (child) => findElementFrom(ancestors[i], child, configuration),
       );
       if (found == null) {
-        final within = i == 0 ? '' : ' inside "${ancestors[i - 1].keyValue}"';
+        final within = i == 0
+            ? ' in the widget tree'
+            : ' inside "${ancestors[i - 1].keyValue}"';
         throw Exception(
           'Scope element with key "${ancestors[i].keyValue}" '
           '(ancestor_keys[$i]) not found$within',
