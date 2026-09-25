@@ -52,6 +52,34 @@ Widget _grid(List<Widget> cells) {
   return _app([for (final cell in cells) Expanded(child: cell)]);
 }
 
+/// A key repeated on two adjacent levels, each level with its own `btn`.
+Widget _nestedNodes() {
+  return MaterialApp(
+    home: Scaffold(
+      body: Column(
+        key: const ValueKey('node'),
+        children: [
+          ElevatedButton(
+            key: const ValueKey('btn'),
+            onPressed: () {},
+            child: const Text('outer'),
+          ),
+          Column(
+            key: const ValueKey('node'),
+            children: [
+              ElevatedButton(
+                key: const ValueKey('btn'),
+                onPressed: () {},
+                child: const Text('inner'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 List<KeyMatcher> _ancestors(List<String> keys) {
   return [for (final key in keys) KeyMatcher(key)];
 }
@@ -103,6 +131,47 @@ void main() {
         reason: 'scoping to grid.cell_2 alone would have matched the cell in '
             'the first session',
       );
+    });
+
+    testWidgets('resolves a key repeated on adjacent levels to the inner one',
+        (tester) async {
+      await tester.pumpWidget(_nestedNodes());
+      final finder = WidgetFinder();
+
+      final once = finder.resolveScopeRoot(
+        _ancestors(['node']),
+        _configuration,
+      );
+      final twice = finder.resolveScopeRoot(
+        _ancestors(['node', 'node']),
+        _configuration,
+      );
+
+      expect(once, isNotNull);
+      expect(
+        identical(once, twice),
+        isFalse,
+        reason: 'the second link must be looked up below the first, not '
+            'match the first element again',
+      );
+      expect(
+        twice,
+        tester.element(find.byKey(const ValueKey('node')).last),
+      );
+    });
+
+    testWidgets('a match scoped to ["node", "node"] lands in the inner node',
+        (tester) async {
+      await tester.pumpWidget(_nestedNodes());
+
+      final element = WidgetFinder().findHittableElement(
+        const KeyMatcher('btn'),
+        _configuration,
+        ancestors: _ancestors(['node', 'node']),
+      );
+
+      expect(element,
+          tester.element(find.widgetWithText(ElevatedButton, 'inner')));
     });
 
     testWidgets('searches the whole tree when no ancestors are given',

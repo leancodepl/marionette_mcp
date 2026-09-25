@@ -87,9 +87,9 @@ class WidgetFinder {
   /// Resolves the element that an `ancestor_keys` chain limits a search to.
   ///
   /// [ancestors] is ordered outermost first and nests: each key is looked up
-  /// inside the subtree of the one before it, so a chain can reach a subtree
-  /// whose own key repeats elsewhere. An empty chain resolves to the app's
-  /// root element.
+  /// strictly below the element the one before it resolved to, so a chain can
+  /// reach a subtree whose own key repeats elsewhere, including on the level
+  /// right above it. An empty chain resolves to the app's root element.
   ///
   /// Throws when a link matches no element: falling back to a tree-wide search
   /// would silently act on a different subtree than the one that was asked
@@ -101,7 +101,10 @@ class WidgetFinder {
     Element? scopeRoot = WidgetsBinding.instance.rootElement;
 
     for (var i = 0; i < ancestors.length; i++) {
-      final found = findElementFrom(ancestors[i], scopeRoot, configuration);
+      final found = _firstBelow(
+        scopeRoot,
+        (child) => findElementFrom(ancestors[i], child, configuration),
+      );
       if (found == null) {
         final within = i == 0 ? '' : ' inside "${ancestors[i - 1].keyValue}"';
         throw Exception(
@@ -138,6 +141,19 @@ class WidgetFinder {
     }
 
     visitor(startElement);
+    return found;
+  }
+
+  /// The first result of [search] over the children of [parent], never
+  /// [parent] itself, so a key repeated on adjacent levels names the inner one.
+  Element? _firstBelow(
+    Element? parent,
+    Element? Function(Element child) search,
+  ) {
+    Element? found;
+    parent?.visitChildren((child) {
+      found ??= search(child);
+    });
     return found;
   }
 }
