@@ -1036,6 +1036,262 @@ void main() {
         );
       },
     );
+
+    // 101-1: the scope is resolved on every lookup, not once up front.
+    testWidgets(
+      'reaches a row a lazy ListView has not built yet',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: _rowsWithActions(itemCount: 30))),
+        );
+        expect(
+          find.byKey(const ValueKey('row_20')),
+          findsNothing,
+          reason: 'precondition: row_20 is not built yet',
+        );
+
+        await ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        ).scrollUntilVisible(
+          const KeyMatcher('row.action'),
+          _configuration,
+          ancestors: const [KeyMatcher('row_20')],
+        );
+        await tester.pump();
+
+        expect(find.text('Action 20'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'names a scope key that exists nowhere once the list is exhausted',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: _rowsWithActions(itemCount: 30))),
+        );
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await expectLater(
+          () => simulator.scrollUntilVisible(
+            const KeyMatcher('row.action'),
+            _configuration,
+            ancestors: const [KeyMatcher('row_99')],
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'message',
+              allOf(contains('"row_99"'), contains('ancestor_keys[0]')),
+            ),
+          ),
+        );
+      },
+    );
+
+    testWidgets(
+      'names a missing scope key rather than a missing Scrollable',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: Text('Nothing to scroll'))),
+        );
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await expectLater(
+          () => simulator.scrollUntilVisible(
+            const KeyMatcher('row.action'),
+            _configuration,
+            ancestors: const [KeyMatcher('row_99')],
+          ),
+          throwsA(
+            isA<Exception>().having(
+              (e) => e.toString(),
+              'message',
+              allOf(contains('"row_99"'), isNot(contains('Scrollable'))),
+            ),
+          ),
+        );
+      },
+    );
+
+    testWidgets(
+      'reports a missing target, not a missing scope, when the scope was seen',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: _rowsWithActions(itemCount: 30))),
+        );
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await expectLater(
+          () => simulator.scrollUntilVisible(
+            const KeyMatcher('row.missing'),
+            _configuration,
+            ancestors: const [KeyMatcher('row_20')],
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              startsWith('Widget not found after'),
+            ),
+          ),
+          reason: 'row_20 was built while scrolling; restoring the position '
+              'unbuilds it again, which must not turn the error into a '
+              'missing scope',
+        );
+      },
+    );
+
+    // 101-2: the Scrollable to drag may sit inside the scope or above it.
+    testWidgets(
+      'scrolls the list above a built scope whose target is not built',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: CustomScrollView(
+                slivers: [
+                  KeyedSubtree(
+                    key: const ValueKey('section_b'),
+                    child: SliverList.builder(
+                      itemCount: 30,
+                      itemBuilder: (context, index) => SizedBox(
+                        key: ValueKey('item_$index'),
+                        height: 80,
+                        child: Text('Item $index'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        expect(find.byKey(const ValueKey('section_b')), findsOneWidget);
+        expect(find.byKey(const ValueKey('item_25')), findsNothing);
+
+        await ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        ).scrollUntilVisible(
+          const KeyMatcher('item_25'),
+          _configuration,
+          ancestors: const [KeyMatcher('section_b')],
+        );
+        await tester.pump();
+
+        expect(find.text('Item 25'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'prefers the list inside the scope over two identical ones before it',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final controllers = List.generate(3, (_) => ScrollController());
+        for (final controller in controllers) {
+          addTearDown(controller.dispose);
+        }
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Expanded(
+                      child: KeyedSubtree(
+                        key: ValueKey('grid.cell_${i + 1}'),
+                        child: _keyedItems(
+                          controller: controllers[i],
+                          itemCount: 20,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        await ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        ).scrollUntilVisible(
+          const KeyMatcher('item_15'),
+          _configuration,
+          ancestors: const [KeyMatcher('grid.cell_3')],
+        );
+        await tester.pump();
+
+        expect(controllers[2].offset, greaterThan(0));
+        expect(controllers[0].offset, 0);
+        expect(controllers[1].offset, 0);
+      },
+    );
+
+    testWidgets(
+      'starts from the deepest link that is built when the rest is not',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final controllers = List.generate(3, (_) => ScrollController());
+        for (final controller in controllers) {
+          addTearDown(controller.dispose);
+        }
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: [
+                  for (var i = 0; i < 3; i++)
+                    Expanded(
+                      child: KeyedSubtree(
+                        key: ValueKey('session_${i + 1}'),
+                        child: _rowsWithActions(
+                          itemCount: 30,
+                          controller: controllers[i],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        await ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        ).scrollUntilVisible(
+          const KeyMatcher('row.action'),
+          _configuration,
+          ancestors: const [KeyMatcher('session_3'), KeyMatcher('row_20')],
+        );
+        await tester.pump();
+
+        expect(controllers[2].offset, greaterThan(0));
+        expect(controllers[0].offset, 0);
+        expect(controllers[1].offset, 0);
+      },
+    );
   });
 }
 
@@ -1264,5 +1520,25 @@ Widget _keyedItems({
         minTileHeight: itemExtent,
       );
     },
+  );
+}
+
+/// A lazily built list of 80px rows keyed `row_<index>`, each holding a
+/// `row.action` button whose key repeats in every row.
+Widget _rowsWithActions(
+    {required int itemCount, ScrollController? controller}) {
+  return ListView.builder(
+    controller: controller,
+    physics: const ClampingScrollPhysics(),
+    itemCount: itemCount,
+    itemBuilder: (BuildContext context, int index) => SizedBox(
+      key: ValueKey('row_$index'),
+      height: 80,
+      child: TextButton(
+        key: const ValueKey('row.action'),
+        onPressed: () {},
+        child: Text('Action $index'),
+      ),
+    ),
   );
 }
