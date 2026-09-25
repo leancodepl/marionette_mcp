@@ -30,7 +30,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 | `swipe` | Swipe/drag. Element-based (`key`/`identifier`/`text` + `direction` + optional `distance` and `ancestor_keys`) or coordinate-based (`startX/Y`, `endX/Y`). For `PageView`, `Dismissible`, `Drawer`, sliders. |
 | `pinch_zoom` | Pinch to zoom an element matched by `key`, `identifier`, `text`, `type`, or `coordinates` (optional `ancestor_keys`). `scale > 1.0` zooms in, `< 1.0` zooms out. For maps, images, PDFs. |
 | `press_back_button` | Simulate the system back button (Android back / iOS swipe-back). Works with Navigator, GoRouter, etc. |
-| `scroll_to` | Scroll until an element matching `key`, `identifier`, or `text` becomes visible. Optional `ancestor_keys` scrolls inside one subtree. |
+| `scroll_to` | Scroll until an element matching `key`, `identifier`, or `text` becomes visible. Optional `ancestor_keys` scopes the target to one subtree; the list that scrolls may be inside it or above it. |
 
 > **Scoping a match with `ancestor_keys`:** every matcher-based tool takes an optional `ancestor_keys` — a list of wrapper `ValueKey<String>`s. The target is searched for inside that subtree only, so a key repeated across identical subtrees (grid cells, repeated cards, embedded app instances) can be disambiguated without baking indices into leaf keys:
 >
@@ -44,7 +44,7 @@ Once your agent is connected (see [Configuring your AI tool](#configuring-your-a
 > { "key": "cell.joinButton", "ancestor_keys": ["session_2", "grid.cell_3"] }
 > ```
 >
-> If any key in the chain matches no element the call fails — naming the link that broke — rather than falling back to a tree-wide search. It is ignored by `coordinates` and `focused_element`, which do not search the tree.
+> If any key in the chain matches no element the call fails — naming the link that broke — rather than falling back to a tree-wide search. `scroll_to` differs only in timing: a scope inside a lazily built list may not exist yet, so it keeps scrolling and fails with the same message once its attempts run out. Only descendants of the element named by the last key match, never that element itself. `ancestor_keys` is ignored by `coordinates` and `focused_element`, which do not search the tree.
 
 ### Text input
 
