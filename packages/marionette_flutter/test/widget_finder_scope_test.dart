@@ -174,6 +174,23 @@ void main() {
           tester.element(find.widgetWithText(ElevatedButton, 'inner')));
     });
 
+    testWidgets('never matches the scope element itself', (tester) async {
+      await tester.pumpWidget(_nestedNodes());
+
+      final element = WidgetFinder().findElement(
+        const KeyMatcher('node'),
+        _configuration,
+        ancestors: _ancestors(['node']),
+      );
+
+      expect(
+        element,
+        tester.element(find.byKey(const ValueKey('node')).last),
+        reason: 'an element is not its own ancestor: the target must be '
+            'found below the scope',
+      );
+    });
+
     testWidgets('searches the whole tree when no ancestors are given',
         (tester) async {
       await tester.pumpWidget(_grid([
@@ -298,6 +315,20 @@ void main() {
         element,
         tester.element(find.widgetWithText(ElevatedButton, 'Join Second')),
       );
+    });
+
+    testWidgets('never matches the scope element itself', (tester) async {
+      await tester.pumpWidget(_grid([
+        _cell(cellKey: 'grid.cell_1', label: 'First'),
+      ]));
+
+      final element = WidgetFinder().findHittableElement(
+        const KeyMatcher('grid.cell_1'),
+        _configuration,
+        ancestors: _ancestors(['grid.cell_1']),
+      );
+
+      expect(element, isNull);
     });
 
     testWidgets('still enforces hittability inside the scope', (tester) async {
