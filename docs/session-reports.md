@@ -49,11 +49,17 @@ The directory's location is resolved from, in order:
 3. The process's current working directory, as a last resort.
 
 `.marionette/sessions/<name>/` is created under whichever of these applies.
+If creating it fails for any reason (e.g. an unwritable `session_dir`),
+`connect`/the command still succeeds — just without a session directory for
+that run, the same as if session reports were disabled. A working
+connection is never dropped over session setup.
 
 ### Naming a session
 
 `connect` accepts an optional `session_title` (the CLI: `--session <title>`).
-The title is slugified and a creation timestamp appended, e.g.
+The title is slugified (kept to ~60 characters, longer is truncated — well
+under common filesystem filename limits even after the timestamp is
+appended) and a creation timestamp appended, e.g.
 `profile-validation-20260922T1412`. It's purely a human-readable label —
 passing the same title again does **not** reopen the earlier directory; it
 always creates a new one. Omitting the title falls back to `run-<timestamp>`.
@@ -65,7 +71,9 @@ interrupted run's session is simply abandoned — there's nothing to resume it
 into.
 
 Old session directories are pruned automatically, keeping the most recently
-used 20 per project.
+used 20 per project — except a directory that already has a `report.md`,
+which is never pruned: a concluded run's report is a deliberately kept
+artifact, not disposable bookkeeping.
 
 ## steps.md
 
