@@ -33,7 +33,8 @@ class ScrollSimulator {
   /// Picks the [Scrollable] the user can currently reach rather than the first
   /// one in the tree — a covered layer stays built and comes earlier — and
   /// drags it until the target becomes reachable or max attempts are
-  /// exhausted.
+  /// exhausted. When [ancestors] is given, both the target and the fallback
+  /// [Scrollable] are searched for inside that subtree only.
   ///
   /// Throws an [Exception] if:
   /// - The target widget is not found
@@ -41,9 +42,11 @@ class ScrollSimulator {
   /// - The target widget is not visible after all attempts are exhausted
   Future<void> scrollUntilVisible(
     WidgetMatcher matcher,
-    MarionetteConfiguration configuration,
-  ) async {
-    final candidates = _findScrollableCandidates(matcher, configuration);
+    MarionetteConfiguration configuration, {
+    List<KeyMatcher> ancestors = const [],
+  }) async {
+    final candidates =
+        _findScrollableCandidates(matcher, configuration, ancestors);
     if (candidates.isEmpty) {
       throw Exception('No Scrollable widget found in the tree');
     }
@@ -85,6 +88,7 @@ class ScrollSimulator {
         initialMoveStep,
         budget,
         configuration,
+        ancestors,
       );
       attemptsLeft -= outcome.attempts;
       draggedSomething |= outcome.attempts > 0;
@@ -128,8 +132,9 @@ class ScrollSimulator {
   List<Element> _findScrollableCandidates(
     WidgetMatcher matcher,
     MarionetteConfiguration configuration,
+    List<KeyMatcher> ancestors,
   ) {
-    final root = WidgetsBinding.instance.rootElement;
+    final root = _widgetFinder.resolveScopeRoot(ancestors, configuration);
     if (root == null) {
       return const <Element>[];
     }
@@ -287,6 +292,7 @@ class ScrollSimulator {
     Offset initialMoveStep,
     int maxScrollAttempts,
     MarionetteConfiguration configuration,
+    List<KeyMatcher> ancestors,
   ) async {
     var moveStep = initialMoveStep;
     var searchingTowardEnd = true;
@@ -301,6 +307,7 @@ class ScrollSimulator {
       final target = _widgetFinder.findHittableElement(
         targetMatcher,
         configuration,
+        ancestors: ancestors,
       );
       if (target != null) {
         return _DragOutcome(found: true, attempts: drags);
@@ -386,6 +393,7 @@ class ScrollSimulator {
     final target = _widgetFinder.findHittableElement(
       targetMatcher,
       configuration,
+      ancestors: ancestors,
     );
     return _DragOutcome(found: target != null, attempts: drags);
   }
