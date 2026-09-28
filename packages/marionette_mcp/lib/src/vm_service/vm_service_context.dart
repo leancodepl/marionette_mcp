@@ -147,23 +147,20 @@ final class VmServiceContext {
 
             // Session reports are opt-in app-side
             // (MarionetteConfiguration.enableSessionReports): with them off,
-            // connect writes nothing to disk and steps go unlogged.
-            final bool sessionReportsEnabled;
+            // connect writes nothing to disk and steps go unlogged. Failing
+            // to even determine that counts as off too, same as a session
+            // directory that fails to open below — the app connection and
+            // every other tool already work fine either way, so neither is
+            // worth dropping an otherwise-working connection over.
+            var sessionReportsEnabled = false;
             try {
               sessionReportsEnabled =
                   await connector.getSessionReportsEnabled();
             } catch (err) {
-              _logger.warning('Failed to read binding configuration', err);
-              _disableDynamicTools();
-              await connector.disconnect();
-              return CallToolResult(
-                isError: true,
-                content: [
-                  TextContent(
-                    text: 'Failed to read marionette_flutter configuration: '
-                        '$err',
-                  ),
-                ],
+              _logger.warning(
+                'Failed to read binding configuration; continuing without '
+                'session reports',
+                err,
               );
             }
             if (!sessionReportsEnabled) {
