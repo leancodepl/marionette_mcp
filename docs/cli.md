@@ -34,7 +34,7 @@ marionette help-ai > .cursor/rules/marionette-cli.md
 
 ## Direct URI mode (stateless)
 
-Pass the VM service URI directly with `--uri` — no registration, no cleanup, no files on disk:
+Pass the VM service URI directly with `--uri` — no registration, no cleanup. (If the app enables session reports, each command still logs one line to its own [session directory](./session-reports.md); see `--session`/`--session-dir` below.)
 
 ```bash
 marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
