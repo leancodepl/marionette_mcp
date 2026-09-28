@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
@@ -61,11 +62,11 @@ void registerInfoExtensions({
   registerInternalMarionetteExtension(
     name: 'marionette.interactiveElements',
     callback: (params) async {
-      final elements = elementTreeFinder.findInteractiveElements(
-        startElement: widgetFinder.resolveScopeRoot(
-          WidgetMatcher.ancestorsFromJson(params),
-          configuration,
-        ),
+      final elements = findScopedInteractiveElements(
+        params,
+        elementTreeFinder: elementTreeFinder,
+        widgetFinder: widgetFinder,
+        configuration: configuration,
       );
       return MarionetteExtensionResult.success({'elements': elements});
     },
@@ -101,5 +102,29 @@ void registerInfoExtensions({
         ],
       });
     },
+  );
+}
+
+/// Lists the interactive elements of `marionette.interactiveElements`: inside
+/// the `ancestor_keys` scope in [params] when there is one, the whole tree
+/// otherwise.
+///
+/// A scope alone is the whole request here, unlike on the matcher tools. It
+/// is resolved by [WidgetFinder.resolveScopeRoot], so a key with no element
+/// fails the same way, naming the link that broke, instead of listing the
+/// whole tree. The scope element itself is listed too: a scope key sitting on
+/// an interactive widget would otherwise list nothing.
+@visibleForTesting
+List<Map<String, dynamic>> findScopedInteractiveElements(
+  Map<String, String> params, {
+  required ElementTreeFinder elementTreeFinder,
+  required WidgetFinder widgetFinder,
+  required MarionetteConfiguration configuration,
+}) {
+  return elementTreeFinder.findInteractiveElements(
+    startElement: widgetFinder.resolveScopeRoot(
+      WidgetMatcher.ancestorsFromJson(params),
+      configuration,
+    ),
   );
 }
