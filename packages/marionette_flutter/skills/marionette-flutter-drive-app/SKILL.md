@@ -337,11 +337,16 @@ disconnecting.
 
 ## Reporting what you found
 
-This section applies only when the app enables session reports
-(`MarionetteConfiguration(enableSessionReports: true)`) — `connect`'s
-response then includes an `Opened session:` path. Without it there's no
-session directory and no `report.md` to write; don't turn it on yourself
-unless the user asks for a report.
+This section applies only when `connect`'s response actually includes an
+`Opened session:` path — check the real response, not just whether you
+expected one. Two different things can be missing it: the app never
+enabled session reports (`MarionetteConfiguration(enableSessionReports:
+true)`) — don't turn that on yourself unless the user asks for a report —
+or it did, but the session directory itself couldn't be created (a connect
+response saying so instead, e.g. "Could not open a session directory, so
+this run will not be logged"). Either way, there's no session directory,
+no `steps.md`, and nowhere to write `report.md` — see the note on this at
+the end of *The report contract*, below.
 
 `connect` opens a fresh session directory under `.marionette/sessions/` —
 the server's own record of the run, kept separate from your own context.
@@ -439,6 +444,11 @@ You own one more file there, which the server never writes:
   or not at all depending on the terminal. `report.md` is a file usually
   opened in an editor or on GitHub, where colored emoji render cleanly —
   different consumption context, different choice; don't mix the two sets.
+- **No session directory (see *Reporting what you found*, above)? There's
+  no `report.md` and no contract to follow** — give the same shape of chat
+  message anyway (verdict, `✓`/`✗`/`∅` lines), just drop the `→` line (no
+  path to give) and don't invent a `Tested:`-style step count — you have no
+  `steps.md` to render one from truthfully.
 
 This is what `report.md` itself looks like (shown in English here; write
 yours in whatever language the prompt used) — a confirmed bug, a clean run,
