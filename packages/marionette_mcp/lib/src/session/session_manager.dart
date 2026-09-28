@@ -75,13 +75,17 @@ class SessionManager {
     return dir.statSync().modified;
   }
 
-  /// Deletes every session directory beyond the [maxSessions] most recently
-  /// used (see [_lastUsed]), never the directory at [keep].
+  /// Deletes every eligible session directory beyond the [maxSessions] most
+  /// recently used (see [_lastUsed]). Never the directory at [keep], and
+  /// never one that already has a `report.md` — a concluded run's report is
+  /// a deliberately kept artifact, not disposable bookkeeping, so it must
+  /// survive regardless of how many newer sessions (from either transport)
+  /// get created after it.
   void _prune(Directory sessionsDir, {required String keep}) {
     final dirs = sessionsDir
         .listSync()
         .whereType<Directory>()
-        .where((d) => d.path != keep)
+        .where((d) => d.path != keep && !_hasReport(d))
         .toList()
       ..sort((a, b) => _lastUsed(b).compareTo(_lastUsed(a)));
     final keepOthers = maxSessions > 0 ? maxSessions - 1 : 0;
@@ -89,6 +93,9 @@ class SessionManager {
       dir.deleteSync(recursive: true);
     }
   }
+
+  bool _hasReport(Directory dir) =>
+      File(p.join(dir.path, 'report.md')).existsSync();
 
   String? _slugify(String? title) {
     if (title == null) return null;

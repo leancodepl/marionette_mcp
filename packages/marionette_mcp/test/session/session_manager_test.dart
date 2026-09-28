@@ -118,5 +118,22 @@ void main() {
       expect(remaining, containsAll([third.name, b.name]));
       expect(remaining, isNot(contains(a.name)));
     });
+
+    test('never prunes a session directory that already has a report.md',
+        () async {
+      // Regression test: pruning is pure LRU across every session
+      // directory, regardless of which transport (MCP or CLI) created it.
+      // Without this guard, enough newer one-line CLI sessions could evict
+      // an older, already-concluded MCP session — deleting its report.md.
+      final manager = SessionManager(maxSessions: 2);
+      final a = manager.create(title: 'a', baseDirOverride: tempDir.path);
+      File(p.join(a.directory.path, 'report.md')).writeAsStringSync('done');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      manager.create(title: 'b', baseDirOverride: tempDir.path);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      manager.create(title: 'c', baseDirOverride: tempDir.path);
+
+      expect(a.directory.existsSync(), isTrue);
+    });
   });
 }
