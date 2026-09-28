@@ -610,6 +610,35 @@ void main() {
       expect((result.content.single as TextContent).text, 'reloaded');
       expect(session.stepsFile.readAsStringSync(), contains('hot_reload'));
     });
+
+    test('still logs a step when the wrapped callback throws, then '
+        'rethrows', () async {
+      // Regression test: an unexpected, uncaught throw (not the usual
+      // isError: true result) must still be recorded — otherwise a report's
+      // Tested: line, rendered from steps.md, silently undercounts what was
+      // actually attempted.
+      final tempDir = Directory.systemTemp.createTempSync('with_step_logging_');
+      addTearDown(() {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      });
+      final session = Session.open(Directory(p.join(tempDir.path, 's')));
+      final stepLogger = StepLogger()..session = session;
+
+      final wrapped = withStepLogging(
+        stepLogger,
+        'tap',
+        (args, extra) async => throw StateError('boom'),
+      );
+
+      await expectLater(
+        () => wrapped(const {}, _fakeExtra()),
+        throwsStateError,
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(content, contains('tap -> error:'));
+      expect(content, contains('boom'));
+    });
   });
 }
 

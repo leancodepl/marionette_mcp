@@ -298,16 +298,32 @@ String _formatTime(DateTime time) {
 
 /// Wraps [callback] so every call is recorded as one line in the active
 /// session's steps.md via [stepLogger] before the result is returned to the
-/// client.
+/// client — including a call [callback] itself throws out of (an
+/// unexpected, un-caught error rather than the usual `isError: true`
+/// result), so the report contract's `Tested:` line — rendered from
+/// steps.md, not the agent's own claim — never silently undercounts an
+/// attempt just because it failed in an unanticipated way.
 ToolFunction withStepLogging(
   StepLogger stepLogger,
   String name,
   ToolFunction callback,
 ) {
   return (args, extra) async {
-    final result = await callback(args, extra);
-    stepLogger.logStep(name, args, result);
-    return result;
+    try {
+      final result = await callback(args, extra);
+      stepLogger.logStep(name, args, result);
+      return result;
+    } catch (err) {
+      stepLogger.logStep(
+        name,
+        args,
+        CallToolResult(
+          isError: true,
+          content: [TextContent(text: 'error: $err')],
+        ),
+      );
+      rethrow;
+    }
   };
 }
 
