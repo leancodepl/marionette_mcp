@@ -270,14 +270,13 @@ Give `connect` a `session_title` (a short description of what you're
 testing, e.g. `"profile validation"` — keep it under ~60 characters, longer
 is truncated) — if the app enables session reports
 (`MarionetteConfiguration(enableSessionReports: true)`), it opens a fresh
-session directory
-that carries this run's step log and screenshots. One Marionette run is one
-session directory, always: there's no resuming, even if you pass the same
-title again on a later `connect` — that just opens another, separate
-directory. If a run gets interrupted partway through (a compaction, a
-dropped connection), its session is simply abandoned; don't try to pick up
-where it left off, and don't reuse its title. **Always give it in
-English**, regardless of the prompt's own language (see *The report
+session directory that carries this run's step log and screenshots. One
+Marionette run is one session directory, always: there's no resuming, even
+if you pass the same title again on a later `connect` — that just opens
+another, separate directory. If a run gets interrupted partway through (a
+compaction, a dropped connection), its session is simply abandoned; don't
+try to pick up where it left off, and don't reuse its title. **Always give
+it in English**, regardless of the prompt's own language (see *The report
 contract*, below) — it gets slugified straight into the session directory's
 name, and that name should stay predictable and filesystem-friendly rather
 than following the run's language. See *Reporting what you found* for what
