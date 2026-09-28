@@ -14,6 +14,7 @@ class DoubleTapCommand extends InstanceCommand {
       ..addOption('type', help: 'Widget type name (e.g., ListTile).')
       ..addOption('x', help: 'X coordinate for positional double tap.')
       ..addOption('y', help: 'Y coordinate for positional double tap.')
+      ..addMultiOption('ancestor-key', help: ancestorKeyHelp)
       ..addOption(
         'delay',
         help: 'Delay between taps in milliseconds.',
@@ -42,6 +43,7 @@ class DoubleTapCommand extends InstanceCommand {
       type: argResults?['type'] as String?,
       x: _parseNum(argResults?['x'] as String?),
       y: _parseNum(argResults?['y'] as String?),
+      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
     );
 
     final xStr = argResults?['x'] as String?;
@@ -50,7 +52,7 @@ class DoubleTapCommand extends InstanceCommand {
       usageException('--x and --y must be provided together.');
     }
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, --text, --type, '
         'or --x/--y.',

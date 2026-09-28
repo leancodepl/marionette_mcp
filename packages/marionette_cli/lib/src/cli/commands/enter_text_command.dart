@@ -16,6 +16,7 @@ class EnterTextCommand extends InstanceCommand {
         help: 'Target the currently focused text field.',
         negatable: false,
       )
+      ..addMultiOption('ancestor-key', help: ancestorKeyHelp)
       ..addOption(
         'input',
         help: 'Text to enter into the field.',
@@ -43,9 +44,10 @@ class EnterTextCommand extends InstanceCommand {
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
       focused: focused,
+      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
     );
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, --text, '
         'or --focused.',

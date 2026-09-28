@@ -979,6 +979,64 @@ void main() {
       },
     );
   });
+
+  group('ScrollSimulator.scrollUntilVisible with ancestor_keys', () {
+    testWidgets(
+      'scrolls the list inside the ancestor scope, not the first one',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        final firstController = ScrollController();
+        final secondController = ScrollController();
+        addTearDown(firstController.dispose);
+        addTearDown(secondController.dispose);
+
+        Widget cell(String cellKey, ScrollController controller) {
+          return Expanded(
+            child: Column(
+              key: ValueKey(cellKey),
+              children: [
+                Expanded(
+                  child: _keyedItems(controller: controller, itemCount: 20),
+                ),
+              ],
+            ),
+          );
+        }
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Row(
+                children: [
+                  cell('grid.cell_1', firstController),
+                  cell('grid.cell_2', secondController),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final simulator = ScrollSimulator(
+          _CoordinateGestureDispatcher(tester),
+          WidgetFinder(),
+        );
+
+        await simulator.scrollUntilVisible(
+          const KeyMatcher('item_15'),
+          _configuration,
+          ancestors: const [KeyMatcher('grid.cell_2')],
+        );
+        await tester.pump();
+
+        expect(secondController.offset, greaterThan(0));
+        expect(
+          firstController.offset,
+          0,
+          reason: 'the list outside the scope must not be scrolled',
+        );
+      },
+    );
+  });
 }
 
 /// A page holding [background] under a modal bottom sheet holding [sheet].
@@ -1186,4 +1244,25 @@ class _CoordinateGestureDispatcher extends GestureDispatcher {
     await _tester.dragFrom(from, to - from);
     await _tester.pump();
   }
+}
+
+/// A lazily built list whose rows carry `item_<index>` keys, for scoping
+/// tests that need the same keys to repeat across several lists.
+Widget _keyedItems({
+  required ScrollController controller,
+  required int itemCount,
+  double itemExtent = 80,
+}) {
+  return ListView.builder(
+    controller: controller,
+    physics: const ClampingScrollPhysics(),
+    itemCount: itemCount,
+    itemBuilder: (BuildContext context, int index) {
+      return ListTile(
+        key: ValueKey('item_$index'),
+        title: Text('Item $index'),
+        minTileHeight: itemExtent,
+      );
+    },
+  );
 }

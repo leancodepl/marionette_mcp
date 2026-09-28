@@ -13,7 +13,7 @@ void registerTextTools(
   server.registerTool(
     'enter_text',
     description:
-        'Enters text into a text field in the Flutter app. You can target the field in three ways: 1. By key: provide the key parameter with the ValueKey<String> of the field. You can discover available keys by calling get_interactive_elements. 2. By Semantics identifier: provide the identifier parameter with the accessibility identifier of the field. Useful when the field has no ValueKey but does set a Semantics identifier. 3. By focused element: first tap a text field to give it focus, then call enter_text with focused_element set to true. Important: when targeting by focused element, a text field must be focused before calling this (for example by using the tap tool), otherwise it will fail with an error. Exactly one of key, identifier, or focused_element must be provided. Requires an active connection established via connect.',
+        'Enters text into a text field in the Flutter app. You can target the field in three ways: 1. By key: provide the key parameter with the ValueKey<String> of the field. You can discover available keys by calling get_interactive_elements. 2. By Semantics identifier: provide the identifier parameter with the accessibility identifier of the field. Useful when the field has no ValueKey but does set a Semantics identifier. 3. By focused element: first tap a text field to give it focus, then call enter_text with focused_element set to true. Important: when targeting by focused element, a text field must be focused before calling this (for example by using the tap tool), otherwise it will fail with an error. Exactly one of key, identifier, or focused_element must be provided. When targeting by key or identifier, add ancestor_keys to scope the search to one subtree if the same key appears in several identical subtrees, outermost wrapper key first. Requires an active connection established via connect.',
     annotations: const ToolAnnotations(title: 'Enter Text'),
     inputSchema: ToolInputSchema(
       properties: {
@@ -34,6 +34,10 @@ void registerTextTools(
           description:
               'If true, enters text into the currently focused text field. '
               'A text field must be focused first (for example by using tap), otherwise this will fail.',
+        ),
+        'ancestor_keys': JsonSchema.array(
+          items: JsonSchema.string(),
+          description: ancestorKeysDescription,
         ),
       },
       required: ['input'],
