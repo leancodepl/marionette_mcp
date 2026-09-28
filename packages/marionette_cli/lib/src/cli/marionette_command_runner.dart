@@ -53,9 +53,10 @@ class MarionetteCommandRunner extends CommandRunner<int> {
       ..addOption(
         'session',
         help: 'Title for the session directory this command\'s step is '
-            'logged into (see .marionette/sessions/). Every invocation gets '
-            'its own fresh session directory, titled from this if given. '
-            'Falls back to an untitled directory when omitted.',
+            'logged into (see .marionette/sessions/). Keep it under ~60 '
+            'characters — longer is truncated. Every invocation gets its '
+            'own fresh session directory, titled from this if given. Falls '
+            'back to an untitled directory when omitted.',
       )
       ..addOption(
         'session-dir',

@@ -76,6 +76,7 @@ final class VmServiceContext {
             'session_title': JsonSchema.string(
               description:
                   'A short title for this run, e.g. "profile validation". '
+                  'Keep it under ~60 characters — longer is truncated. '
                   'Ignored unless the app enabled session reports. '
                   'Slugified and timestamped into the session directory '
                   'name. Purely a human-readable label — every connect '

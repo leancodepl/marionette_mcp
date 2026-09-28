@@ -267,7 +267,8 @@ commands against the same app in a row. When you're done for the session
 easy to act on a stale connection later without noticing.
 
 Give `connect` a `session_title` (a short description of what you're
-testing, e.g. `"profile validation"`) — if the app enables session reports
+testing, e.g. `"profile validation"` — keep it under ~60 characters, longer
+is truncated) — if the app enables session reports
 (`MarionetteConfiguration(enableSessionReports: true)`), it opens a fresh
 session directory
 that carries this run's step log and screenshots. One Marionette run is one

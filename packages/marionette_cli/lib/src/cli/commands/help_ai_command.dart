@@ -53,7 +53,9 @@ gets its own fresh session directory, appending one line to its steps.md (see
       --timeout <seconds>  Connection timeout (default: 5)
       --session <title>    Session title for this command's directory
                            (.marionette/sessions/<title>-<timestamp>/).
-                           Every invocation gets its own fresh directory.
+                           Keep it under ~60 characters — longer is
+                           truncated. Every invocation gets its own fresh
+                           directory.
       --session-dir <path> Base directory .marionette/sessions/ is created
                            under (default: current directory, or
                            $MARIONETTE_SESSION_DIR if set)
