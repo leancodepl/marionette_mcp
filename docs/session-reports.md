@@ -33,9 +33,10 @@ starts a new one.
         01.png
 ```
 
-`.marionette/` is added to this repo's `.gitignore` — add the same entry to
-your own project's. Committing a session directory (e.g. attaching a report
-to a PR) is a deliberate opt-in, not the default.
+The first session created under a given project writes `.marionette/.gitignore`
+(just `*`), so your own project excludes it from version control without any
+setup. Committing a session directory (e.g. attaching a report to a PR) is a
+deliberate opt-in — remove or edit that file yourself if you want that.
 
 ### Where it's created
 

@@ -28,9 +28,12 @@ class SessionManager {
   /// [sessionDirEnvVar] environment variable; if neither is set, the base
   /// directory falls back to the process's current directory.
   Session create({String? title, String? baseDirOverride}) {
-    final sessionsDir = Directory(
-      p.join(_resolveBaseDir(baseDirOverride), '.marionette', 'sessions'),
+    final marionetteDir = Directory(
+      p.join(_resolveBaseDir(baseDirOverride), '.marionette'),
     )..createSync(recursive: true);
+    _ensureGitignored(marionetteDir);
+    final sessionsDir = Directory(p.join(marionetteDir.path, 'sessions'))
+      ..createSync(recursive: true);
 
     final slug = _slugify(title);
     final directory = _freshDirectory(
@@ -41,6 +44,19 @@ class SessionManager {
 
     _prune(sessionsDir, keep: session.directory.path);
     return session;
+  }
+
+  /// Writes `.marionette/.gitignore` (just `*`) the first time a session is
+  /// created under a given base directory, so a consuming project's
+  /// `.marionette/` is excluded from version control without the user
+  /// having to remember to add it themselves — session reports (and their
+  /// screenshots) are runtime output, not something to commit. Left alone
+  /// once present, so a user's own edit to it is never overwritten.
+  void _ensureGitignored(Directory marionetteDir) {
+    final gitignore = File(p.join(marionetteDir.path, '.gitignore'));
+    if (!gitignore.existsSync()) {
+      gitignore.writeAsStringSync('*\n');
+    }
   }
 
   String _resolveBaseDir(String? baseDirOverride) {

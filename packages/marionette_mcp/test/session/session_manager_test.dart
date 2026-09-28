@@ -82,6 +82,33 @@ void main() {
       expect(second.directory.path, isNot(equals(first.directory.path)));
     });
 
+    test('writes a .gitignore excluding .marionette/ from version control',
+        () {
+      final manager = SessionManager();
+      manager.create(title: 'x', baseDirOverride: tempDir.path);
+
+      final gitignore = File(
+        p.join(tempDir.path, '.marionette', '.gitignore'),
+      );
+      expect(gitignore.existsSync(), isTrue);
+      expect(gitignore.readAsStringSync().trim(), '*');
+    });
+
+    test('never overwrites an existing .marionette/.gitignore', () {
+      final marionetteDir = Directory(p.join(tempDir.path, '.marionette'))
+        ..createSync(recursive: true);
+      File(
+        p.join(marionetteDir.path, '.gitignore'),
+      ).writeAsStringSync('custom\n');
+
+      SessionManager().create(title: 'x', baseDirOverride: tempDir.path);
+
+      expect(
+        File(p.join(marionetteDir.path, '.gitignore')).readAsStringSync(),
+        'custom\n',
+      );
+    });
+
     test('resolves the base directory from the env-var-free override first',
         () {
       final manager = SessionManager();

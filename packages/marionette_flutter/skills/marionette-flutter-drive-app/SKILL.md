@@ -512,7 +512,8 @@ Marionette · Password reset — BLOCKED: reset email never arrives
 → .marionette/sessions/password-reset-20260922T1601/report.md · 11 steps, 1 screenshot
 ```
 
-`.marionette/` is gitignored by default. Committing a session directory —
+`.marionette/` is gitignored by default (the server writes that `.gitignore`
+itself the first time a session is created). Committing a session directory —
 attaching a report to a PR, say — is a deliberate choice you make
 explicitly, never something to do as a matter of course.
 
