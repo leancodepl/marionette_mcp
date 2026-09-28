@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:stack_trace/stack_trace.dart';
@@ -70,6 +71,8 @@ const _firstLineOnlyTools = {'connect', 'disconnect'};
 /// selector, outcome. No payloads. No-ops when there is no active session
 /// (nothing connected yet).
 class StepLogger {
+  final _logger = logging.Logger('StepLogger');
+
   /// The session tool calls are currently logged into. Set by `connect` on
   /// success; cleared once `disconnect`'s own step has been logged, so a
   /// stray call made while disconnected — or a later failed reconnect —
@@ -92,11 +95,13 @@ class StepLogger {
     // steps.md is best-effort bookkeeping, not the tool call itself — a
     // failed write here (a full disk, a since-removed session directory)
     // must never turn an already-completed action into a reported error.
+    // Still worth a warning, though, so a persistent problem doesn't go
+    // completely unnoticed.
     try {
       activeSession.stepsFile
           .writeAsStringSync('$line\n', mode: FileMode.append);
-    } on FileSystemException {
-      // Ignored — see above.
+    } on FileSystemException catch (err) {
+      _logger.warning('Failed to write steps.md', err);
     }
   }
 
