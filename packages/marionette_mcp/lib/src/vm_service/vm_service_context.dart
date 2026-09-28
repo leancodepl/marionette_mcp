@@ -184,18 +184,24 @@ final class VmServiceContext {
                 ],
               );
             } catch (err) {
-              // Session setup failed after the connection (and dynamic
-              // tools) were already live — roll both back rather than
-              // report a failed connect while leaving the server connected.
-              _logger.severe('Failed to open session directory', err);
-              _disableDynamicTools();
-              await connector.disconnect();
+              // Session setup is best-effort: the app connection and every
+              // other tool already work fine without it, so a directory
+              // creation failure (e.g. an unwritable session_dir) shouldn't
+              // drop an otherwise-working connection. Degrade the same way
+              // an app that opted out of session reports already does —
+              // connect succeeds, just without step logging.
+              _logger.warning(
+                'Failed to open session directory; continuing without '
+                'session reports',
+                err,
+              );
+              _stepLogger.session = null;
               return CallToolResult(
-                isError: true,
                 content: [
                   TextContent(
-                    text: 'Connected to app, but failed to open a session '
-                        'directory: $err',
+                    text: 'Successfully connected to app at $uri\n'
+                        'Could not open a session directory, so this run '
+                        'will not be logged: $err',
                   ),
                 ],
               );

@@ -86,8 +86,13 @@ abstract class InstanceCommand extends Command<int> {
             baseDirOverride: globalResults?['session-dir'] as String?,
           );
         } catch (e) {
-          stderr.writeln('Could not open a session directory: $e');
-          return 1;
+          // Best-effort: the connection already works, so a directory
+          // creation failure shouldn't abort the command — just run it
+          // without step logging (session stays null).
+          stderr.writeln(
+            'Warning: could not open a session directory, so this run '
+            'will not be logged: $e',
+          );
         }
       }
 
