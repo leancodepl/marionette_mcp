@@ -354,6 +354,77 @@ void main() {
       expect(content, contains('ws://127.0.0.1:8181'));
     });
 
+    test('logs only the status line of connect/disconnect', () {
+      // The session path and report nudge that follow are aimed at the
+      // agent — redundant inside the session they point at, and an absolute
+      // path would otherwise mostly be lost to truncation.
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger
+        ..logStep(
+          'connect',
+          {'uri': 'ws://127.0.0.1:8181/ws'},
+          CallToolResult(
+            content: [
+              TextContent(
+                text: 'Successfully connected to app at '
+                    'ws://127.0.0.1:8181/ws\n'
+                    'Opened session: ${session.directory.path}',
+              ),
+            ],
+          ),
+        )
+        ..logStep(
+          'disconnect',
+          {},
+          CallToolResult(
+            content: [
+              TextContent(
+                text: 'Successfully disconnected from app\n'
+                    'Session: ${session.directory.path}\n'
+                    'Write report.md now.',
+              ),
+            ],
+          ),
+        );
+
+      final lines = session.stepsFile.readAsLinesSync();
+      expect(
+        lines[0],
+        endsWith('-> Successfully connected to app at ws://127.0.0.1:8181'),
+      );
+      expect(lines[1], endsWith('-> Successfully disconnected from app'));
+    });
+
+    test('logs saved screenshot paths relative to the session directory', () {
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+      final shot1 = p.join(session.screenshotsDir.path, '01.png');
+      final shot2 = p.join(session.screenshotsDir.path, '02.png');
+
+      logger.logStep(
+        'take_screenshots',
+        {'inline': false},
+        CallToolResult(
+          content: [
+            TextContent(text: 'Saved 2 screenshot(s):\n$shot1\n$shot2'),
+          ],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(
+        content,
+        contains(
+          '-> Saved 2 screenshot(s): '
+          '${p.join('screenshots', '01.png')} '
+          '${p.join('screenshots', '02.png')}',
+        ),
+      );
+      expect(content, isNot(contains(session.directory.path)));
+    });
+
     test('redacts a uri embedded in an error message', () {
       // A reconnect attempt that fails while a prior session is still open
       // (no disconnect in between) still logs into that session — and a

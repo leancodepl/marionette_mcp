@@ -59,6 +59,13 @@ const _shortConfirmationTools = {
   'take_screenshots',
 };
 
+/// Tools whose success message is one status line followed by session
+/// bookkeeping aimed at the agent — `connect`'s "Opened session: <path>",
+/// `disconnect`'s "Session: <path>" and its report nudge. That tail is
+/// redundant inside the very session it points at (and, being an absolute
+/// path, mostly lost to truncation), so only the first line is logged.
+const _firstLineOnlyTools = {'connect', 'disconnect'};
+
 /// Appends one line per tool call to the active session's steps.md: tool,
 /// selector, outcome. No payloads. No-ops when there is no active session
 /// (nothing connected yet).
@@ -79,19 +86,27 @@ class StepLogger {
     if (activeSession == null) return;
 
     final selector = describeStepSelector(toolName, args);
-    final outcome = _describeOutcome(toolName, result);
+    final outcome = _describeOutcome(toolName, result, activeSession);
     final line = formatStepLine(toolName, selector, outcome);
 
     activeSession.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
   }
 
-  String _describeOutcome(String toolName, CallToolResult result) {
+  String _describeOutcome(
+    String toolName,
+    CallToolResult result,
+    Session session,
+  ) {
     if (result.isError) {
       return describeStepError(_firstNonEmptyText(result));
     }
 
     if (_shortConfirmationTools.contains(toolName)) {
-      final text = _firstNonEmptyText(result);
+      var text = _firstNonEmptyText(result);
+      if (_firstLineOnlyTools.contains(toolName)) {
+        text = text.split('\n').first;
+      }
+      text = _relativizeSessionPaths(text, session);
       if (text.isNotEmpty) return _truncateText(_oneLine(_redactUrisIn(text)));
     }
 
@@ -183,6 +198,12 @@ String _formatFrame(Frame frame) {
       ? '${frame.member} ($path)'
       : '${frame.member} ($path:${frame.line})';
 }
+
+/// Rewrites absolute paths inside [session]'s directory as paths relative
+/// to it — e.g. `take_screenshots`' saved paths become `screenshots/01.png`,
+/// which is also how a report living next to steps.md cites them.
+String _relativizeSessionPaths(String text, Session session) =>
+    text.replaceAll('${session.directory.path}${Platform.pathSeparator}', '');
 
 String _truncateText(String text, [int maxLength = _maxOutcomeLength]) =>
     text.length <= maxLength ? text : '${text.substring(0, maxLength)}…';

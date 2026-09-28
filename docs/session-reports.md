@@ -86,7 +86,9 @@ redacted to `scheme://host:port`, since a Flutter VM service URI embeds a
 live debug-access token in its path), and the outcome. On success, only a
 fixed set of tools whose message is a short, hand-written confirmation
 ("Successfully tapped") get it echoed verbatim (truncated to ~200
-characters); a tool that returns application data
+characters) — `connect`/`disconnect` log only their status line, and
+saved screenshot paths are written relative to the session directory
+(`screenshots/01.png`); a tool that returns application data
 (`get_interactive_elements`, `get_logs`, a custom extension) gets a generic
 `ok` instead, so a payload never ends up on disk. On failure, an app-side
 crash is detected and unpacked into the exception message plus up to 4
