@@ -38,6 +38,23 @@ void main() {
       expect(session.name, startsWith('run-'));
     });
 
+    test('truncates a very long title so the directory name stays a safe '
+        'length', () {
+      // Regression test: an untruncated slug from a long session_title can
+      // exceed common filesystem filename limits (255 bytes) once the
+      // timestamp (and a possible collision suffix) is appended, making
+      // connect fail outright.
+      final manager = SessionManager();
+      final session = manager.create(
+        title: 'a' * 300,
+        baseDirOverride: tempDir.path,
+      );
+
+      final slug = session.name.split('-').first;
+      expect(slug.length, lessThanOrEqualTo(60));
+      expect(session.directory.existsSync(), isTrue);
+    });
+
     test('a repeated title never reuses the previous directory', () {
       final manager = SessionManager();
       final first = manager.create(

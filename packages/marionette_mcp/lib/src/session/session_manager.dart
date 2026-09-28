@@ -113,13 +113,21 @@ class SessionManager {
   bool _hasReport(Directory dir) =>
       File(p.join(dir.path, 'report.md')).existsSync();
 
+  /// Longest slug kept from a [session_title] — well under common filesystem
+  /// filename limits (255 bytes) even after the `-<timestamp>` suffix and a
+  /// possible `-<n>` collision suffix (see [_freshDirectory]) are appended.
+  static const _maxSlugLength = 60;
+
   String? _slugify(String? title) {
     if (title == null) return null;
-    final slug = title
+    var slug = title
         .trim()
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
+    if (slug.length > _maxSlugLength) {
+      slug = slug.substring(0, _maxSlugLength).replaceAll(RegExp(r'-+$'), '');
+    }
     return slug.isEmpty ? null : slug;
   }
 
