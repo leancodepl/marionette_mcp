@@ -132,8 +132,7 @@ void main() {
       expect(
         elements.any((e) => e['key'] == 'grid.cell_2'),
         isTrue,
-        reason: 'the wrapper is itself actionable with the same ancestor_keys, '
-            'and a scope key sitting on an interactive widget would list '
+        reason: 'a scope key sitting on an interactive widget would list '
             'nothing at all if the scope element were skipped',
       );
     });
