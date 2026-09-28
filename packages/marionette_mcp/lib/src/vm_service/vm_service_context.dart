@@ -96,6 +96,12 @@ final class VmServiceContext {
         callback: withStepLogging(_stepLogger, 'connect', (args, extra) async {
           final uri = args['uri'] as String;
           _logger.info('Connecting to app at $uri');
+          // A new connect attempt immediately supersedes whatever session
+          // was active before, regardless of whether this attempt itself
+          // succeeds — otherwise a call that slips in while this attempt is
+          // still in flight (or after it fails) would append to a session
+          // that's no longer the one actually in use.
+          _stepLogger.session = null;
 
           try {
             await connector.connect(uri);
