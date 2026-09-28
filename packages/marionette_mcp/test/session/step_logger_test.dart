@@ -538,6 +538,24 @@ void main() {
       expect(lines, hasLength(2));
     });
 
+    test('a failed steps.md write never throws', () {
+      // Regression test: steps.md is best-effort bookkeeping, not the tool
+      // call itself — a write failure here must never turn an already-
+      // completed action into a reported error.
+      final session = openSession();
+      session.directory.deleteSync(recursive: true);
+      final logger = StepLogger()..session = session;
+
+      expect(
+        () => logger.logStep(
+          'tap',
+          {'key': 'a'},
+          const CallToolResult(content: [TextContent(text: 'ok')]),
+        ),
+        returnsNormally,
+      );
+    });
+
     test('summarizes an image-only result without a payload', () {
       final session = openSession();
       final logger = StepLogger()..session = session;

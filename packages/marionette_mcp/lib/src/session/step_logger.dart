@@ -89,7 +89,15 @@ class StepLogger {
     final outcome = _describeOutcome(toolName, result, activeSession);
     final line = formatStepLine(toolName, selector, outcome);
 
-    activeSession.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
+    // steps.md is best-effort bookkeeping, not the tool call itself — a
+    // failed write here (a full disk, a since-removed session directory)
+    // must never turn an already-completed action into a reported error.
+    try {
+      activeSession.stepsFile
+          .writeAsStringSync('$line\n', mode: FileMode.append);
+    } on FileSystemException {
+      // Ignored — see above.
+    }
   }
 
   String _describeOutcome(

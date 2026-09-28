@@ -147,6 +147,12 @@ abstract class InstanceCommand extends Command<int> {
     };
     final selector = describeStepSelector(name, args);
     final line = formatStepLine(name, selector, outcome);
-    session.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
+    // Best-effort — see StepLogger.logStep. A failed write here must never
+    // turn a command that already ran into an uncaught crash.
+    try {
+      session.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
+    } on FileSystemException {
+      // Ignored — see above.
+    }
   }
 }
