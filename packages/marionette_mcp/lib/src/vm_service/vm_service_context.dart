@@ -37,11 +37,11 @@ final class VmServiceContext {
   /// recorded to the active session's steps.md (see [StepLogger]) — except
   /// `connect`/`disconnect`, registered on the raw server: they own the
   /// version-compatibility handshake with the binding and the session
-  /// lifecycle itself (creating it, and — for `disconnect` — clearing it
-  /// right after logging its own step, which the generic wrapper has no
-  /// hook for), so they log manually instead of going through
-  /// [LoggedMcpServer]. Everything else is delegated to themed registration
-  /// functions.
+  /// lifecycle itself (`connect` clearing it before every attempt and
+  /// setting it fresh on success; `disconnect` clearing it right after
+  /// logging its own step, which the generic wrapper has no hook for), so
+  /// they log manually instead of going through [LoggedMcpServer].
+  /// Everything else is delegated to themed registration functions.
   void registerTools(McpServer server) {
     final loggedServer = LoggedMcpServer(server, _stepLogger);
     _dynamicTools = DynamicExtensionTools(

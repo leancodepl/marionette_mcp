@@ -74,10 +74,11 @@ class StepLogger {
   final _logger = logging.Logger('StepLogger');
 
   /// The session tool calls are currently logged into. Set by `connect` on
-  /// success; cleared once `disconnect`'s own step has been logged, so a
-  /// stray call made while disconnected — or a later failed reconnect —
-  /// can't silently append to a session whose report may already be
-  /// written.
+  /// success; cleared both at the very start of every `connect` attempt and
+  /// once `disconnect`'s own step has been logged (see `VmServiceContext`),
+  /// so neither a stray call made while disconnected nor one that slips in
+  /// during a reconnect attempt — successful or not — can silently append
+  /// to a session whose report may already be written.
   Session? session;
 
   void logStep(
