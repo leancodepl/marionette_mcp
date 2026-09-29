@@ -1,28 +1,5 @@
 import 'dart:convert';
 
-/// Shared description of the `ancestor_keys` field across every matcher-based
-/// tool.
-///
-/// Kept short on purpose: it is repeated in every schema, so its length is
-/// paid on every connection. The full contract — strict nesting, the failure
-/// rule, the `scroll_to` timing, what ignores the field — is stated once in
-/// the server instructions.
-const ancestorKeysDescription =
-    'Optional wrapper keys (ValueKey<String>), outermost first; each is '
-    'looked up inside the previous one. Limits the search to that subtree. '
-    'Fails if a key has no element.';
-
-/// `ancestor_keys` as worded for `get_interactive_elements`, which lists a
-/// subtree rather than matching one element inside it.
-///
-/// Kept separate from [ancestorKeysDescription] because the field means
-/// something else here: the scope alone is the whole request, and it lists
-/// that subtree instead of limiting where one element is searched for.
-const ancestorKeysListDescription =
-    'Optional wrapper keys (ValueKey<String>), outermost first; each is '
-    'looked up inside the previous one. Lists only that subtree. Fails if a '
-    'key has no element.';
-
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
 /// Supports matching by key, identifier, text, type, and coordinates, plus the
