@@ -268,16 +268,16 @@ easy to act on a stale connection later without noticing.
 
 ## What you can do once connected
 
-| Category          | Actions                                                                                                      | Notes                                                                                                                                                                                                                                                                                                            |
-|-------------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `get_logs` needs a `LogCollector` wired up app-side (see *Logs for `get_logs`*, above); otherwise it returns setup instructions instead of an error. |
-| Gestures          | `tap`, `secondary_tap`, `double_tap`, `long_press`, `swipe`, `pinch_zoom`, `scroll_to`, `press_back_button`  | Match by `key` › `identifier` › `text` › `type` › coordinates, in that preference order — see *Good practices*. `secondary_tap` is desktop-only.                                                                                                                                                                 |
-| Text input        | `enter_text`, `press_key`                                                                                    | `enter_text` overwrites a field's value directly. `press_key` sends a real key event (submit on `enter`, shortcuts via `modifiers`) but only edits in-place on desktop/web — on mobile, field editing still needs `enter_text`.                                                                                  |
-| Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see *Device-config sweeps*, above — otherwise it returns setup instructions rather than failing.                                                                            |
-| Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                  |
-| Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                             |
-| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first.                                                                                                                                                                                                             |
-| Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                  |
+| Category          | Actions                                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+|-------------------|--------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `get_logs` needs a `LogCollector` wired up app-side (see *Logs for `get_logs`*, above); otherwise it returns setup instructions instead of an error. On a screen that repeats the same subtree, pass `ancestor_keys` to list just one copy of it (see *Repeated keys*, below). |
+| Gestures          | `tap`, `secondary_tap`, `double_tap`, `long_press`, `swipe`, `pinch_zoom`, `scroll_to`, `press_back_button`  | Match by `key` › `identifier` › `text` › `type` › coordinates, in that preference order — see *Good practices*. When the same key repeats in several identical subtrees, add `ancestor_keys` — see *Repeated keys*, below. `secondary_tap` is desktop-only.                                                                                                                                                                                |
+| Text input        | `enter_text`, `press_key`                                                                                    | `enter_text` overwrites a field's value directly, and takes `ancestor_keys` like the gestures do. `press_key` sends a real key event (submit on `enter`, shortcuts via `modifiers`) but only edits in-place on desktop/web — on mobile, field editing still needs `enter_text`.                                                                                                                                                            |
+| Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see *Device-config sweeps*, above — otherwise it returns setup instructions rather than failing.                                                                                                                                                                                                      |
+| Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                                                                                                                                                       |
+| Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first.                                                                                                                                                                                                                                                                                                                                       |
+| Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                                                                                                                                            |
 
 ## Good practices
 
@@ -293,6 +293,36 @@ easy to act on a stale connection later without noticing.
   the normal way to target something — if nothing else works, that's a sign
   the widget needs a key or `Semantics(identifier: ...)`, not a reason to keep
   using coordinates.
+- **Repeated keys: scope the match with `ancestor_keys`.** Every tool takes
+  the first match in the tree, so on a screen that repeats the same subtree
+  (grid cells, repeated cards, a dev screen embedding several copies of the
+  app) a plain `tap(key: "cell.joinButton")` always hits the first copy. Pass
+  the keys of the wrappers around the one you mean, outermost first:
+  `{"key": "cell.joinButton", "ancestor_keys": ["session_2", "grid.cell_3"]}`.
+  Each key is looked up strictly *inside* the previous one, which is what lets
+  you reach a wrapper whose own key also repeats (`grid.cell_3` exists in every
+  session), and the target itself must be inside the last one. A single key is
+  often not enough — if the wrapper repeats too, go one level up.
+  - **Finding the chain:** `get_interactive_elements` is a flat list in tree
+    order, so a keyed wrapper, when it is listed at all, appears just before
+    the elements inside it. A wrapper whose centre catches no hit test isn't
+    listed, so if a key you expect is missing, read it from the source or ask
+    for it. To confirm a chain, list only that subtree:
+    `get_interactive_elements(ancestor_keys: [...])`. A scope alone is enough
+    there, the wrapper itself is listed too, and a wrong key fails by name.
+  - **A key with no element fails the call**, naming it and where it was
+    looked for (`Scope element with key "grid.cell_9" (ancestor_keys[1]) not
+    found inside "session_2"`). It never falls back to searching the whole
+    screen, so a typo can't silently act on the wrong copy.
+  - **`scroll_to` works into lazy lists:** a scope that isn't built yet (e.g.
+    `ancestor_keys: ["row_20"]` in a long `ListView`) is looked for again after
+    every drag, and the list that scrolls may be inside the scope or above it.
+    A scope key that exists nowhere is reported only after the list has been
+    scanned, like a missing target.
+  - `coordinates` and `focused_element` ignore `ancestor_keys`, and a scope on
+    its own is not a selector for the gesture tools.
+  - Prefer this over tapping by coordinates or baking indices into keys: the
+    chain survives layout changes and keeps production keys clean.
 - **An element "not found" is usually a setup gap, not a bug.** Before
   concluding a widget can't be reached, suspect it's a custom widget type
   Marionette doesn't recognize yet, or custom-painted content with no
@@ -332,15 +362,17 @@ args.
 
 ## Troubleshooting
 
-| Symptom                                                                                            | Likely cause                                                                      | Fix                                                      |
-|----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|----------------------------------------------------------|
-| "Not connected to any app"                                                                         | No successful `connect` yet in this session                                       | `connect` before anything else — see *Connecting*, above |
-| MCP `connect` fails with a version mismatch                                                        | `marionette_mcp` and `marionette_flutter` are different versions (the CLI doesn't check this) | See *Version alignment*, above                           |
-| Custom buttons/fields don't show up, or `tap(text:)`/`scroll_to(text:)` can't find a visible label | Widget type or text isn't recognized                                              | See *Custom design system?*, above                       |
-| `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                        | See *Logs for `get_logs`*, above                         |
-| `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                               | See *Device-config sweeps*, above, then hot restart      |
-| Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                 | See *The single-binding rule*, above                     |
-| Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                   | Not supported by design — see *When not to use*          |
+| Symptom                                                                                            | Likely cause                                                                                  | Fix                                                                                                                              |
+|----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| "Not connected to any app"                                                                         | No successful `connect` yet in this session                                                   | `connect` before anything else — see *Connecting*, above                                                                         |
+| MCP `connect` fails with a version mismatch                                                        | `marionette_mcp` and `marionette_flutter` are different versions (the CLI doesn't check this) | See *Version alignment*, above                                                                                                   |
+| Custom buttons/fields don't show up, or `tap(text:)`/`scroll_to(text:)` can't find a visible label | Widget type or text isn't recognized                                                          | See *Custom design system?*, above                                                                                               |
+| A gesture or `enter_text` hits the wrong copy of a repeated widget                                 | The key repeats across identical subtrees; the first match wins                               | Add `ancestor_keys` — see *Repeated keys*, above                                                                                 |
+| `Scope element with key "…" (ancestor_keys[N]) not found`                                          | That wrapper key is misspelled, not built yet, or not inside the previous one                 | Check with `get_interactive_elements(ancestor_keys: [...])`; off-screen rows need `scroll_to` first — see *Repeated keys*, above |
+| `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                                    | See *Logs for `get_logs`*, above                                                                                                 |
+| `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                                           | See *Device-config sweeps*, above, then hot restart                                                                              |
+| Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                             | See *The single-binding rule*, above                                                                                             |
+| Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                               | Not supported by design — see *When not to use*                                                                                  |
 
 ## CLI fallback
 
@@ -357,7 +389,10 @@ it as the authoritative low-level reference; everything in the capability
 table above maps onto it one-for-one (`tap` ↔
 `tap --key/--identifier/--text/--type/--x/--y`, `get_interactive_elements` ↔
 `get-interactive-elements`, etc.), plus `record-video`, which only exists on
-this side. Use `--uri <ws-uri>` for a one-off session
+this side. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
+outermost first:
+`tap --key cell.joinButton --ancestor-keys session_2 --ancestor-keys grid.cell_3`.
+Use `--uri <ws-uri>` for a one-off session
 and `register <name> <uri>` + `-i <name>` for repeated interaction with the
 same app; `marionette doctor` checks connectivity of every registered
 instance and `unregister` cleans up stale ones.
