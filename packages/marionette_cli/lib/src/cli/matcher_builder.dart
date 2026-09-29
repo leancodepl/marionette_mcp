@@ -38,19 +38,3 @@ Map<String, dynamic> buildMatcherFromArgs({
 bool hasSelector(Map<String, dynamic> matcher) {
   return matcher.keys.any((field) => field != 'ancestor_keys');
 }
-
-/// Help text for the `--ancestor-keys` option, shared by every matcher-based
-/// command.
-const ancestorKeysHelp = 'Limit the search to the subtree of the element with '
-    'this key. Use it when the same key appears in several identical '
-    'subtrees (grid cells, repeated cards). Repeat the option, outermost '
-    'wrapper first, to go deeper: each key is looked up inside the previous '
-    "one's subtree.";
-
-/// Help text for `--ancestor-keys` on `get-interactive-elements`, which lists a
-/// subtree rather than matching one element inside it.
-const ancestorKeysListHelp = 'List only the elements inside the subtree of the '
-    'element with this key. Use it to cut the output down on screens that '
-    'repeat the same subtree (grid cells, repeated cards). Repeat the option, '
-    "outermost wrapper first, to go deeper: each key is looked up inside the "
-    "previous one's subtree.";
