@@ -31,7 +31,7 @@ void registerInspectionTools(
         properties: {
           'ancestor_keys': JsonSchema.array(
             items: JsonSchema.string(),
-            description: ancestorKeysListDescription,
+            description: _ancestorKeysDescription,
           ),
         },
       ),
@@ -228,3 +228,15 @@ List<String> _saveScreenshots(
   }
   return paths;
 }
+
+/// `ancestor_keys` as worded for `get_interactive_elements`, which lists a
+/// subtree rather than matching one element inside it.
+///
+/// Kept separate from the matcher tools' `ancestorKeysDescription` because
+/// the field means something else here: the scope alone is the whole request,
+/// and it lists that subtree instead of limiting where one element is
+/// searched for.
+const _ancestorKeysDescription =
+    'Optional wrapper keys (ValueKey<String>), outermost first; each is '
+    'looked up inside the previous one. Lists only that subtree. Fails if a '
+    'key has no element.';
