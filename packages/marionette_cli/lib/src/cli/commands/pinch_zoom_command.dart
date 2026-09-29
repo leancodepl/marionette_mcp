@@ -14,7 +14,7 @@ class PinchZoomCommand extends InstanceCommand {
       ..addOption('type', help: 'Widget type name (e.g., InteractiveViewer).')
       ..addOption('x', help: 'X coordinate for pinch center.')
       ..addOption('y', help: 'Y coordinate for pinch center.')
-      ..addMultiOption('ancestor-key', help: ancestorKeyHelp)
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp)
       ..addOption(
         'scale',
         help: 'Zoom scale factor. >1.0 zooms in, <1.0 zooms out.',
@@ -49,7 +49,7 @@ class PinchZoomCommand extends InstanceCommand {
       type: argResults?['type'] as String?,
       x: _parseNum(argResults?['x'] as String?),
       y: _parseNum(argResults?['y'] as String?),
-      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
+      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
     );
 
     final xStr = argResults?['x'] as String?;

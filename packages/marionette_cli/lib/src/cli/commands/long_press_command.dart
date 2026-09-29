@@ -14,7 +14,7 @@ class LongPressCommand extends InstanceCommand {
       ..addOption('type', help: 'Widget type name (e.g., ListTile).')
       ..addOption('x', help: 'X coordinate for positional long press.')
       ..addOption('y', help: 'Y coordinate for positional long press.')
-      ..addMultiOption('ancestor-key', help: ancestorKeyHelp)
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp)
       ..addOption(
         'duration',
         help: 'Hold duration in milliseconds.',
@@ -43,7 +43,7 @@ class LongPressCommand extends InstanceCommand {
       type: argResults?['type'] as String?,
       x: _parseNum(argResults?['x'] as String?),
       y: _parseNum(argResults?['y'] as String?),
-      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
+      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
     );
 
     if (!hasSelector(matcher)) {
