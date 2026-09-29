@@ -3,7 +3,7 @@ import 'dart:convert';
 /// Builds a widget matcher map from CLI arguments.
 ///
 /// Accepts named args like --key, --identifier, --text, --type, --x, --y,
-/// --ancestor-key and constructs the matcher map expected by
+/// --ancestor-keys and constructs the matcher map expected by
 /// [VmServiceConnector].
 Map<String, dynamic> buildMatcherFromArgs({
   String? key,
@@ -39,17 +39,17 @@ bool hasSelector(Map<String, dynamic> matcher) {
   return matcher.keys.any((field) => field != 'ancestor_keys');
 }
 
-/// Help text for the `--ancestor-key` option, shared by every matcher-based
+/// Help text for the `--ancestor-keys` option, shared by every matcher-based
 /// command.
-const ancestorKeyHelp = 'Limit the search to the subtree of the element with '
+const ancestorKeysHelp = 'Limit the search to the subtree of the element with '
     'this key. Use it when the same key appears in several identical '
     'subtrees (grid cells, repeated cards). Repeat the option, outermost '
     'wrapper first, to go deeper: each key is looked up inside the previous '
     "one's subtree.";
 
-/// Help text for `--ancestor-key` on `get-interactive-elements`, which lists a
+/// Help text for `--ancestor-keys` on `get-interactive-elements`, which lists a
 /// subtree rather than matching one element inside it.
-const ancestorKeyListHelp = 'List only the elements inside the subtree of the '
+const ancestorKeysListHelp = 'List only the elements inside the subtree of the '
     'element with this key. Use it to cut the output down on screens that '
     'repeat the same subtree (grid cells, repeated cards). Repeat the option, '
     "outermost wrapper first, to go deeper: each key is looked up inside the "

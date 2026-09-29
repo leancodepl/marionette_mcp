@@ -14,7 +14,7 @@ class TapCommand extends InstanceCommand {
       ..addOption('type', help: 'Widget type name (e.g., ElevatedButton).')
       ..addOption('x', help: 'X coordinate for positional tap.')
       ..addOption('y', help: 'Y coordinate for positional tap.')
-      ..addMultiOption('ancestor-key', help: ancestorKeyHelp);
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp);
   }
 
   final InstanceRegistry _registry;
@@ -38,7 +38,7 @@ class TapCommand extends InstanceCommand {
       type: argResults?['type'] as String?,
       x: _parseNum(argResults?['x'] as String?),
       y: _parseNum(argResults?['y'] as String?),
-      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
+      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
     );
 
     if (!hasSelector(matcher)) {

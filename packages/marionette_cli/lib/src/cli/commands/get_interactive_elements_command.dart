@@ -8,7 +8,7 @@ import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class ElementsCommand extends InstanceCommand {
   ElementsCommand(this._registry) {
-    argParser.addMultiOption('ancestor-key', help: ancestorKeyListHelp);
+    argParser.addMultiOption('ancestor-keys', help: ancestorKeysListHelp);
   }
 
   final InstanceRegistry _registry;
@@ -26,7 +26,7 @@ class ElementsCommand extends InstanceCommand {
   @override
   Future<int> execute(VmServiceConnector connector) async {
     final response = await connector.getInteractiveElements(
-      ancestorKeys: argResults?['ancestor-key'] as List<String>? ?? const [],
+      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
     );
     final elements = response['elements'] as List<dynamic>;
 
