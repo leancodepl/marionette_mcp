@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
+import 'package:marionette_flutter/src/binding/extensions/info_extensions.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
+import 'package:marionette_flutter/src/services/text_input_simulator.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 
 class _CompositeButton extends StatelessWidget {
@@ -187,6 +189,60 @@ class _SplitCompositeAdapter implements MarionetteWidgetAdapter {
       key: 'split',
       traversalPolicy: MarionetteTraversalPolicy.ownSubtree,
     );
+  }
+}
+
+/// A design-system text field that owns its subtree: only the composite is
+/// shown to the agent, but `enter_text` still has to reach its EditableText.
+class _CompositeField extends StatelessWidget {
+  const _CompositeField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(width: 240, child: TextField(controller: controller));
+  }
+}
+
+class _CompositeFieldAdapter implements MarionetteWidgetAdapter {
+  const _CompositeFieldAdapter();
+
+  @override
+  MarionetteWidgetDescriptor? describe(Element element) {
+    if (element.widget is! _CompositeField) {
+      return null;
+    }
+    return const MarionetteWidgetDescriptor(
+      type: 'CompositeField',
+      role: 'textField',
+      key: 'email',
+      traversalPolicy: MarionetteTraversalPolicy.ownSubtree,
+    );
+  }
+}
+
+/// A repeated panel identified only through its descriptor key.
+class _Panel extends StatelessWidget {
+  const _Panel({required this.id, required this.child});
+
+  final String id;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
+}
+
+class _PanelAdapter implements MarionetteWidgetAdapter {
+  const _PanelAdapter();
+
+  @override
+  MarionetteWidgetDescriptor? describe(Element element) {
+    final widget = element.widget;
+    if (widget is! _Panel) {
+      return null;
+    }
+    return MarionetteWidgetDescriptor(type: 'Panel', key: widget.id);
   }
 }
 
@@ -492,6 +548,132 @@ void main() {
       );
       expect(matched, isNull);
       expect(taps, 0);
+    });
+  });
+
+  group('matching an owned subtree', () {
+    Widget panelWith(Widget child) {
+      return MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: KeyedSubtree(key: const ValueKey('panel'), child: child),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('does not reach an internal widget of an owning composite',
+        (tester) async {
+      await tester.pumpWidget(
+        panelWith(const _CompositeButton(label: 'Continue')),
+      );
+
+      final internal = WidgetFinder().findHittableElement(
+        const TypeStringMatcher('GestureDetector'),
+        configuration,
+        ancestors: const [KeyMatcher('panel')],
+      );
+
+      expect(internal, isNull);
+    });
+
+    testWidgets('reaches internal widgets under continueTraversal',
+        (tester) async {
+      const continueConfiguration = MarionetteConfiguration(
+        widgetAdapters: <MarionetteWidgetAdapter>[
+          _ContinueCompositeButtonAdapter(),
+        ],
+      );
+      await tester.pumpWidget(
+        panelWith(const _CompositeButton(label: 'Continue')),
+      );
+
+      final internal = WidgetFinder().findHittableElement(
+        const TypeStringMatcher('GestureDetector'),
+        continueConfiguration,
+        ancestors: const [KeyMatcher('panel')],
+      );
+
+      expect(internal?.widget, isA<GestureDetector>());
+    });
+
+    testWidgets('enter_text still types into an owning composite field',
+        (tester) async {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
+      const fieldConfiguration = MarionetteConfiguration(
+        widgetAdapters: <MarionetteWidgetAdapter>[_CompositeFieldAdapter()],
+      );
+      await tester.pumpWidget(
+        panelWith(_CompositeField(controller: controller)),
+      );
+
+      await TextInputSimulator(WidgetFinder()).enterText(
+        const KeyMatcher('email'),
+        'jan@example.com',
+        fieldConfiguration,
+      );
+      await tester.pump();
+
+      expect(controller.text, 'jan@example.com');
+    });
+  });
+
+  group('ancestor_keys through descriptor keys', () {
+    Widget panels() {
+      return MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              for (final id in ['panel-1', 'panel-2'])
+                _Panel(
+                  id: id,
+                  child: Text('Go $id', key: const ValueKey('go')),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    const panelConfiguration = MarionetteConfiguration(
+      widgetAdapters: <MarionetteWidgetAdapter>[_PanelAdapter()],
+    );
+
+    testWidgets('a descriptor key scopes a match', (tester) async {
+      await tester.pumpWidget(panels());
+
+      final matched = WidgetFinder().findHittableElement(
+        const KeyMatcher('go'),
+        panelConfiguration,
+        ancestors: const [KeyMatcher('panel-2')],
+      );
+
+      expect(
+        find.descendant(
+          of: find.byWidgetPredicate(
+            (widget) => widget is _Panel && widget.id == 'panel-2',
+          ),
+          matching: find.byWidget(matched!.widget),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a descriptor key scopes discovery', (tester) async {
+      await tester.pumpWidget(panels());
+
+      final elements = findScopedInteractiveElements(
+        {
+          'ancestor_keys': jsonEncode(['panel-2'])
+        },
+        elementTreeFinder: const ElementTreeFinder(panelConfiguration),
+        widgetFinder: WidgetFinder(),
+        configuration: panelConfiguration,
+      );
+
+      expect(elements.any((e) => e['text'] == 'Go panel-2'), isTrue);
+      expect(elements.any((e) => e['text'] == 'Go panel-1'), isFalse);
     });
   });
 }

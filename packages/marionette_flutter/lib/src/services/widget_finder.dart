@@ -44,6 +44,10 @@ class WidgetFinder {
   /// [ancestors] is given, only the descendants of the element it resolves
   /// to are searched — never that element itself.
   ///
+  /// The search does not reach past an element whose widget adapter claims
+  /// its subtree with [MarionetteTraversalPolicy.ownSubtree], mirroring what
+  /// `get_interactive_elements` lists.
+  ///
   /// Returns null if no matching element is found.
   ///
   /// Throws when [ancestors] is given but cannot be resolved — a missing scope
@@ -56,15 +60,21 @@ class WidgetFinder {
   }) {
     final scope = resolveScopeRoot(ancestors, configuration);
     return ancestors.isEmpty
-        ? findElementFrom(matcher, scope, configuration)
+        ? _search(matcher, scope, configuration, hittable: false)
         : _firstBelow(
             scope,
-            (child) => findElementFrom(matcher, child, configuration),
+            (child) => _search(matcher, child, configuration, hittable: false),
           );
   }
 
   /// Finds the first element that matches the given [matcher] within the subtree
   /// rooted at the given [startElement].
+  ///
+  /// Unlike [findElement], this walks into subtrees that a widget adapter
+  /// claims with [MarionetteTraversalPolicy.ownSubtree]. It is meant for
+  /// finding an implementation detail inside an element that was already
+  /// matched — such as the `EditableText` inside a matched text field — not
+  /// for resolving what an agent asked for.
   ///
   /// Returns null if no matching element is found.
   Element? findElementFrom(
@@ -72,39 +82,13 @@ class WidgetFinder {
     Element? startElement,
     MarionetteConfiguration configuration,
   ) {
-    if (startElement == null) {
-      return null;
-    }
-
-    Element? found;
-
-    void visitor(Element element) {
-      if (found != null) {
-        return;
-      }
-      MarionetteWidgetDescriptor? descriptor;
-      var descriptorIsResolved = false;
-      MarionetteWidgetDescriptor? describeWidget() {
-        if (!descriptorIsResolved) {
-          descriptor = configuration.describeWidget(element);
-          descriptorIsResolved = true;
-        }
-        return descriptor;
-      }
-
-      if (matcher.matches(
-        element,
-        configuration,
-        describeWidget: describeWidget,
-      )) {
-        found = element;
-      } else {
-        element.visitChildren(visitor);
-      }
-    }
-
-    visitor(startElement);
-    return found;
+    return _search(
+      matcher,
+      startElement,
+      configuration,
+      hittable: false,
+      respectOwnedSubtrees: false,
+    );
   }
 
   /// Finds the first element that matches the given [matcher] and is hittable
@@ -117,7 +101,9 @@ class WidgetFinder {
   /// a valid answer.
   ///
   /// When [ancestors] is given, only the descendants of the element it
-  /// resolves to are searched — never that element itself.
+  /// resolves to are searched — never that element itself. Like
+  /// [findElement], the search does not reach past an element whose widget
+  /// adapter owns its subtree.
   ///
   /// Returns null if no matching element is found, and throws when
   /// [ancestors] is given but cannot be resolved — a missing scope is a
@@ -130,10 +116,10 @@ class WidgetFinder {
   }) {
     final scope = resolveScopeRoot(ancestors, configuration);
     return ancestors.isEmpty
-        ? _findHittableElementFrom(matcher, scope, configuration)
+        ? _search(matcher, scope, configuration, hittable: true)
         : _firstBelow(
             scope,
-            (child) => _findHittableElementFrom(matcher, child, configuration),
+            (child) => _search(matcher, child, configuration, hittable: true),
           );
   }
 
@@ -176,7 +162,7 @@ class WidgetFinder {
     for (var i = 0; i < ancestors.length; i++) {
       final found = _firstBelow(
         scopeRoot,
-        (child) => findElementFrom(ancestors[i], child, configuration),
+        (child) => _search(ancestors[i], child, configuration, hittable: false),
       );
       if (found == null) {
         return (
@@ -194,11 +180,22 @@ class WidgetFinder {
     return (element: scopeRoot, missing: null);
   }
 
-  Element? _findHittableElementFrom(
+  /// The first element below and including [startElement] that [matcher]
+  /// matches, and that is hittable when [hittable] is set.
+  ///
+  /// Each visited element is described by the configured widget adapters at
+  /// most once. With [respectOwnedSubtrees], the search does not descend into
+  /// an element whose descriptor claims its subtree with
+  /// [MarionetteTraversalPolicy.ownSubtree]: discovery lists such an element as
+  /// one target and none of its internals, so matching must not reach past it
+  /// to an internal widget the agent was never shown.
+  Element? _search(
     WidgetMatcher matcher,
     Element? startElement,
-    MarionetteConfiguration configuration,
-  ) {
+    MarionetteConfiguration configuration, {
+    required bool hittable,
+    bool respectOwnedSubtrees = true,
+  }) {
     if (startElement == null) {
       return null;
     }
@@ -220,23 +217,35 @@ class WidgetFinder {
       }
 
       if (matcher.matches(
-        element,
-        configuration,
-        describeWidget: describeWidget,
-      )) {
-        descriptor = describeWidget();
-        if (descriptor == null
-            ? isElementHittable(element)
-            : isElementHittableThroughSubtree(element)) {
-          found = element;
-          return;
-        }
+            element,
+            configuration,
+            describeWidget: describeWidget,
+          ) &&
+          (!hittable || _isHittable(element, describeWidget()))) {
+        found = element;
+        return;
+      }
+      if (respectOwnedSubtrees &&
+          describeWidget()?.traversalPolicy ==
+              MarionetteTraversalPolicy.ownSubtree) {
+        return;
       }
       element.visitChildren(visitor);
     }
 
     visitor(startElement);
     return found;
+  }
+
+  /// Whether a gesture dispatched at the center of [element] reaches it.
+  ///
+  /// An adapted composite may forward hit testing to a private render child,
+  /// so for one a hit anywhere in its render subtree counts — still probed at
+  /// its center, where the gesture will land.
+  bool _isHittable(Element element, MarionetteWidgetDescriptor? descriptor) {
+    return descriptor == null
+        ? isElementHittable(element)
+        : isElementHittableThroughSubtree(element);
   }
 
   /// The first result of [search] over the children of [parent], never

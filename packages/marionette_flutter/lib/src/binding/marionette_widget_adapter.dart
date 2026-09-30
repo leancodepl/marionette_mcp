@@ -12,6 +12,12 @@ enum MarionetteTraversalPolicy {
   /// This is useful for composite design-system controls whose implementation
   /// contains gesture detectors or other widgets that should not be exposed as
   /// separate interactive elements.
+  ///
+  /// The subtree is hidden from matching as well as from discovery: a `tap`
+  /// by key, identifier, text or type does not reach past the owner, so an
+  /// agent can only target what `get_interactive_elements` showed it. Tools
+  /// still look inside the matched owner for what they need, such as the
+  /// `EditableText` that `enter_text` types into.
   ownSubtree,
 }
 
@@ -38,6 +44,7 @@ class MarionetteWidgetDescriptor {
   final String? hint;
   final Map<String, Object?> state;
   final List<String> actions;
+
   final Map<String, Object?> properties;
   final MarionetteTraversalPolicy traversalPolicy;
 
