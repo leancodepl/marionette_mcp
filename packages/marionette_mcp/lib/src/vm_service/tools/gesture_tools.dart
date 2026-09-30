@@ -1,5 +1,6 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
+import 'package:marionette_mcp/src/vm_service/tools/ancestor_keys_description.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -52,6 +53,10 @@ void registerGestureTools(
             },
             required: ['x', 'y'],
           ),
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysDescription,
+          ),
         },
       ),
       callback: (args, extra) async {
@@ -103,6 +108,10 @@ void registerGestureTools(
               ),
             },
             required: ['x', 'y'],
+          ),
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysDescription,
           ),
         },
       ),
@@ -161,6 +170,10 @@ void registerGestureTools(
           'delay': JsonSchema.number(
             description:
                 'Time between the two taps in milliseconds. Defaults to 100ms which is within Flutter\'s double-tap recognition window (40ms-300ms).',
+          ),
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysDescription,
           ),
         },
       ),
@@ -231,6 +244,10 @@ void registerGestureTools(
             description:
                 'How long to hold the press in milliseconds. Defaults to 600ms which matches Flutter\'s long press behavior.',
           ),
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysDescription,
+          ),
         },
       ),
       callback: (args, extra) async {
@@ -295,6 +312,10 @@ void registerGestureTools(
           ),
           'endY': JsonSchema.number(
             description: 'End Y coordinate for coordinate-based swipe.',
+          ),
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysDescription,
           ),
         },
       ),
@@ -395,18 +416,22 @@ void registerGestureTools(
             description: 'Initial distance between the two fingers in pixels '
                 '(default: 200).',
           ),
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysDescription,
+          ),
         },
         required: ['scale'],
       ),
       callback: (args, extra) async {
         final matcher = buildMatcher(args);
-        if (matcher.isEmpty) {
+        if (!hasSelector(matcher)) {
           return CallToolResult(
             isError: true,
             content: [
               const TextContent(
-                text: 'Missing required selector: provide "key", "text", '
-                    '"type", or "coordinates".',
+                text: 'Missing required selector: provide "key", '
+                    '"identifier", "text", "type", or "coordinates".',
               ),
             ],
           );
@@ -499,6 +524,10 @@ void registerGestureTools(
           'text': JsonSchema.string(
             description:
                 'The visible text content of the element to scroll to.',
+          ),
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: ancestorKeysDescription,
           ),
         },
       ),

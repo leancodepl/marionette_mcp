@@ -21,11 +21,22 @@ void registerInspectionTools(
         readOnlyHint: true,
         idempotentHint: true,
       ),
-      inputSchema: const ToolInputSchema(properties: {}),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'ancestor_keys': JsonSchema.array(
+            items: JsonSchema.string(),
+            description: _ancestorKeysDescription,
+          ),
+        },
+      ),
       callback: (args, extra) async {
         logger.info('Getting interactive elements');
         return runTool(logger, 'get interactive elements', () async {
-          final response = await connector.getInteractiveElements();
+          final response = await connector.getInteractiveElements(
+            ancestorKeys:
+                (args['ancestor_keys'] as List<dynamic>?)?.cast<String>() ??
+                    const [],
+          );
           final elements = response['elements'] as List<dynamic>;
 
           final buffer = StringBuffer()
@@ -126,3 +137,15 @@ void registerInspectionTools(
       },
     );
 }
+
+/// `ancestor_keys` as worded for `get_interactive_elements`, which lists a
+/// subtree rather than matching one element inside it.
+///
+/// Kept separate from the matcher tools' `ancestorKeysDescription` because
+/// the field means something else here: the scope alone is the whole request,
+/// and it lists that subtree instead of limiting where one element is
+/// searched for.
+const _ancestorKeysDescription =
+    'Optional wrapper keys (ValueKey<String>), outermost first; each is '
+    'looked up inside the previous one. Lists only that subtree. Fails if a '
+    'key has no element.';

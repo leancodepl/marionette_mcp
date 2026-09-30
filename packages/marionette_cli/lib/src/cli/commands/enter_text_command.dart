@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
@@ -16,6 +17,7 @@ class EnterTextCommand extends InstanceCommand {
         help: 'Target the currently focused text field.',
         negatable: false,
       )
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp)
       ..addOption(
         'input',
         help: 'Text to enter into the field.',
@@ -43,9 +45,10 @@ class EnterTextCommand extends InstanceCommand {
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
       focused: focused,
+      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
     );
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, --text, '
         'or --focused.',
