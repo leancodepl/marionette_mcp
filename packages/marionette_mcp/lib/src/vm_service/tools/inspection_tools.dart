@@ -1,13 +1,19 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
+import 'package:marionette_mcp/src/session/session.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:path/path.dart' as p;
 
 /// Registers read-only MCP tools that inspect the running app:
 /// `get_interactive_elements`, `get_logs`, `take_screenshots`.
 void registerInspectionTools(
-  McpServer server,
+  LoggedMcpServer server,
   VmServiceConnector connector,
   logging.Logger logger,
 ) {
@@ -96,33 +102,118 @@ void registerInspectionTools(
     ..registerTool(
       'take_screenshots',
       description:
-          'Takes screenshots of all views in the Flutter app. Returns base64-encoded PNG images that can be decoded and saved. This captures the current visual state of the app. Requires an active connection established via connect.',
+          'Takes screenshots of all views in the Flutter app. By default returns base64-encoded PNG images inline, which can be decoded and saved. Set inline: false to instead save the screenshots straight into the active session directory (only available when the app enables session reports) and get back their paths — evidence you plan to cite in a report but don\'t need to look at right now, since each inline screenshot costs real visual tokens. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Take Screenshots',
         readOnlyHint: true,
       ),
-      inputSchema: const ToolInputSchema(properties: {}),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'inline': JsonSchema.boolean(
+            description:
+                'If false, saves the screenshots into the session directory '
+                'and returns their paths instead of the image data. '
+                'Defaults to true.',
+          ),
+        },
+      ),
       callback: (args, extra) async {
         logger.info('Taking screenshots');
-        return runTool(logger, 'take screenshots', () async {
-          final response = await connector.takeScreenshots();
-          final screenshots =
-              (response['screenshots'] as List<dynamic>).cast<String>();
-
-          if (screenshots.isEmpty) {
-            return CallToolResult(
-              content: [const TextContent(text: 'No screenshots captured')],
-            );
-          }
-          return CallToolResult(
-            content: screenshots
-                .map(
-                  (screenshot) =>
-                      ImageContent(data: screenshot, mimeType: 'image/png'),
-                )
-                .toList(),
-          );
-        });
+        return runTool(
+          logger,
+          'take screenshots',
+          () => takeScreenshots(connector, server.stepLogger.session, args),
+        );
       },
     );
+}
+
+/// Handles a `take_screenshots` invocation: captures via [connector], then
+/// either returns the images inline or — when `args['inline'] == false` —
+/// saves them into [session]'s screenshots directory and returns their paths.
+///
+/// Extracted from the tool callback so the inline/save-only branching can be
+/// exercised in isolation.
+Future<CallToolResult> takeScreenshots(
+  VmServiceConnector connector,
+  Session? session,
+  Map<String, dynamic> args,
+) async {
+  final inline = args['inline'] != false;
+  final response = await connector.takeScreenshots();
+  final screenshots = (response['screenshots'] as List<dynamic>).cast<String>();
+
+  if (screenshots.isEmpty) {
+    return CallToolResult(
+      content: [const TextContent(text: 'No screenshots captured')],
+    );
+  }
+
+  if (inline) {
+    return CallToolResult(
+      content: screenshots
+          .map(
+            (screenshot) =>
+                ImageContent(data: screenshot, mimeType: 'image/png'),
+          )
+          .toList(),
+    );
+  }
+
+  if (session == null) {
+    return CallToolResult(
+      isError: true,
+      content: [
+        const TextContent(
+          text: 'inline: false requires an active session, which is '
+              'only created once connect succeeds and only when the app '
+              'enables session reports '
+              '(MarionetteConfiguration.enableSessionReports).',
+        ),
+      ],
+    );
+  }
+
+  final paths = _saveScreenshots(session.screenshotsDir, screenshots);
+  return CallToolResult(
+    content: [
+      TextContent(
+        text: 'Saved ${paths.length} screenshot(s):\n${paths.join('\n')}',
+      ),
+    ],
+  );
+}
+
+/// Saves each base64-encoded PNG in [screenshots] into [screenshotsDir],
+/// numbered sequentially after whatever is already there, and returns the
+/// paths written to.
+List<String> _saveScreenshots(
+  Directory screenshotsDir,
+  List<String> screenshots,
+) {
+  screenshotsDir.createSync(recursive: true);
+  // The next index is one past the highest existing numeric name, not a
+  // count of PNGs present — a gap (e.g. 01.png and 03.png after 02.png was
+  // deleted) would otherwise make a count-based index collide with, and
+  // overwrite, the existing 03.png.
+  final highestExisting = screenshotsDir
+      .listSync()
+      .whereType<File>()
+      .where((f) => p.extension(f.path) == '.png')
+      .map((f) => int.tryParse(p.basenameWithoutExtension(f.path)))
+      .whereType<int>()
+      .fold(0, (highest, n) => n > highest ? n : highest);
+  var nextIndex = highestExisting + 1;
+
+  final paths = <String>[];
+  for (final screenshot in screenshots) {
+    final path = p.join(
+      screenshotsDir.path,
+      '${nextIndex.toString().padLeft(2, '0')}.png',
+    );
+    File(path).writeAsBytesSync(base64Decode(screenshot));
+    paths.add(path);
+    nextIndex++;
+  }
+  return paths;
 }

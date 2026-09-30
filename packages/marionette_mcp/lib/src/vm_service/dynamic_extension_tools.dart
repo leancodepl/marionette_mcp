@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/tools/arg_coercion.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
@@ -37,13 +38,16 @@ class DynamicExtensionTools {
     required McpServer server,
     required VmServiceConnector connector,
     required logging.Logger logger,
+    StepLogger? stepLogger,
   })  : _server = server,
         _connector = connector,
-        _logger = logger;
+        _logger = logger,
+        _stepLogger = stepLogger;
 
   final McpServer _server;
   final VmServiceConnector _connector;
   final logging.Logger _logger;
+  final StepLogger? _stepLogger;
 
   /// Every tool we have ever registered with the server, keyed by the
   /// (sanitized) MCP tool name. Persists across connect/disconnect cycles so
@@ -195,7 +199,7 @@ class DynamicExtensionTools {
 
     // The extension is always invoked by its real name; only the MCP tool
     // name is sanitized for clients that restrict the character set.
-    final callback = _buildCallback(extensionName);
+    final callback = _buildCallback(toolName, extensionName);
     final effectiveDescription =
         _describe(extensionName, toolName, description);
 
@@ -256,8 +260,9 @@ class DynamicExtensionTools {
     return base == null || base.isEmpty ? note : '$base\n\n$note';
   }
 
-  ToolFunction _buildCallback(String extensionName) {
-    return (args, extra) async {
+  ToolFunction _buildCallback(String toolName, String extensionName) {
+    final callback =
+        (Map<String, dynamic> args, RequestHandlerExtra extra) async {
       return runTool(_logger, 'call extension "$extensionName"', () async {
         final stringArgs = coerceToStringMap(args);
         final response = await _connector.callCustomExtension(
@@ -269,6 +274,10 @@ class DynamicExtensionTools {
         );
       });
     };
+    final stepLogger = _stepLogger;
+    return stepLogger == null
+        ? callback
+        : withStepLogging(stepLogger, toolName, callback);
   }
 }
 

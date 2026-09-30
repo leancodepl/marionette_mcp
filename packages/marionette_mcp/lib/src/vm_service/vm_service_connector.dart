@@ -259,6 +259,15 @@ class VmServiceConnector {
     return response['version'] as String;
   }
 
+  /// Whether the app opted into session reports via
+  /// `MarionetteConfiguration.enableSessionReports`.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<bool> getSessionReportsEnabled() async {
+    final response = await _callExtension('marionette.getConfiguration', {});
+    return response['enableSessionReports'] == true;
+  }
+
   /// Calls a custom VM service extension registered by the Flutter app.
   ///
   /// This is an escape hatch for calling app-specific extensions that are

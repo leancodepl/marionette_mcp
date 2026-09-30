@@ -129,6 +129,7 @@ Or copy the file above directly into your agent's skills folder — e.g.
 | [Log Collection](https://github.com/leancodepl/marionette_mcp/blob/main/docs/logging.md) | Wire up `get_logs` (`logging`, `logger`, or custom). |
 | [Semantics](https://github.com/leancodepl/marionette_mcp/blob/main/docs/semantics.md) | Make custom-painted / rich content readable to agents. |
 | [MCP Tools](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md) | Full tool reference + AI-tool configuration. |
+| [Session Reports](https://github.com/leancodepl/marionette_mcp/blob/main/docs/session-reports.md) | The session directory, `steps.md`, screenshot sink, and the `report.md` handoff. |
 | [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) | Expose app-specific actions as agent tools via `registerMarionetteExtension`. |
 | [CLI](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md) | Drive Marionette from any shell-capable agent. |
 | [Troubleshooting](https://github.com/leancodepl/marionette_mcp/blob/main/docs/troubleshooting.md) | Common gotchas and limitations. |
