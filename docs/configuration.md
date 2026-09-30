@@ -10,11 +10,11 @@ Each callback fixes a specific failure mode. Map your symptom to the fix:
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Your custom buttons / controls don't appear in `get_interactive_elements` | The widget type isn't recognized as interactive | Add it to [`isInteractiveWidget`](#isinteractivewidget) |
+| Your custom buttons / controls don't appear in `get_interactive_elements` | The widget isn't recognized as interactive | Add it to [`isInteractiveElement`](#isinteractiveelement) |
 | `tap(text:)` / `scroll_to(text:)` can't find a custom field or label by its text | Text isn't being extracted from the widget | Implement [`extractText`](#extracttext) for that widget |
 | `get_logs` returns a "no LogCollector configured" message | No log collector is wired up | Set [`logCollector`](./logging.md) |
 | Custom-painted text, badges, or charts are invisible to the agent | The text never reaches a `Text` widget | Annotate with [`Semantics`](./semantics.md) |
-| Widget coverage looks low / the agent can't reach nested content | Over-aggressive traversal stopping | **Leave [`shouldStopTraversal`](#shouldstoptraversal) `null`** — do not filter scroll containers |
+| Widget coverage looks low / the agent can't reach nested content | Over-aggressive traversal stopping | **Leave [`shouldStopTraversalAtElement`](#shouldstoptraversalatelement) `null`** — do not filter scroll containers |
 
 A complete `main.dart` that wires all of these together is at the [bottom of this page](#complete-production-maindart).
 
@@ -34,27 +34,64 @@ If your widgets wrap or replace these — e.g. a `MyPrimaryButton` built on a `G
 
 | Field | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `isInteractiveWidget` | `bool Function(Type type)?` | `null` | Mark app-specific widget types as interactive. |
+| `isInteractiveElement` | `bool Function(Element element)?` | `null` | Mark app-specific widgets as interactive. |
 | `extractText` | `String? Function(Element element)?` | `null` | Extract display text from app-specific widgets. |
 | `logCollector` | `LogCollector?` | `null` | Capture app logs for `get_logs`. See [Logging](./logging.md). |
-| `shouldStopTraversal` | `bool Function(Type type)?` | `null` | Stop descending below given widget types. **Rarely needed** — see below. |
+| `shouldStopTraversalAtElement` | `bool Function(Element element)?` | `null` | Stop descending below given widgets. **Rarely needed** — see below. |
 | `maxScreenshotSize` | `Size?` | `Size(2000, 2000)` | Downscale screenshots to fit; `null` disables resizing. |
 | `enableSessionReports` | `bool` | `false` | Record a per-run session directory (`steps.md`, screenshots, `report.md`). See [Session Reports](./session-reports.md). |
+| ~~`isInteractiveWidget`~~ | `bool Function(Type type)?` | `null` | **Deprecated** — use `isInteractiveElement`. See [Migrating from Type-based callbacks](#migrating-from-type-based-callbacks). |
+| ~~`shouldStopTraversal`~~ | `bool Function(Type type)?` | `null` | **Deprecated** — use `shouldStopTraversalAtElement`. |
 
 Your callbacks run **after** the built-in checks — you're extending the defaults, not replacing them.
 
-### `isInteractiveWidget`
+`isInteractiveElement`, `shouldStopTraversalAtElement` and `extractText` all receive the widget's `Element`, so a whole design system can be described with one `switch` over `element.widget`.
+
+### `isInteractiveElement`
 
 A typical screen has hundreds of widgets (`Padding`, `Container`, `Column`, `SizedBox`, …). `get_interactive_elements` filters that down to actionable targets so the agent gets a concise list instead of an overwhelming dump. Custom widgets aren't on the built-in list, so mark them:
 
 ```dart
 MarionetteConfiguration(
-  isInteractiveWidget: (type) =>
-      type == MyPrimaryButton || type == MyTextField,
+  isInteractiveElement: (element) => switch (element.widget) {
+    MyButton() || MyTextField() => true,
+    _ => false,
+  },
 )
 ```
 
-Now `MyPrimaryButton` and `MyTextField` appear in the element list and can be targeted by `tap` and friends.
+Now every `MyButton` and `MyTextField` appears in the element list and can be targeted by `tap` and friends.
+
+Because the callback gets the `Element`, a plain `is` check (or a pattern like `MyButton()`) covers:
+
+- **Generic widgets** — `MySelect()` matches `MySelect<String>`, `MySelect<Plan>`, and any type argument added later.
+- **Class hierarchies** — `MyButton()` matches `MyPrimaryButton extends MyButton` and every other subclass.
+- **Per-instance decisions** — read the widget's fields, e.g. `MyTile(:final onTap) => onTap != null` marks a tile interactive only when it can actually be tapped.
+- **Placement** — use the element as a `BuildContext`, e.g. `element.findAncestorWidgetOfExactType<MyToolbar>()`, when the decision depends on where the widget sits.
+
+### Migrating from Type-based callbacks
+
+`isInteractiveWidget` and `shouldStopTraversal` receive the widget's `runtimeType`. A `Type` can only be compared with `==`, which is exact, so `type == MySelect` never matches `MySelect<String>` and `type == MyButton` never matches a subclass. Both are deprecated and will be removed in a future release; they keep working until then.
+
+Replace each `type == X` with an `is` check on `element.widget`:
+
+```dart
+// Before
+MarionetteConfiguration(
+  isInteractiveWidget: (type) =>
+      type == MyPrimaryButton || type == MyTextField,
+)
+
+// After
+MarionetteConfiguration(
+  isInteractiveElement: (element) => switch (element.widget) {
+    MyPrimaryButton() || MyTextField() => true,
+    _ => false,
+  },
+)
+```
+
+`shouldStopTraversal` migrates to `shouldStopTraversalAtElement` the same way. While both the deprecated and the new callback are set, their results are combined with OR — a widget is interactive (or stops traversal) when either returns `true` — so you can move widgets over one at a time.
 
 ### `extractText`
 
@@ -171,16 +208,16 @@ void _collectText(Element element, StringBuffer buffer) {
 
 > Custom-rendered content with no underlying `Text` (custom paint, `WidgetSpan`, charts) needs a different tool — see [Semantics](./semantics.md).
 
-### `shouldStopTraversal`
+### `shouldStopTraversalAtElement`
 
 > [!WARNING]
 > **Most apps should leave this `null`.** It is an easy footgun.
 
-`shouldStopTraversal` tells Marionette to stop descending **below** a widget type during tree traversal. The widget itself is still discovered — only its descendants are skipped. By default Marionette stops at interactive leaf widgets (and `Text`) but keeps descending through `GestureDetector` and `InkWell`, which usually wrap content.
+`shouldStopTraversalAtElement` tells Marionette to stop descending **below** a widget during tree traversal. The widget itself is still discovered — only its descendants are skipped. By default Marionette stops at interactive leaf widgets (and `Text`) but keeps descending through `GestureDetector` and `InkWell`, which usually wrap content.
 
 It is tempting to add scroll containers here to "reduce traversal cost." **Don't.** In production testing on a large app, filtering scroll containers *reduced* widget coverage from **25.8% to 17.8%** — the agent lost sight of everything below the stop point, including content it needed to act on.
 
-Only add a type after profiling shows a real, measured win, and never a scrolling container. If you're not sure, leave it `null`.
+Only add a widget after profiling shows a real, measured win, and never a scrolling container. If you're not sure, leave it `null`.
 
 ### `maxScreenshotSize`
 
@@ -219,8 +256,10 @@ void main() {
     MarionetteBinding.ensureInitialized(
       MarionetteConfiguration(
         // 1. Recognize your custom interactive widgets.
-        isInteractiveWidget: (type) =>
-            type == MyPrimaryButton || type == MyTextField,
+        isInteractiveElement: (element) => switch (element.widget) {
+          MyButton() || MyTextField() => true,
+          _ => false,
+        },
 
         // 2. Extract text so agents can match by visible label.
         extractText: (element) {
@@ -235,7 +274,8 @@ void main() {
         // 3. Collect logs for get_logs.
         logCollector: logCollector,
 
-        // 4. Leave shouldStopTraversal null unless profiling proves a win.
+        // 4. Leave shouldStopTraversalAtElement null unless profiling proves
+        //    a win.
 
         // 5. (Optional) tune screenshot size.
         // maxScreenshotSize: const Size(1280, 1280),

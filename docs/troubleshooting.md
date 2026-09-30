@@ -6,11 +6,11 @@ Most "Marionette doesn't work" reports trace back to missing configuration. Matc
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| Custom buttons / controls don't show up in `get_interactive_elements` | Custom widget type isn't recognized as interactive | Add it to [`isInteractiveWidget`](./configuration.md#isinteractivewidget) |
+| Custom buttons / controls don't show up in `get_interactive_elements` | Custom widget isn't recognized as interactive | Add it to [`isInteractiveElement`](./configuration.md#isinteractiveelement) |
 | `tap(text:)` / `scroll_to(text:)` can't find a custom field or label | Text isn't extracted from the widget | Implement [`extractText`](./configuration.md#extracttext) |
 | Custom-painted text, badges, charts are invisible to the agent | Text never reaches a `Text` widget | Annotate with [`Semantics`](./semantics.md) |
 | `get_logs` says no collector is configured | No `LogCollector` wired up | See [Log Collection](./logging.md) |
-| Widget coverage looks low / agent can't reach nested content | Over-aggressive `shouldStopTraversal` | **Leave it `null`** — never filter scroll containers ([why](./configuration.md#shouldstoptraversal)) |
+| Widget coverage looks low / agent can't reach nested content | Over-aggressive `shouldStopTraversalAtElement` | **Leave it `null`** — never filter scroll containers ([why](./configuration.md#shouldstoptraversalatelement)) |
 | Binding assertion error on startup, often in tests | Two `WidgetsBinding`s initialized | See the [single-binding rule](./flutter-setup.md#single-binding-rule) |
 | `connect` fails with a version mismatch | `marionette_mcp`/`marionette_cli` and `marionette_flutter` are different versions | Align both packages to the same version |
 

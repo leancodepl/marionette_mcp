@@ -16,8 +16,18 @@ import 'package:marionette_flutter/src/services/log_collector.dart';
 /// redirect interactions to the wrapper node.
 class MarionetteConfiguration {
   const MarionetteConfiguration({
+    @Deprecated(
+      'Use isInteractiveElement instead. '
+      'It will be removed in a future release.',
+    )
     this.isInteractiveWidget,
+    this.isInteractiveElement,
+    @Deprecated(
+      'Use shouldStopTraversalAtElement instead. '
+      'It will be removed in a future release.',
+    )
     this.shouldStopTraversal,
+    this.shouldStopTraversalAtElement,
     this.extractText,
     this.maxScreenshotSize = const Size(2000, 2000),
     this.logCollector,
@@ -29,13 +39,67 @@ class MarionetteConfiguration {
   /// This is called only after checking built-in Flutter widgets.
   /// Return true for custom widgets that should be included
   /// in the interactive elements tree (e.g., custom buttons, text fields).
+  ///
+  /// A [Type] can only be compared with `==`, so this callback can't match
+  /// generic widgets (`DsSelect<String>`), subclasses, or decide per
+  /// instance. Use [isInteractiveElement] instead. While both are set, a
+  /// widget is interactive when either of them returns true.
+  @Deprecated(
+    'Use isInteractiveElement instead. '
+    'It will be removed in a future release.',
+  )
   final bool Function(Type type)? isInteractiveWidget;
+
+  /// Determines if an app-specific widget is interactive.
+  ///
+  /// This is called only after checking built-in Flutter widgets.
+  /// Return true for custom widgets that should be included
+  /// in the interactive elements tree (e.g., custom buttons, text fields).
+  ///
+  /// The callback receives the [Element], so it can match generic widgets
+  /// and class hierarchies with an `is` check on `element.widget`, decide
+  /// from the widget's fields, or look at the element's ancestors.
+  ///
+  /// Example:
+  /// ```dart
+  /// MarionetteConfiguration(
+  ///   isInteractiveElement: (element) => switch (element.widget) {
+  ///     MyButton() || MySelect() => true,
+  ///     MyTile(:final onTap) => onTap != null,
+  ///     _ => false,
+  ///   },
+  /// )
+  /// ```
+  final bool Function(Element element)? isInteractiveElement;
 
   /// Determines if traversal should stop at an app-specific widget type.
   ///
   /// This is called only after checking built-in Flutter widgets.
   /// Return true for custom widgets that should stop tree traversal.
+  ///
+  /// A [Type] can only be compared with `==`, so this callback can't match
+  /// generic widgets, subclasses, or decide per instance. Use
+  /// [shouldStopTraversalAtElement] instead. While both are set, traversal
+  /// stops when either of them returns true.
+  @Deprecated(
+    'Use shouldStopTraversalAtElement instead. '
+    'It will be removed in a future release.',
+  )
   final bool Function(Type type)? shouldStopTraversal;
+
+  /// Determines if traversal should stop at an app-specific widget.
+  ///
+  /// This is called only after checking built-in Flutter widgets.
+  /// Return true for custom widgets whose descendants should be skipped
+  /// during tree traversal. The widget itself is still discovered.
+  ///
+  /// The callback receives the [Element], so it can match generic widgets
+  /// and class hierarchies with an `is` check on `element.widget`, or decide
+  /// from the widget's fields.
+  ///
+  /// Most apps should leave this null: stopping too early hides content the
+  /// agent needs to reach. Never stop at scroll containers.
+  final bool Function(Element element)? shouldStopTraversalAtElement;
 
   /// Extracts text content from an app-specific widget instance.
   ///
@@ -126,21 +190,44 @@ class MarionetteConfiguration {
   /// See https://github.com/leancodepl/marionette_mcp/blob/main/docs/session-reports.md
   final bool enableSessionReports;
 
+  /// Checks if an element's widget is interactive (built-in + custom).
+  bool isElementInteractive(Element element) {
+    // ignore: deprecated_member_use_from_same_package
+    return isInteractiveWidgetType(element.widget.runtimeType) ||
+        (isInteractiveElement?.call(element) ?? false);
+  }
+
+  /// Returns whether traversal should stop at the given element.
+  bool shouldStopAtElement(Element element) {
+    // ignore: deprecated_member_use_from_same_package
+    return shouldStopAtType(element.widget.runtimeType) ||
+        (shouldStopTraversalAtElement?.call(element) ?? false);
+  }
+
   /// Checks if a widget type is interactive (built-in + custom).
+  ///
+  /// Ignores [isInteractiveElement].
+  @Deprecated(
+    'Use isElementInteractive instead. '
+    'It will be removed in a future release.',
+  )
   bool isInteractiveWidgetType(Type type) {
     return _isBuiltInInteractiveWidget(type) ||
+        // ignore: deprecated_member_use_from_same_package
         (isInteractiveWidget?.call(type) ?? false);
   }
 
   /// Returns whether traversal should stop at the given widget type.
+  ///
+  /// Ignores [shouldStopTraversalAtElement].
+  @Deprecated(
+    'Use shouldStopAtElement instead. '
+    'It will be removed in a future release.',
+  )
   bool shouldStopAtType(Type type) {
-    if (_isBuiltInStopWidget(type)) {
-      return true;
-    } else if (shouldStopTraversal != null) {
-      return shouldStopTraversal!(type);
-    } else {
-      return false;
-    }
+    return _isBuiltInStopWidget(type) ||
+        // ignore: deprecated_member_use_from_same_package
+        (shouldStopTraversal?.call(type) ?? false);
   }
 
   /// Extracts text from a widget (built-in + custom).

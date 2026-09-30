@@ -205,6 +205,180 @@ void main() {
     });
   });
 
+  group('ElementTreeFinder isInteractiveElement', () {
+    testWidgets('matches generic widgets and subclasses with an is check',
+        (tester) async {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: (element) => switch (element.widget) {
+            _DsSelect() || _DsButton() => true,
+            _ => false,
+          },
+        ),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                _DsSelect<String>(),
+                _DsSelect<int>(),
+                _DsPrimaryButton(),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final types = _types(finder.findInteractiveElements());
+      expect(types, contains('_DsSelect<String>'));
+      expect(types, contains('_DsSelect<int>'));
+      expect(types, contains('_DsPrimaryButton'));
+    });
+
+    testWidgets('can decide per instance from the widget fields',
+        (tester) async {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: (element) => switch (element.widget) {
+            _DsTile(:final enabled) => enabled,
+            _ => false,
+          },
+        ),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                _DsTile(enabled: true),
+                _DsTile(enabled: false),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final tiles = finder
+          .findInteractiveElements()
+          .where((e) => e['type'] == '_DsTile')
+          .toList();
+      expect(tiles, hasLength(1));
+    });
+
+    testWidgets('is combined with the deprecated isInteractiveWidget with OR',
+        (tester) async {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          // ignore: deprecated_member_use_from_same_package
+          isInteractiveWidget: (type) => type == _DsTile,
+          isInteractiveElement: (element) => element.widget is _DsButton,
+        ),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                _DsTile(enabled: true),
+                _DsPrimaryButton(),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final types = _types(finder.findInteractiveElements());
+      expect(types, contains('_DsTile'));
+      expect(types, contains('_DsPrimaryButton'));
+    });
+
+    testWidgets('does not replace the built-in interactive widgets',
+        (tester) async {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(isInteractiveElement: (_) => false),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ElevatedButton(onPressed: () {}, child: const SizedBox()),
+          ),
+        ),
+      );
+
+      expect(
+        _types(finder.findInteractiveElements()),
+        contains('ElevatedButton'),
+      );
+    });
+  });
+
+  group('ElementTreeFinder shouldStopTraversalAtElement', () {
+    const card = MaterialApp(
+      home: Scaffold(body: _DsCard<String>(child: Text('inside'))),
+    );
+
+    testWidgets('skips the descendants of matching elements', (tester) async {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: (element) => element.widget is _DsCard,
+          shouldStopTraversalAtElement: (element) => element.widget is _DsCard,
+        ),
+      );
+
+      await tester.pumpWidget(card);
+
+      final elements = finder.findInteractiveElements();
+      expect(_types(elements), contains('_DsCard<String>'),
+          reason: 'The element where traversal stops is still discovered');
+      expect(elements.any((e) => e['text'] == 'inside'), isFalse);
+    });
+
+    testWidgets('descends into everything when null', (tester) async {
+      await tester.pumpWidget(card);
+
+      expect(
+        _finder.findInteractiveElements().any((e) => e['text'] == 'inside'),
+        isTrue,
+      );
+    });
+
+    testWidgets('is combined with the deprecated shouldStopTraversal with OR',
+        (tester) async {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          // ignore: deprecated_member_use_from_same_package
+          shouldStopTraversal: (type) => type == _DsTile,
+          shouldStopTraversalAtElement: (element) => element.widget is _DsCard,
+        ),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                _DsCard<int>(child: Text('in card')),
+                _DsTile(enabled: true, child: Text('in tile')),
+                Text('outside'),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final texts =
+          finder.findInteractiveElements().map((e) => e['text']).toSet();
+      expect(texts, isNot(contains('in card')));
+      expect(texts, isNot(contains('in tile')));
+      expect(texts, contains('outside'));
+    });
+  });
+
   group('ElementTreeFinder visibility in a non-implicit view', () {
     testWidgets(
       'an element inside the view is visible even when the implicit view is '
@@ -291,4 +465,61 @@ Map<String, dynamic> _findProbe() {
       'The probe should be discoverable: $elements',
     ),
   );
+}
+
+Set<Object?> _types(List<Map<String, dynamic>> elements) {
+  return elements.map((e) => e['type']).toSet();
+}
+
+/// A hit-testable box standing in for a design-system widget.
+class _DsBox extends StatelessWidget {
+  const _DsBox({this.child});
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 100,
+      height: 40,
+      child: ColoredBox(color: const Color(0xFF000000), child: child),
+    );
+  }
+}
+
+class _DsSelect<T> extends StatelessWidget {
+  const _DsSelect();
+
+  @override
+  Widget build(BuildContext context) => const _DsBox();
+}
+
+abstract class _DsButton extends StatelessWidget {
+  const _DsButton();
+
+  @override
+  Widget build(BuildContext context) => const _DsBox();
+}
+
+class _DsPrimaryButton extends _DsButton {
+  const _DsPrimaryButton();
+}
+
+class _DsTile extends StatelessWidget {
+  const _DsTile({required this.enabled, this.child});
+
+  final bool enabled;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) => _DsBox(child: child);
+}
+
+class _DsCard<T> extends StatelessWidget {
+  const _DsCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => _DsBox(child: child);
 }
