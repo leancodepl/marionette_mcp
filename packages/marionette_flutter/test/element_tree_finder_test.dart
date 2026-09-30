@@ -254,46 +254,7 @@ void main() {
       },
     );
   });
-}
 
-/// A hit-testable probe placed at [offset] within its view.
-///
-/// [Transform.translate] moves the probe for hit testing as well as for
-/// painting — the hit test is performed at the translated position — and hit
-/// tests are not clipped to the view bounds, so the probe stays reachable
-/// wherever it is put, including past the edge of its own view. That is what
-/// makes it usable here: reachability is held constant, and the only thing
-/// that varies is where the probe sits relative to its view, which is exactly
-/// what the visibility check measures.
-Widget _probeAt(Offset offset) {
-  return Transform.translate(
-    offset: offset,
-    child: Align(
-      alignment: Alignment.topLeft,
-      child: SizedBox(
-        width: 100,
-        height: 100,
-        child: GestureDetector(
-          key: const ValueKey('probe'),
-          behavior: HitTestBehavior.opaque,
-          onTap: () {},
-        ),
-      ),
-    ),
-  );
-}
-
-Map<String, dynamic> _findProbe() {
-  // CompactionMode.none so `visible` is present to assert on: the compact
-  // payload omits it when the element is visible.
-  final elements =
-      _finder.findInteractiveElements(compaction: CompactionMode.none);
-  return elements.firstWhere(
-    (e) => e['key'] == 'probe',
-    orElse: () => throw StateError(
-      'The probe should be discoverable: $elements',
-    ),
-  );
   group('ElementTreeFinder property filtering', () {
     testWidgets('drops object-valued properties without any flag',
         (tester) async {
@@ -563,4 +524,44 @@ Map<String, dynamic> _findProbe() {
       expect(element['visible'], isTrue);
     });
   });
+}
+
+/// A hit-testable probe placed at [offset] within its view.
+///
+/// [Transform.translate] moves the probe for hit testing as well as for
+/// painting — the hit test is performed at the translated position — and hit
+/// tests are not clipped to the view bounds, so the probe stays reachable
+/// wherever it is put, including past the edge of its own view. That is what
+/// makes it usable here: reachability is held constant, and the only thing
+/// that varies is where the probe sits relative to its view, which is exactly
+/// what the visibility check measures.
+Widget _probeAt(Offset offset) {
+  return Transform.translate(
+    offset: offset,
+    child: Align(
+      alignment: Alignment.topLeft,
+      child: SizedBox(
+        width: 100,
+        height: 100,
+        child: GestureDetector(
+          key: const ValueKey('probe'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () {},
+        ),
+      ),
+    ),
+  );
+}
+
+Map<String, dynamic> _findProbe() {
+  // CompactionMode.none so `visible` is present to assert on: the compact
+  // payload omits it when the element is visible.
+  final elements =
+      _finder.findInteractiveElements(compaction: CompactionMode.none);
+  return elements.firstWhere(
+    (e) => e['key'] == 'probe',
+    orElse: () => throw StateError(
+      'The probe should be discoverable: $elements',
+    ),
+  );
 }
