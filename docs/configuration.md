@@ -38,6 +38,7 @@ If your widgets wrap or replace these — e.g. a `MyPrimaryButton` built on a `G
 | `extractText` | `String? Function(Element element)?` | `null` | Extract display text from app-specific widgets. |
 | `logCollector` | `LogCollector?` | `null` | Capture app logs for `get_logs`. See [Logging](./logging.md). |
 | `shouldStopTraversal` | `bool Function(Type type)?` | `null` | Stop descending below given widget types. **Rarely needed** — see below. |
+| `widgetAdapters` | `List<MarionetteWidgetAdapter>` | `[]` | Describe composite design-system widgets as one logical target. |
 | `maxScreenshotSize` | `Size?` | `Size(2000, 2000)` | Downscale screenshots to fit; `null` disables resizing. |
 | `compaction` | `CompactionMode` | `CompactionMode.compact` | How much `get_interactive_elements` reduces its payload by default. |
 
@@ -182,6 +183,39 @@ It is tempting to add scroll containers here to "reduce traversal cost." **Don't
 
 Only add a type after profiling shows a real, measured win, and never a scrolling container. If you're not sure, leave it `null`.
 
+### `widgetAdapters`
+
+A composite design-system widget is often built from lower-level widgets — a `GestureDetector` around a `Text`, say. Left alone, `get_interactive_elements` lists those implementation widgets instead of the control the user sees. A widget adapter describes the composite as one logical target instead.
+
+Adapters are tried in order, and the first one that returns a descriptor for an element owns it:
+
+```dart
+class DsButtonAdapter implements MarionetteWidgetAdapter {
+  const DsButtonAdapter();
+
+  @override
+  MarionetteWidgetDescriptor? describe(Element element) {
+    final widget = element.widget;
+    if (widget is! DsButton) return null;
+    return MarionetteWidgetDescriptor(
+      type: 'DsButton',
+      role: 'button',
+      key: widget.id,
+      text: widget.label,
+      state: {'enabled': widget.onPressed != null},
+      traversalPolicy: MarionetteTraversalPolicy.ownSubtree,
+    );
+  }
+}
+
+MarionetteConfiguration(widgetAdapters: const [DsButtonAdapter()])
+```
+
+- The descriptor's `key`, `text` and `type` work with the matching tools, so what the agent sees in `get_interactive_elements` is what it can pass to `tap`, `scroll_to` or `ancestor_keys`. `value` is reported but deliberately not matchable as text.
+- `MarionetteTraversalPolicy.ownSubtree` hides the composite's internals from discovery **and** from matching: a `tap` by key, text or type does not reach past it. Tools still look inside the matched composite for what they need, such as the `EditableText` that `enter_text` types into. `continueTraversal` (the default) only adds the descriptor and keeps the internals visible.
+- A composite counts as reachable when a hit test at its center lands on it or anything inside it, because that is where gestures are dispatched.
+- Descriptor fields must be JSON-encodable. `properties` is free-form extension data and is reported only with `compaction: none`.
+
 ### `maxScreenshotSize`
 
 By default screenshots are downscaled to fit within `2000 × 2000` physical pixels to keep payloads manageable. Override it, or set it to `null` to disable resizing:
@@ -201,6 +235,7 @@ MarionetteConfiguration(maxScreenshotSize: Size(1280, 1280))
 - A `Text` element's `data`, when it repeats the `text` field.
 - `bounds` is rounded to whole logical pixels.
 - `visible` is reported only when an element is **not** visible.
+- A [widget adapter](#widgetadapters) descriptor's free-form `properties`.
 
 `CompactionMode.none` reports every primitive property. Set it when you need the full property dump for debugging:
 
