@@ -264,6 +264,13 @@ String describeStepSelector(String toolName, Map<String, dynamic> args) {
             ? 'uri=${_redactUri(args[key].toString())}'
             : '$key=${_oneLine(args[key].toString())}',
   ];
+  // The MCP field is `ancestor_keys`, the CLI option `--ancestor-keys`. The
+  // keys are joined with `>` rather than written as a Dart list, whose
+  // `[a, b]` form would put a space inside a single part of the line.
+  final ancestorKeys = args['ancestor_keys'] ?? args['ancestor-keys'];
+  if (ancestorKeys is List && ancestorKeys.isNotEmpty) {
+    parts.add('ancestor_keys=${_oneLine(ancestorKeys.join('>'))}');
+  }
   if (args['focused_element'] == true) parts.add('focused_element=true');
   if (args['coordinates'] case final Map<String, dynamic> coordinates) {
     parts.add('x=${coordinates['x']} y=${coordinates['y']}');

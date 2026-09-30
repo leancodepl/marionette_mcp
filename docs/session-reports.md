@@ -90,9 +90,11 @@ can't be skipped or embellished:
 ```
 
 Each line has the tool name, a short selector summary (key/identifier/text/
-coordinates — never the full argument payload — and any `ws://`/`http://` URI
-redacted to `scheme://host:port`, since a Flutter VM service URI embeds a
-live debug-access token in its path), and the outcome. On success, only a
+coordinates, plus any `ancestor_keys` chain joined outermost first, as in
+`ancestor_keys=session_2>grid.cell_3` — never the full argument payload —
+and any `ws://`/`http://` URI redacted to `scheme://host:port`, since a
+Flutter VM service URI embeds a live debug-access token in its path), and
+the outcome. On success, only a
 fixed set of tools whose message is a short, hand-written confirmation
 ("Successfully tapped") get it echoed verbatim (truncated to ~200
 characters) — `connect`/`disconnect` log only their status line, and

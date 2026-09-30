@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 
@@ -29,6 +31,56 @@ sealed class WidgetMatcher {
       throw ArgumentError(
         'Matcher JSON must contain "focused", "x" & "y", "key", '
         '"identifier", "text", or "type" field',
+      );
+    }
+  }
+
+  /// Parses the optional `ancestor_keys` scope that accompanies a matcher.
+  ///
+  /// The scope is not part of the target matcher: it names the subtree the
+  /// target is searched in, so that a key repeated across identical subtrees
+  /// (grid cells, embedded app instances) can be disambiguated. The keys are
+  /// ordered outermost first and nest — each one is looked up inside the
+  /// subtree of the previous — so a chain can reach a cell whose own key also
+  /// repeats, e.g. `['session_2', 'grid.cell_3']`.
+  ///
+  /// Returns an empty list when `ancestor_keys` is absent, meaning the whole
+  /// tree is searched.
+  ///
+  /// Extension params arrive as a flat `string → string` map, so the list
+  /// travels JSON-encoded — the same convention the custom-extension path uses
+  /// for nested values, and one that (unlike a delimiter) cannot collide with
+  /// characters inside a key.
+  static List<KeyMatcher> ancestorsFromJson(Map<String, dynamic> json) {
+    final raw = json['ancestor_keys'];
+    if (raw == null) {
+      return const [];
+    }
+
+    final decoded = raw is String ? _decodeAncestorKeys(raw) : raw;
+    if (decoded is! List) {
+      throw ArgumentError(
+        '"ancestor_keys" must be a JSON array of key strings, got: $raw',
+      );
+    }
+
+    return [
+      for (final key in decoded)
+        if (key is String)
+          KeyMatcher(key)
+        else
+          throw ArgumentError(
+            '"ancestor_keys" must contain only key strings, got: $key',
+          ),
+    ];
+  }
+
+  static Object? _decodeAncestorKeys(String raw) {
+    try {
+      return jsonDecode(raw);
+    } on FormatException catch (e) {
+      throw ArgumentError(
+        '"ancestor_keys" must be a JSON array of key strings, got: $raw (${e.message})',
       );
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
@@ -12,6 +13,7 @@ class SwipeCommand extends InstanceCommand {
       ..addOption('identifier', help: 'Semantics identifier of the element.')
       ..addOption('text', help: 'Visible text content of the element.')
       ..addOption('type', help: 'Widget type name (e.g., PageView).')
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp)
       ..addOption(
         'direction',
         help: 'Swipe direction for element-based mode: left, right, up, down.',
@@ -59,6 +61,8 @@ class SwipeCommand extends InstanceCommand {
         argResults?['identifier'] != null ||
         argResults?['text'] != null ||
         argResults?['type'] != null ||
+        (argResults?['ancestor-keys'] as List<String>? ?? const [])
+            .isNotEmpty ||
         argResults?['direction'] != null ||
         (argResults?.wasParsed('distance') ?? false);
 
@@ -66,8 +70,8 @@ class SwipeCommand extends InstanceCommand {
       usageException(
         'Cannot mix coordinate-based options '
         '(--start-x/--start-y/--end-x/--end-y) with element-based options '
-        '(--key/--identifier/--text/--type/--direction/--distance). '
-        'Use one mode.',
+        '(--key/--identifier/--text/--type/--ancestor-keys/--direction'
+        '/--distance). Use one mode.',
       );
     }
 
@@ -94,8 +98,9 @@ class SwipeCommand extends InstanceCommand {
         identifier: argResults?['identifier'] as String?,
         text: argResults?['text'] as String?,
         type: argResults?['type'] as String?,
+        ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
       );
-      if (matcher.isEmpty) {
+      if (!hasSelector(matcher)) {
         usageException(
           'Element-based swipe requires a matcher: --key, --identifier, '
           '--text, or --type. Alternatively provide '

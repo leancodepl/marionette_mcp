@@ -1,6 +1,7 @@
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
+import 'package:marionette_mcp/src/vm_service/tools/ancestor_keys_description.dart';
 import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -35,6 +36,10 @@ void registerTextTools(
           description:
               'If true, enters text into the currently focused text field. '
               'A text field must be focused first (for example by using tap), otherwise this will fail.',
+        ),
+        'ancestor_keys': JsonSchema.array(
+          items: JsonSchema.string(),
+          description: ancestorKeysDescription,
         ),
       },
       required: ['input'],
