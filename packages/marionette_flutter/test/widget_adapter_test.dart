@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
+import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/widget_finder.dart';
 
 class _CompositeButton extends StatelessWidget {
@@ -136,6 +137,54 @@ class _DelegatingCompositeAdapter implements MarionetteWidgetAdapter {
       type: 'DelegatingCompositeControl',
       key: 'delegating-control',
       actions: <String>['tap'],
+      traversalPolicy: MarionetteTraversalPolicy.ownSubtree,
+    );
+  }
+}
+
+/// A composite whose center hits nothing of its own: the two gesture targets
+/// sit at its ends, so only a descendant is hittable, and not where a gesture
+/// on the composite lands.
+class _SplitComposite extends StatelessWidget {
+  const _SplitComposite({required this.onEnd});
+
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 300,
+      height: 48,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onEnd,
+            child: const SizedBox(width: 40, height: 40),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onEnd,
+            child: const SizedBox(width: 40, height: 40),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SplitCompositeAdapter implements MarionetteWidgetAdapter {
+  const _SplitCompositeAdapter();
+
+  @override
+  MarionetteWidgetDescriptor? describe(Element element) {
+    if (element.widget is! _SplitComposite) {
+      return null;
+    }
+    return const MarionetteWidgetDescriptor(
+      type: 'SplitComposite',
+      key: 'split',
       traversalPolicy: MarionetteTraversalPolicy.ownSubtree,
     );
   }
@@ -375,5 +424,74 @@ void main() {
       isTrue,
     );
     expect(matched?.widget, isA<_DelegatingCompositeControl>());
+  });
+
+  group('hit testing an adapted composite', () {
+    testWidgets('a tap on a matched delegating composite reaches its handler',
+        (tester) async {
+      var presses = 0;
+      const delegatedConfiguration = MarionetteConfiguration(
+        widgetAdapters: <MarionetteWidgetAdapter>[
+          _DelegatingCompositeAdapter(),
+        ],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: _DelegatingCompositeControl(
+                child: ElevatedButton(
+                  onPressed: () => presses++,
+                  child: const Text('Private gesture target'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.runAsync(
+        () => GestureDispatcher().tap(
+          const KeyMatcher('delegating-control'),
+          WidgetFinder(),
+          delegatedConfiguration,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(presses, 1);
+    });
+
+    testWidgets(
+        'a composite whose center hits nothing of its own is not actionable',
+        (tester) async {
+      var taps = 0;
+      const splitConfiguration = MarionetteConfiguration(
+        widgetAdapters: <MarionetteWidgetAdapter>[_SplitCompositeAdapter()],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(child: _SplitComposite(onEnd: () => taps++)),
+          ),
+        ),
+      );
+
+      final elements =
+          const ElementTreeFinder(splitConfiguration).findInteractiveElements();
+      final matched = WidgetFinder().findHittableElement(
+        const KeyMatcher('split'),
+        splitConfiguration,
+      );
+
+      // A hittable descendant is not enough: the gesture would be dispatched
+      // at the composite's center, where nothing of it would receive it.
+      expect(
+        elements.any((element) => element['type'] == 'SplitComposite'),
+        isFalse,
+      );
+      expect(matched, isNull);
+      expect(taps, 0);
+    });
   });
 }

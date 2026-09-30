@@ -106,10 +106,11 @@ class ElementTreeFinder {
     }
 
     // Adapted composites can delegate hit testing to a private descendant
-    // without placing their own render object in the hit-test path.
+    // without placing their own render object in the hit-test path. The check
+    // still probes the composite's center, which is where gestures land.
     final isHittable = descriptor == null
         ? isElementHittable(element)
-        : isElementOrDescendantHittable(element);
+        : isElementHittableThroughSubtree(element);
     if (!isHittable) {
       return null;
     }

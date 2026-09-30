@@ -227,7 +227,7 @@ class WidgetFinder {
         descriptor = describeWidget();
         if (descriptor == null
             ? isElementHittable(element)
-            : isElementOrDescendantHittable(element)) {
+            : isElementHittableThroughSubtree(element)) {
           found = element;
           return;
         }

@@ -56,6 +56,38 @@ bool isElementHittable(Element element) {
 /// covered by an app bar or a bottom bar over part of its extent while
 /// remaining reachable elsewhere.
 bool isElementHittableAt(Element element, Offset localPoint) {
+  return _isHitAt(element, localPoint, acceptSubtree: false);
+}
+
+/// Checks if the [element] can receive pointer events at its center, counting
+/// a hit on any render object in its own render subtree.
+///
+/// A widget adapter describes a composite as one logical target, and such a
+/// composite can forward hit testing to a private render child without adding
+/// its own render object to the hit-test path. [isElementHittable] would
+/// reject it even though a tap at its center reaches its gesture handler.
+///
+/// Only the center is probed, because that is where gestures are dispatched:
+/// a composite whose center hits nothing of its own is not actionable, even if
+/// some descendant is hittable elsewhere.
+bool isElementHittableThroughSubtree(Element element) {
+  final renderObject = element.renderObject;
+  if (renderObject is! RenderBox || !renderObject.hasSize) {
+    return false;
+  }
+
+  return _isHitAt(
+    element,
+    renderObject.size.center(Offset.zero),
+    acceptSubtree: true,
+  );
+}
+
+bool _isHitAt(
+  Element element,
+  Offset localPoint, {
+  required bool acceptSubtree,
+}) {
   final renderObject = element.renderObject;
   if (renderObject is! RenderBox || !renderObject.hasSize) {
     return false;
@@ -77,7 +109,13 @@ bool isElementHittableAt(Element element, Offset localPoint) {
     WidgetsBinding.instance.hitTestInView(result, absoluteOffset, viewId);
 
     for (final entry in result.path) {
-      if (entry.target == renderObject) {
+      final target = entry.target;
+      if (target == renderObject) {
+        return true;
+      }
+      if (acceptSubtree &&
+          target is RenderObject &&
+          _isInRenderSubtree(target, renderObject)) {
         return true;
       }
     }
@@ -88,45 +126,14 @@ bool isElementHittableAt(Element element, Offset localPoint) {
   }
 }
 
-/// Checks whether [element] or one of its visible descendants can receive
-/// pointer events, within a bounded traversal.
-///
-/// A composite widget can delegate hit testing to a private render-object
-/// child without adding its own render object to the hit-test path. Adapters
-/// describe the public composite element, so discovery and action lookup need
-/// to accept the descendant that implements its pointer behavior.
-bool isElementOrDescendantHittable(
-  Element element, {
-  int maxVisitedElements = 512,
-}) {
-  if (maxVisitedElements <= 0) {
-    return false;
-  }
-  var remaining = maxVisitedElements;
-
-  bool visit(Element candidate) {
-    if (remaining <= 0) {
-      return false;
-    }
-    remaining--;
-
-    final widget = candidate.widget;
-    if ((widget is Offstage && widget.offstage) ||
-        (widget is Visibility && !widget.visible)) {
-      return false;
-    }
-    if (isElementHittable(candidate)) {
+/// Whether [node] is [root] or one of its render descendants.
+bool _isInRenderSubtree(RenderObject node, RenderObject root) {
+  RenderObject? current = node;
+  while (current != null) {
+    if (identical(current, root)) {
       return true;
     }
-
-    var result = false;
-    candidate.visitChildren((child) {
-      if (!result) {
-        result = visit(child);
-      }
-    });
-    return result;
+    current = current.parent;
   }
-
-  return visit(element);
+  return false;
 }
