@@ -55,6 +55,25 @@ class VmServiceExtensionException implements Exception {
   }
 }
 
+/// Builds the wire args for `marionette.interactiveElements`.
+///
+/// The VM service delivers extension params to the app as a
+/// `Map<String, String>`, so [compaction] travels as the name of the
+/// `CompactionMode` value rather than as a Dart value the transport would have
+/// to coerce — same as the screencast params. An omitted key is what tells the
+/// app to use its configured default, so null sends nothing.
+///
+/// [ancestorKeys] travels JSON-encoded for the same reason, and an empty chain
+/// sends nothing, which lists the whole tree.
+Map<String, dynamic> interactiveElementsArgs(
+  String? compaction, {
+  List<String> ancestorKeys = const [],
+}) =>
+    {
+      if (compaction != null) 'compaction': compaction,
+      if (ancestorKeys.isNotEmpty) 'ancestor_keys': jsonEncode(ancestorKeys),
+    };
+
 /// Modifier keys accepted by [VmServiceConnector.pressKey].
 ///
 /// Must stay in sync with the modifiers the `marionette_flutter`
@@ -70,6 +89,14 @@ const supportedKeyModifiers = {'control', 'shift', 'alt', 'meta'};
 /// import, so bad input is rejected before it reaches the device.
 const supportedBrightnessValues = {'light', 'dark'};
 
+/// Values accepted for `compaction` by
+/// [VmServiceConnector.getInteractiveElements].
+///
+/// Mirrors the names of the `marionette_flutter` `CompactionMode` enum, which
+/// the CLI and MCP server can't import, so bad input is rejected before it
+/// reaches the device.
+const supportedCompactionModes = {'none', 'compact'};
+
 /// Validates [brightness] against [supportedBrightnessValues].
 ///
 /// Returns a human-readable error message, or `null` when [brightness] is
@@ -80,6 +107,18 @@ String? invalidBrightnessError(String? brightness) {
   }
   return 'Unsupported brightness: $brightness. '
       'Supported values: ${supportedBrightnessValues.join(', ')}.';
+}
+
+/// Validates [compaction] against [supportedCompactionModes].
+///
+/// Returns a human-readable error message, or `null` when [compaction] is
+/// null or supported.
+String? invalidCompactionError(String? compaction) {
+  if (compaction == null || supportedCompactionModes.contains(compaction)) {
+    return null;
+  }
+  return 'Unsupported compaction: $compaction. '
+      'Supported values: ${supportedCompactionModes.join(', ')}.';
 }
 
 /// Validates a comma-separated [modifiers] string against
@@ -309,13 +348,19 @@ class VmServiceConnector {
   /// keys nest, outermost first, and the call fails if any of them matches no
   /// element.
   ///
+  /// [compaction] must be one of [supportedCompactionModes]. It overrides the
+  /// app's `MarionetteConfiguration.compaction` default in both directions;
+  /// pass null to use it (see `get_interactive_elements`).
+  ///
   /// Throws [NotConnectedException] if not connected.
   Future<Map<String, dynamic>> getInteractiveElements({
     List<String> ancestorKeys = const [],
+    String? compaction,
   }) {
-    return _callExtension('marionette.interactiveElements', {
-      if (ancestorKeys.isNotEmpty) 'ancestor_keys': jsonEncode(ancestorKeys),
-    });
+    return _callExtension(
+      'marionette.interactiveElements',
+      interactiveElementsArgs(compaction, ancestorKeys: ancestorKeys),
+    );
   }
 
   /// Taps an element matching the given criteria.

@@ -11,12 +11,16 @@ const _configuration = MarionetteConfiguration();
 
 /// Calls the interactiveElements composition with params as they arrive over
 /// the VM service: string values, the chain JSON-encoded.
-List<Map<String, dynamic>> _list(List<String>? ancestorKeys) {
+List<Map<String, dynamic>> _list(
+  List<String>? ancestorKeys, {
+  CompactionMode? compaction,
+}) {
   return findScopedInteractiveElements(
     {if (ancestorKeys != null) 'ancestor_keys': jsonEncode(ancestorKeys)},
     elementTreeFinder: const ElementTreeFinder(_configuration),
     widgetFinder: WidgetFinder(),
     configuration: _configuration,
+    compaction: compaction,
   );
 }
 
@@ -114,6 +118,58 @@ void main() {
 
       expect(_hasText(elements, 'inner'), isTrue);
       expect(_hasText(elements, 'outer'), isFalse);
+    });
+  });
+
+  group('parseCompactionParam', () {
+    test('reads each CompactionMode name off the wire', () {
+      // The VM service hands every param to the app as a string, so the sender
+      // sends the enum name instead of relying on the transport's coercion.
+      expect(
+        parseCompactionParam({'compaction': 'none'}).value,
+        CompactionMode.none,
+      );
+      expect(
+        parseCompactionParam({'compaction': 'compact'}).value,
+        CompactionMode.compact,
+      );
+    });
+
+    test('an absent key selects the app default', () {
+      final parsed = parseCompactionParam({});
+
+      expect(parsed.value, isNull);
+      expect(parsed.error, isNull);
+    });
+
+    test('rejects an unknown mode, naming the valid ones', () {
+      final parsed = parseCompactionParam({'compaction': 'ultra'});
+
+      expect(parsed.value, isNull);
+      expect(parsed.error, isA<MarionetteExtensionInvalidParams>());
+      expect(
+        (parsed.error! as MarionetteExtensionInvalidParams).detail,
+        contains('must be "none" or "compact", got "ultra"'),
+      );
+    });
+  });
+
+  group('marionette.interactiveElements with ancestor_keys and compaction', () {
+    testWidgets('compacts a scoped listing the way the request asks',
+        (tester) async {
+      await tester.pumpWidget(_sessions());
+
+      final compact = _list(['session_2'], compaction: CompactionMode.compact);
+      final full = _list(['session_2'], compaction: CompactionMode.none);
+
+      expect(
+        compact.map((e) => e['text']),
+        full.map((e) => e['text']),
+        reason: 'compaction must not change which elements the scope lists',
+      );
+      expect(_hasText(compact, 'A 1'), isFalse);
+      expect(compact, everyElement(isNot(contains('visible'))));
+      expect(full, everyElement(contains('visible')));
     });
   });
 }

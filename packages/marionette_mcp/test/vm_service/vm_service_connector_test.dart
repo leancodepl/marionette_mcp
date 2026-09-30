@@ -224,4 +224,31 @@ void main() {
       });
     });
   });
+
+  group('interactiveElementsArgs', () {
+    test('sends the compaction mode by name', () {
+      // The VM service delivers params to the app as a Map<String, String>,
+      // and the app parses these names back into its CompactionMode enum.
+      expect(interactiveElementsArgs('none'), {'compaction': 'none'});
+      expect(interactiveElementsArgs('compact'), {'compaction': 'compact'});
+      expect(interactiveElementsArgs(null), isEmpty,
+          reason: 'an omitted key is what selects the app default');
+    });
+  });
+
+  group('invalidCompactionError', () {
+    test('accepts null and every supported mode', () {
+      expect(invalidCompactionError(null), isNull);
+      for (final mode in supportedCompactionModes) {
+        expect(invalidCompactionError(mode), isNull);
+      }
+    });
+
+    test('rejects an unknown mode, naming the supported ones', () {
+      final error = invalidCompactionError('ultra');
+
+      expect(error, contains('ultra'));
+      expect(error, contains('none, compact'));
+    });
+  });
 }

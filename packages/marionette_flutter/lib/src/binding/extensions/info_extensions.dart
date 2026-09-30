@@ -62,11 +62,19 @@ void registerInfoExtensions({
   registerInternalMarionetteExtension(
     name: 'marionette.interactiveElements',
     callback: (params) async {
+      // Validated before the scope is resolved, so a bad value is reported as
+      // such rather than masked by a missing scope key.
+      final compaction = parseCompactionParam(params);
+      if (compaction.error case final error?) {
+        return error;
+      }
+
       final elements = findScopedInteractiveElements(
         params,
         elementTreeFinder: elementTreeFinder,
         widgetFinder: widgetFinder,
         configuration: configuration,
+        compaction: compaction.value,
       );
       return MarionetteExtensionResult.success({'elements': elements});
     },
@@ -114,17 +122,48 @@ void registerInfoExtensions({
 /// fails the same way, naming the link that broke, instead of listing the
 /// whole tree. The scope element itself is listed too: a scope key sitting on
 /// an interactive widget would otherwise list nothing.
+///
+/// [compaction] is passed through to [ElementTreeFinder.findInteractiveElements];
+/// null uses the app's configured default.
 @visibleForTesting
 List<Map<String, dynamic>> findScopedInteractiveElements(
   Map<String, String> params, {
   required ElementTreeFinder elementTreeFinder,
   required WidgetFinder widgetFinder,
   required MarionetteConfiguration configuration,
+  CompactionMode? compaction,
 }) {
   return elementTreeFinder.findInteractiveElements(
     startElement: widgetFinder.resolveScopeRoot(
       WidgetMatcher.ancestorsFromJson(params),
       configuration,
     ),
+    compaction: compaction,
   );
+}
+
+/// Reads the optional `compaction` param of `marionette.interactiveElements`.
+///
+/// VM service params always arrive as strings, so the caller sends the enum
+/// name rather than a Dart value. An absent key means "use the app's
+/// `MarionetteConfiguration.compaction` default", so it maps to null.
+@visibleForTesting
+({CompactionMode? value, MarionetteExtensionResult? error})
+    parseCompactionParam(
+  Map<String, String> params,
+) {
+  final raw = params['compaction'];
+  if (raw == null) {
+    return (value: null, error: null);
+  }
+  return switch (raw) {
+    'none' => (value: CompactionMode.none, error: null),
+    'compact' => (value: CompactionMode.compact, error: null),
+    _ => (
+        value: null,
+        error: MarionetteExtensionResult.invalidParams(
+          'Parameter "compaction" must be "none" or "compact", got "$raw"',
+        ),
+      ),
+  };
 }
