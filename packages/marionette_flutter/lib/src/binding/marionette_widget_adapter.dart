@@ -45,6 +45,11 @@ class MarionetteWidgetDescriptor {
   final Map<String, Object?> state;
   final List<String> actions;
 
+  /// Free-form, JSON-encodable extension data.
+  ///
+  /// Reported only when `get_interactive_elements` runs with compaction
+  /// `none`: no interaction tool reads it, so the compact payload leaves it
+  /// out.
   final Map<String, Object?> properties;
   final MarionetteTraversalPolicy traversalPolicy;
 

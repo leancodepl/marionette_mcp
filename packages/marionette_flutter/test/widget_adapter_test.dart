@@ -300,7 +300,11 @@ void main() {
     );
 
     const finder = ElementTreeFinder(configuration);
-    final elements = finder.findInteractiveElements();
+    // CompactionMode.none so that every descriptor field, `properties`
+    // included, is reported.
+    final elements = finder.findInteractiveElements(
+      compaction: CompactionMode.none,
+    );
 
     final button = elements.singleWhere(
       (element) => element['type'] == 'CompositeButton',
@@ -674,6 +678,46 @@ void main() {
 
       expect(elements.any((e) => e['text'] == 'Go panel-2'), isTrue);
       expect(elements.any((e) => e['text'] == 'Go panel-1'), isFalse);
+    });
+  });
+
+  group('compaction of descriptor elements', () {
+    testWidgets('compact keeps the stable fields and drops properties',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: _CompositeButton(label: 'Continue')),
+        ),
+      );
+
+      final button = const ElementTreeFinder(configuration)
+          .findInteractiveElements(compaction: CompactionMode.compact)
+          .singleWhere((element) => element['type'] == 'CompositeButton');
+
+      expect(button['role'], 'button');
+      expect(button['key'], 'continue');
+      expect(button['text'], 'Continue');
+      expect(button['state'], <String, Object?>{'enabled': true});
+      expect(button['actions'], <String>['tap']);
+      expect(button.containsKey('properties'), isFalse);
+      expect(button.containsKey('visible'), isFalse);
+      final bounds = button['bounds'] as Map<String, Object?>;
+      expect(bounds.values, everyElement(isA<int>()));
+    });
+
+    testWidgets('none reports properties and visibility', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: _CompositeButton(label: 'Continue')),
+        ),
+      );
+
+      final button = const ElementTreeFinder(configuration)
+          .findInteractiveElements(compaction: CompactionMode.none)
+          .singleWhere((element) => element['type'] == 'CompositeButton');
+
+      expect(button['properties'], <String, Object?>{'variant': 'primary'});
+      expect(button['visible'], isTrue);
     });
   });
 }

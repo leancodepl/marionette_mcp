@@ -118,7 +118,14 @@ class ElementTreeFinder {
     final compact = compaction == CompactionMode.compact;
     final Map<String, Object?> data;
     if (descriptor != null) {
+      // The adapter chose every descriptor field, so none of them goes through
+      // the primitive filter below. `properties` is the free-form extension
+      // bag, though, and no interaction tool reads it, so the compact payload
+      // leaves it out like the other details no tool acts on.
       data = descriptor.toJson();
+      if (compact) {
+        data.remove('properties');
+      }
     } else {
       final properties = DiagnosticPropertiesBuilder();
       widget.debugFillProperties(properties);
