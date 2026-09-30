@@ -36,6 +36,34 @@ void main() {
       expect(selector, 'x=10 y=20');
     });
 
+    test('records the ancestor_keys chain, outermost first', () {
+      final selector = describeStepSelector('tap', {
+        'key': 'cell.joinButton',
+        'ancestor_keys': ['session_2', 'grid.cell_3'],
+      });
+
+      expect(
+          selector, 'key=cell.joinButton ancestor_keys=session_2>grid.cell_3');
+    });
+
+    test('records the CLI --ancestor-keys option under the same name', () {
+      final selector = describeStepSelector('tap', {
+        'type': 'TextField',
+        'ancestor-keys': ['login_passwordTextField'],
+      });
+
+      expect(selector, 'type=TextField ancestor_keys=login_passwordTextField');
+    });
+
+    test('omits an empty ancestor_keys list', () {
+      final selector = describeStepSelector('tap', {
+        'key': 'submit_button',
+        'ancestor_keys': <String>[],
+      });
+
+      expect(selector, 'key=submit_button');
+    });
+
     test('redacts a connect uri to scheme://host:port', () {
       // Regression test: Flutter VM service URIs commonly embed an auth
       // token as a path segment (ws://host:PORT/TOKEN=/ws) — logging the
