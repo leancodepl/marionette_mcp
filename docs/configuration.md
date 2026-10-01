@@ -24,6 +24,8 @@ With no configuration, Marionette recognizes the standard Flutter widgets.
 
 **Interactive (returned by `get_interactive_elements`, targetable by `tap`):** `Checkbox`, `CheckboxListTile`, `DropdownButton`, `DropdownButtonFormField`, `ElevatedButton`, `FilledButton`, `FloatingActionButton`, `GestureDetector`, `IconButton`, `InkWell`, `OutlinedButton`, `PopupMenuButton`, `Radio`, `RadioListTile`, `Slider`, `Switch`, `SwitchListTile`, `TextButton`, `TextField`, `TextFormField`, `ButtonStyleButton`.
 
+Generic widgets (`DropdownButton<String>`, `Radio<int>`, …) and subclasses (such as the button returned by `ElevatedButton.icon`, or your own `class MyButton extends ElevatedButton`) are recognized too.
+
 **Text extraction (used for `tap(text:)` matching and shown in element output):** `Text`, `RichText`, `EditableText`, `TextField`, `TextFormField`.
 
 If your widgets wrap or replace these — e.g. a `MyPrimaryButton` built on a `GestureDetector`, or a `MyText` that isn't a `Text` — Marionette won't know about them until you tell it. That's what the callbacks below are for.

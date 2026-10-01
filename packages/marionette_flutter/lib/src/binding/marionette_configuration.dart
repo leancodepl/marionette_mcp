@@ -192,40 +192,47 @@ class MarionetteConfiguration {
 
   /// Checks if an element's widget is interactive (built-in + custom).
   bool isElementInteractive(Element element) {
-    // ignore: deprecated_member_use_from_same_package
-    return isInteractiveWidgetType(element.widget.runtimeType) ||
+    final widget = element.widget;
+    return _isBuiltInInteractiveWidget(widget) ||
+        // ignore: deprecated_member_use_from_same_package
+        (isInteractiveWidget?.call(widget.runtimeType) ?? false) ||
         (isInteractiveElement?.call(element) ?? false);
   }
 
   /// Returns whether traversal should stop at the given element.
   bool shouldStopAtElement(Element element) {
-    // ignore: deprecated_member_use_from_same_package
-    return shouldStopAtType(element.widget.runtimeType) ||
+    final widget = element.widget;
+    return _isBuiltInStopWidget(widget) ||
+        // ignore: deprecated_member_use_from_same_package
+        (shouldStopTraversal?.call(widget.runtimeType) ?? false) ||
         (shouldStopTraversalAtElement?.call(element) ?? false);
   }
 
   /// Checks if a widget type is interactive (built-in + custom).
   ///
-  /// Ignores [isInteractiveElement].
+  /// Compares types exactly, so it doesn't recognize generic built-in widgets
+  /// such as `DropdownButton<String>`, or subclasses. Ignores
+  /// [isInteractiveElement].
   @Deprecated(
     'Use isElementInteractive instead. '
     'It will be removed in a future release.',
   )
   bool isInteractiveWidgetType(Type type) {
-    return _isBuiltInInteractiveWidget(type) ||
+    return _isBuiltInInteractiveType(type) ||
         // ignore: deprecated_member_use_from_same_package
         (isInteractiveWidget?.call(type) ?? false);
   }
 
   /// Returns whether traversal should stop at the given widget type.
   ///
-  /// Ignores [shouldStopTraversalAtElement].
+  /// Compares types exactly, so it doesn't recognize generic built-in widgets
+  /// or subclasses. Ignores [shouldStopTraversalAtElement].
   @Deprecated(
     'Use shouldStopAtElement instead. '
     'It will be removed in a future release.',
   )
   bool shouldStopAtType(Type type) {
-    return _isBuiltInStopWidget(type) ||
+    return _isBuiltInStopType(type) ||
         // ignore: deprecated_member_use_from_same_package
         (shouldStopTraversal?.call(type) ?? false);
   }
@@ -238,7 +245,62 @@ class MarionetteConfiguration {
 
   // Built-in Flutter widget support
 
-  static bool _isBuiltInInteractiveWidget(Type type) {
+  /// Matches with `is`, so generic widgets (`DropdownButton<String>`) and
+  /// subclasses (the private button returned by `ElevatedButton.icon`) are
+  /// recognized too.
+  static bool _isBuiltInInteractiveWidget(Widget widget) {
+    return switch (widget) {
+      Checkbox() ||
+      CheckboxListTile() ||
+      DropdownButton() ||
+      DropdownButtonFormField() ||
+      FloatingActionButton() ||
+      GestureDetector() ||
+      IconButton() ||
+      InkWell() ||
+      PopupMenuButton() ||
+      Radio() ||
+      RadioListTile() ||
+      Slider() ||
+      Switch() ||
+      SwitchListTile() ||
+      TextField() ||
+      TextFormField() ||
+      // ElevatedButton, FilledButton, OutlinedButton, TextButton and their
+      // private variants, such as the one returned by ElevatedButton.icon.
+      ButtonStyleButton() =>
+        true,
+      _ => false,
+    };
+  }
+
+  /// Built-in interactive widgets whose descendants are still traversed.
+  ///
+  /// [GestureDetector] and [InkWell] usually wrap content. The others show
+  /// their label or selected value in a child that would otherwise be hidden
+  /// from discovery.
+  static bool _isBuiltInPassThroughWidget(Widget widget) {
+    return switch (widget) {
+      GestureDetector() ||
+      InkWell() ||
+      DropdownButton() ||
+      DropdownButtonFormField() ||
+      PopupMenuButton() ||
+      RadioListTile() =>
+        true,
+      _ => false,
+    };
+  }
+
+  static bool _isBuiltInStopWidget(Widget widget) {
+    return !_isBuiltInPassThroughWidget(widget) &&
+        (_isBuiltInInteractiveWidget(widget) || widget is Text);
+  }
+
+  // Exact type comparisons used only by the deprecated Type-based methods.
+  // Remove together with them.
+
+  static bool _isBuiltInInteractiveType(Type type) {
     return type == Checkbox ||
         type == CheckboxListTile ||
         type == DropdownButton ||
@@ -262,9 +324,9 @@ class MarionetteConfiguration {
         type == ButtonStyleButton;
   }
 
-  static bool _isBuiltInStopWidget(Type type) {
+  static bool _isBuiltInStopType(Type type) {
     return (type != GestureDetector && type != InkWell) &&
-        (_isBuiltInInteractiveWidget(type) || type == Text);
+        (_isBuiltInInteractiveType(type) || type == Text);
   }
 
   static String? _extractBuiltInText(Widget widget) {

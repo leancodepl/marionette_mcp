@@ -205,6 +205,123 @@ void main() {
     });
   });
 
+  group('ElementTreeFinder built-in generic widgets', () {
+    Future<List<Map<String, dynamic>>> discover(
+      WidgetTester tester,
+      Widget child,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: Center(child: child))),
+      );
+      return _finder.findInteractiveElements();
+    }
+
+    const items = [DropdownMenuItem(value: 'Apple', child: Text('Apple'))];
+
+    testWidgets('DropdownButton is recognized and keeps its selected value',
+        (tester) async {
+      final elements = await discover(
+        tester,
+        DropdownButton<String>(
+          value: 'Apple',
+          items: items,
+          onChanged: (_) {},
+        ),
+      );
+
+      expect(_types(elements), contains('DropdownButton<String>'));
+      expect(elements.any((e) => e['text'] == 'Apple'), isTrue);
+    });
+
+    testWidgets(
+        'DropdownButtonFormField is recognized and keeps its selected value',
+        (tester) async {
+      final elements = await discover(
+        tester,
+        SizedBox(
+          width: 300,
+          child: DropdownButtonFormField<String>(
+            initialValue: 'Apple',
+            items: items,
+            onChanged: (_) {},
+          ),
+        ),
+      );
+
+      expect(_types(elements), contains('DropdownButtonFormField<String>'));
+      expect(elements.any((e) => e['text'] == 'Apple'), isTrue);
+    });
+
+    testWidgets('Radio is recognized and stops traversal like Checkbox',
+        (tester) async {
+      final elements = await discover(tester, const Radio<int>(value: 1));
+
+      expect(_types(elements), {'Radio<int>'});
+    });
+
+    testWidgets('RadioListTile is recognized and keeps its title',
+        (tester) async {
+      final elements = await discover(
+        tester,
+        RadioGroup<int>(
+          groupValue: 1,
+          onChanged: (_) {},
+          child: const RadioListTile<int>(value: 1, title: Text('One')),
+        ),
+      );
+
+      expect(_types(elements), contains('RadioListTile<int>'));
+      expect(elements.any((e) => e['text'] == 'One'), isTrue);
+    });
+
+    testWidgets('PopupMenuButton is recognized and keeps its child',
+        (tester) async {
+      final elements = await discover(
+        tester,
+        PopupMenuButton<String>(
+          itemBuilder: (_) => const [],
+          child: const Text('Menu'),
+        ),
+      );
+
+      expect(_types(elements), contains('PopupMenuButton<String>'));
+      expect(elements.any((e) => e['text'] == 'Menu'), isTrue);
+    });
+  });
+
+  group('ElementTreeFinder built-in widget subclasses', () {
+    testWidgets('ElevatedButton.icon is reported like a plain ElevatedButton',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ElevatedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.add),
+              label: const Text('Save'),
+            ),
+          ),
+        ),
+      );
+
+      final elements = _finder.findInteractiveElements();
+      expect(elements, hasLength(1));
+      expect(elements.single['type'], contains('ElevatedButton'));
+    });
+
+    testWidgets('an app subclass of a built-in button is recognized',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: _AppButton())),
+      );
+
+      expect(
+        _types(_finder.findInteractiveElements()),
+        {'_AppButton'},
+      );
+    });
+  });
+
   group('ElementTreeFinder isInteractiveElement', () {
     testWidgets('matches generic widgets and subclasses with an is check',
         (tester) async {
@@ -522,4 +639,10 @@ class _DsCard<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => _DsBox(child: child);
+}
+
+class _AppButton extends ElevatedButton {
+  const _AppButton() : super(onPressed: _noop, child: const Text('App'));
+
+  static void _noop() {}
 }
