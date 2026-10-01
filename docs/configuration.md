@@ -242,13 +242,13 @@ MarionetteConfiguration(enableSessionReports: true)
 
 `get_interactive_elements` always reports only primitive-valued properties — `ButtonStyle`, `TextStyle`, `InputDecoration` and colour blobs never reach the agent. `compaction` decides how much of what is left is reported.
 
-`CompactionMode.compact` is the default. It additionally drops:
+`CompactionMode.compact` is the default. It additionally:
 
-- Rendering details no interaction tool reads: `textAlign`, `textDirection`, `softWrap`, `overflow`, `textWidthBasis`, `startBehavior`.
-- The text-style primitives a `Text` inlines from its `style`: `inherit`, `family`, `size`, `letterSpacing`, `height`, `baseline`, `leadingDistribution`.
-- A `Text` element's `data`, when it repeats the `text` field.
-- `bounds` is rounded to whole logical pixels.
-- `visible` is reported only when an element is **not** visible.
+- Drops rendering details no interaction tool reads: `textAlign`, `textDirection`, `softWrap`, `overflow`, `textWidthBasis`, `startBehavior`.
+- Drops the text-style primitives a `Text` inlines from its `style`: `inherit`, `family`, `size`, `letterSpacing`, `height`, `baseline`, `leadingDistribution`.
+- Drops a `Text` element's `data`, when it repeats the `text` field.
+- Rounds `bounds` to whole logical pixels.
+- Reports `visible` only when an element is **not** visible.
 
 `CompactionMode.none` reports every primitive property. Set it when you need the full property dump for debugging:
 
