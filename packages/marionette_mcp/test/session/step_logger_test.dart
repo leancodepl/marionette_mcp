@@ -64,6 +64,21 @@ void main() {
       expect(selector, 'key=submit_button');
     });
 
+    test('records a compaction override', () {
+      final selector = describeStepSelector('get_interactive_elements', {
+        'ancestor_keys': ['session_2'],
+        'compaction': 'none',
+      });
+
+      expect(selector, 'ancestor_keys=session_2 compaction=none');
+    });
+
+    test('omits compaction when the app default is used', () {
+      final selector = describeStepSelector('get_interactive_elements', {});
+
+      expect(selector, isEmpty);
+    });
+
     test('redacts a connect uri to scheme://host:port', () {
       // Regression test: Flutter VM service URIs commonly embed an auth
       // token as a path segment (ws://host:PORT/TOKEN=/ws) — logging the
