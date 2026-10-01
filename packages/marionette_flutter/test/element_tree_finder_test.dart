@@ -241,7 +241,9 @@ void main() {
         SizedBox(
           width: 300,
           child: DropdownButtonFormField<String>(
-            initialValue: 'Apple',
+            // `initialValue` replaces it only in newer Flutter versions.
+            // ignore: deprecated_member_use
+            value: 'Apple',
             items: items,
             onChanged: (_) {},
           ),
@@ -254,7 +256,17 @@ void main() {
 
     testWidgets('Radio is recognized and stops traversal like Checkbox',
         (tester) async {
-      final elements = await discover(tester, const Radio<int>(value: 1));
+      final elements = await discover(
+        tester,
+        Radio<int>(
+          value: 1,
+          // RadioGroup replaces these only in newer Flutter versions.
+          // ignore: deprecated_member_use
+          groupValue: 1,
+          // ignore: deprecated_member_use
+          onChanged: (_) {},
+        ),
+      );
 
       expect(_types(elements), {'Radio<int>'});
     });
@@ -263,10 +275,14 @@ void main() {
         (tester) async {
       final elements = await discover(
         tester,
-        RadioGroup<int>(
+        RadioListTile<int>(
+          value: 1,
+          // RadioGroup replaces these only in newer Flutter versions.
+          // ignore: deprecated_member_use
           groupValue: 1,
+          // ignore: deprecated_member_use
           onChanged: (_) {},
-          child: const RadioListTile<int>(value: 1, title: Text('One')),
+          title: const Text('One'),
         ),
       );
 
