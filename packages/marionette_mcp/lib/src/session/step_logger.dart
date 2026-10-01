@@ -271,6 +271,11 @@ String describeStepSelector(String toolName, Map<String, dynamic> args) {
   if (ancestorKeys is List && ancestorKeys.isNotEmpty) {
     parts.add('ancestor_keys=${_oneLine(ancestorKeys.join('>'))}');
   }
+  // Only present when the caller overrode the app's default, so the log shows
+  // whether a listing was the full payload or the compact one.
+  if (args['compaction'] case final String compaction) {
+    parts.add('compaction=${_oneLine(compaction)}');
+  }
   if (args['focused_element'] == true) parts.add('focused_element=true');
   if (args['coordinates'] case final Map<String, dynamic> coordinates) {
     parts.add('x=${coordinates['x']} y=${coordinates['y']}');
