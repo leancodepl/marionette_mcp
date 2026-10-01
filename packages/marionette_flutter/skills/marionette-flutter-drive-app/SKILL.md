@@ -61,13 +61,15 @@ Zero-config setup only recognizes stock Material widgets (`ElevatedButton`,
 buttons, fields, or text — true of most production apps — `get_interactive_elements`
 will look sparse and `tap(text: ...)` will fail to find things that are
 clearly on screen. That's not a Marionette bug; it just doesn't know your
-widget types yet:
+widgets yet:
 
 ```dart
 MarionetteConfiguration(
   // Recognize your custom interactive widgets.
-  isInteractiveWidget: (type) =>
-      type == MyPrimaryButton || type == MyTextField,
+  isInteractiveElement: (element) => switch (element.widget) {
+    MyButton() || MyTextField() => true,
+    _ => false,
+  },
   // Extract their visible text for text-based matching and discovery.
   extractText: (element) {
     final widget = element.widget;
@@ -83,8 +85,17 @@ For a non-trivial design system, extract the configuration to its own file
 rather than growing it inline in `main.dart` — that keeps release builds free
 of design-system introspection helpers even before the compiler strips them.
 
-`extractText` receives the `Element`, not just the `Widget`, so it can walk
+`isInteractiveElement` and `extractText` receive the `Element`, not just the
+`Widget`. Match with an `is` check or pattern on `element.widget` — that
+covers generic widgets (`MySelect()` matches `MySelect<String>`) and
+subclasses (`MyButton()` matches `MyPrimaryButton extends MyButton`), and can
+read the widget's fields to decide per instance. `extractText` can also walk
 the subtree when a label is itself a widget rather than a plain string.
+If the app still uses the deprecated `isInteractiveWidget: (type) => ...` or
+`shouldStopTraversal: (type) => ...`, move it to `isInteractiveElement` /
+`shouldStopTraversalAtElement`: a `Type` only compares with exact `==`, so it
+silently misses generic and subclassed widgets. While both are set, their
+results are combined with OR.
 Custom-painted text and badges reach no `Text` widget at all, and a
 `WidgetSpan` is only a problem when its embedded content isn't itself built
 from `Text`/`RichText` (an icon, a custom-painted chip) — plain text nested
@@ -102,9 +113,9 @@ only ever decorative, or ones that already wrap a primitive Marionette sees
 need to be exhaustive up front — extend it as real use surfaces a missing
 target.
 
-One more `MarionetteConfiguration` field, `shouldStopTraversal`, is worth
-naming only to warn against it: it's tempting to add a scroll container there
-to "reduce traversal cost," but on a real production app that measurably
+One more `MarionetteConfiguration` field, `shouldStopTraversalAtElement`, is
+worth naming only to warn against it: it's tempting to add a scroll container
+there to "reduce traversal cost," but on a real production app that measurably
 *dropped* widget coverage from 25.8% to 17.8% — the agent lost visibility into
 everything nested below the cut, including the content it needed to reach.
 Leave it `null` unless a profiler has shown a real, measured cost, and never
@@ -346,7 +357,7 @@ disconnecting.
   `Semantics` annotation — both fixed under *Preparing the app*, above, not
   something to work around here.
 - **If coverage looks low across a whole screen rather than one missing
-  element, don't reach for `shouldStopTraversal`.** It's tempting to suggest
+  element, don't reach for `shouldStopTraversalAtElement`.** It's tempting to suggest
   filtering a scroll container out of traversal to "reduce noise," but that's
   the one config change measured to make things worse (25.8% → 17.8% widget
   coverage on a real app) — see *Custom design system?*, above.

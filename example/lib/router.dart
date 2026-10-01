@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'screens/about_screen.dart';
+import 'screens/custom_widgets_screen.dart';
 import 'screens/dismissible_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/items_screen.dart';
@@ -26,6 +27,7 @@ const availablePages = <String, String>{
   'pinch_zoom': '/settings/pinch-zoom',
   'mouse_tap': '/settings/mouse-tap',
   'scoped_matching': '/settings/scoped-matching',
+  'custom_widgets': '/settings/custom-widgets',
 };
 
 final router = GoRouter(
@@ -70,6 +72,10 @@ final router = GoRouter(
             GoRoute(
               path: 'scoped-matching',
               builder: (context, state) => const ScopedMatchingScreen(),
+            ),
+            GoRoute(
+              path: 'custom-widgets',
+              builder: (context, state) => const CustomWidgetsScreen(),
             ),
           ],
         ),

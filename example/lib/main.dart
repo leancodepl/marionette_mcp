@@ -4,6 +4,7 @@ import 'package:logging/logging.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:marionette_logging/marionette_logging.dart';
 
+import 'custom_widgets.dart';
 import 'router.dart';
 
 void main() {
@@ -12,6 +13,21 @@ void main() {
       MarionetteConfiguration(
         logCollector: LoggingLogCollector(),
         enableSessionReports: true,
+        // Teach Marionette about the custom widgets in custom_widgets.dart.
+        // An `is` check matches every DsButton subclass and every
+        // DsSelect<T>, and the widget's fields allow per-instance decisions.
+        isInteractiveElement: (element) => switch (element.widget) {
+          DsButton() || DsSelect() => true,
+          DsTile(:final onTap) => onTap != null,
+          _ => false,
+        },
+        // DsSelect reports its label through extractText, so its internals
+        // would only duplicate it.
+        shouldStopTraversalAtElement: (element) => element.widget is DsSelect,
+        extractText: (element) => switch (element.widget) {
+          DsSelect(:final selectedLabel) => selectedLabel,
+          _ => null,
+        },
       ),
     );
     _registerNavigationExtensions();

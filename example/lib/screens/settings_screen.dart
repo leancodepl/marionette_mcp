@@ -69,6 +69,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/scoped-matching'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.widgets_outlined),
+            title: const Text('Custom Widgets'),
+            subtitle: const Text('Design-system and generic widgets'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/custom-widgets'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),

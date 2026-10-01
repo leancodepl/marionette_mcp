@@ -35,7 +35,7 @@ class ElementTreeFinder {
       result.add(elementData);
     }
 
-    if (configuration.shouldStopAtType(widget.runtimeType)) {
+    if (configuration.shouldStopAtElement(element)) {
       return;
     }
 
@@ -52,9 +52,7 @@ class ElementTreeFinder {
     }
 
     // Check if this is an interactive or meaningful widget
-    final isInteractive = configuration.isInteractiveWidgetType(
-      widget.runtimeType,
-    );
+    final isInteractive = configuration.isElementInteractive(element);
     final text = configuration.extractTextFromWidget(element);
     // Discovery-only Semantics fallback: if the standard matcher path yielded
     // no text, surface explicit accessibility annotations so agents can read
