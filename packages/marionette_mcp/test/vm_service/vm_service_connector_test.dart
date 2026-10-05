@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:test/test.dart';
 import 'package:vm_service/vm_service.dart';
@@ -47,6 +50,50 @@ void main() {
       expect(exception.error, contains('callback failed'));
       expect(exception.error, contains('retryable: false'));
     });
+  });
+
+  group('VmServiceConnector.connect', () {
+    test(
+      'connects when the Service stream subscription never completes',
+      () async {
+        // A DDS whose stream-subscription lock is stuck never answers
+        // streamListen, while getVM and getIsolate still work.
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.transform(WebSocketTransformer()).listen((socket) {
+          socket.listen((message) {
+            final request = jsonDecode(message as String) as Map;
+            final result = switch (request['method']) {
+              'getVM' => {
+                  'type': 'VM',
+                  'isolates': [
+                    {'type': '@Isolate', 'id': 'isolates/1', 'name': 'main'},
+                  ],
+                },
+              'getIsolate' => {
+                  'type': 'Isolate',
+                  'id': 'isolates/1',
+                  'name': 'main',
+                  'extensionRPCs': ['ext.flutter.marionette.getLogs'],
+                },
+              _ => null,
+            };
+            if (result != null) {
+              socket.add(jsonEncode(
+                {'jsonrpc': '2.0', 'id': request['id'], 'result': result},
+              ));
+            }
+          });
+        });
+
+        final connector = VmServiceConnector();
+        addTearDown(connector.disconnect);
+        await connector.connect('ws://127.0.0.1:${server.port}/ws');
+
+        expect(connector.isConnected, isTrue);
+      },
+      timeout: const Timeout(Duration(seconds: 5)),
+    );
   });
 
   group('VmServiceConnector.callCustomExtension', () {
