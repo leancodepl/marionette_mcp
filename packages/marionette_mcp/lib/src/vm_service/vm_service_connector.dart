@@ -187,7 +187,13 @@ class VmServiceConnector {
             _logger.info('Service event: $e');
         }
       });
-      await _service!.streamListen(EventStreams.kService);
+      try {
+        await _service!
+            .streamListen(EventStreams.kService)
+            .timeout(const Duration(milliseconds: 500));
+      } catch (e) {
+        _logger.info('streamListen(EventStreams.kService) skipped: $e');
+      }
 
       _isolateId = await _findIsolateWithMarionetteExtensions();
       _logger.info('Connected to isolate: $_isolateId');
