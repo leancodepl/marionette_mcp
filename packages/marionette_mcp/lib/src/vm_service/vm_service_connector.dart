@@ -187,12 +187,18 @@ class VmServiceConnector {
             _logger.info('Service event: $e');
         }
       });
+      // A DDS can stop answering streamListen for every client until
+      // `flutter run` restarts, so connecting must not wait on it.
       try {
         await _service!
             .streamListen(EventStreams.kService)
             .timeout(const Duration(milliseconds: 500));
-      } catch (e) {
-        _logger.info('streamListen(EventStreams.kService) skipped: $e');
+      } catch (err) {
+        _logger.warning(
+          'Could not subscribe to the Service stream; '
+          'hot reload and hot restart may not work',
+          err,
+        );
       }
 
       _isolateId = await _findIsolateWithMarionetteExtensions();

@@ -19,6 +19,7 @@
 - Fix `scroll_to` on screens with more than one scrollable: when the target is not built yet it now tries the two best-ranked reachable scrollables in turn rather than committing to a single guess, so a chip row, tab strip or nav rail no longer swallows the gesture
 - Fix the `scroll_to` failure reading `Widget not found after 0 scroll attempts` when no scrollable could be dragged at all, which hid the real cause
 - Fix every pointer gesture (`tap`, `double_tap`, `long_press`, `secondary_tap`, `swipe`, `pinch_zoom`, `scroll_to`) silently doing nothing, and every element being reported `visible: false`, in an app whose content is not in the implicit view — as with the desktop windowing API: gestures are now dispatched to, and visibility measured against, the view the element is actually in
+- Fix `connect` hanging forever when the app's Dart Development Service stops answering stream subscriptions — it now waits at most 500 ms for the Service stream and continues; `hot_reload`/`hot_restart` report failure in that state ([#127](https://github.com/leancodepl/marionette_mcp/pull/127))
 
 # 0.6.0
 
