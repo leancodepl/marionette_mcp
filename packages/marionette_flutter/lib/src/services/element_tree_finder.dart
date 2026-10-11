@@ -143,12 +143,19 @@ class ElementTreeFinder {
     // carries a keyless text field's only human-readable handle (`text` holds
     // the entered value, empty for a blank field). Surface the label/hint so
     // such fields stay identifiable. TextFormField has no public `decoration`,
-    // so this only applies to TextField.
-    if (widget is TextField) {
-      final label = widget.decoration?.labelText ?? widget.decoration?.hintText;
-      if (label != null && label.isNotEmpty) {
-        data['label'] = label;
-      }
+    // so its label is read off the TextField it builds.
+    final label = _extractFieldLabel(element);
+    if (label != null) {
+      data['label'] = label;
+    }
+
+    // Unlike Switch, Checkbox and CheckboxListTile declare none of their state
+    // as diagnostics, so without this a checked box looks like an empty one.
+    // `null` is the tristate "mixed" value.
+    if (widget is Checkbox) {
+      data['value'] = '${widget.value}';
+    } else if (widget is CheckboxListTile) {
+      data['value'] = '${widget.value}';
     }
 
     // Get position and size if available
@@ -186,6 +193,28 @@ class ElementTreeFinder {
     }
 
     return data;
+  }
+
+  /// The label or hint of a `TextField`, or of the `TextField` a
+  /// `TextFormField` builds; null for anything else.
+  static String? _extractFieldLabel(Element element) {
+    final widget = element.widget;
+    TextField? field = widget is TextField ? widget : null;
+    if (field == null && widget is TextFormField) {
+      void visit(Element child) {
+        if (field != null) return;
+        final inner = child.widget;
+        if (inner is TextField) {
+          field = inner;
+          return;
+        }
+        child.visitChildren(visit);
+      }
+
+      element.visitChildren(visit);
+    }
+    final label = field?.decoration?.labelText ?? field?.decoration?.hintText;
+    return label == null || label.isEmpty ? null : label;
   }
 
   /// Whether [value] is a primitive worth keeping in the property dump.

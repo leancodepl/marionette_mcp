@@ -617,6 +617,80 @@ void main() {
       expect(field['label'], 'Email',
           reason: 'without the label an empty keyless field has no handle');
     });
+
+    testWidgets('reports a TextFormField label read off its inner TextField',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TextFormField(
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+          ),
+        ),
+      );
+
+      final field = _finder
+          .findInteractiveElements()
+          .firstWhere((e) => e['type'] == 'TextFormField');
+
+      expect(field['label'], 'Title');
+    });
+
+    for (final (name, field) in [
+      ('TextField', TextField()),
+      ('TextFormField', TextFormField()),
+    ]) {
+      testWidgets('reports the typed value of a $name without a controller',
+          (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: field)),
+        );
+        await tester.enterText(find.byType(EditableText), 'Groceries');
+        await tester.pump();
+
+        final element = _finder
+            .findInteractiveElements()
+            .firstWhere((e) => e['type'] == name);
+
+        expect(element['text'], 'Groceries',
+            reason: 'the value lives only in the internal controller');
+      });
+    }
+
+    for (final value in [true, false, null]) {
+      testWidgets('reports Checkbox value $value', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Checkbox(value: value, tristate: true, onChanged: (_) {}),
+          ),
+        ));
+        final elements = _finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+          '$value',
+        );
+      });
+    }
+
+    testWidgets('reports CheckboxListTile value', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: CheckboxListTile(
+            value: true,
+            title: const Text('Brushed Teeth'),
+            onChanged: (_) {},
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements.firstWhere((e) => e['type'] == 'CheckboxListTile')['value'],
+        'true',
+      );
+    });
   });
 
   group('ElementTreeFinder compact mode', () {
