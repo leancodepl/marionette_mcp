@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fix `get_interactive_elements` not reporting form state an agent needs to tell a filled form from an empty one: `Checkbox` and `CheckboxListTile` now report their `value` (`true`, `false`, or `null` for the tristate mixed state), a `TextField`/`TextFormField` built without a `controller` now reports the typed text, and a `TextFormField` reports the `label` of the `TextField` it builds. An app's own `extractText` still takes precedence for controller-less fields
+
 # 0.7.0
 
 - **Behaviour change:** `get_interactive_elements` now reports only primitive-valued properties (`bool`, `num`, `String`, `Enum`) for every caller. The `ButtonStyle`, `TextStyle`, `InputDecoration` and colour blobs that previously dominated the payload are gone from every level of output, which shrank by about a quarter on the example app. A `TextField`'s `decoration.labelText`/`hintText` is now surfaced as `label` so keyless fields keep a human-readable handle
