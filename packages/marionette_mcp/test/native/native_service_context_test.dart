@@ -2,43 +2,21 @@ import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:test/test.dart';
 
-class _FakeNativeConnector implements NativeConnector {
-  var disposed = false;
-
-  @override
-  Future<List<NativeElement>> getNativeElements() async => const [];
-
-  @override
-  Future<String?> get foregroundApp async => 'com.example.app';
-
-  @override
-  Future<void> tapElement(NativeElement element) async {}
-
-  @override
-  Future<void> tapAt(int x, int y) async {}
-
-  @override
-  Future<void> enterText(NativeElement element, String text) async {}
-
-  @override
-  Future<void> swipe({
-    required int startX,
-    required int startY,
-    required int endX,
-    required int endY,
-    int durationMs = 300,
-  }) async {}
-
-  @override
-  Future<String> takeScreenshot() async => 'fake-png-base64';
-
-  @override
-  Future<void> dispose() async {
-    disposed = true;
-  }
-}
+import 'support/fake_native_connector.dart';
 
 void main() {
+  group('NativePlatform.tryParse', () {
+    test('accepts known platforms case-insensitively', () {
+      expect(NativePlatform.tryParse(' Android '), NativePlatform.android);
+      expect(NativePlatform.tryParse('IOS'), NativePlatform.ios);
+    });
+
+    test('rejects anything else', () {
+      expect(NativePlatform.tryParse('web'), isNull);
+      expect(NativePlatform.tryParse(null), isNull);
+    });
+  });
+
   group('NativeServiceContext', () {
     test('requireConnector throws when disconnected', () {
       final context = NativeServiceContext();
@@ -50,18 +28,64 @@ void main() {
 
     test('dispose tears down the active connector', () async {
       final context = NativeServiceContext();
-      final connector = _FakeNativeConnector();
+      final connector = FakeNativeConnector();
       context.connector = connector;
 
       expect(context.requireConnector(), same(connector));
 
       await context.dispose();
       expect(context.connector, isNull);
-      expect(connector.disposed, isTrue);
+      expect(connector.disposeCalls, 1);
       expect(
         context.requireConnector,
         throwsA(isA<NativeNotConnectedException>()),
       );
+    });
+
+    test('connect passes arguments to the factory and stores the connector',
+        () async {
+      final created = FakeNativeConnector();
+      final calls = <(NativePlatform, String?, String?)>[];
+      final context = NativeServiceContext(
+        connectorFactory: (platform, {serial, udid}) async {
+          calls.add((platform, serial, udid));
+          return created;
+        },
+      );
+
+      await context.connect(NativePlatform.android, serial: 'emulator-5554');
+
+      expect(calls, [(NativePlatform.android, 'emulator-5554', null)]);
+      expect(context.requireConnector(), same(created));
+    });
+
+    test('connect disposes the previous session first', () async {
+      final previous = FakeNativeConnector();
+      final context = NativeServiceContext(
+        connectorFactory: (platform, {serial, udid}) async {
+          expect(previous.disposeCalls, 1);
+          return FakeNativeConnector();
+        },
+      )..connector = previous;
+
+      await context.connect(NativePlatform.ios);
+
+      expect(context.connector, isNot(same(previous)));
+    });
+
+    test('a failed connect leaves the context disconnected', () async {
+      final previous = FakeNativeConnector();
+      final context = NativeServiceContext(
+        connectorFactory: (platform, {serial, udid}) =>
+            Future<NativeConnector>.error(StateError('boom')),
+      )..connector = previous;
+
+      await expectLater(
+        context.connect(NativePlatform.android),
+        throwsA(isA<StateError>()),
+      );
+      expect(context.connector, isNull);
+      expect(previous.disposeCalls, 1);
     });
   });
 }

@@ -1,79 +1,59 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
 import 'package:test/test.dart';
 
+import 'support/fake_process_runner.dart';
+import 'support/fake_webdriver_server.dart';
+
 void main() {
   group('AndroidBootstrap', () {
     late Directory cacheDir;
-    late HttpServer statusServer;
-    late int localPort;
-    late List<(String, List<String>)> adbCalls;
+    late FakeWebDriverServer server;
+    late FakeProcessRunner runner;
 
     setUp(() async {
       cacheDir = await Directory.systemTemp.createTemp('marionette_uia2_');
-      adbCalls = [];
-      statusServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      localPort = statusServer.port;
-      statusServer.listen((request) async {
-        if (request.uri.path == '/status') {
-          request.response.statusCode = HttpStatus.ok;
-          request.response.headers.contentType = ContentType.json;
-          request.response.write(jsonEncode({
-            'value': {'ready': true},
-          }));
-        } else {
-          request.response.statusCode = HttpStatus.notFound;
-        }
-        await request.response.close();
-      });
+      server = await FakeWebDriverServer.start();
+      runner = FakeProcessRunner()
+        ..onAdb(['version'], result: ok('1.0.41'))
+        ..onAdb(['get-state'], result: ok('device'))
+        ..onAdb(['install'], result: ok('Success'));
     });
 
     tearDown(() async {
-      await statusServer.close(force: true);
+      await server.close();
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
       }
     });
 
-    ProcessResult ok([String stdout = '']) => ProcessResult(0, 0, stdout, '');
+    AndroidBootstrap bootstrap({
+      String? serial,
+      ApkDownloader? downloader,
+    }) =>
+        AndroidBootstrap(
+          serial: serial,
+          processRunner: runner.call,
+          downloader: downloader ?? (_) async => [1],
+          cacheDir: cacheDir,
+          localPort: server.port,
+        );
 
-    Future<ProcessResult> recordingRunner(
-      String executable,
-      List<String> arguments, {
-      ProcessResult Function(List<String> args)? onCall,
-    }) async {
-      expect(executable, 'adb');
-      adbCalls.add((executable, List<String>.from(arguments)));
-      if (onCall != null) return onCall(arguments);
-      return ok('device');
-    }
-
-    List<String> stripSerial(List<String> args) {
-      if (args.length >= 2 && args[0] == '-s') {
-        return args.sublist(2);
-      }
-      return args;
-    }
+    Matcher failsWith(AndroidBootstrapFailure failure) => throwsA(
+          isA<AndroidBootstrapException>()
+              .having((e) => e.failure, 'failure', failure)
+              .having((e) => e.hint, 'hint', failure.hint),
+        );
 
     test('missing adb throws AndroidBootstrapException(adbMissing)', () async {
-      final bootstrap = AndroidBootstrap(
-        processRunner: (executable, arguments) async {
-          throw ProcessException(
-            executable,
-            arguments,
-            'No such file or directory',
-            2,
-          );
-        },
-        downloader: (_) async => [1],
-        cacheDir: cacheDir,
-        localPort: localPort,
+      runner.failExecutable(
+        'adb',
+        const ProcessException('adb', [], 'No such file or directory', 2),
       );
 
-      expect(
-        () => bootstrap.ensureServerReady(),
+      await expectLater(
+        bootstrap().ensureServerReady(),
         throwsA(
           isA<AndroidBootstrapException>()
               .having(
@@ -87,30 +67,14 @@ void main() {
     });
 
     test('device not online throws deviceUnavailable', () async {
-      final bootstrap = AndroidBootstrap(
-        processRunner: (executable, arguments) async {
-          adbCalls.add((executable, List<String>.from(arguments)));
-          final cmd = stripSerial(arguments);
-          if (cmd.first == 'version') return ok('1.0.41');
-          if (cmd.first == 'get-state') {
-            return ProcessResult(0, 1, 'offline', 'error: device offline');
-          }
-          return ok();
-        },
-        downloader: (_) async => [1],
-        cacheDir: cacheDir,
-        localPort: localPort,
+      runner.onAdb(
+        ['get-state'],
+        result: failed(stdout: 'offline', stderr: 'error: device offline'),
       );
 
-      expect(
-        () => bootstrap.ensureServerReady(),
-        throwsA(
-          isA<AndroidBootstrapException>().having(
-            (e) => e.failure,
-            'failure',
-            AndroidBootstrapFailure.deviceUnavailable,
-          ),
-        ),
+      await expectLater(
+        bootstrap().ensureServerReady(),
+        failsWith(AndroidBootstrapFailure.deviceUnavailable),
       );
     });
 
@@ -118,36 +82,16 @@ void main() {
       'ensureServerReady installs, instruments, forwards, and becomes healthy',
       () async {
         final downloadedUrls = <Uri>[];
-        final bootstrap = AndroidBootstrap(
+        final subject = bootstrap(
           serial: 'emulator-5554',
-          processRunner: (executable, arguments) => recordingRunner(
-            executable,
-            arguments,
-            onCall: (args) {
-              final cmd = stripSerial(args);
-              if (cmd.first == 'version') return ok('1.0.41');
-              if (cmd.first == 'get-state') return ok('device');
-              if (cmd.first == 'install') return ok('Success');
-              if (cmd.length >= 3 && cmd[0] == 'shell' && cmd[1] == 'am' && cmd[2] == 'instrument') {
-                return ok();
-              }
-              if (cmd.first == 'forward') return ok();
-              if (cmd.length >= 3 && cmd[0] == 'shell' && cmd[1] == 'am' && cmd[2] == 'force-stop') {
-                return ok();
-              }
-              return ok();
-            },
-          ),
           downloader: (url) async {
             downloadedUrls.add(url);
             return [0x50, 0x4B, 0x03, 0x04]; // minimal zip/apk-ish bytes
           },
-          cacheDir: cacheDir,
-          localPort: localPort,
         );
 
-        final uri = await bootstrap.ensureServerReady();
-        expect(uri.port, localPort);
+        final uri = await subject.ensureServerReady();
+        expect(uri.port, server.port);
         expect(uri.host, '127.0.0.1');
 
         expect(downloadedUrls, hasLength(2));
@@ -158,59 +102,72 @@ void main() {
           isTrue,
         );
 
-        final commandSequences = adbCalls
-            .map((call) => stripSerial(call.$2))
-            .where((cmd) =>
-                cmd.first == 'install' ||
-                cmd.first == 'forward' ||
-                (cmd.length >= 3 && cmd[0] == 'shell' && cmd[2] == 'instrument'))
+        final commands = runner.adbCommands
+            .where(
+              (cmd) =>
+                  cmd.first == 'install' ||
+                  cmd.first == 'forward' ||
+                  (cmd.length >= 3 &&
+                      cmd[0] == 'shell' &&
+                      cmd[2] == 'instrument'),
+            )
             .toList();
 
-        expect(commandSequences[0].take(3).toList(), ['install', '-r', '-t']);
-        expect(commandSequences[1].take(3).toList(), ['install', '-r', '-t']);
-        expect(
-          commandSequences[2],
-          [
-            'shell',
-            'am',
-            'instrument',
-            '-e',
-            'disableAnalytics',
-            'true',
-            'io.appium.uiautomator2.server.test/'
-                'androidx.test.runner.AndroidJUnitRunner',
-          ],
-        );
-        expect(commandSequences[3], ['forward', 'tcp:$localPort', 'tcp:6790']);
+        expect(commands[0].take(3).toList(), ['install', '-r', '-t']);
+        expect(commands[1].take(3).toList(), ['install', '-r', '-t']);
+        expect(commands[2], [
+          'shell',
+          'am',
+          'instrument',
+          '-e',
+          'disableAnalytics',
+          'true',
+          'io.appium.uiautomator2.server.test/'
+              'androidx.test.runner.AndroidJUnitRunner',
+        ]);
+        expect(commands[3], ['forward', 'tcp:${server.port}', 'tcp:6790']);
 
-        // Serial is threaded into adb invocations.
+        // Serial is threaded into every adb invocation.
         expect(
-          adbCalls.every((call) => call.$2.length >= 2 && call.$2[0] == '-s' && call.$2[1] == 'emulator-5554'),
+          runner.calls.every(
+            (call) =>
+                call.arguments.length >= 2 &&
+                call.arguments[0] == '-s' &&
+                call.arguments[1] == 'emulator-5554',
+          ),
           isTrue,
         );
 
-        await bootstrap.dispose();
+        await subject.dispose();
+        expect(
+          runner.adbCommands,
+          containsAll([
+            ['shell', 'am', 'force-stop', 'io.appium.uiautomator2.server.test'],
+            ['forward', '--remove', 'tcp:${server.port}'],
+          ]),
+        );
       },
     );
 
-    test('install failure throws AndroidBootstrapException(install)', () async {
-      final bootstrap = AndroidBootstrap(
-        processRunner: (executable, arguments) async {
-          final cmd = stripSerial(arguments);
-          if (cmd.first == 'version') return ok('1.0.41');
-          if (cmd.first == 'get-state') return ok('device');
-          if (cmd.first == 'install') {
-            return ProcessResult(0, 1, '', 'Failure [INSTALL_FAILED]');
-          }
-          return ok();
-        },
-        downloader: (_) async => [1, 2, 3],
-        cacheDir: cacheDir,
-        localPort: localPort,
-      );
+    test('reuses cached APKs instead of downloading again', () async {
+      var downloads = 0;
+      Future<List<int>> downloader(Uri _) async {
+        downloads++;
+        return [1, 2, 3];
+      }
 
-      expect(
-        () => bootstrap.ensureServerReady(),
+      await bootstrap(downloader: downloader).ensureServerReady();
+      await bootstrap(downloader: downloader).ensureServerReady();
+
+      expect(downloads, 2, reason: 'two APKs on the first run, none after');
+    });
+
+    test('install failure throws AndroidBootstrapException(install)', () async {
+      runner.onAdb(['install'],
+          result: failed(stderr: 'Failure [INSTALL_FAILED]'));
+
+      await expectLater(
+        bootstrap().ensureServerReady(),
         throwsA(
           isA<AndroidBootstrapException>()
               .having(
@@ -227,27 +184,58 @@ void main() {
       );
     });
 
-    test('empty download throws download failure', () async {
-      final bootstrap = AndroidBootstrap(
-        processRunner: (executable, arguments) async {
-          final cmd = stripSerial(arguments);
-          if (cmd.first == 'version') return ok('1.0.41');
-          if (cmd.first == 'get-state') return ok('device');
-          return ok();
-        },
-        downloader: (_) async => <int>[],
-        cacheDir: cacheDir,
-        localPort: localPort,
+    test('"already installed" is not treated as an install failure', () async {
+      runner.onAdb(
+        ['install'],
+        result:
+            failed(stderr: 'INSTALL_FAILED_ALREADY_EXISTS: already installed'),
       );
 
+      await expectLater(bootstrap().ensureServerReady(), completes);
+    });
+
+    test('empty download throws download failure', () async {
+      await expectLater(
+        bootstrap(downloader: (_) async => <int>[]).ensureServerReady(),
+        failsWith(AndroidBootstrapFailure.download),
+      );
+    });
+
+    test('instrumentation start failure throws instrumentation', () async {
+      runner.onAdb(
+        ['shell', 'am', 'instrument'],
+        result: failed(stderr: 'INSTRUMENTATION_FAILED'),
+      );
+
+      await expectLater(
+        bootstrap().ensureServerReady(),
+        failsWith(AndroidBootstrapFailure.instrumentation),
+      );
+    });
+
+    test('port forward failure throws portForward', () async {
+      runner.onAdb(['forward'], result: failed(stderr: 'cannot bind'));
+
+      await expectLater(
+        bootstrap().ensureServerReady(),
+        failsWith(AndroidBootstrapFailure.portForward),
+      );
+    });
+
+    test('failure tears down what was started', () async {
+      runner.onAdb(['forward'], result: failed(stderr: 'cannot bind'));
+
+      await expectLater(bootstrap().ensureServerReady(), throwsA(anything));
+
       expect(
-        () => bootstrap.ensureServerReady(),
-        throwsA(
-          isA<AndroidBootstrapException>().having(
-            (e) => e.failure,
-            'failure',
-            AndroidBootstrapFailure.download,
-          ),
+        runner.adbCommands,
+        contains(
+          equals([
+            'shell',
+            'am',
+            'force-stop',
+            'io.appium.uiautomator2.server.test',
+          ]),
         ),
       );
     });

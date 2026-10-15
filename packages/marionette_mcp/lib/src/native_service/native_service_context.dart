@@ -1,5 +1,8 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
+import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/tools/connection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
@@ -7,16 +10,44 @@ import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/text_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
-/// Exception thrown when a native tool is used without an active
-/// [NativeConnector] session.
-class NativeNotConnectedException implements Exception {
-  const NativeNotConnectedException();
+export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
+    show NativeNotConnectedException;
 
-  @override
-  String toString() =>
-      'Not connected to any native connector. Use native_connect first '
-      'with platform (android|ios).';
+/// Platform targeted by a native automation session.
+enum NativePlatform {
+  android,
+  ios;
+
+  /// Parses the `platform` tool argument (case-insensitive), or returns
+  /// null for anything else.
+  static NativePlatform? tryParse(String? raw) {
+    final normalized = raw?.toLowerCase().trim();
+    for (final platform in values) {
+      if (platform.name == normalized) return platform;
+    }
+    return null;
+  }
 }
+
+/// Creates a connected [NativeConnector] for [platform].
+///
+/// [serial] selects an Android device, [udid] an iOS Simulator; the one not
+/// matching [platform] is ignored.
+typedef NativeConnectorFactory = Future<NativeConnector> Function(
+  NativePlatform platform, {
+  String? serial,
+  String? udid,
+});
+
+Future<NativeConnector> _connectPlatform(
+  NativePlatform platform, {
+  String? serial,
+  String? udid,
+}) =>
+    switch (platform) {
+      NativePlatform.android => AndroidNativeConnector.connect(serial: serial),
+      NativePlatform.ios => IosNativeConnector.connect(udid: udid),
+    };
 
 /// Context for managing the optional native automation session and
 /// registering native MCP tools.
@@ -24,20 +55,46 @@ class NativeNotConnectedException implements Exception {
 /// Independent of [VmServiceContext] — Flutter `connect` and
 /// `native_connect` can be used separately or together.
 final class NativeServiceContext {
-  NativeServiceContext() : _logger = logging.Logger('NativeServiceContext');
+  NativeServiceContext({
+    NativeConnectorFactory? connectorFactory,
+    logging.Logger? logger,
+  })  : _connectorFactory = connectorFactory ?? _connectPlatform,
+        logger = logger ?? logging.Logger('NativeServiceContext');
+
+  final NativeConnectorFactory _connectorFactory;
+
+  /// Logger shared by the native tools.
+  final logging.Logger logger;
 
   /// Active native connector, or null when disconnected.
   NativeConnector? connector;
 
-  final logging.Logger _logger;
-
   /// Registers all native-lane MCP tools with [server].
   void registerTools(McpServer server) {
-    registerNativeConnectionTools(server, this, _logger);
-    registerNativeInspectionTools(server, this, _logger);
-    registerNativeGestureTools(server, this, _logger);
-    registerNativeTextTools(server, this, _logger);
-    registerNativeScreenshotTools(server, this, _logger);
+    registerNativeConnectionTools(server, this);
+    registerNativeInspectionTools(server, this);
+    registerNativeGestureTools(server, this);
+    registerNativeTextTools(server, this);
+    registerNativeScreenshotTools(server, this);
+  }
+
+  /// Replaces any active session with a new one for [platform].
+  ///
+  /// The previous connector is disposed first, so a failed connect leaves
+  /// the context disconnected.
+  Future<NativeConnector> connect(
+    NativePlatform platform, {
+    String? serial,
+    String? udid,
+  }) async {
+    await dispose();
+    final created = await _connectorFactory(
+      platform,
+      serial: serial,
+      udid: udid,
+    );
+    connector = created;
+    return created;
   }
 
   /// Returns the active connector or throws [NativeNotConnectedException].

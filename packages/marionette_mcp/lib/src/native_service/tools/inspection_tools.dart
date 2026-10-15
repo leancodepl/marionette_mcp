@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
@@ -10,7 +9,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 void registerNativeInspectionTools(
   McpServer server,
   NativeServiceContext context,
-  logging.Logger logger,
 ) {
   server.registerTool(
     'native_get_elements',
@@ -30,20 +28,29 @@ void registerNativeInspectionTools(
       idempotentHint: true,
     ),
     inputSchema: const ToolInputSchema(properties: {}),
-    callback: (args, extra) async {
-      logger.info('Getting native elements');
-      return runTool(logger, 'get native elements', () async {
-        final connector = context.requireConnector();
-        final elements = await connector.getNativeElements();
-        final foregroundApp = await connector.foregroundApp;
-        final payload = <String, dynamic>{
-          'elements': elements.map((e) => e.toJson()).toList(),
-          'foregroundApp': foregroundApp,
-        };
-        return CallToolResult(
-          content: [TextContent(text: jsonEncode(payload))],
-        );
-      });
-    },
+    callback: (args, extra) => handleNativeGetElements(context),
   );
+}
+
+/// Handles `native_get_elements`.
+Future<CallToolResult> handleNativeGetElements(
+  NativeServiceContext context,
+) {
+  final logger = context.logger;
+  logger.info('Getting native elements');
+  return runTool(logger, 'get native elements', () async {
+    final connector = context.requireConnector();
+    // foregroundApp is a diagnostic hint: fetch it alongside the tree and
+    // report null rather than failing the whole call when it is unavailable.
+    final foregroundApp = connector.foregroundApp
+        .then<String?>((value) => value, onError: (Object _) => null);
+    final elements = await connector.getNativeElements();
+    final payload = <String, dynamic>{
+      'elements': elements.map((e) => e.toJson()).toList(),
+      'foregroundApp': await foregroundApp,
+    };
+    return CallToolResult(
+      content: [TextContent(text: jsonEncode(payload))],
+    );
+  });
 }

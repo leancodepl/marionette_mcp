@@ -76,6 +76,19 @@ class NativeElement {
       };
 }
 
+/// Prepares a device-side WebDriver server (UIAutomator2 / WebDriverAgent)
+/// and tears it down again.
+///
+/// Connectors depend on this interface rather than on the concrete
+/// bootstraps so tests can point them at a fake server.
+abstract interface class NativeServerBootstrap {
+  /// Starts the server if needed and returns its local base URL.
+  Future<Uri> ensureServerReady();
+
+  /// Stops whatever [ensureServerReady] started. Best-effort; never throws.
+  Future<void> dispose();
+}
+
 /// A connected native automation session (UIAutomator2 on Android,
 /// WebDriverAgent on iOS).
 ///
@@ -139,9 +152,10 @@ const uiNodeTagKey = '#tag';
 /// This is a deliberately minimal parser for machine-generated UI dumps
 /// (UIAutomator `page source`, WDA source XML) that avoids adding an XML
 /// package dependency. It handles nested and self-closing tags, single- and
-/// double-quoted attribute values, and the five predefined entities
-/// (`&amp;` `&lt;` `&gt;` `&quot;` `&apos;`). It does NOT handle CDATA
-/// sections, other entities, or DTDs — acceptable because both servers emit
+/// double-quoted attribute values, the five predefined entities
+/// (`&amp;` `&lt;` `&gt;` `&quot;` `&apos;`) and numeric character
+/// references (`&#10;`, `&#x2019;`). It does NOT handle CDATA sections,
+/// other named entities, or DTDs — acceptable because both servers emit
 /// plain escaped XML. Malformed input yields best-effort results rather
 /// than throwing.
 List<Map<String, String>> parseUiTree(
@@ -230,14 +244,32 @@ Map<String, String>? _parseTag(String tagContent) {
   return attributes;
 }
 
+const _namedXmlEntities = {
+  'quot': '"',
+  'apos': "'",
+  'lt': '<',
+  'gt': '>',
+  'amp': '&',
+};
+
+final _xmlEntityPattern = RegExp(r'&(#x[0-9a-fA-F]+|#[0-9]+|[a-z]+);');
+
+/// Decodes the predefined XML entities and numeric character references
+/// (`&#10;`, `&#x2019;`) in a single pass, so `&amp;#10;` stays `&#10;`.
+/// Unknown or invalid references are kept verbatim.
 String _decodeXmlEntities(String value) {
   if (!value.contains('&')) return value;
-  return value
-      .replaceAll('&quot;', '"')
-      .replaceAll('&apos;', "'")
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&amp;', '&');
+  return value.replaceAllMapped(_xmlEntityPattern, (match) {
+    final entity = match.group(1)!;
+    if (!entity.startsWith('#')) {
+      return _namedXmlEntities[entity] ?? match.group(0)!;
+    }
+    final codePoint = entity.startsWith('#x')
+        ? int.tryParse(entity.substring(2), radix: 16)
+        : int.tryParse(entity.substring(1));
+    if (codePoint == null || codePoint > 0x10FFFF) return match.group(0)!;
+    return String.fromCharCode(codePoint);
+  });
 }
 
 final _androidBoundsPattern = RegExp(r'\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]');

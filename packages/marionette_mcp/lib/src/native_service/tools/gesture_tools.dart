@@ -1,8 +1,9 @@
 import 'dart:math' show min;
 
-import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -79,7 +80,6 @@ enum SwipeDirection {
 void registerNativeGestureTools(
   McpServer server,
   NativeServiceContext context,
-  logging.Logger logger,
 ) {
   server
     ..registerTool(
@@ -117,89 +117,7 @@ void registerNativeGestureTools(
           ),
         },
       ),
-      callback: (args, extra) async {
-        final text = args['text'] as String?;
-        final id = args['id'] as String?;
-        final hasX = args.containsKey('x');
-        final hasY = args.containsKey('y');
-        final hasCoords = hasX || hasY;
-
-        final modeCount = [
-          text != null,
-          id != null,
-          hasCoords,
-        ].where((e) => e).length;
-
-        if (modeCount != 1) {
-          return CallToolResult(
-            isError: true,
-            content: [
-              const TextContent(
-                text: 'native_tap requires exactly one matching mode: '
-                    'text, id, or x+y.',
-              ),
-            ],
-          );
-        }
-
-        if (hasCoords && (!hasX || !hasY)) {
-          return CallToolResult(
-            isError: true,
-            content: [
-              const TextContent(
-                text: 'native_tap coordinate mode requires both x and y.',
-              ),
-            ],
-          );
-        }
-
-        logger.info('Native tapping with args: $args');
-        return runTool(logger, 'native tap', () async {
-          final connector = context.requireConnector();
-
-          if (hasCoords) {
-            final x = (args['x'] as num).toInt();
-            final y = (args['y'] as num).toInt();
-            await connector.tapAt(x, y);
-            return CallToolResult(
-              content: [
-                TextContent(text: 'Successfully tapped at ($x, $y)'),
-              ],
-            );
-          }
-
-          final elements = await connector.getNativeElements();
-          final NativeElement match;
-          if (text != null) {
-            match = elements.firstWhere(
-              (e) => e.text == text,
-              orElse: () => throw StateError(
-                'No native element with text="$text". '
-                'Call native_get_elements and retry.',
-              ),
-            );
-          } else {
-            match = elements.firstWhere(
-              (e) => e.resourceId == id,
-              orElse: () => throw StateError(
-                'No native element with id="$id". '
-                'Call native_get_elements and retry.',
-              ),
-            );
-          }
-
-          await connector.tapElement(match);
-          return CallToolResult(
-            content: [
-              TextContent(
-                text: text != null
-                    ? 'Successfully tapped native element text="$text"'
-                    : 'Successfully tapped native element id="$id"',
-              ),
-            ],
-          );
-        });
-      },
+      callback: (args, extra) => handleNativeTap(context, args),
     )
     ..registerTool(
       'native_scroll',
@@ -242,104 +160,156 @@ void registerNativeGestureTools(
         },
         required: ['direction'],
       ),
-      callback: (args, extra) async {
-        final direction = SwipeDirection.tryParse(
-          args['direction'] as String?,
-        );
-        final text = args['text'] as String?;
-        final distance = (args['distance'] as num?)?.toInt();
-        final startX = (args['startX'] as num?)?.toInt();
-        final startY = (args['startY'] as num?)?.toInt();
-
-        if (direction == null) {
-          return CallToolResult(
-            isError: true,
-            content: [
-              TextContent(
-                text: 'native_scroll requires direction to be '
-                    '${SwipeDirection.quotedWireNames}.',
-              ),
-            ],
-          );
-        }
-
-        if (distance != null && distance <= 0) {
-          return CallToolResult(
-            isError: true,
-            content: [
-              const TextContent(
-                text: 'Parameter "distance" must be a positive integer.',
-              ),
-            ],
-          );
-        }
-
-        if ((startX == null) != (startY == null)) {
-          return CallToolResult(
-            isError: true,
-            content: [
-              const TextContent(
-                text: 'native_scroll requires both startX and startY when '
-                    'either is provided.',
-              ),
-            ],
-          );
-        }
-
-        logger.info(
-          'Native scrolling direction=${direction.wireName} text=$text '
-          'distance=$distance start=($startX,$startY)',
-        );
-        return runTool(logger, 'native scroll', () async {
-          final connector = context.requireConnector();
-          final delta = distance ?? _defaultSwipeDistance;
-
-          if (text == null) {
-            await _swipeInDirection(
-              connector,
-              direction,
-              delta,
-              startX: startX,
-              startY: startY,
-            );
-            return CallToolResult(
-              content: [
-                TextContent(
-                  text: 'Successfully swiped ${direction.wireName} '
-                      '(distance=$delta)',
-                ),
-              ],
-            );
-          }
-
-          for (var attempt = 0; attempt < _maxScrollAttempts; attempt++) {
-            final elements = await connector.getNativeElements();
-            if (elements.any((e) => e.text == text)) {
-              return CallToolResult(
-                content: [
-                  TextContent(
-                    text: 'Found native element text="$text" '
-                        'after $attempt swipe(s)',
-                  ),
-                ],
-              );
-            }
-            await _swipeInDirection(
-              connector,
-              direction,
-              delta,
-              startX: startX,
-              startY: startY,
-            );
-          }
-
-          throw StateError(
-            'Could not find native element text="$text" after '
-            '$_maxScrollAttempts swipe(s) in direction=${direction.wireName}.',
-          );
-        });
-      },
+      callback: (args, extra) => handleNativeScroll(context, args),
     );
+}
+
+/// Handles `native_tap`.
+Future<CallToolResult> handleNativeTap(
+  NativeServiceContext context,
+  Map<String, dynamic> args,
+) async {
+  final logger = context.logger;
+  final text = args['text'] as String?;
+  final id = args['id'] as String?;
+  final coordinates = argPairPresence(args, 'x', 'y');
+  final hasCoords = coordinates != ArgPairPresence.none;
+
+  final modeCount =
+      [text != null, id != null, hasCoords].where((e) => e).length;
+  if (modeCount != 1) {
+    return invalidArguments(
+      'native_tap requires exactly one matching mode: text, id, or x+y.',
+    );
+  }
+  if (coordinates == ArgPairPresence.partial) {
+    return invalidArguments(
+      'native_tap coordinate mode requires both x and y.',
+    );
+  }
+
+  logger.info('Native tapping with args: $args');
+  return runTool(logger, 'native tap', () async {
+    final connector = context.requireConnector();
+
+    if (hasCoords) {
+      final x = intArg(args, 'x')!;
+      final y = intArg(args, 'y')!;
+      await connector.tapAt(x, y);
+      return CallToolResult(
+        content: [TextContent(text: 'Successfully tapped at ($x, $y)')],
+      );
+    }
+
+    final elements = await connector.getNativeElements();
+    final NativeElement match;
+    if (text != null) {
+      match = elements.firstWhere(
+        (e) => e.text == text,
+        orElse: () => throw NativeElementNotFoundException('text="$text"'),
+      );
+    } else {
+      match = elements.firstWhere(
+        (e) => e.resourceId == id,
+        orElse: () => throw NativeElementNotFoundException('id="$id"'),
+      );
+    }
+
+    await connector.tapElement(match);
+    return CallToolResult(
+      content: [
+        TextContent(
+          text: text != null
+              ? 'Successfully tapped native element text="$text"'
+              : 'Successfully tapped native element id="$id"',
+        ),
+      ],
+    );
+  });
+}
+
+/// Handles `native_scroll`.
+Future<CallToolResult> handleNativeScroll(
+  NativeServiceContext context,
+  Map<String, dynamic> args,
+) async {
+  final logger = context.logger;
+  final direction = SwipeDirection.tryParse(args['direction'] as String?);
+  final text = args['text'] as String?;
+  final distance = intArg(args, 'distance');
+  final startX = intArg(args, 'startX');
+  final startY = intArg(args, 'startY');
+
+  if (direction == null) {
+    return invalidArguments(
+      'native_scroll requires direction to be '
+      '${SwipeDirection.quotedWireNames}.',
+    );
+  }
+  if (distance != null && distance <= 0) {
+    return invalidArguments(
+      'Parameter "distance" must be a positive integer.',
+    );
+  }
+  if (argPairPresence(args, 'startX', 'startY') == ArgPairPresence.partial) {
+    return invalidArguments(
+      'native_scroll requires both startX and startY when either is '
+      'provided.',
+    );
+  }
+
+  logger.info(
+    'Native scrolling direction=${direction.wireName} text=$text '
+    'distance=$distance start=($startX,$startY)',
+  );
+  return runTool(logger, 'native scroll', () async {
+    final connector = context.requireConnector();
+    final delta = distance ?? _defaultSwipeDistance;
+
+    if (text == null) {
+      await _swipeInDirection(
+        connector,
+        direction,
+        delta,
+        startX: startX,
+        startY: startY,
+      );
+      return CallToolResult(
+        content: [
+          TextContent(
+            text: 'Successfully swiped ${direction.wireName} '
+                '(distance=$delta)',
+          ),
+        ],
+      );
+    }
+
+    for (var attempt = 0; attempt < _maxScrollAttempts; attempt++) {
+      final elements = await connector.getNativeElements();
+      if (elements.any((e) => e.text == text)) {
+        return CallToolResult(
+          content: [
+            TextContent(
+              text: 'Found native element text="$text" '
+                  'after $attempt swipe(s)',
+            ),
+          ],
+        );
+      }
+      await _swipeInDirection(
+        connector,
+        direction,
+        delta,
+        startX: startX,
+        startY: startY,
+      );
+    }
+
+    throw NativeElementNotFoundException(
+      'text="$text" after $_maxScrollAttempts swipe(s) in '
+      'direction=${direction.wireName}',
+    );
+  });
 }
 
 Future<void> _swipeInDirection(

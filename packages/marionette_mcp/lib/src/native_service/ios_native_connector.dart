@@ -1,6 +1,7 @@
 import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+import 'package:marionette_mcp/src/native_service/xpath.dart';
 
 /// [NativeConnector] backed by WebDriverAgent on an iOS Simulator.
 ///
@@ -10,7 +11,7 @@ class IosNativeConnector implements NativeConnector {
   IosNativeConnector._({
     required WebDriverClient client,
     required String sessionId,
-    required IosBootstrap bootstrap,
+    required NativeServerBootstrap bootstrap,
     required bool ownsBootstrap,
   })  : _client = client,
         _sessionId = sessionId,
@@ -19,18 +20,21 @@ class IosNativeConnector implements NativeConnector {
 
   final WebDriverClient _client;
   final String _sessionId;
-  final IosBootstrap _bootstrap;
+  final NativeServerBootstrap _bootstrap;
   final bool _ownsBootstrap;
+
+  bool _disposed = false;
 
   /// Bootstraps WDA (unless [bootstrap] was already prepared), creates a
   /// WebDriver session, and returns a connected connector.
   ///
-  /// [udid] selects a simulator when [bootstrap] is omitted. Session
-  /// capabilities default to `{platformName: iOS}`, which WDA accepts for an
-  /// already-launched runner.
+  /// [udid] selects a simulator when [bootstrap] is omitted. A [bootstrap]
+  /// passed in is not disposed by this connector; the caller keeps
+  /// ownership. Session capabilities default to `{platformName: iOS}`, which
+  /// WDA accepts for an already-launched runner.
   static Future<IosNativeConnector> connect({
     String? udid,
-    IosBootstrap? bootstrap,
+    NativeServerBootstrap? bootstrap,
     Map<String, dynamic>? capabilities,
   }) async {
     final ownsBootstrap = bootstrap == null;
@@ -105,15 +109,16 @@ class IosNativeConnector implements NativeConnector {
 
   @override
   Future<void> enterText(NativeElement element, String text) async {
-    await tapElement(element);
-
+    // One lookup serves both the focusing click and the typing.
     final elementId = await _tryFindElement(element);
     if (elementId == null) {
       throw WebDriverException(
         'Could not locate element to type into '
         '(id=${element.resourceId}, text=${element.text})',
+        error: 'no such element',
       );
     }
+    await _client.elementClick(_sessionId, elementId);
     await _client.elementSendKeys(_sessionId, elementId, text);
   }
 
@@ -140,14 +145,15 @@ class IosNativeConnector implements NativeConnector {
 
   @override
   Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
     try {
       await _client.deleteSession(_sessionId);
     } catch (_) {
-      // Session may already be gone if WDA died.
-    }
-    _client.close();
-    if (_ownsBootstrap) {
-      await _bootstrap.dispose();
+      // Continue teardown when the server/session has already disappeared.
+    } finally {
+      _client.close();
+      if (_ownsBootstrap) await _bootstrap.dispose();
     }
   }
 
@@ -170,12 +176,11 @@ class IosNativeConnector implements NativeConnector {
         // Fall through.
       }
       try {
-        // XPath escape: WDA labels rarely contain quotes; double-quote wrap.
-        final escaped = text.replaceAll('"', '\\"');
+        final literal = xpathLiteral(text);
         return await _client.findElement(
           _sessionId,
           'xpath',
-          '//*[@label="$escaped" or @name="$escaped" or @value="$escaped"]',
+          '//*[@label=$literal or @name=$literal or @value=$literal]',
         );
       } on WebDriverException {
         return null;

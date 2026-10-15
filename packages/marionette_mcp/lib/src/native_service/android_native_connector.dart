@@ -1,43 +1,48 @@
-import 'dart:io';
-
-import 'android_bootstrap.dart';
-import 'native_connector.dart';
-import 'webdriver_client.dart';
+import 'package:marionette_mcp/src/native_service/adb_client.dart';
+import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+import 'package:marionette_mcp/src/native_service/xpath.dart';
 
 /// Android implementation of [NativeConnector] backed by UIAutomator2.
 class AndroidNativeConnector implements NativeConnector {
   AndroidNativeConnector._({
-    required AndroidBootstrap bootstrap,
+    required NativeServerBootstrap bootstrap,
+    required bool ownsBootstrap,
     required WebDriverClient client,
     required String sessionId,
-    required ProcessRunner processRunner,
-    String? serial,
+    required AdbClient adb,
   })  : _bootstrap = bootstrap,
+        _ownsBootstrap = ownsBootstrap,
         _client = client,
         _sessionId = sessionId,
-        _run = processRunner,
-        _serial = serial;
+        _adb = adb;
 
-  final AndroidBootstrap _bootstrap;
+  final NativeServerBootstrap _bootstrap;
+  final bool _ownsBootstrap;
   final WebDriverClient _client;
   final String _sessionId;
-  final ProcessRunner _run;
-  final String? _serial;
+  final AdbClient _adb;
 
   bool _disposed = false;
 
-  /// Starts UIAutomator2 and opens a WebDriver session.
+  /// Starts UIAutomator2 (unless [bootstrap] is given) and opens a WebDriver
+  /// session.
+  ///
+  /// A [bootstrap] passed in is not disposed by this connector; the caller
+  /// keeps ownership. [adb] defaults to a client for [serial].
   static Future<AndroidNativeConnector> connect({
     String? serial,
-    AndroidBootstrap? bootstrap,
-    ProcessRunner? processRunner,
+    NativeServerBootstrap? bootstrap,
+    AdbClient? adb,
   }) async {
-    final runner = processRunner ?? Process.run;
-    final ownedBootstrap = bootstrap ??
-        (processRunner == null
-            ? AndroidBootstrap(serial: serial)
-            : AndroidBootstrap(serial: serial, processRunner: processRunner));
-    final baseUri = await ownedBootstrap.ensureServerReady();
+    final ownsBootstrap = bootstrap == null;
+    final AndroidBootstrap? ownedBootstrap =
+        ownsBootstrap ? AndroidBootstrap(serial: serial) : null;
+    final resolvedBootstrap = bootstrap ?? ownedBootstrap!;
+    final resolvedAdb = adb ?? ownedBootstrap?.adb ?? AdbClient(serial: serial);
+
+    final baseUri = await resolvedBootstrap.ensureServerReady();
     final client = WebDriverClient(baseUri.toString());
 
     try {
@@ -48,15 +53,15 @@ class AndroidNativeConnector implements NativeConnector {
         },
       );
       return AndroidNativeConnector._(
-        bootstrap: ownedBootstrap,
+        bootstrap: resolvedBootstrap,
+        ownsBootstrap: ownsBootstrap,
         client: client,
         sessionId: sessionId,
-        processRunner: runner,
-        serial: serial ?? ownedBootstrap.serial,
+        adb: resolvedAdb,
       );
     } catch (_) {
       client.close();
-      await ownedBootstrap.dispose();
+      if (ownsBootstrap) await resolvedBootstrap.dispose();
       rethrow;
     }
   }
@@ -68,27 +73,7 @@ class AndroidNativeConnector implements NativeConnector {
   }
 
   @override
-  Future<String?> get foregroundApp async {
-    try {
-      final result = await _run('adb', [
-        if (_serial != null) ...['-s', _serial],
-        'shell',
-        'dumpsys',
-        'window',
-        'windows',
-      ]);
-      if (result.exitCode != 0 || result.stdout is! String) return null;
-
-      final output = result.stdout as String;
-      for (final pattern in _foregroundPackagePatterns) {
-        final match = pattern.firstMatch(output);
-        if (match != null) return match.group(1);
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  Future<String?> get foregroundApp => _adb.foregroundPackage();
 
   @override
   Future<void> tapElement(NativeElement element) {
@@ -129,7 +114,7 @@ class AndroidNativeConnector implements NativeConnector {
 
     final visibleText = element.text;
     if (elementId == null && visibleText != null && visibleText.isNotEmpty) {
-      final literal = _xpathLiteral(visibleText);
+      final literal = xpathLiteral(visibleText);
       elementId = await _tryFind(
         'xpath',
         '//android.widget.EditText[@text=$literal or @content-desc=$literal]',
@@ -191,20 +176,7 @@ class AndroidNativeConnector implements NativeConnector {
       // Continue teardown when the server/session has already disappeared.
     } finally {
       _client.close();
-      await _bootstrap.dispose();
+      if (_ownsBootstrap) await _bootstrap.dispose();
     }
   }
-}
-
-final _foregroundPackagePatterns = [
-  RegExp(r'mCurrentFocus=.*?\s([\w.]+)/[\w.$]+'),
-  RegExp(r'mFocusedApp=.*?\s([\w.]+)/[\w.$]+'),
-];
-
-String _xpathLiteral(String value) {
-  if (!value.contains("'")) return "'$value'";
-  if (!value.contains('"')) return '"$value"';
-
-  final parts = value.split("'");
-  return 'concat(${parts.map((part) => "'$part'").join(', "\'", ')})';
 }

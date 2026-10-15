@@ -1,44 +1,19 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'webdriver_client.dart';
+import 'package:marionette_mcp/src/native_service/adb_client.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/process.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 
-/// Signature for running an ADB command, injectable for tests.
-typedef ProcessRunner = Future<ProcessResult> Function(
-  String executable,
-  List<String> arguments,
-);
-
-/// Signature for starting the long-running instrumentation process.
-typedef ProcessStarter = Future<Process> Function(
-  String executable,
-  List<String> arguments,
-);
+export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
+    show AndroidBootstrapException, AndroidBootstrapFailure;
+export 'package:marionette_mcp/src/native_service/process.dart'
+    show ProcessRunner, ProcessStarter;
 
 /// Signature for downloading a release asset, injectable for tests.
 typedef ApkDownloader = Future<List<int>> Function(Uri url);
-
-/// The stage at which Android native automation bootstrap failed.
-enum AndroidBootstrapFailure {
-  adbMissing,
-  deviceUnavailable,
-  download,
-  install,
-  instrumentation,
-  portForward,
-  healthCheck,
-}
-
-/// A failure while preparing the on-device UIAutomator2 server.
-class AndroidBootstrapException implements Exception {
-  const AndroidBootstrapException(this.failure, this.message);
-
-  final AndroidBootstrapFailure failure;
-  final String message;
-
-  @override
-  String toString() => 'AndroidBootstrapException($failure): $message';
-}
 
 /// Installs, starts, and exposes Appium's standalone UIAutomator2 server.
 ///
@@ -47,7 +22,7 @@ class AndroidBootstrapException implements Exception {
 ///
 /// Set `MARIONETTE_UIA2_SERVER_APK` and `MARIONETTE_UIA2_TEST_APK` to use
 /// local APKs instead. Downloads are cached under the platform cache directory.
-class AndroidBootstrap {
+class AndroidBootstrap implements NativeServerBootstrap {
   AndroidBootstrap({
     this.serial,
     ProcessRunner? processRunner,
@@ -55,7 +30,7 @@ class AndroidBootstrap {
     ApkDownloader? downloader,
     Directory? cacheDir,
     this.localPort = 8200,
-  })  : _run = processRunner ?? Process.run,
+  })  : _adb = AdbClient(serial: serial, processRunner: processRunner),
         _start =
             processStarter ?? (processRunner == null ? Process.start : null),
         _downloader = downloader ?? _download,
@@ -71,7 +46,7 @@ class AndroidBootstrap {
 
   final String? serial;
   final int localPort;
-  final ProcessRunner _run;
+  final AdbClient _adb;
   final ProcessStarter? _start;
   final ApkDownloader _downloader;
   final Directory _cacheDir;
@@ -83,7 +58,11 @@ class AndroidBootstrap {
   StreamSubscription<List<int>>? _instrumentStderr;
   Uri? _readyUri;
 
+  /// The `adb` client bound to [serial], shared with the connector.
+  AdbClient get adb => _adb;
+
   /// Ensures UIAutomator2 is reachable and returns its local WebDriver URL.
+  @override
   Future<Uri> ensureServerReady() async {
     final readyUri = _readyUri;
     final existingClient = _healthClient;
@@ -130,7 +109,7 @@ class AndroidBootstrap {
   Future<void> _checkAdbAndDevice() async {
     ProcessResult version;
     try {
-      version = await _adb(const ['version']);
+      version = await _adb.run(const ['version']);
     } on ProcessException catch (error) {
       throw AndroidBootstrapException(
         AndroidBootstrapFailure.adbMissing,
@@ -140,18 +119,18 @@ class AndroidBootstrap {
     if (version.exitCode != 0) {
       throw AndroidBootstrapException(
         AndroidBootstrapFailure.adbMissing,
-        'adb is unavailable: ${_processMessage(version)}',
+        'adb is unavailable: ${processMessage(version)}',
       );
     }
 
-    final state = await _adb(const ['get-state']);
-    final deviceState = _stdout(state).trim();
+    final state = await _adb.run(const ['get-state']);
+    final deviceState = processStdout(state).trim();
     if (state.exitCode != 0 || deviceState != 'device') {
       throw AndroidBootstrapException(
         AndroidBootstrapFailure.deviceUnavailable,
         'Android device ${serial ?? '(default)'} is not online'
         '${deviceState.isEmpty ? '' : ' (state: $deviceState)'}: '
-        '${_processMessage(state)}',
+        '${processMessage(state)}',
       );
     }
   }
@@ -165,7 +144,7 @@ class AndroidBootstrap {
       final file = File(overridePath);
       if (!await file.exists()) {
         throw AndroidBootstrapException(
-          AndroidBootstrapFailure.download,
+          AndroidBootstrapFailure.apkOverrideMissing,
           '$environmentKey points to a missing file: $overridePath',
         );
       }
@@ -195,8 +174,8 @@ class AndroidBootstrap {
   }
 
   Future<void> _install(File apk) async {
-    final result = await _adb(['install', '-r', '-t', apk.path]);
-    final message = _processMessage(result);
+    final result = await _adb.run(['install', '-r', '-t', apk.path]);
+    final message = processMessage(result);
     final alreadyInstalled =
         message.toLowerCase().contains('already installed');
     if (result.exitCode != 0 && !alreadyInstalled) {
@@ -224,12 +203,12 @@ class AndroidBootstrap {
       if (starter == null) {
         // A supplied ProcessRunner must see every ADB call in unit tests.
         // Without `-w`, `am instrument` returns after launching the runner.
-        final result = await _adb(command);
+        final result = await _adb.run(command);
         if (result.exitCode != 0) {
           throw AndroidBootstrapException(
             AndroidBootstrapFailure.instrumentation,
             'Failed to start UIAutomator2 instrumentation: '
-            '${_processMessage(result)}',
+            '${processMessage(result)}',
           );
         }
         return;
@@ -237,7 +216,7 @@ class AndroidBootstrap {
 
       final process = await starter(
         'adb',
-        _adbArguments([...command.take(3), '-w', ...command.skip(3)]),
+        _adb.argumentsFor([...command.take(3), '-w', ...command.skip(3)]),
       );
       _instrumentProcess = process;
       _instrumentExitCode = null;
@@ -253,7 +232,7 @@ class AndroidBootstrap {
   }
 
   Future<void> _forwardPort() async {
-    final result = await _adb([
+    final result = await _adb.run([
       'forward',
       'tcp:$localPort',
       'tcp:6790',
@@ -262,7 +241,7 @@ class AndroidBootstrap {
       throw AndroidBootstrapException(
         AndroidBootstrapFailure.portForward,
         'Failed to forward local port $localPort to UIAutomator2: '
-        '${_processMessage(result)}',
+        '${processMessage(result)}',
       );
     }
   }
@@ -290,15 +269,8 @@ class AndroidBootstrap {
     );
   }
 
-  Future<ProcessResult> _adb(List<String> arguments) =>
-      _run('adb', _adbArguments(arguments));
-
-  List<String> _adbArguments(List<String> arguments) => [
-        if (serial != null) ...['-s', serial!],
-        ...arguments,
-      ];
-
   /// Stops instrumentation and removes the ADB forward, best-effort.
+  @override
   Future<void> dispose() async {
     _healthClient?.close();
     _healthClient = null;
@@ -312,8 +284,7 @@ class AndroidBootstrap {
     _instrumentStderr = null;
 
     try {
-      await _adb([
-        'shell',
+      await _adb.shell([
         'am',
         'force-stop',
         'io.appium.uiautomator2.server.test',
@@ -323,7 +294,7 @@ class AndroidBootstrap {
     }
 
     try {
-      await _adb(['forward', '--remove', 'tcp:$localPort']);
+      await _adb.run(['forward', '--remove', 'tcp:$localPort']);
     } catch (_) {
       // Teardown is best-effort, including when adb has disappeared.
     }
@@ -365,17 +336,5 @@ class AndroidBootstrap {
     } finally {
       client.close(force: true);
     }
-  }
-
-  static String _stdout(ProcessResult result) =>
-      result.stdout is String ? result.stdout as String : '${result.stdout}';
-
-  static String _processMessage(ProcessResult result) {
-    final stderr =
-        result.stderr is String ? (result.stderr as String).trim() : '';
-    final stdout = _stdout(result).trim();
-    if (stderr.isNotEmpty) return stderr;
-    if (stdout.isNotEmpty) return stdout;
-    return 'process exited with code ${result.exitCode}';
   }
 }

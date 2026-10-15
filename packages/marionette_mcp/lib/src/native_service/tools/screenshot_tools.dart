@@ -1,4 +1,3 @@
-import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/screenshot_saver.dart';
@@ -9,7 +8,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 void registerNativeScreenshotTools(
   McpServer server,
   NativeServiceContext context,
-  logging.Logger logger,
 ) {
   server.registerTool(
     'native_take_screenshot',
@@ -34,29 +32,35 @@ void registerNativeScreenshotTools(
       readOnlyHint: true,
     ),
     inputSchema: const ToolInputSchema(properties: {}),
-    callback: (args, extra) async {
-      logger.info('Taking native screenshot');
-      return runTool(logger, 'native take screenshot', () async {
-        final connector = context.requireConnector();
-        final pngBase64 = await connector.takeScreenshot();
-        if (pngBase64.isEmpty) {
-          return CallToolResult(
-            content: [
-              const TextContent(text: 'Native screenshot was empty'),
-            ],
-          );
-        }
-        final saved = saveScreenshotPng(pngBase64, suffix: 'native');
-        if (saved != null) {
-          logger.info('Saved native screenshot to ${saved.path}');
-        }
-        return CallToolResult(
-          content: screenshotToolContent(
-            pngBase64: pngBase64,
-            savedFile: saved,
-          ),
-        );
-      });
-    },
+    callback: (args, extra) => handleNativeTakeScreenshot(context),
   );
+}
+
+/// Handles `native_take_screenshot`.
+Future<CallToolResult> handleNativeTakeScreenshot(
+  NativeServiceContext context,
+) {
+  final logger = context.logger;
+  logger.info('Taking native screenshot');
+  return runTool(logger, 'native take screenshot', () async {
+    final connector = context.requireConnector();
+    final pngBase64 = await connector.takeScreenshot();
+    if (pngBase64.isEmpty) {
+      return CallToolResult(
+        content: [
+          const TextContent(text: 'Native screenshot was empty'),
+        ],
+      );
+    }
+    final saved = saveScreenshotPng(pngBase64, suffix: 'native');
+    if (saved != null) {
+      logger.info('Saved native screenshot to ${saved.path}');
+    }
+    return CallToolResult(
+      content: screenshotToolContent(
+        pngBase64: pngBase64,
+        savedFile: saved,
+      ),
+    );
+  });
 }

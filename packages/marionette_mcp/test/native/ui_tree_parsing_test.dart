@@ -94,6 +94,25 @@ void main() {
       expect(clickableEmpty.resourceId, isNull);
     });
 
+    test('decodes entities and numeric character references in one pass', () {
+      final elements = parseAndroidUiDump(
+        '<hierarchy>'
+        '<node class="android.widget.Button" clickable="true" '
+        'text="Home&#10;Tab 1 of 4" bounds="[0,0][1,1]"/>'
+        '<node class="android.widget.Button" clickable="true" '
+        'text="Don&#x2019;t &amp; won&apos;t" bounds="[0,0][1,1]"/>'
+        '<node class="android.widget.Button" clickable="true" '
+        'text="&amp;#10; &nbsp; &#xZZ;" bounds="[0,0][1,1]"/>'
+        '</hierarchy>',
+      );
+
+      expect(elements.map((e) => e.text), [
+        'Home\nTab 1 of 4',
+        'Don’t & won\'t',
+        '&#10; &nbsp; &#xZZ;',
+      ]);
+    });
+
     test('drops non-interactive empty container nodes', () {
       final elements = parseAndroidUiDump(androidFixture);
       expect(

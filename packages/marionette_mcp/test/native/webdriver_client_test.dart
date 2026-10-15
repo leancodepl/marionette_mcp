@@ -1,148 +1,82 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:test/test.dart';
 
-typedef _Handler = FutureOr<void> Function(
-  HttpRequest request,
-  Map<String, dynamic>? body,
-);
+import 'support/fake_webdriver_server.dart';
 
 void main() {
   group('WebDriverClient', () {
-    late HttpServer server;
-    late Uri baseUri;
-    late Map<String, _Handler> routes;
-    late List<({String method, String path, Map<String, dynamic>? body})> requests;
+    late FakeWebDriverServer server;
+    late WebDriverClient client;
 
     setUp(() async {
-      routes = {};
-      requests = [];
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      baseUri = Uri(
-        scheme: 'http',
-        host: '127.0.0.1',
-        port: server.port,
-      );
-
-      server.listen((request) async {
-        final bodyBytes = await request.fold<List<int>>(
-          <int>[],
-          (bytes, chunk) => bytes..addAll(chunk),
-        );
-        Map<String, dynamic>? body;
-        if (bodyBytes.isNotEmpty) {
-          body = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
-        }
-
-        final key = '${request.method} ${request.uri.path}';
-        requests.add((method: request.method, path: request.uri.path, body: body));
-
-        final handler = routes[key];
-        if (handler == null) {
-          request.response.statusCode = HttpStatus.notFound;
-          request.response.write(jsonEncode({
-            'value': {
-              'error': 'unknown command',
-              'message': 'No handler for $key',
-            },
-          }));
-          await request.response.close();
-          return;
-        }
-
-        await handler(request, body);
-      });
+      server = await FakeWebDriverServer.start(defaultRoutes: false);
+      client = WebDriverClient(server.baseUrl);
     });
 
     tearDown(() async {
-      await server.close(force: true);
+      client.close();
+      await server.close();
     });
 
-    Future<void> writeJson(
-      HttpRequest request,
-      Object? value, {
-      int status = HttpStatus.ok,
-    }) async {
-      request.response.statusCode = status;
-      request.response.headers.contentType = ContentType.json;
-      request.response.write(jsonEncode({'value': value}));
-      await request.response.close();
-    }
-
     test('status returns true when /status is healthy', () async {
-      routes['GET /status'] = (request, _) => writeJson(request, {'ready': true});
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.onValue('GET', '/status', {'ready': true});
 
       expect(await client.status(), isTrue);
     });
 
     test('status returns false on HTTP error without throwing', () async {
-      routes['GET /status'] = (request, _) async {
-        request.response.statusCode = HttpStatus.serviceUnavailable;
-        await request.response.close();
-      };
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.on(
+        'GET',
+        '/status',
+        (_) =>
+            const FakeResponse.raw('', status: HttpStatus.serviceUnavailable),
+      );
 
       expect(await client.status(), isFalse);
     });
 
     test('createSession reads W3C value.sessionId', () async {
-      routes['POST /session'] = (request, body) {
-        expect(body?['capabilities'], isA<Map>());
-        return writeJson(request, {
+      server.on('POST', '/session', (request) {
+        expect(request.body?['capabilities'], isA<Map<String, dynamic>>());
+        return const FakeResponse.value({
           'sessionId': 'sess-123',
           'capabilities': <String, dynamic>{},
         });
-      };
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      });
 
       expect(await client.createSession(), 'sess-123');
     });
 
     test('getPageSource returns XML string', () async {
       const xml = '<hierarchy/>';
-      routes['GET /session/sess-1/source'] = (request, _) => writeJson(request, xml);
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.onValue('GET', '/session/sess-1/source', xml);
 
       expect(await client.getPageSource('sess-1'), xml);
     });
 
     test('takeScreenshot returns raw base64 PNG payload', () async {
-      const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-      routes['GET /session/sess-1/screenshot'] = (request, _) => writeJson(request, png);
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      const png =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQ'
+          'DwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      server.onValue('GET', '/session/sess-1/screenshot', png);
 
       expect(await client.takeScreenshot('sess-1'), png);
     });
 
     test('takeScreenshot strips data URI prefix when present', () async {
-      const png = 'abc123';
-      routes['GET /session/sess-1/screenshot'] = (request, _) => writeJson(request, 'data:image/png;base64,$png');
+      server.onValue(
+        'GET',
+        '/session/sess-1/screenshot',
+        'data:image/png;base64,abc123',
+      );
 
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
-
-      expect(await client.takeScreenshot('sess-1'), png);
+      expect(await client.takeScreenshot('sess-1'), 'abc123');
     });
 
     test('takeScreenshot rejects empty payload', () async {
-      routes['GET /session/sess-1/screenshot'] = (request, _) => writeJson(request, '');
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.onValue('GET', '/session/sess-1/screenshot', '');
 
       expect(
         () => client.takeScreenshot('sess-1'),
@@ -151,71 +85,56 @@ void main() {
     });
 
     test('findElement reads W3C element key', () async {
-      routes['POST /session/sess-1/element'] = (request, body) {
-        expect(body, {
+      server.on('POST', '/session/sess-1/element', (request) {
+        expect(request.body, {
           'using': 'xpath',
           'value': '//Button',
           'strategy': 'xpath',
           'selector': '//Button',
         });
-        return writeJson(request, {w3cElementKey: 'el-99'});
-      };
+        return const FakeResponse.value({w3cElementKey: 'el-99'});
+      });
 
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
-
-      expect(
-        await client.findElement('sess-1', 'xpath', '//Button'),
-        'el-99',
-      );
+      expect(await client.findElement('sess-1', 'xpath', '//Button'), 'el-99');
     });
 
     test('findElement falls back to legacy ELEMENT key', () async {
-      routes['POST /session/sess-1/element'] = (request, _) => writeJson(request, {'ELEMENT': 'legacy-el'});
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
-
-      expect(
-        await client.findElement('sess-1', 'id', 'foo'),
-        'legacy-el',
+      server.onValue(
+        'POST',
+        '/session/sess-1/element',
+        {'ELEMENT': 'legacy-el'},
       );
+
+      expect(await client.findElement('sess-1', 'id', 'foo'), 'legacy-el');
     });
 
     test('elementClick posts to element click endpoint', () async {
-      routes['POST /session/sess-1/element/el-1/click'] = (request, _) => writeJson(request, null);
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.onValue('POST', '/session/sess-1/element/el-1/click', null);
 
       await client.elementClick('sess-1', 'el-1');
+
       expect(
-        requests.any((r) => r.path == '/session/sess-1/element/el-1/click'),
-        isTrue,
+        server.requestsTo('POST', '/session/sess-1/element/el-1/click'),
+        hasLength(1),
       );
     });
 
     test('elementSendKeys posts text payload', () async {
-      routes['POST /session/sess-1/element/el-1/value'] = (request, body) {
-        expect(body, {'text': 'hello'});
-        return writeJson(request, null);
-      };
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.onValue('POST', '/session/sess-1/element/el-1/value', null);
 
       await client.elementSendKeys('sess-1', 'el-1', 'hello');
+
+      expect(
+        server
+            .requestsTo('POST', '/session/sess-1/element/el-1/value')
+            .single
+            .body,
+        {'text': 'hello'},
+      );
     });
 
     test('swipe builds W3C pointer actions via performActions', () async {
-      Map<String, dynamic>? captured;
-      routes['POST /session/sess-1/actions'] = (request, body) {
-        captured = body;
-        return writeJson(request, null);
-      };
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.onValue('POST', '/session/sess-1/actions', null);
 
       await client.swipe(
         'sess-1',
@@ -226,7 +145,9 @@ void main() {
         durationMs: 150,
       );
 
-      final actions = captured!['actions'] as List<dynamic>;
+      final body =
+          server.requestsTo('POST', '/session/sess-1/actions').single.body!;
+      final actions = body['actions'] as List<dynamic>;
       expect(actions, hasLength(1));
       final source = actions.single as Map<String, dynamic>;
       expect(source['type'], 'pointer');
@@ -248,32 +169,24 @@ void main() {
     });
 
     test('deleteSession issues DELETE', () async {
-      routes['DELETE /session/sess-1'] = (request, _) => writeJson(request, null);
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.onValue('DELETE', '/session/sess-1', null);
 
       await client.deleteSession('sess-1');
-      expect(
-        requests.any(
-          (r) => r.method == 'DELETE' && r.path == '/session/sess-1',
-        ),
-        isTrue,
-      );
+
+      expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
     });
 
-    test('W3C error body becomes WebDriverException with error/message', () async {
-      routes['POST /session/sess-1/element'] = (request, _) => writeJson(
-            request,
-            {
-              'error': 'no such element',
-              'message': 'Element not found',
-            },
-            status: HttpStatus.notFound,
-          );
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+    test('W3C error body becomes WebDriverException with error/message',
+        () async {
+      server.on(
+        'POST',
+        '/session/sess-1/element',
+        (_) => const FakeResponse.error(
+          'no such element',
+          'Element not found',
+          status: HttpStatus.notFound,
+        ),
+      );
 
       expect(
         () => client.findElement('sess-1', 'id', 'missing'),
@@ -287,14 +200,14 @@ void main() {
     });
 
     test('non-2xx without W3C body becomes WebDriverException', () async {
-      routes['GET /session/sess-1/source'] = (request, _) async {
-        request.response.statusCode = HttpStatus.badGateway;
-        request.response.write('upstream down');
-        await request.response.close();
-      };
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
+      server.on(
+        'GET',
+        '/session/sess-1/source',
+        (_) => const FakeResponse.raw(
+          'upstream down',
+          status: HttpStatus.badGateway,
+        ),
+      );
 
       expect(
         () => client.getPageSource('sess-1'),
@@ -307,13 +220,10 @@ void main() {
     });
 
     test('wdaDeviceInfo reads /wda/device/info value', () async {
-      routes['GET /wda/device/info'] = (request, _) => writeJson(request, {
+      server.onValue('GET', '/wda/device/info', {
         'udid': 'SIM-UDID',
         'name': 'iPhone 16',
       });
-
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
 
       expect(await client.wdaDeviceInfo(), {
         'udid': 'SIM-UDID',
@@ -322,28 +232,19 @@ void main() {
     });
 
     test('wdaActiveAppInfo reads session active app value', () async {
-      routes['GET /session/sess-1/wda/activeAppInfo'] =
-          (request, _) => writeJson(request, {
-                'bundleId': 'com.example.app',
-                'processArguments': <dynamic>[],
-              });
+      server.onValue('GET', '/session/sess-1/wda/activeAppInfo', {
+        'bundleId': 'com.example.app',
+        'processArguments': <dynamic>[],
+      });
 
-      final client = WebDriverClient(baseUri.toString());
-      addTearDown(client.close);
-
-      expect(
-        await client.wdaActiveAppInfo('sess-1'),
-        {
-          'bundleId': 'com.example.app',
-          'processArguments': isEmpty,
-        },
-      );
+      expect(await client.wdaActiveAppInfo('sess-1'), {
+        'bundleId': 'com.example.app',
+        'processArguments': isEmpty,
+      });
     });
 
     test('close cleans up so further requests fail', () async {
-      routes['GET /status'] = (request, _) => writeJson(request, {'ready': true});
-
-      final client = WebDriverClient(baseUri.toString());
+      server.onValue('GET', '/status', {'ready': true});
       expect(await client.status(), isTrue);
 
       client.close();

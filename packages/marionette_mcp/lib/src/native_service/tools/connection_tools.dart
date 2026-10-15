@@ -1,8 +1,5 @@
-import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
-import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
-import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -10,7 +7,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 void registerNativeConnectionTools(
   McpServer server,
   NativeServiceContext context,
-  logging.Logger logger,
 ) {
   server
     ..registerTool(
@@ -43,58 +39,7 @@ void registerNativeConnectionTools(
         },
         required: ['platform'],
       ),
-      callback: (args, extra) async {
-        final platform = (args['platform'] as String?)?.toLowerCase().trim();
-        final serial = args['serial'] as String?;
-        final udid = args['udid'] as String?;
-
-        if (platform != 'android' && platform != 'ios') {
-          return CallToolResult(
-            isError: true,
-            content: [
-              const TextContent(
-                text: 'native_connect requires platform to be '
-                    '"android" or "ios".',
-              ),
-            ],
-          );
-        }
-
-        logger.info(
-          'Connecting native connector: platform=$platform '
-          'serial=$serial udid=$udid',
-        );
-
-        try {
-          await context.dispose();
-
-          final NativeConnector connector;
-          if (platform == 'android') {
-            connector = await AndroidNativeConnector.connect(serial: serial);
-          } else {
-            connector = await IosNativeConnector.connect(udid: udid);
-          }
-          context.connector = connector;
-
-          return CallToolResult(
-            content: [
-              TextContent(
-                text: 'Successfully connected native connector '
-                    '(platform=$platform)',
-              ),
-            ],
-          );
-        } catch (err) {
-          logger.severe('Failed to connect native connector', err);
-          context.connector = null;
-          return CallToolResult(
-            isError: true,
-            content: [
-              TextContent(text: 'Failed to connect native connector: $err'),
-            ],
-          );
-        }
-      },
+      callback: (args, extra) => handleNativeConnect(context, args),
     )
     ..registerTool(
       'native_disconnect',
@@ -105,26 +50,75 @@ void registerNativeConnectionTools(
           '$nativeRoutingPreferFlutter',
       annotations: const ToolAnnotations(title: 'Disconnect Native Connector'),
       inputSchema: const ToolInputSchema(properties: {}),
-      callback: (args, extra) async {
-        logger.info('Disconnecting native connector');
-        try {
-          await context.dispose();
-          return CallToolResult(
-            content: [
-              const TextContent(
-                text: 'Successfully disconnected native connector',
-              ),
-            ],
-          );
-        } catch (err) {
-          logger.severe('Error during native disconnect', err);
-          return CallToolResult(
-            isError: true,
-            content: [
-              TextContent(text: 'Error during native disconnect: $err'),
-            ],
-          );
-        }
-      },
+      callback: (args, extra) => handleNativeDisconnect(context),
     );
+}
+
+/// Handles `native_connect`. Does not use `runTool` because a failed connect
+/// must also leave the context disconnected.
+Future<CallToolResult> handleNativeConnect(
+  NativeServiceContext context,
+  Map<String, dynamic> args,
+) async {
+  final logger = context.logger;
+  final platform = NativePlatform.tryParse(args['platform'] as String?);
+  final serial = args['serial'] as String?;
+  final udid = args['udid'] as String?;
+
+  if (platform == null) {
+    return invalidArguments(
+      'native_connect requires platform to be "android" or "ios".',
+    );
+  }
+
+  logger.info(
+    'Connecting native connector: platform=${platform.name} '
+    'serial=$serial udid=$udid',
+  );
+
+  try {
+    await context.connect(platform, serial: serial, udid: udid);
+    return CallToolResult(
+      content: [
+        TextContent(
+          text: 'Successfully connected native connector '
+              '(platform=${platform.name})',
+        ),
+      ],
+    );
+  } catch (err) {
+    // context.connect disposed the previous session before trying, so the
+    // context is already disconnected here.
+    logger.severe('Failed to connect native connector', err);
+    return CallToolResult(
+      isError: true,
+      content: [
+        TextContent(text: 'Failed to connect native connector: $err'),
+      ],
+    );
+  }
+}
+
+/// Handles `native_disconnect`.
+Future<CallToolResult> handleNativeDisconnect(
+  NativeServiceContext context,
+) async {
+  final logger = context.logger;
+  logger.info('Disconnecting native connector');
+  try {
+    await context.dispose();
+    return CallToolResult(
+      content: [
+        const TextContent(text: 'Successfully disconnected native connector'),
+      ],
+    );
+  } catch (err) {
+    logger.severe('Error during native disconnect', err);
+    return CallToolResult(
+      isError: true,
+      content: [
+        TextContent(text: 'Error during native disconnect: $err'),
+      ],
+    );
+  }
 }

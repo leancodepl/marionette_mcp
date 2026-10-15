@@ -1,5 +1,9 @@
 # Unreleased
 
+- Native lane: errors from `native_connect` and the `native_*` tools now name the failing stage (iOS bootstrap included) and end with a `Hint:` describing how to fix it
+- Native lane: fix `foregroundApp` in `native_get_elements` always being `null` on Android 10+
+- Native lane: decode numeric character references (e.g. `&#10;`) in native element text, so multi-line labels can be matched by `native_tap` / `native_enter_text`
+
 # 0.6.0
 
 - Promote schema-bearing custom extensions to first-class MCP tools via the new `ExtensionInputSchema`/`ExtensionParam` DSL

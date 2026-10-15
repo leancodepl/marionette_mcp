@@ -1,20 +1,16 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/process.dart';
+import 'package:marionette_mcp/src/native_service/simctl_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 
-/// Signature for running a short-lived process — injectable for testing.
-typedef ProcessRunner = Future<ProcessResult> Function(
-  String executable,
-  List<String> arguments,
-);
-
-/// Signature for starting a long-running process — injectable for testing.
-typedef ProcessStarter = Future<Process> Function(
-  String executable,
-  List<String> arguments,
-);
+export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
+    show IosBootstrapException, IosBootstrapFailure;
+export 'package:marionette_mcp/src/native_service/process.dart'
+    show ProcessRunner, ProcessStarter;
 
 /// Default cache directory for a previously-built WebDriverAgent runner.
 Directory get defaultWdaCacheDir => Directory(
@@ -65,7 +61,9 @@ Directory get defaultWdaCacheDir => Directory(
 ///    a plain `simctl launch` often does **not** start the HTTP server.
 ///    Prefer the xctestrun path when possible.
 /// 3. Else throw with the build instructions above.
-class IosBootstrap {
+///
+/// Failures are reported as [IosBootstrapException] with the failing stage.
+class IosBootstrap implements NativeServerBootstrap {
   /// Creates a bootstrapper for the simulator identified by [udid].
   ///
   /// When [udid] is null, [ensureServerReady] picks the first booted
@@ -85,7 +83,7 @@ class IosBootstrap {
     Duration pollInterval = const Duration(milliseconds: 500),
     logging.Logger? logger,
   })  : _udid = udid,
-        _run = processRunner ?? Process.run,
+        _simctl = SimctlClient(processRunner: processRunner),
         _start = processStarter ?? Process.start,
         _wdaLocalPort = wdaLocalPort,
         _wdaPathOverride = wdaPath,
@@ -95,7 +93,7 @@ class IosBootstrap {
         _logger = logger ?? logging.Logger('IosBootstrap');
 
   final String? _udid;
-  final ProcessRunner _run;
+  final SimctlClient _simctl;
   final ProcessStarter _start;
   final int _wdaLocalPort;
   final String? _wdaPathOverride;
@@ -123,6 +121,7 @@ class IosBootstrap {
   /// Ensures WDA is running and healthy, returning `http://127.0.0.1:$port`.
   ///
   /// Idempotent when the server is already responding on [wdaLocalPort].
+  @override
   Future<Uri> ensureServerReady() async {
     _requireMacOS();
 
@@ -139,19 +138,26 @@ class IosBootstrap {
       if (await _wdaServesSimulator(baseUri, _resolvedUdid!)) {
         return baseUri;
       }
-      throw StateError(
+      throw IosBootstrapException(
+        IosBootstrapFailure.portConflict,
         'Port $_wdaLocalPort is already in use by WebDriverAgent attached to '
-        'a different simulator than $_resolvedUdid. Stop the other WDA '
-        'instance or choose another wdaLocalPort.',
+        'a different simulator than $_resolvedUdid.',
       );
     }
     final artifacts = _resolveWdaArtifacts();
-    await _launchWda(artifacts, _resolvedUdid!);
-    await _waitUntilHealthy(baseUri);
+    try {
+      await _launchWda(artifacts, _resolvedUdid!);
+      await _waitUntilHealthy(baseUri);
+    } catch (_) {
+      // Do not leave a half-started xcodebuild/WDA behind.
+      await dispose();
+      rethrow;
+    }
     return baseUri;
   }
 
   /// Kills any xcodebuild/WDA process started by this instance. Best-effort.
+  @override
   Future<void> dispose() async {
     await _terminateSimctlLaunch();
 
@@ -174,7 +180,8 @@ class IosBootstrap {
 
   void _requireMacOS() {
     if (!Platform.isMacOS) {
-      throw StateError(
+      throw IosBootstrapException(
+        IosBootstrapFailure.notMacOS,
         'IosBootstrap requires macOS (WebDriverAgent / xcrun simctl). '
         'Current platform: ${Platform.operatingSystem}.',
       );
@@ -185,44 +192,30 @@ class IosBootstrap {
     final explicitUdid = _udid;
     if (explicitUdid != null && explicitUdid.isNotEmpty) return explicitUdid;
 
-    final result =
-        await _run('xcrun', ['simctl', 'list', 'devices', 'booted', '-j']);
-    if (result.exitCode != 0) {
-      throw StateError(
-        'Failed to list booted simulators (exit ${result.exitCode}): '
-        '${(result.stderr as String).trim()}',
+    final List<String> booted;
+    try {
+      booted = await _simctl.listBootedUdids();
+    } on ProcessCommandException catch (error) {
+      throw IosBootstrapException(
+        IosBootstrapFailure.simctl,
+        'Failed to list booted simulators: $error',
+      );
+    } on FormatException catch (error) {
+      throw IosBootstrapException(
+        IosBootstrapFailure.simctl,
+        'Failed to parse simctl output: ${error.message}',
+      );
+    } on ProcessException catch (error) {
+      throw IosBootstrapException(
+        IosBootstrapFailure.simctl,
+        'Failed to run xcrun: ${error.message}',
       );
     }
 
-    final decoded = jsonDecode(result.stdout as String);
-    if (decoded is! Map<String, dynamic>) {
-      throw StateError('Unexpected simctl JSON: expected an object');
-    }
-
-    final devices = decoded['devices'];
-    if (devices is! Map<String, dynamic>) {
-      throw StateError('Unexpected simctl JSON: missing devices map');
-    }
-
-    final booted = <String>[];
-    for (final entry in devices.values) {
-      if (entry is! List) continue;
-      for (final device in entry) {
-        if (device is! Map<String, dynamic>) continue;
-        final state = device['state'] as String?;
-        final udid = device['udid'] as String?;
-        if (state == 'Booted' && udid != null && udid.isNotEmpty) {
-          booted.add(udid);
-        }
-      }
-    }
-
     if (booted.isEmpty) {
-      throw StateError(
-        'No booted iOS Simulator found. Boot one first, e.g.:\n'
-        '  open -a Simulator\n'
-        '  xcrun simctl boot "iPhone 16"\n'
-        'Or pass an explicit udid to IosBootstrap.',
+      throw IosBootstrapException(
+        IosBootstrapFailure.noBootedSimulator,
+        'No booted iOS Simulator found.',
       );
     }
 
@@ -243,7 +236,8 @@ class IosBootstrap {
       if (file.existsSync()) {
         return _WdaArtifacts(xctestrunPath: file.path);
       }
-      throw StateError(
+      throw IosBootstrapException(
+        IosBootstrapFailure.wdaArtifactsMissing,
         'MARIONETTE_WDA_XCTESTRUN is set but file not found: $xctestrunEnv',
       );
     }
@@ -269,7 +263,10 @@ class IosBootstrap {
       if (fromCache != null) return fromCache;
     }
 
-    throw StateError(_missingWdaMessage());
+    throw IosBootstrapException(
+      IosBootstrapFailure.wdaArtifactsMissing,
+      _missingWdaMessage(),
+    );
   }
 
   _WdaArtifacts? _artifactsFromPath(String path) {
@@ -333,19 +330,30 @@ class IosBootstrap {
       await _launchViaSimctl(artifacts.bundlePath!, udid);
       return;
     }
-    throw StateError(_missingWdaMessage());
+    throw IosBootstrapException(
+      IosBootstrapFailure.wdaArtifactsMissing,
+      _missingWdaMessage(),
+    );
   }
 
   Future<void> _launchViaXcodebuild(String xctestrunPath, String udid) async {
     // Standard Appium approach: run the already-built test without rebuilding.
     // WDA binds to localhost:8100 on the Mac when targeting a simulator.
-    final process = await _start('xcodebuild', [
-      'test-without-building',
-      '-xctestrun',
-      xctestrunPath,
-      '-destination',
-      'platform=iOS Simulator,id=$udid',
-    ]);
+    final Process process;
+    try {
+      process = await _start('xcodebuild', [
+        'test-without-building',
+        '-xctestrun',
+        xctestrunPath,
+        '-destination',
+        'platform=iOS Simulator,id=$udid',
+      ]);
+    } on ProcessException catch (error) {
+      throw IosBootstrapException(
+        IosBootstrapFailure.launch,
+        'Failed to start xcodebuild: ${error.message}',
+      );
+    }
     _attachProcess(process);
   }
 
@@ -353,28 +361,17 @@ class IosBootstrap {
     // Best-effort fallback. WDA normally must run as an XCUITest host; a
     // plain simctl launch frequently never opens the HTTP server. Prefer
     // MARIONETTE_WDA_XCTESTRUN when available.
-    final install =
-        await _run('xcrun', ['simctl', 'install', udid, bundlePath]);
-    if (install.exitCode != 0) {
-      throw StateError(
-        'simctl install failed (exit ${install.exitCode}): '
-        '${(install.stderr as String).trim()}',
-      );
-    }
-
     const bundleId = wdaRunnerBundleId;
-    final launch = await _run('xcrun', [
-      'simctl',
-      'launch',
-      udid,
-      bundleId,
-    ]);
-    if (launch.exitCode != 0) {
-      throw StateError(
-        'simctl launch of $bundleId failed (exit ${launch.exitCode}): '
-        '${(launch.stderr as String).trim()}\n'
-        'Note: WDA typically needs to run as an XCUITest. Prefer setting '
-        'MARIONETTE_WDA_XCTESTRUN and using xcodebuild test-without-building.',
+    try {
+      await _simctl.install(udid, bundlePath);
+      await _simctl.launch(udid, bundleId);
+    } on ProcessCommandException catch (error) {
+      throw IosBootstrapException(
+        IosBootstrapFailure.launch,
+        'Launching WebDriverAgent via simctl failed: $error',
+        hint: 'WDA typically needs to run as an XCUITest. Set '
+            'MARIONETTE_WDA_XCTESTRUN so Marionette can use xcodebuild '
+            'test-without-building.',
       );
     }
 
@@ -390,7 +387,7 @@ class IosBootstrap {
     if (udid == null || bundleId == null) return;
 
     try {
-      await _run('xcrun', ['simctl', 'terminate', udid, bundleId]);
+      await _simctl.terminate(udid, bundleId);
     } catch (_) {
       // Best-effort cleanup.
     }
@@ -439,21 +436,20 @@ class IosBootstrap {
 
       final exitCode = _wdaExitCode;
       if (exitCode != null) {
-        throw StateError(
+        throw IosBootstrapException(
+          IosBootstrapFailure.launch,
           'WebDriverAgent process exited with code $exitCode before becoming '
-          'ready on $baseUri. Check xcodebuild output and that the '
-          'xctestrun matches this simulator runtime.',
+          'ready on $baseUri.',
         );
       }
 
       await Future<void>.delayed(_pollInterval);
     }
 
-    throw StateError(
+    throw IosBootstrapException(
+      IosBootstrapFailure.healthCheck,
       'WebDriverAgent did not become ready at $baseUri within '
-      '${_readyTimeout.inSeconds}s. WDA is often slow to start; verify the '
-      'runner was built for this simulator and that port $_wdaLocalPort is '
-      'free.',
+      '${_readyTimeout.inSeconds}s.',
     );
   }
 
