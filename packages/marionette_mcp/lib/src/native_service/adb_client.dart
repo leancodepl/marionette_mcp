@@ -85,6 +85,18 @@ class AdbClient {
     }
   }
 
+  /// Display size in pixels from `adb shell wm size` (an override size wins
+  /// over the physical one), or null when it cannot be read. Never throws.
+  Future<({int width, int height})?> screenSize() async {
+    try {
+      final result = await shell(const ['wm', 'size']);
+      if (result.exitCode != 0) return null;
+      return parseWmSize(processStdout(result));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Package that owns the focused window (a system dialog when one covers
   /// the app), or null when it cannot be determined. Never throws.
   ///
@@ -107,6 +119,23 @@ class AdbClient {
 }
 
 final _sha256Pattern = RegExp(r'^[0-9a-fA-F]{64}$');
+
+final _wmSizePattern = RegExp(r'(Physical|Override) size:\s*(\d+)x(\d+)');
+
+/// Parses `adb shell wm size` output; an `Override size` (set with
+/// `wm size WxH`) takes precedence over the `Physical size`.
+({int width, int height})? parseWmSize(String output) {
+  ({int width, int height})? physical;
+  for (final match in _wmSizePattern.allMatches(output)) {
+    final size = (
+      width: int.parse(match.group(2)!),
+      height: int.parse(match.group(3)!),
+    );
+    if (match.group(1) == 'Override') return size;
+    physical = size;
+  }
+  return physical;
+}
 
 /// Parses `adb forward --list` output (`<serial> tcp:<local> tcp:<remote>`
 /// per line) and returns the local port forwarded from [deviceSerial] to

@@ -31,6 +31,7 @@ class FakeNativeConnector implements NativeConnector {
     this.foregroundAppValue = 'com.example.app',
     this.foregroundAppError,
     this.screenshot = 'fake-png-base64',
+    this.screen = const NativeScreen(width: 1000, height: 2000, scale: 1),
     this.error,
   }) : screens = screens ?? [const []];
 
@@ -42,6 +43,7 @@ class FakeNativeConnector implements NativeConnector {
   String? foregroundAppValue;
   Object? foregroundAppError;
   String screenshot;
+  NativeScreen screen;
 
   /// When set, every UI operation throws it.
   Object? error;
@@ -114,6 +116,12 @@ class FakeNativeConnector implements NativeConnector {
   Future<String> takeScreenshot() async {
     _maybeThrow();
     return screenshot;
+  }
+
+  @override
+  Future<NativeScreen> getScreen() async {
+    _maybeThrow();
+    return screen;
   }
 
   @override

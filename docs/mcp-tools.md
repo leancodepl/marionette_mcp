@@ -58,10 +58,10 @@ Tools for system / native UI outside the Flutter widget tree (permission dialogs
 | --- | --- |
 | `native_connect` | Start a native automation session (UIAutomator2 on Android, WebDriverAgent on iOS). Requires `platform`: `android` or `ios`. If the device-side server or session is lost later, it is re-established automatically once: reads are retried, an interrupted action is not repeated ([D3](./native-lane-decisions.md#d3)). |
 | `native_disconnect` | Stop the native session and release device-side processes. |
-| `native_get_elements` | Return the native UI hierarchy as JSON (`elements`, optional `foregroundApp`). |
-| `native_tap` | Tap by exact `text`, `id`, or physical-pixel `x`/`y`. |
-| `native_scroll` | Swipe in a `direction` from screen center (default) or optional `startX`/`startY`; optionally scroll until `text` is visible. |
-| `native_enter_text` | Type into a native field by `id` or `label`. |
+| `native_get_elements` | Return the native UI hierarchy as JSON (`elements`, optional `foregroundApp`). `bounds` are in screenshot pixels on every platform ([D2](./native-lane-decisions.md#d2)). |
+| `native_tap` | Tap an element chosen by a selector (`text`, `textContains`, `id`, `type`, optional `index`) or at `x`/`y` in screenshot pixels. An ambiguous selector fails and lists the candidates ([D1](./native-lane-decisions.md#d1)). |
+| `native_scroll` | Swipe in a `direction` from screen center (default) or optional `startX`/`startY`; optionally scroll until an element matching `text` / `textContains` / `id` / `type` is visible. |
+| `native_enter_text` | Type `text` into a native field chosen by a selector (`label`, `textContains`, `id`, `type`, optional `index`). |
 | `native_take_screenshot` | Returns a base64 inline PNG of the full device screen via the native session (system UI, WebViews). When `MARIONETTE_SCREENSHOTS_DIR` is set, also saves the PNG to that directory and includes the absolute path alongside the inline image. |
 
 ### Dev workflow

@@ -30,14 +30,39 @@ final class NativeNotConnectedException extends NativeLaneException {
 }
 
 /// No element in the native UI tree matched the requested target.
+///
+/// [similar] lists texts of elements that almost match (e.g. differ only in
+/// case or line breaks), to steer the agent to the right value.
 final class NativeElementNotFoundException extends NativeLaneException {
-  const NativeElementNotFoundException(String target)
+  NativeElementNotFoundException(String target,
+      {List<String> similar = const []})
       : super(
           'No native element with $target.',
-          hint: 'Call native_get_elements and retry with a value from its '
-              'output.',
+          hint: similar.isEmpty
+              ? 'Call native_get_elements and retry with a value from its '
+                  'output.'
+              : 'Similar elements: ${similar.map(_quote).join(', ')}. Call '
+                  'native_get_elements and retry with a value from its '
+                  'output.',
         );
 }
+
+/// More than one element matched and none could be preferred, so acting on
+/// "the first one" could hit the wrong control. See
+/// docs/native-lane-decisions.md#d1.
+final class NativeAmbiguousElementException extends NativeLaneException {
+  NativeAmbiguousElementException(
+    String target,
+    List<String> candidates,
+  ) : super(
+          '${candidates.length} native elements match $target:\n'
+          '${candidates.map((c) => '  $c').join('\n')}',
+          hint: 'Pass index (0-${candidates.length - 1}, in the order above) '
+              'or a more specific selector (id, type, textContains).',
+        );
+}
+
+String _quote(String text) => '"${text.replaceAll('\n', r'\n')}"';
 
 /// The device-side automation server or its session went away and could not
 /// be transparently re-established. See docs/native-lane-decisions.md#d3.

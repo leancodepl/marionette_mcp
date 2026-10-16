@@ -3,6 +3,11 @@
 - Native lane: errors from `native_connect` and the `native_*` tools now name the failing stage (iOS bootstrap included) and end with a `Hint:` describing how to fix it
 - Native lane: fix `foregroundApp` in `native_get_elements` always being `null` on Android 10+
 - Native lane: decode numeric character references (e.g. `&#10;`) in native element text, so multi-line labels can be matched by `native_tap` / `native_enter_text`
+- **Breaking (native lane):** element-targeting tools (`native_tap`, `native_enter_text`, `native_scroll`) share one selector — `text` (`label` in `native_enter_text`), `textContains`, `id`, `type`, `index`. When a selector matches several elements and clickable ones do not narrow it to one, the tool fails and lists the candidates instead of acting on the first match; pass `index` or a more specific selector ([D1](docs/native-lane-decisions.md#d1))
+- **Breaking (native lane, iOS):** all native coordinates — `bounds` and `x`/`y`/`startX`/`startY`/`distance` — are screenshot pixels on every platform; on iOS they were WebDriverAgent points ([D2](docs/native-lane-decisions.md#d2))
+- Native lane: tap and type into exactly the element the selector chose (iOS no longer re-locates it by accessibility id, which could hit another element with the same id)
+- Native lane: `native_scroll` uses the real screen size instead of inferring it from element bounds
+- Native lane (Android): an empty text field is identified by its hint (placeholder) text; (iOS) software keyboard keys are reported as clickable
 - Native lane: re-establish a lost device-side session automatically once; reads are retried, actions check that the server responds first and are only repeated when they certainly did not run ([D3](docs/native-lane-decisions.md#d3))
 - Native lane (iOS): `native_connect` with the `udid` of a simulator that is not booted now fails immediately with a hint, instead of `xcodebuild` silently booting it headless
 - Native lane (Android): pick a free local port for UIAutomator2 (or `MARIONETTE_UIA2_PORT`), reuse a healthy server already forwarded for the device, install APKs only when they changed, and verify downloaded APKs against pinned SHA-256 checksums ([D10](docs/native-lane-decisions.md#d10))

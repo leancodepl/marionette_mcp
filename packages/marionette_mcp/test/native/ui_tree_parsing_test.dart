@@ -1,5 +1,7 @@
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/adb_client.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:test/test.dart';
 
 const androidFixture = '''
@@ -64,6 +66,8 @@ const wdaFixture = '''
 ''';
 
 void main() {
+  _unitTests();
+
   group('parseAndroidUiDump', () {
     test('parses interactive and labelled nodes with expected fields', () {
       final elements = parseAndroidUiDump(androidFixture);
@@ -111,6 +115,19 @@ void main() {
         'Don’t & won\'t',
         '&#10; &nbsp; &#xZZ;',
       ]);
+    });
+
+    test('an empty field is labelled by its hint', () {
+      final elements = parseAndroidUiDump(
+        '<hierarchy>'
+        '<android.widget.EditText class="android.widget.EditText" text="" '
+        'hint="Amount" clickable="true" bounds="[0,0][10,10]"/>'
+        '<android.widget.EditText class="android.widget.EditText" '
+        'text="42" hint="Amount" clickable="true" bounds="[0,0][10,10]"/>'
+        '</hierarchy>',
+      );
+
+      expect(elements.map((e) => e.text), ['Amount', '42']);
     });
 
     test('drops non-interactive empty container nodes', () {
@@ -256,6 +273,64 @@ void main() {
         bounds: NativeBounds(x: 10, y: 20, width: 5, height: 7),
       );
       expect(element.center, (x: 12, y: 23));
+    });
+  });
+}
+
+void _unitTests() {
+  group('NativeBounds.scaled (D2)', () {
+    test('multiplies and rounds every edge', () {
+      const bounds = NativeBounds(x: 10, y: 20, width: 101, height: 33);
+
+      expect(bounds.scaled(3).toJson(), {
+        'x': 30,
+        'y': 60,
+        'width': 303,
+        'height': 99,
+      });
+      expect(bounds.scaled(1.5).toJson(), {
+        'x': 15,
+        'y': 30,
+        'width': 152,
+        'height': 50,
+      });
+      expect(identical(bounds.scaled(1), bounds), isTrue);
+    });
+  });
+
+  group('pngSize', () {
+    test('reads width and height from the IHDR chunk', () {
+      // 1x1 transparent PNG.
+      const png =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQ'
+          'DwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+      expect(pngSize(png), (width: 1, height: 1));
+    });
+
+    test('returns null for non-PNG data', () {
+      expect(
+          pngSize('aGVsbG8gd29ybGQgdGhpcyBpcyBub3QgYSBwbmcgZmlsZQ=='), isNull);
+      expect(pngSize('short'), isNull);
+      expect(pngSize('!!!!not base64 at all, definitely not!!!!'), isNull);
+    });
+  });
+
+  group('parseWmSize', () {
+    test('reads the physical size', () {
+      expect(parseWmSize('Physical size: 1080x2160\n'),
+          (width: 1080, height: 2160));
+    });
+
+    test('an override size wins', () {
+      expect(
+        parseWmSize('Physical size: 1440x3120\nOverride size: 1080x2340\n'),
+        (width: 1080, height: 2340),
+      );
+    });
+
+    test('returns null for unrelated output', () {
+      expect(parseWmSize('error: closed'), isNull);
     });
   });
 }

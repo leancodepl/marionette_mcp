@@ -7,7 +7,11 @@ import 'package:marionette_mcp/src/native_service/xpath.dart';
 /// [NativeConnector] backed by WebDriverAgent on an iOS Simulator.
 ///
 /// Use [connect] to bootstrap WDA (see [IosBootstrap]), open a WebDriver
-/// session, and obtain a ready connector. Coordinates are physical pixels.
+/// session, and obtain a ready connector.
+///
+/// WebDriverAgent reports and accepts coordinates in points; this connector
+/// converts them to screenshot pixels with the display scale read at
+/// connect time (see docs/native-lane-decisions.md#d2).
 final class IosNativeConnector extends WebDriverNativeConnector {
   IosNativeConnector._({
     required super.client,
@@ -15,6 +19,12 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     required super.bootstrap,
     required super.ownsBootstrap,
   });
+
+  /// Screenshot pixels per point; read by [_loadScale] during [connect].
+  double _scale = 1;
+
+  @override
+  double get serverUnitScale => _scale;
 
   /// Bootstraps WDA (unless [bootstrap] was already prepared), creates a
   /// WebDriver session, and returns a connected connector.
@@ -27,11 +37,11 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     String? udid,
     NativeServerBootstrap? bootstrap,
     Map<String, dynamic>? capabilities,
-  }) {
+  }) async {
     final ownsBootstrap = bootstrap == null;
     final resolvedBootstrap = bootstrap ?? IosBootstrap(udid: udid);
 
-    return WebDriverNativeConnector.openSession(
+    final connector = await WebDriverNativeConnector.openSession(
       bootstrap: resolvedBootstrap,
       ownsBootstrap: ownsBootstrap,
       capabilities: capabilities ?? const {'platformName': 'iOS'},
@@ -41,6 +51,49 @@ final class IosNativeConnector extends WebDriverNativeConnector {
         bootstrap: resolvedBootstrap,
         ownsBootstrap: ownsBootstrap,
       ),
+    );
+    try {
+      await connector._loadScale();
+    } catch (_) {
+      await connector.dispose();
+      rethrow;
+    }
+    return connector;
+  }
+
+  /// Reads the display scale from WDA's `wda/screen`; falls back to the
+  /// screenshot width divided by the window width in points.
+  Future<void> _loadScale() async {
+    try {
+      _scale = (await client.wdaScreen(sessionId)).scale;
+      return;
+    } on WebDriverException {
+      // Older WDA builds: derive the scale from a screenshot below.
+    }
+    final window = await client.windowRectSize(sessionId);
+    final png = pngSize(await client.takeScreenshot(sessionId));
+    if (png == null || window.width <= 0) {
+      throw const WebDriverException(
+        'Could not determine the iOS display scale (wda/screen unavailable '
+        'and the screenshot size is unknown)',
+      );
+    }
+    _scale = png.width / window.width;
+  }
+
+  @override
+  Future<NativeScreen> getScreen() async {
+    ({int width, int height}) points;
+    try {
+      final screen = await client.wdaScreen(sessionId);
+      points = (width: screen.width, height: screen.height);
+    } on WebDriverException {
+      points = await client.windowRectSize(sessionId);
+    }
+    return NativeScreen(
+      width: (points.width * _scale).round(),
+      height: (points.height * _scale).round(),
+      scale: _scale,
     );
   }
 
@@ -63,15 +116,13 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     return foregroundAppFromWdaSource(source);
   }
 
+  /// Taps the center of [element]. Re-locating it through WDA (by id or
+  /// label) could hit a different element with the same id — exactly the
+  /// ambiguity the selector already resolved (docs/native-lane-decisions.md#d1).
   @override
-  Future<void> tapElement(NativeElement element) async {
-    final elementId = await _tryFindElement(element);
-    if (elementId != null) {
-      await client.elementClick(sessionId, elementId);
-      return;
-    }
+  Future<void> tapElement(NativeElement element) {
     final center = element.center;
-    await tapAt(center.x, center.y);
+    return tapAt(center.x, center.y);
   }
 
   @override
@@ -89,8 +140,20 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     await client.elementSendKeys(sessionId, elementId, text);
   }
 
-  /// Locates the element by accessibility id (`name`) or visible label/text.
+  /// Locates the WDA element for [element]: first by its type and exact
+  /// geometry from the same UI tree (unique even when ids or labels repeat),
+  /// then by accessibility id (`name`) or visible label/text.
   Future<String?> _tryFindElement(NativeElement element) async {
+    try {
+      return await client.findElement(
+        sessionId,
+        'xpath',
+        wdaGeometryXPath(element, toServerUnits),
+      );
+    } on WebDriverException {
+      // Element moved or the tree changed; fall back to id/label below.
+    }
+
     final id = element.resourceId;
     if (id != null && id.isNotEmpty) {
       try {
@@ -147,3 +210,17 @@ final _bundleIdentifierPattern = RegExp(r'^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$');
 
 bool _looksLikeBundleIdentifier(String value) =>
     _bundleIdentifierPattern.hasMatch(value);
+
+/// XPath selecting the WDA element of [element]'s type at exactly its bounds,
+/// converted to server units with [toServerUnits] (WDA reports integer
+/// points, so the conversion back from screenshot pixels is exact).
+String wdaGeometryXPath(
+    NativeElement element, int Function(int) toServerUnits) {
+  final bounds = element.bounds;
+  final type =
+      element.className.startsWith('XCUIElementType') ? element.className : '*';
+  return '//$type[@x=${toServerUnits(bounds.x)} and '
+      '@y=${toServerUnits(bounds.y)} and '
+      '@width=${toServerUnits(bounds.width)} and '
+      '@height=${toServerUnits(bounds.height)}]';
+}

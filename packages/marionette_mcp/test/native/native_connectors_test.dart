@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
@@ -143,6 +144,33 @@ void main() {
       expect(bootstrap.disposeCalls, 0);
     });
 
+    test('getScreen reads UIAutomator2 window size in pixels', () async {
+      server.onValue(
+        'GET',
+        '/session/sess-1/window/current/size',
+        {'width': 1080, 'height': 2160},
+      );
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      expect((await connector.getScreen()).toJson(), {
+        'width': 1080,
+        'height': 2160,
+        'scale': 1.0,
+      });
+    });
+
+    test('getScreen falls back to adb wm size', () async {
+      runner.onAdb(
+        ['shell', 'wm', 'size'],
+        result: ok('Physical size: 1280x2856\n'),
+      );
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      expect((await connector.getScreen()).width, 1280);
+    });
+
     test('isServerResponding reflects /status', () async {
       final connector = await connect();
       addTearDown(connector.dispose);
@@ -171,25 +199,44 @@ void main() {
   });
 
   group('IosNativeConnector', () {
+    // An iPhone-like display: 402x874 points at scale 3.
+    setUp(() {
+      server.onValue('GET', '/session/sess-1/wda/screen', {
+        'statusBarSize': {'width': 402, 'height': 54},
+        'scale': 3,
+        'screenSize': {'width': 402, 'height': 874},
+      });
+    });
+
     Future<IosNativeConnector> connect() =>
         IosNativeConnector.connect(bootstrap: bootstrap);
 
-    test('tapElement clicks the element found by accessibility id', () async {
-      server
-        ..on('POST', '/session/sess-1/element', (request) {
-          expect(request.body!['using'], 'accessibility id');
-          expect(request.body!['value'], 'allow_button');
-          return const FakeResponse.value({w3cElementKey: 'el-7'});
-        })
-        ..onValue('POST', '/session/sess-1/element/el-7/click', null);
+    test('tapElement taps the chosen element even when its id repeats',
+        () async {
+      // Two "Request" buttons share label and id; the selector picked the
+      // second one, so WDA must not be asked to find "Request" again.
+      server.onValue('POST', '/session/sess-1/actions', null);
       final connector = await connect();
       addTearDown(connector.dispose);
 
-      await connector.tapElement(nativeElement(id: 'allow_button'));
+      await connector.tapElement(
+        nativeElement(
+          type: 'XCUIElementTypeButton',
+          text: 'Request',
+          id: 'Request',
+          x: 819,
+          y: 1278,
+          width: 315,
+          height: 144,
+        ),
+      );
 
+      expect(server.requestsTo('POST', '/session/sess-1/element'), isEmpty);
       expect(
-        server.requestsTo('POST', '/session/sess-1/element/el-7/click'),
-        hasLength(1),
+        _pointerStart(
+          server.requestsTo('POST', '/session/sess-1/actions').single,
+        ),
+        (x: 325, y: 450),
       );
     });
 
@@ -200,27 +247,151 @@ void main() {
       final connector = await connect();
       addTearDown(connector.dispose);
 
-      await connector.tapElement(nativeElement(text: 'OK', x: 10, y: 10));
+      // Bounds are screenshot pixels; the center (60, 36) is sent to WDA in
+      // points.
+      await connector.tapElement(
+        nativeElement(text: 'OK', x: 12, y: 12, width: 96, height: 48),
+      );
 
       expect(
         _pointerStart(
             server.requestsTo('POST', '/session/sess-1/actions').single),
-        (x: 60, y: 35),
+        (x: 20, y: 12),
       );
     });
 
-    test('label lookup builds a valid XPath literal for apostrophes', () async {
-      server
-        ..on('POST', '/session/sess-1/element', (request) {
-          return request.body!['using'] == 'xpath'
-              ? const FakeResponse.value({w3cElementKey: 'el-1'})
-              : _noSuchElement;
-        })
-        ..onValue('POST', '/session/sess-1/element/el-1/click', null);
+    test('reports element bounds in screenshot pixels', () async {
+      server.onValue(
+        'GET',
+        '/session/sess-1/source',
+        '<XCUIElementTypeApplication><XCUIElementTypeButton label="OK" '
+            'enabled="true" x="10" y="20" width="100" height="44"/>'
+            '</XCUIElementTypeApplication>',
+      );
       final connector = await connect();
       addTearDown(connector.dispose);
 
-      await connector.tapElement(nativeElement(text: "Don't Allow"));
+      final button = (await connector.getNativeElements())
+          .singleWhere((e) => e.text == 'OK');
+
+      expect(button.bounds.toJson(), {
+        'x': 30,
+        'y': 60,
+        'width': 300,
+        'height': 132,
+      });
+    });
+
+    test('swipe and tapAt convert screenshot pixels to points', () async {
+      server.onValue('POST', '/session/sess-1/actions', null);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await connector.tapAt(600, 1200);
+      await connector.swipe(startX: 300, startY: 1500, endX: 300, endY: 300);
+
+      final requests = server.requestsTo('POST', '/session/sess-1/actions');
+      expect(_pointerStart(requests[0]), (x: 200, y: 400));
+      final swipe = ((requests[1].body!['actions'] as List).single
+          as Map)['actions'] as List;
+      expect((swipe.first as Map)['y'], 500);
+      expect((swipe[2] as Map)['y'], 100);
+    });
+
+    test('getScreen reports the screen in screenshot pixels', () async {
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      final screen = await connector.getScreen();
+
+      expect(screen.toJson(), {'width': 1206, 'height': 2622, 'scale': 3.0});
+    });
+
+    test('derives the scale from the screenshot when wda/screen is missing',
+        () async {
+      server
+        ..on(
+          'GET',
+          '/session/sess-1/wda/screen',
+          (_) => const FakeResponse.error(
+            'unknown command',
+            'nope',
+            status: HttpStatus.notFound,
+          ),
+        )
+        ..onValue('GET', '/session/sess-1/window/rect', {
+          'x': 0,
+          'y': 0,
+          'width': 375,
+          'height': 667,
+        })
+        ..onValue('GET', '/session/sess-1/screenshot', _pngHeader(750, 1334));
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      expect((await connector.getScreen()).toJson(), {
+        'width': 750,
+        'height': 1334,
+        'scale': 2.0,
+      });
+    });
+
+    test('connect fails when the display scale cannot be determined', () async {
+      server.on(
+        'GET',
+        '/session/sess-1/wda/screen',
+        (_) => const FakeResponse.error('unknown command', 'nope'),
+      );
+
+      await expectLater(connect(), throwsA(isA<WebDriverException>()));
+      expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
+    });
+
+    test('enterText finds the field by type and geometry in points', () async {
+      server
+        ..onValue('POST', '/session/sess-1/element', {w3cElementKey: 'f-1'})
+        ..onValue('POST', '/session/sess-1/element/f-1/click', null)
+        ..onValue('POST', '/session/sess-1/element/f-1/value', null);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await connector.enterText(
+        nativeElement(
+          type: 'XCUIElementTypeTextField',
+          id: 'native_input',
+          x: 96,
+          y: 1764,
+          width: 1014,
+          height: 102,
+        ),
+        'hi',
+      );
+
+      expect(
+        server
+            .requestsTo('POST', '/session/sess-1/element')
+            .single
+            .body!['value'],
+        '//XCUIElementTypeTextField[@x=32 and @y=588 and @width=338 and '
+        '@height=34]',
+      );
+    });
+
+    test('the label fallback builds a valid XPath literal for apostrophes',
+        () async {
+      server
+        ..on('POST', '/session/sess-1/element', (request) {
+          final value = request.body!['value'] as String;
+          return request.body!['using'] == 'xpath' && value.contains('@label')
+              ? const FakeResponse.value({w3cElementKey: 'el-1'})
+              : _noSuchElement;
+        })
+        ..onValue('POST', '/session/sess-1/element/el-1/click', null)
+        ..onValue('POST', '/session/sess-1/element/el-1/value', null);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await connector.enterText(nativeElement(text: "Don't Allow"), 'x');
 
       final xpath = server
           .requestsTo('POST', '/session/sess-1/element')
@@ -301,4 +472,17 @@ void main() {
       expect(bootstrap.disposeCalls, 0);
     });
   });
+}
+
+/// Base64 of a PNG signature + IHDR header for a [width]x[height] image.
+String _pngHeader(int width, int height) {
+  List<int> uint32(int value) =>
+      [value >> 24 & 0xFF, value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF];
+  return base64Encode([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // signature
+    0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, // IHDR length + type
+    ...uint32(width),
+    ...uint32(height),
+    8, 6, 0, 0, 0, 0, 0, 0, 0, // rest of IHDR + CRC (unchecked)
+  ]);
 }

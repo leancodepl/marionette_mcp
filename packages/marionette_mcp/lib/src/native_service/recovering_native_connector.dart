@@ -10,7 +10,8 @@ typedef NativeReconnect = Future<NativeConnector> Function();
 /// session (see docs/native-lane-decisions.md#d3).
 ///
 /// Every operation is classified by its method:
-/// - reads ([getNativeElements], [foregroundApp], [takeScreenshot]) are
+/// - reads ([getNativeElements], [foregroundApp], [takeScreenshot],
+///   [getScreen]) are
 ///   retried once on a fresh session whenever the session was lost;
 /// - actions ([tapElement], [tapAt], [enterText], [swipe]) first check
 ///   [isServerResponding]; a server that is already gone is replaced before
@@ -57,6 +58,9 @@ final class RecoveringNativeConnector implements NativeConnector {
 
   @override
   Future<String> takeScreenshot() => _read((c) => c.takeScreenshot());
+
+  @override
+  Future<NativeScreen> getScreen() => _read((c) => c.getScreen());
 
   @override
   Future<void> tapElement(NativeElement element) =>

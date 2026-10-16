@@ -2,9 +2,11 @@ import 'dart:math' show min;
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
+import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -85,35 +87,25 @@ void registerNativeGestureTools(
     ..registerTool(
       'native_tap',
       description:
-          'Taps a native / system control by visible text, resource id / '
-          'accessibility id, or physical-pixel coordinates. Match against '
-          'elements from native_get_elements (exact text equality, exact id '
-          'equality, or x+y). Provide exactly one matching mode: text, id, '
-          'or both x and y. '
+          'Taps a native / system control, chosen by a selector (text, '
+          'textContains, id, type, optional index — values from '
+          'native_get_elements) or by x+y coordinates in screenshot pixels '
+          '(the pixel grid of native_take_screenshot and of the bounds in '
+          'native_get_elements). Use either a selector or x+y, not both. '
+          '$nativeSelectorRules '
           '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native Tap'),
       inputSchema: ToolInputSchema(
         properties: {
-          'text': JsonSchema.string(
-            description: 'Exact visible text (or content-desc / label) of the '
-                'element to tap, as returned by native_get_elements.',
-          ),
-          'id': JsonSchema.string(
-            description:
-                'Exact Android resource-id or iOS accessibility id of the '
-                'element to tap, as returned in the "id" field of '
-                'native_get_elements.',
-          ),
+          ...nativeSelectorProperties(),
           'x': JsonSchema.number(
-            description:
-                'Physical-pixel X coordinate to tap. Must be paired with y. '
-                'Do not use Flutter logical coordinates.',
+            description: 'X coordinate in screenshot pixels. Must be paired '
+                'with y. Do not use Flutter logical coordinates.',
           ),
           'y': JsonSchema.number(
-            description:
-                'Physical-pixel Y coordinate to tap. Must be paired with x. '
-                'Do not use Flutter logical coordinates.',
+            description: 'Y coordinate in screenshot pixels. Must be paired '
+                'with x. Do not use Flutter logical coordinates.',
           ),
         },
       ),
@@ -125,10 +117,11 @@ void registerNativeGestureTools(
           'Performs a native swipe gesture. direction is the finger-swipe '
           'direction: ${SwipeDirection.commaSeparatedWireNames}. Swipes from '
           'screen center by default; optional startX/startY set the finger '
-          'start (physical pixels). Optional distance defaults to '
+          'start (screenshot pixels). Optional distance defaults to '
           '$_defaultSwipeDistance. '
-          'If text is provided, repeatedly swipes until an element with that '
-          'exact text is visible (max $_maxScrollAttempts attempts) or fails. '
+          'If a target selector (text, textContains, id, type) is given, '
+          'swipes repeatedly until a matching element is visible (max '
+          '$_maxScrollAttempts swipes) or fails. '
           '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native Scroll'),
@@ -138,23 +131,17 @@ void registerNativeGestureTools(
             description:
                 'Finger-swipe direction: ${SwipeDirection.quotedWireNames}.',
           ),
-          'text': JsonSchema.string(
-            description:
-                'Optional exact visible text to scroll until visible. When '
-                'set, swipes repeatedly in direction until the text appears '
-                'in native_get_elements.',
-          ),
+          ...nativeSelectorProperties(withIndex: false),
           'distance': JsonSchema.number(
-            description: 'Swipe distance in physical pixels '
+            description: 'Swipe distance in screenshot pixels '
                 '(default: $_defaultSwipeDistance).',
           ),
           'startX': JsonSchema.number(
-            description: 'Optional finger start X in physical pixels. '
-                'Requires startY. Default: horizontal/vertical center of '
-                'inferred viewport.',
+            description: 'Optional finger start X in screenshot pixels. '
+                'Requires startY. Default: screen center.',
           ),
           'startY': JsonSchema.number(
-            description: 'Optional finger start Y in physical pixels. '
+            description: 'Optional finger start Y in screenshot pixels. '
                 'Requires startX.',
           ),
         },
@@ -170,22 +157,24 @@ Future<CallToolResult> handleNativeTap(
   Map<String, dynamic> args,
 ) async {
   final logger = context.logger;
-  final text = args['text'] as String?;
-  final id = args['id'] as String?;
+  final selector = nativeSelectorFromArgs(args);
   final coordinates = argPairPresence(args, 'x', 'y');
   final hasCoords = coordinates != ArgPairPresence.none;
+  final hasSelector = !selector.isEmpty;
 
-  final modeCount =
-      [text != null, id != null, hasCoords].where((e) => e).length;
-  if (modeCount != 1) {
+  if (hasSelector == hasCoords) {
     return invalidArguments(
-      'native_tap requires exactly one matching mode: text, id, or x+y.',
+      'native_tap requires either a selector (text, textContains, id, type) '
+      'or both x and y — not both, not neither.',
     );
   }
   if (coordinates == ArgPairPresence.partial) {
     return invalidArguments(
       'native_tap coordinate mode requires both x and y.',
     );
+  }
+  if (hasCoords && selector.index != null) {
+    return invalidArguments('native_tap index requires a selector.');
   }
 
   logger.info('Native tapping with args: $args');
@@ -201,27 +190,12 @@ Future<CallToolResult> handleNativeTap(
       );
     }
 
-    final elements = await connector.getNativeElements();
-    final NativeElement match;
-    if (text != null) {
-      match = elements.firstWhere(
-        (e) => e.text == text,
-        orElse: () => throw NativeElementNotFoundException('text="$text"'),
-      );
-    } else {
-      match = elements.firstWhere(
-        (e) => e.resourceId == id,
-        orElse: () => throw NativeElementNotFoundException('id="$id"'),
-      );
-    }
-
+    final match = selectElement(await connector.getNativeElements(), selector);
     await connector.tapElement(match);
     return CallToolResult(
       content: [
         TextContent(
-          text: text != null
-              ? 'Successfully tapped native element text="$text"'
-              : 'Successfully tapped native element id="$id"',
+          text: 'Successfully tapped native element ${selector.describe()}',
         ),
       ],
     );
@@ -235,7 +209,7 @@ Future<CallToolResult> handleNativeScroll(
 ) async {
   final logger = context.logger;
   final direction = SwipeDirection.tryParse(args['direction'] as String?);
-  final text = args['text'] as String?;
+  final target = nativeSelectorFromArgs(args);
   final distance = intArg(args, 'distance');
   final startX = intArg(args, 'startX');
   final startY = intArg(args, 'startY');
@@ -259,14 +233,14 @@ Future<CallToolResult> handleNativeScroll(
   }
 
   logger.info(
-    'Native scrolling direction=${direction.wireName} text=$text '
-    'distance=$distance start=($startX,$startY)',
+    'Native scrolling direction=${direction.wireName} '
+    'target=${target.describe()} distance=$distance start=($startX,$startY)',
   );
   return runTool(logger, 'native scroll', () async {
     final connector = context.requireConnector();
     final delta = distance ?? _defaultSwipeDistance;
 
-    if (text == null) {
+    if (target.isEmpty) {
       await _swipeInDirection(
         connector,
         direction,
@@ -286,11 +260,11 @@ Future<CallToolResult> handleNativeScroll(
 
     for (var attempt = 0; attempt < _maxScrollAttempts; attempt++) {
       final elements = await connector.getNativeElements();
-      if (elements.any((e) => e.text == text)) {
+      if (elements.any(target.matches)) {
         return CallToolResult(
           content: [
             TextContent(
-              text: 'Found native element text="$text" '
+              text: 'Found native element ${target.describe()} '
                   'after $attempt swipe(s)',
             ),
           ],
@@ -306,7 +280,7 @@ Future<CallToolResult> handleNativeScroll(
     }
 
     throw NativeElementNotFoundException(
-      'text="$text" after $_maxScrollAttempts swipe(s) in '
+      '${target.describe()} after $_maxScrollAttempts swipe(s) in '
       'direction=${direction.wireName}',
     );
   });
@@ -319,17 +293,9 @@ Future<void> _swipeInDirection(
   int? startX,
   int? startY,
 }) async {
-  final elements = await connector.getNativeElements();
-  var maxX = 0;
-  var maxY = 0;
-  for (final element in elements) {
-    final right = element.bounds.x + element.bounds.width;
-    final bottom = element.bounds.y + element.bounds.height;
-    if (right > maxX) maxX = right;
-    if (bottom > maxY) maxY = bottom;
-  }
-  if (maxX <= 0) maxX = 1080;
-  if (maxY <= 0) maxY = 1920;
+  final screen = await connector.getScreen();
+  final maxX = screen.width;
+  final maxY = screen.height;
 
   final ({int startX, int startY, int endX, int endY}) endpoints;
   if (startX != null && startY != null) {

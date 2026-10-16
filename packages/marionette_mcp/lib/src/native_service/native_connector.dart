@@ -3,11 +3,13 @@
 /// implementations.
 library;
 
-/// Rectangle in physical screen pixels, as reported by native automation
-/// servers.
+/// Rectangle in **screenshot pixels**: the pixel grid of the image returned
+/// by `native_take_screenshot`, on every platform.
 ///
-/// Note this differs from the Flutter lane, which reports logical pixels —
-/// coordinates from the two lanes must never be mixed.
+/// Servers that work in other units (WebDriverAgent uses points) are
+/// converted by the connector; see docs/native-lane-decisions.md#d2. This
+/// differs from the Flutter lane, which reports logical pixels — coordinates
+/// from the two lanes must never be mixed.
 class NativeBounds {
   const NativeBounds({
     required this.x,
@@ -21,11 +23,44 @@ class NativeBounds {
   final int width;
   final int height;
 
+  /// These bounds multiplied by [factor], rounded to whole pixels.
+  NativeBounds scaled(double factor) {
+    if (factor == 1) return this;
+    int scale(int value) => (value * factor).round();
+    return NativeBounds(
+      x: scale(x),
+      y: scale(y),
+      width: scale(width),
+      height: scale(height),
+    );
+  }
+
   Map<String, int> toJson() => {
         'x': x,
         'y': y,
         'width': width,
         'height': height,
+      };
+}
+
+/// Size of the device screen in screenshot pixels, plus how many
+/// screenshot pixels make up one server unit ([scale]; 1 on Android, the
+/// display scale such as 3 on iOS, where WebDriverAgent works in points).
+class NativeScreen {
+  const NativeScreen({
+    required this.width,
+    required this.height,
+    required this.scale,
+  });
+
+  final int width;
+  final int height;
+  final double scale;
+
+  Map<String, Object> toJson() => {
+        'width': width,
+        'height': height,
+        'scale': scale,
       };
 }
 
@@ -55,10 +90,22 @@ class NativeElement {
   /// Whether the platform reports the element as tappable.
   final bool clickable;
 
-  /// On-screen rectangle in physical pixels.
+  /// On-screen rectangle in screenshot pixels.
   final NativeBounds bounds;
 
-  /// Center of [bounds] in physical pixels — the natural tap target.
+  /// This element with [bounds] multiplied by [factor] (see
+  /// [NativeBounds.scaled]).
+  NativeElement scaled(double factor) => factor == 1
+      ? this
+      : NativeElement(
+          className: className,
+          clickable: clickable,
+          bounds: bounds.scaled(factor),
+          text: text,
+          resourceId: resourceId,
+        );
+
+  /// Center of [bounds] in screenshot pixels — the natural tap target.
   ({int x, int y}) get center => (
         x: bounds.x + bounds.width ~/ 2,
         y: bounds.y + bounds.height ~/ 2,
@@ -93,8 +140,8 @@ abstract interface class NativeServerBootstrap {
 /// WebDriverAgent on iOS).
 ///
 /// Implementations own the underlying WebDriver session and any device-side
-/// processes; [dispose] must release both. All coordinates are physical
-/// pixels (see [NativeBounds]).
+/// processes; [dispose] must release both. All coordinates, in and out, are
+/// screenshot pixels (see [NativeBounds]).
 abstract class NativeConnector {
   /// Returns the interactive/labelled elements currently on screen,
   /// spanning the whole device UI (system dialogs included), not just the
@@ -113,13 +160,13 @@ abstract class NativeConnector {
   /// Taps [element], typically at its [NativeElement.center].
   Future<void> tapElement(NativeElement element);
 
-  /// Taps at ([x], [y]) in physical pixels.
+  /// Taps at ([x], [y]) in screenshot pixels.
   Future<void> tapAt(int x, int y);
 
   /// Focuses [element] and types [text] into it.
   Future<void> enterText(NativeElement element, String text);
 
-  /// Swipes from ([startX], [startY]) to ([endX], [endY]) in physical
+  /// Swipes from ([startX], [startY]) to ([endX], [endY]) in screenshot
   /// pixels over [durationMs] milliseconds.
   Future<void> swipe({
     required int startX,
@@ -136,6 +183,9 @@ abstract class NativeConnector {
   /// is actually on screen — permission dialogs, sheets, status-bar panels —
   /// not just the Flutter view hierarchy.
   Future<String> takeScreenshot();
+
+  /// Current screen size in screenshot pixels and the server-unit scale.
+  Future<NativeScreen> getScreen();
 
   /// Whether the device-side server answers a health check right now.
   ///
@@ -286,31 +336,34 @@ final _androidBoundsPattern = RegExp(r'\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]');
 /// [NativeElement]s.
 ///
 /// Keeps only nodes that are clickable, or carry non-empty text /
-/// `content-desc`, or a non-empty `resource-id` — mirroring the Flutter
-/// lane's "interactive or meaningful" filter.
+/// `content-desc` / `hint`, or a non-empty `resource-id` — mirroring the
+/// Flutter lane's "interactive or meaningful" filter.
+///
+/// [NativeElement.text] is the first non-empty of `text`, `content-desc` and
+/// `hint`: an empty text field is identified by its placeholder (e.g.
+/// "Amount"), which is what the user sees.
 List<NativeElement> parseAndroidUiDump(String xml) {
+  String? visibleText(Map<String, String> attributes) {
+    for (final key in const ['text', 'content-desc', 'hint']) {
+      final value = attributes[key] ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
   final nodes = parseUiTree(xml, isRelevant: (attributes) {
-    final text = attributes['text'] ?? '';
-    final contentDesc = attributes['content-desc'] ?? '';
     final resourceId = attributes['resource-id'] ?? '';
     return attributes['clickable'] == 'true' ||
-        text.isNotEmpty ||
-        contentDesc.isNotEmpty ||
+        visibleText(attributes) != null ||
         resourceId.isNotEmpty;
   });
 
   return nodes.map((attributes) {
-    final text = attributes['text'] ?? '';
-    final contentDesc = attributes['content-desc'] ?? '';
     final resourceId = attributes['resource-id'] ?? '';
 
     return NativeElement(
       className: attributes['class'] ?? attributes[uiNodeTagKey]!,
-      text: text.isNotEmpty
-          ? text
-          : contentDesc.isNotEmpty
-              ? contentDesc
-              : null,
+      text: visibleText(attributes),
       resourceId: resourceId.isNotEmpty ? resourceId : null,
       clickable: attributes['clickable'] == 'true',
       bounds: _parseAndroidBounds(attributes['bounds']),
@@ -338,6 +391,8 @@ NativeBounds _parseAndroidBounds(String? bounds) {
 /// XML has no direct clickable flag.
 const _wdaInteractiveTypes = {
   'Button',
+  'Key', // software keyboard keys
+
   'Cell',
   'TextField',
   'SecureTextField',

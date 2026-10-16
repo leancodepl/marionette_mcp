@@ -157,17 +157,17 @@ void main() {
   });
 
   group('native_tap', () {
-    test('requires exactly one matching mode', () async {
+    test('requires either a selector or coordinates', () async {
       final context = _contextWith(FakeNativeConnector());
 
       for (final args in <Map<String, dynamic>>[
         {},
-        {'text': 'OK', 'id': 'ok'},
+        {'index': 0},
         {'text': 'OK', 'x': 1, 'y': 2},
       ]) {
         expect(
           await handleNativeTap(context, args),
-          _isToolError(contains('exactly one matching mode')),
+          _isToolError(contains('either a selector')),
           reason: '$args',
         );
       }
@@ -192,7 +192,7 @@ void main() {
       expect(connector.taps, [(x: 10, y: 20)]);
     });
 
-    test('taps the first element with matching text or id', () async {
+    test('taps the element chosen by the selector', () async {
       final allow = nativeElement(text: 'Allow', id: 'allow');
       final deny = nativeElement(text: 'Deny', id: 'deny');
       final connector = FakeNativeConnector.single([allow, deny]);
@@ -200,8 +200,40 @@ void main() {
 
       await handleNativeTap(context, {'text': 'Deny'});
       await handleNativeTap(context, {'id': 'allow'});
+      await handleNativeTap(context, {'textContains': 'den', 'type': 'Button'});
 
-      expect(connector.tappedElements, [deny, allow]);
+      expect(connector.tappedElements, [deny, allow, deny]);
+    });
+
+    test('an ambiguous selector fails and taps nothing (D1)', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'Request', y: 100),
+        nativeElement(text: 'Request', y: 200),
+      ]);
+
+      final result =
+          await handleNativeTap(_contextWith(connector), {'text': 'Request'});
+
+      expect(
+        result,
+        _isToolError(allOf(contains('2 native elements'), contains('index'))),
+      );
+      expect(connector.tappedElements, isEmpty);
+    });
+
+    test('index resolves an ambiguous selector', () async {
+      final second = nativeElement(text: 'Request', y: 200);
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'Request', y: 100),
+        second,
+      ]);
+
+      await handleNativeTap(
+        _contextWith(connector),
+        {'text': 'Request', 'index': 1},
+      );
+
+      expect(connector.tappedElements, [second]);
     });
 
     test('reports a missing element with a hint', () async {
@@ -268,6 +300,37 @@ void main() {
       expect(connector.swipes, hasLength(1));
     });
 
+    test('scrolls until an element matching the selector appears', () async {
+      final connector = FakeNativeConnector(
+        screens: [
+          [nativeElement(text: 'Item 1')],
+          [nativeElement(text: 'Item 1'), nativeElement(id: 'footer')],
+        ],
+      );
+
+      final result = await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'up', 'id': 'footer'},
+      );
+
+      expect(result, _isToolSuccess(contains('id="footer"')));
+    });
+
+    test('uses the real screen size, not element bounds', () async {
+      final connector = FakeNativeConnector(
+        screen: const NativeScreen(width: 1206, height: 2622, scale: 3),
+      );
+
+      await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'down', 'distance': 600},
+      );
+
+      expect(connector.swipes, [
+        (startX: 603, startY: 1011, endX: 603, endY: 1611),
+      ]);
+    });
+
     test('gives up after the maximum number of swipes', () async {
       final connector = FakeNativeConnector.single([
         nativeElement(text: 'Item 1', width: 1000, height: 2000),
@@ -284,7 +347,7 @@ void main() {
   });
 
   group('native_enter_text', () {
-    test('requires text and exactly one target', () async {
+    test('requires text and a field selector', () async {
       final context = _contextWith(FakeNativeConnector());
 
       expect(
@@ -293,18 +356,11 @@ void main() {
       );
       expect(
         await handleNativeEnterText(context, {'text': 'x'}),
-        _isToolError(contains('exactly one target')),
-      );
-      expect(
-        await handleNativeEnterText(
-          context,
-          {'text': 'x', 'id': 'a', 'label': 'b'},
-        ),
-        _isToolError(contains('exactly one target')),
+        _isToolError(contains('field selector')),
       );
     });
 
-    test('types into the field found by id or label', () async {
+    test('types into the field chosen by the selector', () async {
       final email = nativeElement(type: 'android.widget.EditText', id: 'email');
       final name = nativeElement(type: 'android.widget.EditText', text: 'Name');
       final connector = FakeNativeConnector.single([email, name]);
@@ -312,11 +368,32 @@ void main() {
 
       await handleNativeEnterText(context, {'text': 'a@b.c', 'id': 'email'});
       await handleNativeEnterText(context, {'text': 'Ann', 'label': 'Name'});
+      await handleNativeEnterText(
+        context,
+        {'text': 'Bo', 'type': 'EditText', 'index': 1},
+      );
 
       expect(connector.enteredText, [
         (element: email, text: 'a@b.c'),
         (element: name, text: 'Ann'),
+        (element: name, text: 'Bo'),
       ]);
+    });
+
+    test('an ambiguous field selector fails and types nothing', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(type: 'android.widget.EditText'),
+        nativeElement(type: 'android.widget.EditText'),
+      ]);
+
+      expect(
+        await handleNativeEnterText(
+          _contextWith(connector),
+          {'text': 'x', 'type': 'EditText'},
+        ),
+        _isToolError(contains('2 native elements')),
+      );
+      expect(connector.enteredText, isEmpty);
     });
 
     test('reports a missing field', () async {

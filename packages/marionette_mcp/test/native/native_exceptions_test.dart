@@ -6,7 +6,7 @@ void main() {
   group('NativeLaneException', () {
     test('toString appends the hint for the agent', () {
       expect(
-        const NativeElementNotFoundException('text="Allow"').toString(),
+        NativeElementNotFoundException('text="Allow"').toString(),
         'No native element with text="Allow".\n'
         'Hint: Call native_get_elements and retry with a value from its '
         'output.',

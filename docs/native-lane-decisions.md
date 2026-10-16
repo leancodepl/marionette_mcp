@@ -6,8 +6,98 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 
 | # | Topic | Status |
 | --- | --- | --- |
+| [D1](#d1) | Ambiguous element selectors | Accepted |
+| [D2](#d2) | Coordinate space of the native lane | Accepted |
 | [D3](#d3) | Automatic recovery of a lost session | Accepted |
 | [D10](#d10) | UIAutomator2 local port and server reuse | Accepted |
+
+---
+
+<a id="d1"></a>
+
+## D1 — Ambiguous element selectors
+
+- **Status:** Accepted (2026-10-16)
+- **Applies to:** `NativeSelector`, `selectElement`, `native_tap`, `native_enter_text`, `native_scroll`; element lookup in `AndroidNativeConnector` / `IosNativeConnector`.
+
+### Context and dilemma
+
+System screens often contain several elements with the same or similar label: two "Request" buttons on one screen, a button and its own text label with identical text (common on iOS, where a `Button` contains a `StaticText`), "Allow" next to "Allow only while using the app". The tools used to act on the *first* element in tree order with an exact `text` or `id`, so the agent could tap the wrong control and still get a success message. Making matching stricter, on the other hand, can break calls that work today.
+
+### Options considered
+
+1. **Keep "first match".** No behaviour change; silent mistakes with repeated labels that are hard for the agent to notice.
+2. **Always fail on more than one match.** Safest, but breaks the common case of a label inside a button, which then matches twice.
+3. **Prefer clickable elements, then fail with the candidates.** Resolves the label-inside-button case and reports real ambiguity together with how to resolve it.
+
+### Decision
+
+Option 3. One selector is shared by every tool that targets an element: `text` (exact; `label` in `native_enter_text`, whose `text` is the string to type), `textContains` (case-insensitive), `id`, `type` (full class or short name such as `Button`) and `index`. All given fields must match.
+
+- With `index`, the n-th of **all** matches (0-based, UI-tree order, the order of `native_get_elements`) is used — before the clickable preference, so it is stable and predictable.
+- Without `index`: one match is used; with several, clickable ones are preferred; if more than one remains (or several non-clickable ones match), `NativeAmbiguousElementException` lists every candidate (`[i] type text id clickable bounds`) with the hint to pass `index` or a more specific selector.
+- No match: `NativeElementNotFoundException`, listing up to five near misses (same text ignoring case and whitespace, or containing it) — e.g. `"Amount\nDigits only"` when asked for `"Amount"`.
+- **The chosen element is the one acted on.** Connectors must not re-locate it by id or label, which could return another element with the same id: iOS `tapElement` taps the element's center; iOS `enterText` locates the WDA element by type and exact geometry from the same tree; Android `enterText` uses the field that received focus from the tap before trying `resource-id`.
+
+### Rationale
+
+For an agent, an error listing the candidates is cheaper than tapping the wrong control, noticing, undoing and retrying. The clickable preference removes the most frequent false conflict, so most existing calls keep working.
+
+### Consequences
+
+- **Behaviour change:** calls that used to act on "the first match" now fail when the match is genuinely ambiguous (changelog entry). Tool descriptions and the server instructions explain the rule.
+- New selector fields are available in all element-targeting tools.
+- iOS taps no longer go through WebDriverAgent's element click; they are coordinate taps at the element's center (verified to work on app UI and on SpringBoard alerts).
+
+### Verification
+
+- Unit tests cover the full matrix (`native_selector_test.dart`) and the tools (`native_tools_test.dart`); fixture tests (`fixtures_test.dart`) run the selector on UI trees captured from Android 9 and iOS 26.4.
+- Live, Android API 28 and 35, iOS 26.4 and 18.6: `native_tap text="Request"` on the example app's permission screen fails with two candidates; `index: 0` / `index: 1` open the camera / photos dialog respectively; "Tap me (native)" (button + label) resolves to the button.
+- Verification found that iOS `tapElement` re-located the element by its accessibility id, so `index: 1` tapped the *first* "Request" button (same id). This led to the "chosen element is the one acted on" rule above.
+
+---
+
+<a id="d2"></a>
+
+## D2 — Coordinate space of the native lane
+
+- **Status:** Accepted (2026-10-16)
+- **Applies to:** `NativeBounds`, `NativeScreen`, `NativeConnector.getScreen`, `WebDriverNativeConnector.serverUnitScale`, every `x` / `y` / `startX` / `startY` / `distance` argument and every `bounds` value.
+
+### Context and dilemma
+
+UIAutomator2 reports and accepts physical pixels, which match the pixels of its screenshots. WebDriverAgent reports and accepts **points**, while its screenshots are in pixels (×2 or ×3). The documentation claimed "physical pixels" everywhere. An agent reading a position off a screenshot and passing it to `native_tap` would miss by the scale factor on iOS. In addition, `native_scroll` inferred the screen size from the largest element bounds, falling back to 1080×1920.
+
+### Options considered
+
+1. **Native units per platform** (pixels on Android, points on iOS). Simplest, but the agent must know the platform and scale, and screenshots do not match `bounds` on iOS.
+2. **Logical points everywhere.** Matches the Flutter lane, but needs scaling on Android and matches screenshots on neither platform.
+3. **Screenshot pixels everywhere.** What the agent sees in the image is exactly what it passes to the tools; the conversion is hidden in the connector.
+
+### Decision
+
+Option 3. All native-lane coordinates — input and output — are pixels of the image returned by `native_take_screenshot`.
+
+- `WebDriverNativeConnector` converts with `serverUnitScale`: element bounds from the server are multiplied by it; coordinates sent to the server are divided by it (rounded). Android: 1. iOS: the display scale.
+- iOS reads the scale once per session from `GET /session/{id}/wda/screen`; if that endpoint is missing it derives it from the screenshot width divided by the window width in points; if both fail, `native_connect` fails rather than guessing.
+- `NativeConnector.getScreen()` returns the screen size in screenshot pixels and the scale. Android uses UIAutomator2's `GET /session/{id}/window/current/size` (UIAutomator2 does not implement the W3C `window/rect`), falling back to `adb shell wm size`. `native_scroll` uses it instead of inferring the size from element bounds.
+- The Flutter lane stays in logical pixels; mixing the two remains forbidden.
+
+### Rationale
+
+Agents work with screenshots. One coordinate space that matches the image removes a whole class of mistakes and does not require the agent to know the platform.
+
+### Consequences
+
+- **Behaviour change on iOS:** `bounds` values are multiplied by the display scale, and `x` / `y` arguments are interpreted as pixels (changelog entry).
+- Coordinates sent to WebDriverAgent are rounded to whole points (no practical effect).
+- Tool descriptions say "screenshot pixels" instead of "physical pixels".
+
+### Verification
+
+- WDA (iOS 26.4, iPhone 17): `window/size` and `window/rect` return 402×874 (points), `wda/screen` returns scale 3, screenshots are 1206×2622 — confirming that WDA works in points. UIAutomator2 (API 28): `window/current/size` 1080×2160 equals the screenshot and `wm size`; `window/rect` is an unknown command. API 35: `getScreen()` 1280×2856 equals the screenshot, and a tap at a button's screenshot-pixel center hit it.
+- Unit tests cover the conversion (bounds ×3, taps and swipes ÷3, `getScreen`, the screenshot-based fallback, failing connect) and `native_scroll` geometry from the real screen size; fixture tests check that the converted iOS application element spans exactly the screenshot.
+- Live, iOS 26.4 and 18.6 (iPhone 17: 402×874 pt, iPhone 16 Pro Max: 440×956 pt, both scale 3): a tap at the native button's center taken from its screenshot-pixel bounds — (603, 1365) and (660, 1632) — hit the button; the application element converts to exactly the screenshot size (1206×2622, 1320×2868); candidates in ambiguity errors show pixel bounds (e.g. `(819, 1278, 315x144)`).
 
 ---
 

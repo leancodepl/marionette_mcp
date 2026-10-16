@@ -56,6 +56,20 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   @override
   Future<String?> get foregroundApp => _adb.foregroundPackage();
 
+  /// UIAutomator2 works in pixels (scale 1). Its `window/current/size`
+  /// matches the screenshot; `adb shell wm size` is the fallback.
+  @override
+  Future<NativeScreen> getScreen() async {
+    try {
+      final size = await client.uia2WindowSize(sessionId);
+      return NativeScreen(width: size.width, height: size.height, scale: 1);
+    } on WebDriverException {
+      final size = await _adb.screenSize();
+      if (size == null) rethrow;
+      return NativeScreen(width: size.width, height: size.height, scale: 1);
+    }
+  }
+
   @override
   Future<void> tapElement(NativeElement element) {
     final center = element.center;
@@ -66,20 +80,21 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   Future<void> enterText(NativeElement element, String text) async {
     await tapElement(element);
 
-    String? elementId;
-    final resourceId = element.resourceId;
-    if (resourceId != null && resourceId.isNotEmpty) {
-      elementId = await _tryFind('id', resourceId);
-    }
-
-    // Prefer a focused EditText before matching by label text. Compose-based
-    // search bars often expose the hint as a sibling View with content-desc
-    // (e.g. "Search…") while the actual editable node has empty text.
-    elementId ??= await _tryFind(
+    // The tap focused exactly the element the selector chose, so the focused
+    // field comes first; an id lookup could return another element with the
+    // same id (docs/native-lane-decisions.md#d1). Compose-based search bars
+    // also expose the hint as a sibling View while the editable node has
+    // empty text, which the focused lookup handles too.
+    String? elementId = await _tryFind(
       'xpath',
       '//android.widget.EditText[@focused="true"]',
     );
     elementId ??= await _tryFind('xpath', '//*[@focused="true"]');
+
+    final resourceId = element.resourceId;
+    if (elementId == null && resourceId != null && resourceId.isNotEmpty) {
+      elementId = await _tryFind('id', resourceId);
+    }
 
     final visibleText = element.text;
     if (elementId == null && visibleText != null && visibleText.isNotEmpty) {

@@ -1,0 +1,10 @@
+{
+  "platform": "ios",
+  "os": "iOS 18.6",
+  "screen": {
+    "width": 1320,
+    "height": 2868,
+    "scale": 3.0
+  },
+  "foregroundApp": "com.example.counter"
+}

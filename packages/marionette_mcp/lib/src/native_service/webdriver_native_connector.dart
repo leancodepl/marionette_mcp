@@ -6,8 +6,14 @@ import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 ///
 /// Owns the [WebDriverClient], the session and — when [ownsBootstrap] — the
 /// server bootstrap. Platform subclasses supply the session capabilities
-/// (via [openSession]), [parseSource], and the operations whose protocol
-/// differs per platform ([tapElement], [enterText], [foregroundApp]).
+/// (via [openSession]), [parseSource], [getScreen], and the operations whose
+/// protocol differs per platform ([tapElement], [enterText],
+/// [foregroundApp]).
+///
+/// Coordinates crossing this class are screenshot pixels; the server may
+/// work in other units. [serverUnitScale] converts between the two: element
+/// bounds from the server are multiplied by it, coordinates sent to the
+/// server divided by it (see docs/native-lane-decisions.md#d2).
 abstract base class WebDriverNativeConnector implements NativeConnector {
   WebDriverNativeConnector({
     required this.client,
@@ -51,22 +57,37 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     }
   }
 
-  /// Converts the server's page source into [NativeElement]s.
+  /// Converts the server's page source into [NativeElement]s, with bounds
+  /// in server units.
   List<NativeElement> parseSource(String xml);
 
+  /// Screenshot pixels per server unit: 1 when the server works in pixels.
+  double get serverUnitScale => 1;
+
+  /// Converts a coordinate in screenshot pixels to server units.
+  int toServerUnits(int pixels) =>
+      serverUnitScale == 1 ? pixels : (pixels / serverUnitScale).round();
+
   @override
-  Future<List<NativeElement>> getNativeElements() async =>
-      parseSource(await client.getPageSource(sessionId));
+  Future<List<NativeElement>> getNativeElements() async {
+    final elements = parseSource(await client.getPageSource(sessionId));
+    final scale = serverUnitScale;
+    return scale == 1
+        ? elements
+        : [for (final element in elements) element.scaled(scale)];
+  }
 
   @override
   Future<void> tapAt(int x, int y) {
+    final serverX = toServerUnits(x);
+    final serverY = toServerUnits(y);
     // A zero-length swipe is a tap in both servers' W3C actions support.
     return client.swipe(
       sessionId,
-      startX: x,
-      startY: y,
-      endX: x,
-      endY: y,
+      startX: serverX,
+      startY: serverY,
+      endX: serverX,
+      endY: serverY,
       durationMs: 50,
     );
   }
@@ -81,10 +102,10 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   }) {
     return client.swipe(
       sessionId,
-      startX: startX,
-      startY: startY,
-      endX: endX,
-      endY: endY,
+      startX: toServerUnits(startX),
+      startY: toServerUnits(startY),
+      endX: toServerUnits(endX),
+      endY: toServerUnits(endY),
       durationMs: durationMs,
     );
   }

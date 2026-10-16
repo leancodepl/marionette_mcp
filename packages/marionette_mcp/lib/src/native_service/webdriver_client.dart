@@ -201,7 +201,8 @@ class WebDriverClient {
   /// sequence that presses down at ([startX], [startY]) and moves to
   /// ([endX], [endY]) over [durationMs] milliseconds.
   ///
-  /// Coordinates are in the server's native (physical) pixel space.
+  /// Coordinates are in the server's own units (pixels for UIAutomator2,
+  /// points for WebDriverAgent).
   Future<void> swipe(
     String sessionId, {
     required int startX,
@@ -234,6 +235,53 @@ class WebDriverClient {
         ],
       },
     ]);
+  }
+
+  /// Returns the window size from UIAutomator2's
+  /// `GET /session/{id}/window/current/size` (pixels). UIAutomator2 does not
+  /// implement the W3C `window/rect`.
+  Future<({int width, int height})> uia2WindowSize(String sessionId) async {
+    final value =
+        await _request('GET', '/session/$sessionId/window/current/size');
+    final size = _sizeOf(value);
+    if (size != null) return size;
+    throw const WebDriverException('Window size response had no width/height');
+  }
+
+  /// Returns WDA's `GET /session/{id}/wda/screen`: screen size in points and
+  /// the display scale (screenshot pixels per point).
+  Future<({int width, int height, double scale})> wdaScreen(
+    String sessionId,
+  ) async {
+    final value = await _request('GET', '/session/$sessionId/wda/screen');
+    if (value is Map<String, dynamic>) {
+      final size = _sizeOf(value['screenSize']);
+      final scale = value['scale'];
+      if (size != null && scale is num && scale > 0) {
+        return (
+          width: size.width,
+          height: size.height,
+          scale: scale.toDouble()
+        );
+      }
+    }
+    throw const WebDriverException('WDA screen response had no size/scale');
+  }
+
+  /// Returns the W3C window rect size (`GET /session/{id}/window/rect`).
+  Future<({int width, int height})> windowRectSize(String sessionId) async {
+    final value = await _request('GET', '/session/$sessionId/window/rect');
+    final size = _sizeOf(value);
+    if (size != null) return size;
+    throw const WebDriverException('Window rect response had no width/height');
+  }
+
+  static ({int width, int height})? _sizeOf(Object? value) {
+    if (value is! Map<String, dynamic>) return null;
+    final width = value['width'];
+    final height = value['height'];
+    if (width is! num || height is! num) return null;
+    return (width: width.round(), height: height.round());
   }
 
   /// Returns WDA device metadata from `GET /wda/device/info` (simulator UDID, etc.).
@@ -359,4 +407,31 @@ class WebDriverClient {
 
     return value;
   }
+}
+
+/// Width and height of a base64-encoded PNG, read from its IHDR chunk, or
+/// null when [pngBase64] is not a PNG.
+({int width, int height})? pngSize(String pngBase64) {
+  // Signature (8 bytes) + IHDR length/type (8 bytes) + width + height.
+  const headerLength = 24;
+  final List<int> bytes;
+  try {
+    // 32 base64 characters decode to exactly 24 bytes.
+    bytes = base64Decode(pngBase64.substring(0, 32));
+  } on FormatException {
+    return null;
+  } on RangeError {
+    return null;
+  }
+  const signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+  if (bytes.length < headerLength) return null;
+  for (var i = 0; i < signature.length; i++) {
+    if (bytes[i] != signature[i]) return null;
+  }
+  int readUint32(int offset) =>
+      (bytes[offset] << 24) |
+      (bytes[offset + 1] << 16) |
+      (bytes[offset + 2] << 8) |
+      bytes[offset + 3];
+  return (width: readUint32(16), height: readUint32(20));
 }

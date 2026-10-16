@@ -14,8 +14,11 @@ void registerNativeInspectionTools(
     'native_get_elements',
     description: 'Returns the native UI hierarchy as JSON: '
         '{ elements: [...], foregroundApp: string? }. '
-        'Each element has type, optional text/id, bounds (physical px), '
-        'and clickable. Use when the target is missing from '
+        'Each element has type, optional text/id, bounds in screenshot '
+        'pixels (the pixel grid of native_take_screenshot), and clickable. '
+        'Elements are listed in UI-tree order; the index selector of other '
+        'native tools counts matches in this order. '
+        'Use when the target is missing from '
         'get_interactive_elements or a system surface covers the app. '
         'foregroundApp (Android package / iOS bundle id) helps detect '
         'permission controllers and other system UIs on top of the Flutter '
