@@ -15,7 +15,8 @@ class FakeResponse {
   const FakeResponse.value(Object? value, {this.status = HttpStatus.ok})
       : _json = value,
         _raw = null,
-        _error = null;
+        _error = null,
+        _drop = false;
 
   /// W3C error envelope `{"value": {"error": ..., "message": ...}}`.
   const FakeResponse.error(
@@ -24,18 +25,30 @@ class FakeResponse {
     this.status = HttpStatus.internalServerError,
   })  : _json = null,
         _raw = null,
-        _error = (error, message);
+        _error = (error, message),
+        _drop = false;
 
   /// Non-JSON body, e.g. a proxy error page.
   const FakeResponse.raw(String body, {required this.status})
       : _json = null,
         _raw = body,
-        _error = null;
+        _error = null,
+        _drop = false;
+
+  /// Closes the connection without answering, as a server that crashed
+  /// after receiving the request would.
+  const FakeResponse.dropConnection()
+      : status = 0,
+        _json = null,
+        _raw = null,
+        _error = null,
+        _drop = true;
 
   final int status;
   final Object? _json;
   final String? _raw;
   final (String, String)? _error;
+  final bool _drop;
 
   String get _body {
     if (_raw != null) return _raw;
@@ -142,6 +155,12 @@ class FakeWebDriverServer {
             status: HttpStatus.notFound,
           )
         : await handler(recorded);
+
+    if (response._drop) {
+      final socket = await request.response.detachSocket(writeHeaders: false);
+      socket.destroy();
+      return;
+    }
 
     request.response.statusCode = response.status;
     request.response.headers.contentType = ContentType.json;

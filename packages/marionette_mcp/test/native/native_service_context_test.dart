@@ -1,5 +1,6 @@
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:test/test.dart';
 
 import 'support/fake_native_connector.dart';
@@ -56,7 +57,8 @@ void main() {
       await context.connect(NativePlatform.android, serial: 'emulator-5554');
 
       expect(calls, [(NativePlatform.android, 'emulator-5554', null)]);
-      expect(context.requireConnector(), same(created));
+      await context.requireConnector().tapAt(5, 6);
+      expect(created.taps, [(x: 5, y: 6)]);
     });
 
     test('connect disposes the previous session first', () async {
@@ -86,6 +88,53 @@ void main() {
       );
       expect(context.connector, isNull);
       expect(previous.disposeCalls, 1);
+    });
+
+    test('connect wraps the connector so a lost session is re-established',
+        () async {
+      final first = FakeNativeConnector()
+        ..errorsOnce.add(
+          const WebDriverException('gone', error: webDriverConnectionLost),
+        );
+      final second = FakeNativeConnector.single([nativeElement(text: 'OK')]);
+      final created = [first, second];
+      final args = <(NativePlatform, String?)>[];
+      final context = NativeServiceContext(
+        connectorFactory: (platform, {serial, udid}) async {
+          args.add((platform, serial));
+          return created.removeAt(0);
+        },
+      );
+      await context.connect(NativePlatform.android, serial: 'emulator-5554');
+
+      final elements = await context.requireConnector().getNativeElements();
+
+      expect(elements.single.text, 'OK');
+      expect(args, [
+        (NativePlatform.android, 'emulator-5554'),
+        (NativePlatform.android, 'emulator-5554'),
+      ]);
+    });
+
+    test('a session that cannot be recovered disconnects the context',
+        () async {
+      var created = 0;
+      final context = NativeServiceContext(
+        connectorFactory: (platform, {serial, udid}) async {
+          if (created++ > 0) throw StateError('emulator is gone');
+          return FakeNativeConnector()
+            ..errorsOnce.add(
+              const WebDriverException('gone', error: webDriverConnectionLost),
+            );
+        },
+      );
+      await context.connect(NativePlatform.android);
+
+      await expectLater(
+        context.requireConnector().getNativeElements(),
+        throwsA(isA<Exception>()),
+      );
+      expect(context.connector, isNull);
     });
   });
 }

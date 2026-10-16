@@ -113,6 +113,98 @@ void main() {
     });
   });
 
+  group('AdbClient device queries', () {
+    test('resolveSerial prefers the configured serial', () async {
+      final runner = FakeProcessRunner();
+
+      expect(
+        await AdbClient(serial: 'X', processRunner: runner.call)
+            .resolveSerial(),
+        'X',
+      );
+      expect(runner.calls, isEmpty);
+    });
+
+    test('resolveSerial asks adb for the default device', () async {
+      final runner = FakeProcessRunner()
+        ..onAdb(['get-serialno'], result: ok('emulator-5556\n'));
+
+      expect(
+        await AdbClient(processRunner: runner.call).resolveSerial(),
+        'emulator-5556',
+      );
+    });
+
+    test('forwardedLocalPort lists forwards of all devices', () async {
+      final runner = FakeProcessRunner()
+        ..on(
+          'adb',
+          ['forward', '--list'],
+          result: ok(
+            'emulator-5554 tcp:8200 tcp:6790\n'
+            'emulator-5556 tcp:8201 tcp:6790\n',
+          ),
+        );
+      final adb =
+          AdbClient(serial: 'emulator-5556', processRunner: runner.call);
+
+      expect(await adb.forwardedLocalPort('emulator-5556', 6790), 8201);
+      expect(runner.calls.single.arguments, ['forward', '--list']);
+    });
+
+    test('installedApkSha256 hashes the installed base APK', () async {
+      const hash =
+          '8463a42f7701bf29d07571089e189ff10178c5f6dab2b65ae8cce7018d44fbd8';
+      final runner = FakeProcessRunner()
+        ..onAdb(
+          ['shell', 'pm', 'path', 'io.appium.uiautomator2.server'],
+          result: ok('package:/data/app/~~a==/io.appium-1/base.apk\n'),
+        )
+        ..onAdb(
+          ['shell', 'sha256sum', '/data/app/~~a==/io.appium-1/base.apk'],
+          result: ok('${hash.toUpperCase()}  /data/app/base.apk\n'),
+        );
+
+      expect(
+        await AdbClient(processRunner: runner.call)
+            .installedApkSha256('io.appium.uiautomator2.server'),
+        hash,
+      );
+    });
+
+    test('installedApkSha256 returns null for a missing package', () async {
+      final runner = FakeProcessRunner()
+        ..onAdb(['shell', 'pm', 'path'], result: failed());
+
+      expect(
+        await AdbClient(processRunner: runner.call)
+            .installedApkSha256('com.missing'),
+        isNull,
+      );
+    });
+  });
+
+  group('parseForwardedLocalPort', () {
+    test('matches serial and remote port exactly', () {
+      const list = 'emulator-5554 tcp:9000 tcp:1234\n'
+          'emulator-5554 tcp:8200 tcp:6790\n'
+          'emulator-55540 tcp:8300 tcp:6790\n';
+
+      expect(
+        parseForwardedLocalPort(
+          list,
+          deviceSerial: 'emulator-5554',
+          remotePort: 6790,
+        ),
+        8200,
+      );
+      expect(
+        parseForwardedLocalPort(list, deviceSerial: 'other', remotePort: 6790),
+        isNull,
+      );
+    });
+  });
+
   group('parseForegroundPackage', () {
     test('falls back to mFocusedApp', () {
       expect(

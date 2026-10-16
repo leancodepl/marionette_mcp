@@ -25,7 +25,14 @@ void main() {
 
     setUp(() async {
       cacheDir = await Directory.systemTemp.createTemp('marionette_wda_');
-      runner = FakeProcessRunner();
+      // Default: the simulators named by the tests are booted. Tests that
+      // need another listing register their own (the latest rule wins).
+      runner = FakeProcessRunner()
+        ..on(
+          'xcrun',
+          ['simctl', 'list'],
+          result: ok(_bootedJson(['SIM-A', 'SIM-B'])),
+        );
     });
 
     tearDown(() async {
@@ -123,8 +130,40 @@ void main() {
     );
 
     test(
+      'throws noBootedSimulator for an explicit udid that is not booted',
+      () async {
+        runner.on(
+          'xcrun',
+          ['simctl', 'list'],
+          result: ok(_bootedJson(['OTHER-UDID'])),
+        );
+
+        await expectLater(
+          bootstrap(udid: 'SHUTDOWN-UDID').ensureServerReady(),
+          throwsA(
+            isA<IosBootstrapException>()
+                .having(
+                  (e) => e.failure,
+                  'failure',
+                  IosBootstrapFailure.noBootedSimulator,
+                )
+                .having((e) => e.message, 'message', contains('SHUTDOWN-UDID'))
+                .having((e) => e.message, 'message', contains('OTHER-UDID'))
+                .having((e) => e.hint, 'hint', contains('simctl boot')),
+          ),
+        );
+      },
+      skip: !Platform.isMacOS ? _macOnly : false,
+    );
+
+    test(
       'throws a helpful message when WDA artifacts are missing',
       () async {
+        runner.on(
+          'xcrun',
+          ['simctl', 'list'],
+          result: ok(_bootedJson(['AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'])),
+        );
         await expectLater(
           bootstrap(udid: 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE', port: 18102)
               .ensureServerReady(),
@@ -168,7 +207,11 @@ void main() {
               .ensureServerReady();
 
           expect(uri.port, wda.port);
-          expect(runner.calls, isEmpty, reason: 'no launch needed');
+          expect(
+            runner.calls.map((c) => c.arguments.take(2).join(' ')),
+            everyElement('simctl list'),
+            reason: 'no launch needed',
+          );
         },
         skip: !Platform.isMacOS ? _macOnly : false,
       );

@@ -1,29 +1,20 @@
 import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/xpath.dart';
 
 /// [NativeConnector] backed by WebDriverAgent on an iOS Simulator.
 ///
 /// Use [connect] to bootstrap WDA (see [IosBootstrap]), open a WebDriver
 /// session, and obtain a ready connector. Coordinates are physical pixels.
-class IosNativeConnector implements NativeConnector {
+final class IosNativeConnector extends WebDriverNativeConnector {
   IosNativeConnector._({
-    required WebDriverClient client,
-    required String sessionId,
-    required NativeServerBootstrap bootstrap,
-    required bool ownsBootstrap,
-  })  : _client = client,
-        _sessionId = sessionId,
-        _bootstrap = bootstrap,
-        _ownsBootstrap = ownsBootstrap;
-
-  final WebDriverClient _client;
-  final String _sessionId;
-  final NativeServerBootstrap _bootstrap;
-  final bool _ownsBootstrap;
-
-  bool _disposed = false;
+    required super.client,
+    required super.sessionId,
+    required super.bootstrap,
+    required super.ownsBootstrap,
+  });
 
   /// Bootstraps WDA (unless [bootstrap] was already prepared), creates a
   /// WebDriver session, and returns a connected connector.
@@ -36,50 +27,39 @@ class IosNativeConnector implements NativeConnector {
     String? udid,
     NativeServerBootstrap? bootstrap,
     Map<String, dynamic>? capabilities,
-  }) async {
+  }) {
     final ownsBootstrap = bootstrap == null;
-    final resolved = bootstrap ?? IosBootstrap(udid: udid);
-    final baseUri = await resolved.ensureServerReady();
+    final resolvedBootstrap = bootstrap ?? IosBootstrap(udid: udid);
 
-    final client = WebDriverClient(baseUri.toString());
-    try {
-      final sessionId = await client.createSession(
-        capabilities: capabilities ?? const {'platformName': 'iOS'},
-      );
-      return IosNativeConnector._(
+    return WebDriverNativeConnector.openSession(
+      bootstrap: resolvedBootstrap,
+      ownsBootstrap: ownsBootstrap,
+      capabilities: capabilities ?? const {'platformName': 'iOS'},
+      create: (client, sessionId) => IosNativeConnector._(
         client: client,
         sessionId: sessionId,
-        bootstrap: resolved,
+        bootstrap: resolvedBootstrap,
         ownsBootstrap: ownsBootstrap,
-      );
-    } catch (_) {
-      client.close();
-      if (ownsBootstrap) {
-        await resolved.dispose();
-      }
-      rethrow;
-    }
+      ),
+    );
   }
 
   @override
-  Future<List<NativeElement>> getNativeElements() async {
-    final source = await _client.getPageSource(_sessionId);
-    return parseWdaSource(source);
-  }
+  List<NativeElement> parseSource(String xml) => parseWdaSource(xml);
 
   /// Foreground app bundle identifier from WDA's active-app endpoint, with
   /// page-source fallback when that endpoint is unavailable.
   @override
   Future<String?> get foregroundApp async {
     try {
-      final info = await _client.wdaActiveAppInfo(_sessionId);
+      final info = await client.wdaActiveAppInfo(sessionId);
       final bundleId = info['bundleId'];
       if (bundleId is String && bundleId.isNotEmpty) return bundleId;
     } on WebDriverException {
       // Fall back to page source parsing below.
     }
 
-    final source = await _client.getPageSource(_sessionId);
+    final source = await client.getPageSource(sessionId);
     return foregroundAppFromWdaSource(source);
   }
 
@@ -87,24 +67,11 @@ class IosNativeConnector implements NativeConnector {
   Future<void> tapElement(NativeElement element) async {
     final elementId = await _tryFindElement(element);
     if (elementId != null) {
-      await _client.elementClick(_sessionId, elementId);
+      await client.elementClick(sessionId, elementId);
       return;
     }
     final center = element.center;
     await tapAt(center.x, center.y);
-  }
-
-  @override
-  Future<void> tapAt(int x, int y) async {
-    // Zero-length swipe acts as a tap in WDA's W3C actions implementation.
-    await _client.swipe(
-      _sessionId,
-      startX: x,
-      startY: y,
-      endX: x,
-      endY: y,
-      durationMs: 50,
-    );
   }
 
   @override
@@ -118,43 +85,8 @@ class IosNativeConnector implements NativeConnector {
         error: 'no such element',
       );
     }
-    await _client.elementClick(_sessionId, elementId);
-    await _client.elementSendKeys(_sessionId, elementId, text);
-  }
-
-  @override
-  Future<void> swipe({
-    required int startX,
-    required int startY,
-    required int endX,
-    required int endY,
-    int durationMs = 300,
-  }) {
-    return _client.swipe(
-      _sessionId,
-      startX: startX,
-      startY: startY,
-      endX: endX,
-      endY: endY,
-      durationMs: durationMs,
-    );
-  }
-
-  @override
-  Future<String> takeScreenshot() => _client.takeScreenshot(_sessionId);
-
-  @override
-  Future<void> dispose() async {
-    if (_disposed) return;
-    _disposed = true;
-    try {
-      await _client.deleteSession(_sessionId);
-    } catch (_) {
-      // Continue teardown when the server/session has already disappeared.
-    } finally {
-      _client.close();
-      if (_ownsBootstrap) await _bootstrap.dispose();
-    }
+    await client.elementClick(sessionId, elementId);
+    await client.elementSendKeys(sessionId, elementId, text);
   }
 
   /// Locates the element by accessibility id (`name`) or visible label/text.
@@ -162,7 +94,7 @@ class IosNativeConnector implements NativeConnector {
     final id = element.resourceId;
     if (id != null && id.isNotEmpty) {
       try {
-        return await _client.findElement(_sessionId, 'accessibility id', id);
+        return await client.findElement(sessionId, 'accessibility id', id);
       } on WebDriverException {
         // Fall through to name/label strategies.
       }
@@ -171,14 +103,14 @@ class IosNativeConnector implements NativeConnector {
     final text = element.text;
     if (text != null && text.isNotEmpty) {
       try {
-        return await _client.findElement(_sessionId, 'name', text);
+        return await client.findElement(sessionId, 'name', text);
       } on WebDriverException {
         // Fall through.
       }
       try {
         final literal = xpathLiteral(text);
-        return await _client.findElement(
-          _sessionId,
+        return await client.findElement(
+          sessionId,
           'xpath',
           '//*[@label=$literal or @name=$literal or @value=$literal]',
         );

@@ -56,7 +56,7 @@ Tools for system / native UI outside the Flutter widget tree (permission dialogs
 
 | Tool | Description |
 | --- | --- |
-| `native_connect` | Start a native automation session (UIAutomator2 on Android, WebDriverAgent on iOS). Requires `platform`: `android` or `ios`. |
+| `native_connect` | Start a native automation session (UIAutomator2 on Android, WebDriverAgent on iOS). Requires `platform`: `android` or `ios`. If the device-side server or session is lost later, it is re-established automatically once: reads are retried, an interrupted action is not repeated ([D3](./native-lane-decisions.md#d3)). |
 | `native_disconnect` | Stop the native session and release device-side processes. |
 | `native_get_elements` | Return the native UI hierarchy as JSON (`elements`, optional `foregroundApp`). |
 | `native_tap` | Tap by exact `text`, `id`, or physical-pixel `x`/`y`. |

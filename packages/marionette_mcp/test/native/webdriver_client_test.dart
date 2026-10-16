@@ -243,6 +243,35 @@ void main() {
       });
     });
 
+    test('an unreachable server is reported as such (request not sent)',
+        () async {
+      await server.close();
+
+      await expectLater(
+        client.getPageSource('sess-1'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', webDriverServerUnreachable),
+        ),
+      );
+    });
+
+    test('a connection dropped after sending is reported as lost', () async {
+      server.on(
+        'POST',
+        '/session/sess-1/actions',
+        (_) => const FakeResponse.dropConnection(),
+      );
+
+      await expectLater(
+        client.performActions('sess-1', const []),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', webDriverConnectionLost),
+        ),
+      );
+    });
+
     test('close cleans up so further requests fail', () async {
       server.onValue('GET', '/status', {'ready': true});
       expect(await client.status(), isTrue);

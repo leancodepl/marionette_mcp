@@ -3,6 +3,9 @@
 - Native lane: errors from `native_connect` and the `native_*` tools now name the failing stage (iOS bootstrap included) and end with a `Hint:` describing how to fix it
 - Native lane: fix `foregroundApp` in `native_get_elements` always being `null` on Android 10+
 - Native lane: decode numeric character references (e.g. `&#10;`) in native element text, so multi-line labels can be matched by `native_tap` / `native_enter_text`
+- Native lane: re-establish a lost device-side session automatically once; reads are retried, actions check that the server responds first and are only repeated when they certainly did not run ([D3](docs/native-lane-decisions.md#d3))
+- Native lane (iOS): `native_connect` with the `udid` of a simulator that is not booted now fails immediately with a hint, instead of `xcodebuild` silently booting it headless
+- Native lane (Android): pick a free local port for UIAutomator2 (or `MARIONETTE_UIA2_PORT`), reuse a healthy server already forwarded for the device, install APKs only when they changed, and verify downloaded APKs against pinned SHA-256 checksums ([D10](docs/native-lane-decisions.md#d10))
 
 # 0.6.0
 

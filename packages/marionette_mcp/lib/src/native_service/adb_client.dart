@@ -32,6 +32,59 @@ class AdbClient {
   Future<ProcessResult> shell(List<String> arguments) =>
       run(['shell', ...arguments]);
 
+  /// Serial of the device this client talks to: [serial] when set, otherwise
+  /// the default device as reported by `adb get-serialno`. Null when it
+  /// cannot be determined.
+  Future<String?> resolveSerial() async {
+    if (serial != null) return serial;
+    try {
+      final result = await run(const ['get-serialno']);
+      final value = processStdout(result).trim();
+      return result.exitCode == 0 && value.isNotEmpty ? value : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Local port of an existing `adb forward` from [deviceSerial] to device
+  /// TCP port [remotePort], or null when there is none.
+  Future<int?> forwardedLocalPort(String deviceSerial, int remotePort) async {
+    try {
+      final result = await _run('adb', const ['forward', '--list']);
+      if (result.exitCode != 0) return null;
+      return parseForwardedLocalPort(
+        processStdout(result),
+        deviceSerial: deviceSerial,
+        remotePort: remotePort,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// SHA-256 (lowercase hex) of the APK installed for [packageName], or null
+  /// when the package is missing or the device cannot compute it (e.g. no
+  /// `sha256sum` on old Android versions). Never throws.
+  Future<String?> installedApkSha256(String packageName) async {
+    try {
+      final pathResult = await shell(['pm', 'path', packageName]);
+      if (pathResult.exitCode != 0) return null;
+      final apkPath = processStdout(pathResult)
+          .split('\n')
+          .map((line) => line.trim())
+          .firstWhere((line) => line.startsWith('package:'), orElse: () => '')
+          .replaceFirst('package:', '');
+      if (apkPath.isEmpty) return null;
+
+      final hashResult = await shell(['sha256sum', apkPath]);
+      if (hashResult.exitCode != 0) return null;
+      final hash = processStdout(hashResult).trim().split(RegExp(r'\s+')).first;
+      return _sha256Pattern.hasMatch(hash) ? hash.toLowerCase() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Package that owns the focused window (a system dialog when one covers
   /// the app), or null when it cannot be determined. Never throws.
   ///
@@ -51,6 +104,28 @@ class AdbClient {
     }
     return null;
   }
+}
+
+final _sha256Pattern = RegExp(r'^[0-9a-fA-F]{64}$');
+
+/// Parses `adb forward --list` output (`<serial> tcp:<local> tcp:<remote>`
+/// per line) and returns the local port forwarded from [deviceSerial] to
+/// [remotePort], if any.
+int? parseForwardedLocalPort(
+  String forwardList, {
+  required String deviceSerial,
+  required int remotePort,
+}) {
+  for (final line in forwardList.split('\n')) {
+    final parts = line.trim().split(RegExp(r'\s+'));
+    if (parts.length != 3 || parts[0] != deviceSerial) continue;
+    if (parts[2] != 'tcp:$remotePort' || !parts[1].startsWith('tcp:')) {
+      continue;
+    }
+    final port = int.tryParse(parts[1].substring(4));
+    if (port != null) return port;
+  }
+  return null;
 }
 
 final _foregroundPackagePatterns = [

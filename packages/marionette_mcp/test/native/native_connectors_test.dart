@@ -143,6 +143,20 @@ void main() {
       expect(bootstrap.disposeCalls, 0);
     });
 
+    test('isServerResponding reflects /status', () async {
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      expect(await connector.isServerResponding(), isTrue);
+
+      server.on(
+        'GET',
+        '/status',
+        (_) => const FakeResponse.raw('', status: HttpStatus.badGateway),
+      );
+      expect(await connector.isServerResponding(), isFalse);
+    });
+
     test('failed session creation does not dispose an injected bootstrap',
         () async {
       server.on(

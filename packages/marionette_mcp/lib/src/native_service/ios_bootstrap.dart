@@ -188,10 +188,11 @@ class IosBootstrap implements NativeServerBootstrap {
     }
   }
 
+  /// Returns [_udid] when that simulator is booted, else the first booted
+  /// simulator. An explicit but shut-down simulator is an error: xcodebuild
+  /// would otherwise boot it headless (slowly, without a window).
   Future<String> _resolveSimulatorUdid() async {
     final explicitUdid = _udid;
-    if (explicitUdid != null && explicitUdid.isNotEmpty) return explicitUdid;
-
     final List<String> booted;
     try {
       booted = await _simctl.listBootedUdids();
@@ -209,6 +210,17 @@ class IosBootstrap implements NativeServerBootstrap {
       throw IosBootstrapException(
         IosBootstrapFailure.simctl,
         'Failed to run xcrun: ${error.message}',
+      );
+    }
+
+    if (explicitUdid != null && explicitUdid.isNotEmpty) {
+      if (booted.contains(explicitUdid)) return explicitUdid;
+      throw IosBootstrapException(
+        IosBootstrapFailure.noBootedSimulator,
+        'iOS Simulator $explicitUdid is not booted'
+        '${booted.isEmpty ? '' : ' (booted: ${booted.join(', ')})'}.',
+        hint: 'Boot it first (`xcrun simctl boot $explicitUdid` and '
+            '`open -a Simulator`), or omit udid to use a booted one.',
       );
     }
 

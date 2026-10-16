@@ -93,6 +93,16 @@ export MARIONETTE_UIA2_SERVER_APK=/path/to/appium-uiautomator2-server.apk
 export MARIONETTE_UIA2_TEST_APK=/path/to/appium-uiautomator2-server-debug-androidTest.apk
 ```
 
+Downloaded APKs are verified against pinned SHA-256 checksums, and an APK is only installed when the copy on the device differs, so reconnecting is fast.
+
+Marionette forwards a local port to UIAutomator2: by default the first free port from 8200 (an existing forward for the same device is reused). To pin it:
+
+```bash
+export MARIONETTE_UIA2_PORT=8200
+```
+
+If the device-side server (UIAutomator2 or WebDriverAgent) dies during a session, the next native call re-establishes it automatically. See [Native lane design decisions](docs/native-lane-decisions.md) for details.
+
 ### Native lane requirements (iOS)
 
 `native_connect` with `platform: ios` uses **WebDriverAgent (WDA)** on an **iOS Simulator** (real devices are not supported yet). Unlike Android, Marionette does **not** download or build WDA for you — you need a **one-time build**, then Marionette can launch and reuse it.

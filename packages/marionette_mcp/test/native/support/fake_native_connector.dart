@@ -46,6 +46,13 @@ class FakeNativeConnector implements NativeConnector {
   /// When set, every UI operation throws it.
   Object? error;
 
+  /// Errors thrown by the next UI operations, one per call, before [error].
+  final List<Object> errorsOnce = [];
+
+  /// Result of [isServerResponding].
+  bool serverResponding = true;
+  int healthChecks = 0;
+
   final List<({int x, int y})> taps = [];
   final List<NativeElement> tappedElements = [];
   final List<({NativeElement element, String text})> enteredText = [];
@@ -54,6 +61,7 @@ class FakeNativeConnector implements NativeConnector {
   int disposeCalls = 0;
 
   void _maybeThrow() {
+    if (errorsOnce.isNotEmpty) throw errorsOnce.removeAt(0);
     final pending = error;
     if (pending != null) throw pending;
   }
@@ -106,6 +114,12 @@ class FakeNativeConnector implements NativeConnector {
   Future<String> takeScreenshot() async {
     _maybeThrow();
     return screenshot;
+  }
+
+  @override
+  Future<bool> isServerResponding() async {
+    healthChecks++;
+    return serverResponding;
   }
 
   @override

@@ -36,6 +36,21 @@ class WebDriverException implements Exception {
   }
 }
 
+/// [WebDriverException.error] used when no connection to the server could be
+/// opened, so the request was never sent (not a W3C error code).
+const webDriverServerUnreachable = 'server unreachable';
+
+/// [WebDriverException.error] used when the connection broke after the
+/// request was sent, so the server may have acted on it (not a W3C error
+/// code).
+///
+/// Together with [webDriverServerUnreachable] and the W3C `invalid session
+/// id` it signals a lost session; see docs/native-lane-decisions.md#d3.
+const webDriverConnectionLost = 'connection lost';
+
+/// W3C error code for a session the server no longer knows.
+const webDriverInvalidSessionId = 'invalid session id';
+
 /// W3C WebDriver element identifier key used in element response objects.
 ///
 /// See https://www.w3.org/TR/webdriver/#elements. Older (JSON Wire) servers
@@ -268,10 +283,23 @@ class WebDriverClient {
   }) async {
     final uri = Uri.parse('$_baseUrl$path');
 
+    // dart:io connects inside openUrl, so a failure here means the request
+    // never left this process — unlike failures after it is sent below.
+    final HttpClientRequest request;
+    try {
+      request = await _http.openUrl(method, uri);
+    } on IOException catch (e) {
+      throw WebDriverException(
+        '$method $uri failed: $e',
+        error: webDriverServerUnreachable,
+      );
+    } catch (e) {
+      throw WebDriverException('$method $uri failed: $e');
+    }
+
     HttpClientResponse response;
     String responseBody;
     try {
-      final request = await _http.openUrl(method, uri);
       if (body != null) {
         // ChromeDriver rejects chunked request bodies, which dart:io uses
         // unless contentLength is set explicitly.
@@ -285,6 +313,13 @@ class WebDriverClient {
       responseBody = await utf8.decodeStream(response);
     } on WebDriverException {
       rethrow;
+    } on IOException catch (e) {
+      // Reset / closed connections (SocketException, HttpException) mean the
+      // device-side server went away, possibly after acting on the request.
+      throw WebDriverException(
+        '$method $uri failed: $e',
+        error: webDriverConnectionLost,
+      );
     } catch (e) {
       throw WebDriverException('$method $uri failed: $e');
     }

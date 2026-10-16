@@ -137,6 +137,14 @@ abstract class NativeConnector {
   /// not just the Flutter view hierarchy.
   Future<String> takeScreenshot();
 
+  /// Whether the device-side server answers a health check right now.
+  ///
+  /// Never throws; a slow or dead server reports false. Used before actions
+  /// to tell "the server was already gone" (safe to reconnect and act) from
+  /// "the connection broke while acting" (see
+  /// docs/native-lane-decisions.md#d3).
+  Future<bool> isServerResponding();
+
   /// Ends the session and tears down any resources the connector started.
   Future<void> dispose();
 }

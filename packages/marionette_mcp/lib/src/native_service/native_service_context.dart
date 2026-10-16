@@ -3,6 +3,7 @@ import 'package:marionette_mcp/src/native_service/android_native_connector.dart'
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/recovering_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/tools/connection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
@@ -81,20 +82,30 @@ final class NativeServiceContext {
   /// Replaces any active session with a new one for [platform].
   ///
   /// The previous connector is disposed first, so a failed connect leaves
-  /// the context disconnected.
+  /// the context disconnected. The new connector is wrapped in a
+  /// [RecoveringNativeConnector] that re-establishes a lost session with the
+  /// same arguments (see docs/native-lane-decisions.md#d3).
   Future<NativeConnector> connect(
     NativePlatform platform, {
     String? serial,
     String? udid,
   }) async {
     await dispose();
-    final created = await _connectorFactory(
-      platform,
-      serial: serial,
-      udid: udid,
+    Future<NativeConnector> create() =>
+        _connectorFactory(platform, serial: serial, udid: udid);
+
+    final initial = await create();
+    late final RecoveringNativeConnector recovering;
+    recovering = RecoveringNativeConnector(
+      initial,
+      reconnect: create,
+      logger: logger,
+      onClosed: () {
+        if (identical(connector, recovering)) connector = null;
+      },
     );
-    connector = created;
-    return created;
+    connector = recovering;
+    return recovering;
   }
 
   /// Returns the active connector or throws [NativeNotConnectedException].
