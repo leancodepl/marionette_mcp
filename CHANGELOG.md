@@ -1,3 +1,7 @@
+# Unreleased
+
+- Fix `record-video --width/--height` recording only the top-left corner of the screen at full scale instead of the whole screen scaled down to that size. Web recordings were not affected ([#134](https://github.com/leancodepl/marionette_mcp/issues/134))
+
 # 0.7.0
 
 - **Behaviour change:** `get_interactive_elements` now reports only primitive-valued properties (`bool`, `num`, `String`, `Enum`) for every caller. The `ButtonStyle`, `TextStyle`, `InputDecoration` and colour blobs that previously dominated the payload are gone from every level of output, which shrank by about a quarter on the example app. A `TextField`'s `decoration.labelText`/`hintText` is now surfaced as `label` so keyless fields keep a human-readable handle

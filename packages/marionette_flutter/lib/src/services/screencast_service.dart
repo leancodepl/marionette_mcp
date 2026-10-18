@@ -58,10 +58,10 @@ typedef FrameCapturer = Future<CapturedFrame?> Function(
 
 /// Default frame capturer that uses the real rendering pipeline.
 ///
-/// If [targetWidth] and [targetHeight] are provided, the GPU scales the
-/// scene to those dimensions. Otherwise captures at the view's physical size.
-/// Returns raw RGBA bytes via [ImageByteFormat.rawRgba] — essentially free
-/// compared to PNG encoding.
+/// If [targetWidth] and [targetHeight] are provided, the scene is scaled to
+/// those dimensions in the same rasterization pass. Otherwise captures at the
+/// view's physical size. Returns raw RGBA bytes via [ImageByteFormat.rawRgba]
+/// — essentially free compared to PNG encoding.
 Future<CapturedFrame?> defaultFrameCapturer(
   RenderView renderView, {
   int? targetWidth,
@@ -85,7 +85,21 @@ Future<CapturedFrame?> defaultFrameCapturer(
   ui.Image? image;
 
   try {
+    // Scene.toImage rasterizes a width x height window from the origin at the
+    // scene's own scale, so a smaller target must be scaled down here or it
+    // becomes a top-left crop.
+    final scaled = width != size.width || height != size.height;
+    if (scaled) {
+      builder.pushTransform(
+        Matrix4.diagonal3Values(
+          width / size.width,
+          height / size.height,
+          1,
+        ).storage,
+      );
+    }
     layer.addToScene(builder);
+    if (scaled) builder.pop();
     scene = builder.build();
     image = await scene.toImage(width, height);
 
