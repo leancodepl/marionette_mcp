@@ -151,7 +151,8 @@ class ElementTreeFinder {
 
     // Unlike Switch, Checkbox and CheckboxListTile declare none of their state
     // as diagnostics, so without this a checked box looks like an empty one.
-    // `null` is the tristate "mixed" value.
+    // A tristate checkbox's indeterminate "mixed" state is a `null` value,
+    // reported as the string 'null' — neither checked nor unchecked.
     if (widget is Checkbox) {
       data['value'] = '${widget.value}';
     } else if (widget is CheckboxListTile) {
