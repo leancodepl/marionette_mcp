@@ -1,6 +1,7 @@
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/xpath.dart';
@@ -54,6 +55,17 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   List<NativeElement> parseSource(String xml) => parseAndroidUiDump(xml);
 
   @override
+  String get classAttribute => 'className';
+
+  /// `EditText` and its subclasses (Flutter and Compose fields report
+  /// `android.widget.EditText`; Material's `TextInputEditText`,
+  /// `AutoCompleteTextView`).
+  @override
+  bool isEditableClass(String className) =>
+      className.contains('EditText') ||
+      className.contains('AutoCompleteTextView');
+
+  @override
   Future<String?> get foregroundApp => _adb.foregroundPackage();
 
   /// UIAutomator2 works in pixels (scale 1). Its `window/current/size`
@@ -77,7 +89,11 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   }
 
   @override
-  Future<void> enterText(NativeElement element, String text) async {
+  Future<void> enterText(
+    NativeElement element,
+    String text, {
+    bool clear = false,
+  }) async {
     await tapElement(element);
 
     // The tap focused exactly the element the selector chose, so the focused
@@ -115,7 +131,50 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
         error: 'no such element',
       );
     }
-    await client.elementSendKeys(sessionId, elementId, text);
+    await typeInto(elementId, text, clear: clear);
+  }
+
+  @override
+  Future<void> pressKey(NativeKey key) => client.uia2PressKeycode(
+        sessionId,
+        switch (key) {
+          NativeKey.back => 4,
+          NativeKey.home => 3,
+          NativeKey.enter => 66,
+          NativeKey.backspace => 67,
+          NativeKey.tab => 61,
+          NativeKey.recents => 187,
+          NativeKey.volumeUp => 24,
+          NativeKey.volumeDown => 25,
+        },
+      );
+
+  @override
+  Future<bool> isKeyboardShown() async {
+    final shown = await _adb.isKeyboardShown();
+    if (shown == null) {
+      throw const NativeOperationFailedException(
+        'Could not read the keyboard state (adb dumpsys input_method).',
+        hint: 'Check that adb can reach the device.',
+      );
+    }
+    return shown;
+  }
+
+  /// Presses Back, which closes a shown IME without navigating. Back is
+  /// only sent when the keyboard is shown — otherwise it would navigate.
+  @override
+  Future<bool> hideKeyboard() async {
+    if (!await isKeyboardShown()) return false;
+    await pressKey(NativeKey.back);
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (!await isKeyboardShown()) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    throw const NativeOperationFailedException(
+      'The keyboard is still shown after pressing Back.',
+      hint: 'Unfocus the field in the app (e.g. tap outside it) and retry.',
+    );
   }
 
   Future<String?> _tryFind(String using, String value) async {

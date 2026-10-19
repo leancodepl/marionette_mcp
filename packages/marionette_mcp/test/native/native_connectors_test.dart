@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:test/test.dart';
 
@@ -169,6 +171,175 @@ void main() {
       addTearDown(connector.dispose);
 
       expect((await connector.getScreen()).width, 1280);
+    });
+
+    group('keyboard', () {
+      setUp(() {
+        server.onValue(
+          'POST',
+          '/session/sess-1/appium/device/press_keycode',
+          null,
+        );
+      });
+
+      List<int> keycodes() => server
+          .requestsTo('POST', '/session/sess-1/appium/device/press_keycode')
+          .map((r) => r.body!['keycode'] as int)
+          .toList();
+
+      void keyboardShown(List<bool> states) {
+        var call = 0;
+        runner.onAdb(
+          ['shell', 'dumpsys', 'input_method'],
+          respond: (_) => ok(
+            'mInputShown=${states[call < states.length ? call++ : states.length - 1]}',
+          ),
+        );
+      }
+
+      test('pressKey sends Android keycodes', () async {
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        for (final key in NativeKey.values) {
+          await connector.pressKey(key);
+        }
+
+        expect(keycodes(), [4, 3, 66, 67, 61, 187, 24, 25]);
+      });
+
+      test('hideKeyboard does not press Back when no keyboard is shown',
+          () async {
+        keyboardShown([false]);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        expect(await connector.hideKeyboard(), isFalse);
+        expect(keycodes(), isEmpty, reason: 'Back would navigate away');
+      });
+
+      test('hideKeyboard presses Back once and waits for the IME to close',
+          () async {
+        keyboardShown([true, true, false]);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        expect(await connector.hideKeyboard(), isTrue);
+        expect(keycodes(), [4]);
+      });
+
+      test('hideKeyboard fails when the IME stays open', () async {
+        keyboardShown([true]);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.hideKeyboard(),
+          throwsA(isA<NativeOperationFailedException>()),
+        );
+      });
+
+      test('typeText types into the active element, clearing on request',
+          () async {
+        server
+          ..onValue('GET', '/session/sess-1/element/active', {
+            w3cElementKey: 'focused',
+          })
+          ..onValue('POST', '/session/sess-1/element/focused/clear', null)
+          ..onValue('POST', '/session/sess-1/element/focused/value', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.typeText('42', clear: true);
+
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/focused/clear'),
+          hasLength(1),
+        );
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element/focused/value')
+              .single
+              .body,
+          {'text': '42'},
+        );
+      });
+
+      test('typeText refuses when focus is on something other than a field',
+          () async {
+        // After a Tab press focus can sit on a button; UIAutomator2 would
+        // accept send keys there without typing anything.
+        server
+          ..onValue('GET', '/session/sess-1/element/active', {
+            w3cElementKey: 'btn',
+          })
+          ..onValue(
+            'GET',
+            '/session/sess-1/element/btn/attribute/className',
+            'android.widget.Button',
+          );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.typeText('x'),
+          throwsA(
+            isA<NativeElementNotFoundException>().having(
+              (e) => e.message,
+              'message',
+              contains('focus is on android.widget.Button'),
+            ),
+          ),
+        );
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/btn/value'),
+          isEmpty,
+        );
+      });
+
+      test('typeText accepts EditText subclasses', () async {
+        server
+          ..onValue('GET', '/session/sess-1/element/active', {
+            w3cElementKey: 'f',
+          })
+          ..onValue(
+            'GET',
+            '/session/sess-1/element/f/attribute/className',
+            'com.google.android.material.textfield.TextInputEditText',
+          )
+          ..onValue('POST', '/session/sess-1/element/f/value', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.typeText('ok');
+
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/f/value'),
+          hasLength(1),
+        );
+      });
+
+      test('typeText without a focused field asks to focus one', () async {
+        server.on(
+          'GET',
+          '/session/sess-1/element/active',
+          (_) => const FakeResponse.error(
+            'no such element',
+            'nothing focused',
+            status: HttpStatus.notFound,
+          ),
+        );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.typeText('x'),
+          throwsA(
+            isA<NativeElementNotFoundException>()
+                .having((e) => e.hint, 'hint', contains('Focus a text field')),
+          ),
+        );
+      });
     });
 
     test('isServerResponding reflects /status', () async {
@@ -460,6 +631,168 @@ void main() {
       addTearDown(connector.dispose);
 
       expect(await connector.foregroundApp, 'com.apple.springboard');
+    });
+
+    group('keyboard', () {
+      test('pressKey maps buttons and keyboard keys', () async {
+        server
+          ..onValue('POST', '/session/sess-1/wda/pressButton', null)
+          ..onValue('POST', '/session/sess-1/wda/keys', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.pressKey(NativeKey.home);
+        await connector.pressKey(NativeKey.enter);
+        await connector.pressKey(NativeKey.backspace);
+
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/wda/pressButton')
+              .single
+              .body,
+          {'name': 'home'},
+        );
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/wda/keys')
+              .map((r) => r.body!['value']),
+          [
+            ['\n'],
+            ['\b'],
+          ],
+        );
+      });
+
+      test('back, recents and tab are unsupported, with a hint', () async {
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        // tab: `\t` would be typed as a character, not move focus.
+        for (final key in [NativeKey.back, NativeKey.recents, NativeKey.tab]) {
+          await expectLater(
+            connector.pressKey(key),
+            throwsA(isA<NativeUnsupportedException>()),
+            reason: key.wireName,
+          );
+        }
+      });
+
+      test('a button the Simulator lacks is reported as unsupported', () async {
+        server.on(
+          'POST',
+          '/session/sess-1/wda/pressButton',
+          (_) => const FakeResponse.error(
+            'unknown error',
+            "The button 'volumeUp' is not supported.",
+          ),
+        );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.pressKey(NativeKey.volumeUp),
+          throwsA(
+            isA<NativeUnsupportedException>()
+                .having((e) => e.hint, 'hint', contains('Simulator')),
+          ),
+        );
+      });
+
+      test('typeText checks the focused element type', () async {
+        var type = 'XCUIElementTypeButton';
+        server
+          ..onValue('GET', '/session/sess-1/element/active', {
+            w3cElementKey: 'el',
+          })
+          ..on(
+            'GET',
+            '/session/sess-1/element/el/attribute/type',
+            (_) => FakeResponse.value(type),
+          )
+          ..onValue('POST', '/session/sess-1/element/el/value', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.typeText('x'),
+          throwsA(isA<NativeElementNotFoundException>()),
+        );
+
+        type = 'XCUIElementTypeTextView';
+        await connector.typeText('x');
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/el/value'),
+          hasLength(1),
+        );
+      });
+
+      void sourceWithKeyboard(List<bool> shown) {
+        var call = 0;
+        server.on('GET', '/session/sess-1/source', (_) {
+          final visible =
+              shown[call < shown.length ? call++ : shown.length - 1];
+          return FakeResponse.value(
+            '<XCUIElementTypeApplication>'
+            '${visible ? '<XCUIElementTypeKeyboard/>' : ''}'
+            '</XCUIElementTypeApplication>',
+          );
+        });
+      }
+
+      test('hideKeyboard is a no-op without a keyboard', () async {
+        sourceWithKeyboard([false]);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        expect(await connector.hideKeyboard(), isFalse);
+        expect(
+          server.requestsTo('POST', '/session/sess-1/wda/keyboard/dismiss'),
+          isEmpty,
+        );
+      });
+
+      test('hideKeyboard uses only non-editing dismiss keys', () async {
+        sourceWithKeyboard([true, false]);
+        server.onValue('POST', '/session/sess-1/wda/keyboard/dismiss', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        expect(await connector.hideKeyboard(), isTrue);
+        final keyNames = server
+            .requestsTo('POST', '/session/sess-1/wda/keyboard/dismiss')
+            .single
+            .body!['keyNames'] as List;
+        expect(keyNames, contains('Done'));
+        expect(
+          keyNames.map((k) => (k as String).toLowerCase()),
+          isNot(contains('return')),
+          reason: 'return inserts a newline in multi-line fields',
+        );
+      });
+
+      test('hideKeyboard fails fast when WDA cannot dismiss it', () async {
+        sourceWithKeyboard([true]);
+        server.on(
+          'POST',
+          '/session/sess-1/wda/keyboard/dismiss',
+          (_) => const FakeResponse.error(
+            'unknown error',
+            'Did not know how to dismiss the keyboard.',
+          ),
+        );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.hideKeyboard(),
+          throwsA(isA<NativeOperationFailedException>()),
+        );
+        expect(
+          server.requestsTo('GET', '/session/sess-1/source'),
+          hasLength(2),
+          reason: 'one check before, one after — no polling',
+        );
+      });
     });
 
     test('dispose is idempotent and keeps an injected bootstrap', () async {

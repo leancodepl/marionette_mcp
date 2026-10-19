@@ -8,6 +8,7 @@
 - Native lane: tap and type into exactly the element the selector chose (iOS no longer re-locates it by accessibility id, which could hit another element with the same id)
 - Native lane: `native_scroll` uses the real screen size instead of inferring it from element bounds
 - Native lane (Android): an empty text field is identified by its hint (placeholder) text; (iOS) software keyboard keys are reported as clickable
+- Native lane: add `native_press_key` (back, home, enter, backspace, tab, recents, volume_up, volume_down) and `native_hide_keyboard`; `native_enter_text` types into the focused field when no selector is given and accepts `clear` ([D14](docs/native-lane-decisions.md#d14))
 - Native lane: re-establish a lost device-side session automatically once; reads are retried, actions check that the server responds first and are only repeated when they certainly did not run ([D3](docs/native-lane-decisions.md#d3))
 - Native lane (iOS): `native_connect` with the `udid` of a simulator that is not booted now fails immediately with a hint, instead of `xcodebuild` silently booting it headless
 - Native lane (Android): pick a free local port for UIAutomator2 (or `MARIONETTE_UIA2_PORT`), reuse a healthy server already forwarded for the device, install APKs only when they changed, and verify downloaded APKs against pinned SHA-256 checksums ([D10](docs/native-lane-decisions.md#d10))

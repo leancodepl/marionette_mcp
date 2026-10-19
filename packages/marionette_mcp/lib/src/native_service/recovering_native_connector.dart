@@ -11,9 +11,10 @@ typedef NativeReconnect = Future<NativeConnector> Function();
 ///
 /// Every operation is classified by its method:
 /// - reads ([getNativeElements], [foregroundApp], [takeScreenshot],
-///   [getScreen]) are
+///   [getScreen], [isKeyboardShown]) are
 ///   retried once on a fresh session whenever the session was lost;
-/// - actions ([tapElement], [tapAt], [enterText], [swipe]) first check
+/// - actions ([tapElement], [tapAt], [enterText], [typeText], [pressKey],
+///   [hideKeyboard], [swipe]) first check
 ///   [isServerResponding]; a server that is already gone is replaced before
 ///   the action is sent. An action is retried only when it certainly did
 ///   not run — the server answered `invalid session id`, or no connection
@@ -70,8 +71,25 @@ final class RecoveringNativeConnector implements NativeConnector {
   Future<void> tapAt(int x, int y) => _act((c) => c.tapAt(x, y));
 
   @override
-  Future<void> enterText(NativeElement element, String text) =>
-      _act((c) => c.enterText(element, text));
+  Future<void> enterText(
+    NativeElement element,
+    String text, {
+    bool clear = false,
+  }) =>
+      _act((c) => c.enterText(element, text, clear: clear));
+
+  @override
+  Future<void> typeText(String text, {bool clear = false}) =>
+      _act((c) => c.typeText(text, clear: clear));
+
+  @override
+  Future<void> pressKey(NativeKey key) => _act((c) => c.pressKey(key));
+
+  @override
+  Future<bool> hideKeyboard() => _act((c) => c.hideKeyboard());
+
+  @override
+  Future<bool> isKeyboardShown() => _read((c) => c.isKeyboardShown());
 
   @override
   Future<void> swipe({

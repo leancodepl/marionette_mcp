@@ -97,6 +97,20 @@ class AdbClient {
     }
   }
 
+  /// Whether the software keyboard (IME) is shown, from
+  /// `dumpsys input_method`, or null when it cannot be read. Never throws.
+  Future<bool?> isKeyboardShown() async {
+    try {
+      final result = await shell(const ['dumpsys', 'input_method']);
+      if (result.exitCode != 0) return null;
+      final match =
+          RegExp(r'mInputShown=(true|false)').firstMatch(processStdout(result));
+      return match == null ? null : match.group(1) == 'true';
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Package that owns the focused window (a system dialog when one covers
   /// the app), or null when it cannot be determined. Never throws.
   ///

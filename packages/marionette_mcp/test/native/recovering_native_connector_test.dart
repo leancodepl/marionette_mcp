@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:logging/logging.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/native_key.dart';
 import 'package:marionette_mcp/src/native_service/recovering_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:test/test.dart';
@@ -114,6 +115,21 @@ void main() {
 
       expect(inner.healthChecks, 1);
       expect(reconnects, 0);
+    });
+
+    test('keyboard operations are classified as actions and reads', () async {
+      final inner = FakeNativeConnector()..keyboardShown = true;
+      final connector = wrap(inner);
+
+      await connector.isKeyboardShown();
+      expect(inner.healthChecks, 0, reason: 'isKeyboardShown is a read');
+
+      await connector.pressKey(NativeKey.enter);
+      await connector.typeText('x');
+      await connector.hideKeyboard();
+      expect(inner.healthChecks, 3, reason: 'each action probes first');
+      expect(inner.pressedKeys, [NativeKey.enter]);
+      expect(inner.typedText, [(text: 'x', clear: false)]);
     });
 
     test('reads do not probe the server first', () async {

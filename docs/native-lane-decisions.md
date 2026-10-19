@@ -10,6 +10,7 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D2](#d2) | Coordinate space of the native lane | Accepted |
 | [D3](#d3) | Automatic recovery of a lost session | Accepted |
 | [D10](#d10) | UIAutomator2 local port and server reuse | Accepted |
+| [D14](#d14) | Software keyboard and key presses | Accepted |
 
 ---
 
@@ -209,3 +210,53 @@ Zero configuration in the common single-device case (still port 8200), correct b
   - With a listener on 8200, the forward used 8201; `MARIONETTE_UIA2_PORT=8250` used 8250; `MARIONETTE_UIA2_PORT=8200` while busy and `MARIONETTE_UIA2_PORT=abc` failed immediately with a hint.
   - A second process connected in ≈ 0.1 s by reusing the running server and left it running on disconnect; the first process's next call took ≈ 1.9 s because its session had been replaced (see consequences).
 - Android emulator (API 28): `sha256sum` is available and both installed APK hashes equal the pinned ones; two consecutive connects did not reinstall (`lastUpdateTime` unchanged, connect ≈ 1.7 s); the forward exists only during the session.
+
+---
+
+<a id="d14"></a>
+
+## D14 — Software keyboard and key presses
+
+- **Status:** Accepted (2026-10-16)
+- **Applies to:** `native_press_key`, `native_hide_keyboard`, `native_enter_text` (focused-field mode, `clear`); `NativeConnector.pressKey` / `hideKeyboard` / `isKeyboardShown` / `typeText`.
+
+### Context and dilemma
+
+The software keyboard is a native window on both platforms. After typing it stays open and covers part of the app — in the example app, Flutter resizes above it and the bottom navigation bar disappears from the UI tree. On Android, Gboard does not publish its keys to accessibility, so an agent cannot type by tapping keys. Three choices had to be made: how to hide the keyboard without side effects, what typing does to existing text, and how to treat keys a platform does not have.
+
+### Options considered
+
+- **Hiding on Android:** (a) always press Back — hides the IME, but navigates back when no keyboard is shown; (b) Escape — not handled consistently by apps; (c) press Back **only while the IME is shown**, checked with `dumpsys input_method` (UIAutomator2 has no `is_keyboard_shown`).
+- **Hiding on iOS:** (a) WDA `keyboard/dismiss` alone — fails for most keyboards ("Did not know how to dismiss the keyboard"); (b) tap `return` — dismisses single-line fields but inserts a newline in multi-line ones; (c) WDA dismiss restricted to non-editing keys (`Done`, `Hide keyboard`, `Dismiss`) and a clear failure otherwise; (d) tap outside the field — position-dependent, may hit a control.
+- **Typing:** replace the field content, or append at the cursor like a user typing.
+- **Unsupported keys:** silently ignore, or fail with a hint.
+
+### Decision
+
+- **Android:** `hideKeyboard` presses Back only if `mInputShown=true`, then waits (≤ 2 s) for the IME to close; when no keyboard is shown it returns false and sends nothing.
+- **iOS:** `hideKeyboard` returns false without a keyboard; otherwise WDA dismiss with `Done` / `done` / `Hide keyboard` / `Dismiss` (never `return`). If WDA reports it cannot dismiss, the tool fails immediately with a hint (tap outside the field, use the app's Done button, or unfocus via the Flutter lane); after a reported success it waits briefly for the keyboard to disappear.
+- **Typing appends** on both platforms; `clear: true` empties the field first (W3C element clear). Without a selector, `native_enter_text` types into the element that has keyboard focus (W3C `element/active`) — the way to type into Flutter fields on Android, where the keyboard is invisible to the native lane. The focused element must be a text field (Android `className` containing `EditText` / `AutoCompleteTextView`; iOS `type` text field, secure field, text view or search field); otherwise the tool fails and names what has focus. If the class cannot be read, typing proceeds unchecked.
+- **Keys:** Android maps every key to a `KeyEvent` keycode (`press_keycode`). iOS: `home` (and `volume_*` on devices) through `wda/pressButton`; `enter` / `backspace` as `\n` / `\b` through `wda/keys`; `back`, `recents` and `tab` do not exist and fail with `NativeUnsupportedException` and a hint (the software keyboard has no Tab key — `\t` would be typed into the field as a character); a button the Simulator lacks (volume) is reported the same way. Key names match the Flutter lane's `press_key` where they overlap.
+
+### Rationale
+
+No operation may have a hidden side effect: an unconditional Back would navigate, `return` would edit text. A clear failure with a concrete next step is better than a guess. Appending matches what a user typing does and is identical on both platforms; replacing is one explicit flag away.
+
+### Consequences
+
+- Some iOS keyboards (number pad, default keyboard of a plain `UITextField`) cannot be hidden by the tool; the agent gets a hint instead.
+- On iOS the typed text of a field labelled by Flutter (`label="Title"`) is reported as the label, not the value, in `native_get_elements` — to be addressed by the richer element model (N-01).
+
+### Verification
+
+- Endpoints probed live: UIAutomator2 `element/active`, W3C key actions and `press_keycode` type into a focused Flutter field (API 35); `is_keyboard_shown` is an unknown command. WDA `wda/keys` types into the focused field; `wda/keyboard/dismiss` without keys fails with "Did not know how to dismiss the keyboard"; `wda/pressButton` volume on the Simulator fails with "not supported".
+- Live, Android API 28: the same results as on API 35 (fields found by their hint, typing appends, `clear`, backspace, hide restores the bottom tabs, a second hide does not navigate, back / home / volume / recents).
+- Live, Android API 35: focused typing appends (`71` → `715`), `clear` replaces (`42`), backspace deletes, `native_hide_keyboard` hides the IME and the bottom tabs reappear, a second call reports "not shown" without navigating; back / home / volume work.
+- Live, iOS 26.4 (iPhone 17 Pro Max): the same results as on 18.6, including a plain `UITextField` (`ab` + backspace → `a`) and `enter`. Follow-up checks: Polish characters ("zażółć gęślą jaźń", "Łódź ĄĘ €") are typed correctly into the focused field and through a selector, `clear` replaces the content in both modes, and typing with nothing focused fails with the "focus a field first" hint. `tab` was first mapped to `\t`; the screenshot showed a tab character typed into the Flutter field instead of a focus change, so `tab` became unsupported on iOS.
+- Found through the MCP server on Android: after `tab` moved focus onto a list button, focused typing first returned a raw WebDriver error and then **reported success without typing anything** (UIAutomator2 accepts send keys on a button). This led to the focused-element class check above; afterwards the same call fails with "focus is on android.widget.Button" and typing into a real field still works.
+- Live through the real MCP server (stdio JSON-RPC: `initialize`, `tools/list`, `tools/call`) on iOS 26.4 and Android API 35: tool schemas, focused typing, key presses including the unsupported-key and invalid-argument errors, `native_hide_keyboard` (hidden / not shown).
+- Follow-up repeated through the MCP server on Android API 28 and iOS 18.6 with the same results: Polish characters in both modes (on iOS also in a Flutter field, checked on a screenshot), `clear` in both modes, `enter` (newline / submit) and `tab` (focus change) on Android, `tab` unsupported on iOS, the "focus a field first" error, and the focused-on-a-button rejection on Android.
+- Live, Android API 35 (follow-up): Polish characters in both modes, `clear` through a selector, `enter` inserts a newline in a multi-line field and submits a single-line one (the keyboard closes), `tab` moves focus to the next field, typing with nothing focused fails with the hint.
+- Live, iOS 18.6: focused typing appends and backspace deletes; the Flutter `Title` field (Done key) is hidden; the number pad and a plain `UITextField` fail fast (≈ 4 s, of which most is WDA trying keys) with the hint; home works; back / recents / volume are reported as unsupported.
+- Unit tests cover keycode mapping, Back never sent without a keyboard, polling and failure, iOS key mapping, dismiss key names without `return`, fail-fast without polling, focused typing with clear, and decorator classification.
+

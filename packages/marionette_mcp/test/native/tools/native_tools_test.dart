@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/connection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
+import 'package:marionette_mcp/src/native_service/tools/keyboard_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/text_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -347,7 +349,7 @@ void main() {
   });
 
   group('native_enter_text', () {
-    test('requires text and a field selector', () async {
+    test('requires text; index requires a selector', () async {
       final context = _contextWith(FakeNativeConnector());
 
       expect(
@@ -355,9 +357,34 @@ void main() {
         _isToolError(contains('requires "text"')),
       );
       expect(
-        await handleNativeEnterText(context, {'text': 'x'}),
-        _isToolError(contains('field selector')),
+        await handleNativeEnterText(context, {'text': 'x', 'index': 0}),
+        _isToolError(contains('index requires a selector')),
       );
+    });
+
+    test('without a selector types into the focused field', () async {
+      final connector = FakeNativeConnector();
+
+      final result = await handleNativeEnterText(
+        _contextWith(connector),
+        {'text': '42', 'clear': true},
+      );
+
+      expect(result, _isToolSuccess(contains('the focused field')));
+      expect(connector.typedText, [(text: '42', clear: true)]);
+      expect(connector.enteredText, isEmpty);
+    });
+
+    test('passes clear to the selected field', () async {
+      final field = nativeElement(type: 'android.widget.EditText', id: 'f');
+      final connector = FakeNativeConnector.single([field]);
+
+      await handleNativeEnterText(
+        _contextWith(connector),
+        {'text': 'x', 'id': 'f', 'clear': true},
+      );
+
+      expect(connector.enteredText, [(element: field, text: 'x', clear: true)]);
     });
 
     test('types into the field chosen by the selector', () async {
@@ -374,9 +401,9 @@ void main() {
       );
 
       expect(connector.enteredText, [
-        (element: email, text: 'a@b.c'),
-        (element: name, text: 'Ann'),
-        (element: name, text: 'Bo'),
+        (element: email, text: 'a@b.c', clear: false),
+        (element: name, text: 'Ann', clear: false),
+        (element: name, text: 'Bo', clear: false),
       ]);
     });
 
@@ -424,6 +451,60 @@ void main() {
           _contextWith(FakeNativeConnector(screenshot: '')),
         ),
         _isToolSuccess('Native screenshot was empty'),
+      );
+    });
+  });
+
+  group('native_press_key', () {
+    test('parses key names and presses the key', () async {
+      final connector = FakeNativeConnector();
+      final context = _contextWith(connector);
+
+      expect(
+        await handleNativePressKey(context, {'key': ' Volume_Up '}),
+        _isToolSuccess('Pressed volume_up'),
+      );
+      await handleNativePressKey(context, {'key': 'backspace'});
+
+      expect(connector.pressedKeys, [NativeKey.volumeUp, NativeKey.backspace]);
+    });
+
+    test('rejects unknown keys and lists the valid ones', () async {
+      expect(
+        await handleNativePressKey(
+          _contextWith(FakeNativeConnector()),
+          {'key': 'escape'},
+        ),
+        _isToolError(allOf(contains('back, home, enter'), contains('volume'))),
+      );
+    });
+
+    test('reports an unsupported key with its hint', () async {
+      final connector = FakeNativeConnector()
+        ..error = const NativeUnsupportedException(
+          'iOS has no Back key.',
+          hint: 'Tap the navigation bar back button.',
+        );
+
+      expect(
+        await handleNativePressKey(_contextWith(connector), {'key': 'back'}),
+        _isToolError(allOf(contains('no Back key'), contains('Hint:'))),
+      );
+    });
+  });
+
+  group('native_hide_keyboard', () {
+    test('reports whether the keyboard was shown', () async {
+      final connector = FakeNativeConnector()..keyboardShown = true;
+      final context = _contextWith(connector);
+
+      expect(
+        await handleNativeHideKeyboard(context),
+        _isToolSuccess('Keyboard hidden'),
+      );
+      expect(
+        await handleNativeHideKeyboard(context),
+        _isToolSuccess('Keyboard was not shown'),
       );
     });
   });

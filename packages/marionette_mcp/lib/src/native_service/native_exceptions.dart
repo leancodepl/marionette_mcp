@@ -34,16 +34,19 @@ final class NativeNotConnectedException extends NativeLaneException {
 /// [similar] lists texts of elements that almost match (e.g. differ only in
 /// case or line breaks), to steer the agent to the right value.
 final class NativeElementNotFoundException extends NativeLaneException {
-  NativeElementNotFoundException(String target,
-      {List<String> similar = const []})
-      : super(
+  NativeElementNotFoundException(
+    String target, {
+    List<String> similar = const [],
+    String? hint,
+  }) : super(
           'No native element with $target.',
-          hint: similar.isEmpty
-              ? 'Call native_get_elements and retry with a value from its '
-                  'output.'
-              : 'Similar elements: ${similar.map(_quote).join(', ')}. Call '
-                  'native_get_elements and retry with a value from its '
-                  'output.',
+          hint: hint ??
+              (similar.isEmpty
+                  ? 'Call native_get_elements and retry with a value from its '
+                      'output.'
+                  : 'Similar elements: ${similar.map(_quote).join(', ')}. '
+                      'Call native_get_elements and retry with a value from '
+                      'its output.'),
         );
 }
 
@@ -63,6 +66,17 @@ final class NativeAmbiguousElementException extends NativeLaneException {
 }
 
 String _quote(String text) => '"${text.replaceAll('\n', r'\n')}"';
+
+/// A device operation ran but did not have the expected effect (e.g. the
+/// keyboard is still shown after trying to hide it).
+final class NativeOperationFailedException extends NativeLaneException {
+  const NativeOperationFailedException(super.message, {super.hint});
+}
+
+/// The operation does not exist on this platform (e.g. a Back key on iOS).
+final class NativeUnsupportedException extends NativeLaneException {
+  const NativeUnsupportedException(super.message, {super.hint});
+}
 
 /// The device-side automation server or its session went away and could not
 /// be transparently re-established. See docs/native-lane-decisions.md#d3.

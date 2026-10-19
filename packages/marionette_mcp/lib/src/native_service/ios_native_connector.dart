@@ -1,5 +1,6 @@
 import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/xpath.dart';
@@ -100,6 +101,19 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   @override
   List<NativeElement> parseSource(String xml) => parseWdaSource(xml);
 
+  @override
+  String get classAttribute => 'type';
+
+  static const _editableTypes = {
+    'XCUIElementTypeTextField',
+    'XCUIElementTypeSecureTextField',
+    'XCUIElementTypeTextView',
+    'XCUIElementTypeSearchField',
+  };
+
+  @override
+  bool isEditableClass(String className) => _editableTypes.contains(className);
+
   /// Foreground app bundle identifier from WDA's active-app endpoint, with
   /// page-source fallback when that endpoint is unavailable.
   @override
@@ -126,7 +140,11 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   }
 
   @override
-  Future<void> enterText(NativeElement element, String text) async {
+  Future<void> enterText(
+    NativeElement element,
+    String text, {
+    bool clear = false,
+  }) async {
     // One lookup serves both the focusing click and the typing.
     final elementId = await _tryFindElement(element);
     if (elementId == null) {
@@ -137,7 +155,82 @@ final class IosNativeConnector extends WebDriverNativeConnector {
       );
     }
     await client.elementClick(sessionId, elementId);
-    await client.elementSendKeys(sessionId, elementId, text);
+    await typeInto(elementId, text, clear: clear);
+  }
+
+  @override
+  Future<void> pressKey(NativeKey key) async => switch (key) {
+        NativeKey.home => _pressButton('home'),
+        NativeKey.volumeUp => _pressButton('volumeUp'),
+        NativeKey.volumeDown => _pressButton('volumeDown'),
+        NativeKey.enter => client.wdaKeys(sessionId, '\n'),
+        NativeKey.backspace => client.wdaKeys(sessionId, '\b'),
+        // The iOS software keyboard has no Tab key: `\t` would be typed
+        // into the field as a character instead of moving focus.
+        NativeKey.tab => throw const NativeUnsupportedException(
+            'The iOS software keyboard has no Tab key.',
+            hint: 'Tap the next field instead (native_tap or Flutter tap).',
+          ),
+        NativeKey.back => throw const NativeUnsupportedException(
+            'iOS has no Back key.',
+            hint: 'Tap the navigation bar back button (e.g. native_tap '
+                'id="Back") or swipe right from the left screen edge '
+                '(native_scroll direction=right startX=1 …).',
+          ),
+        NativeKey.recents => throw const NativeUnsupportedException(
+            'iOS has no recent-apps key.',
+            hint: 'Use home to leave the app.',
+          ),
+      };
+
+  /// Presses a hardware button; the Simulator only has `home`, and WDA's
+  /// "not supported" answer is reported as such.
+  Future<void> _pressButton(String name) async {
+    try {
+      await client.wdaPressButton(sessionId, name);
+    } on WebDriverException catch (error) {
+      if (!error.message.contains('not supported')) rethrow;
+      throw NativeUnsupportedException(
+        'The "$name" button is not available on this device.',
+        hint: 'The iOS Simulator only has the home button; volume buttons '
+            'exist on physical devices.',
+      );
+    }
+  }
+
+  @override
+  Future<bool> isKeyboardShown() async =>
+      (await client.getPageSource(sessionId))
+          .contains('<XCUIElementTypeKeyboard');
+
+  /// Keys that dismiss the keyboard without editing the text. `return` is
+  /// deliberately absent: in a multi-line field it inserts a newline.
+  static const _dismissKeyNames = ['Done', 'done', 'Hide keyboard', 'Dismiss'];
+
+  @override
+  Future<bool> hideKeyboard() async {
+    if (!await isKeyboardShown()) return false;
+    var dismissed = true;
+    try {
+      await client.wdaDismissKeyboard(sessionId, keyNames: _dismissKeyNames);
+    } on WebDriverException {
+      // WDA found no way to dismiss it; confirm once below instead of
+      // waiting for an animation that will not happen.
+      dismissed = false;
+    }
+    final attempts = dismissed ? 5 : 1;
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      if (!await isKeyboardShown()) return true;
+      if (attempt < attempts - 1) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+    throw const NativeOperationFailedException(
+      'Could not hide the iOS keyboard: it has no Done / dismiss key.',
+      hint: 'Tap outside the field (native_tap on a non-interactive area), use '
+          "the app's own Done button, or unfocus the field via the Flutter "
+          'lane.',
+    );
   }
 
   /// Locates the WDA element for [element]: first by its type and exact

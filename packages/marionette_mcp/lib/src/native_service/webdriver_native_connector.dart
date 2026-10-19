@@ -1,4 +1,5 @@
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 
 /// Shared implementation of [NativeConnector] for WebDriver-based servers
@@ -112,6 +113,71 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
 
   @override
   Future<String> takeScreenshot() => client.takeScreenshot(sessionId);
+
+  /// Name of the element attribute holding its class (`className` on
+  /// UIAutomator2, `type` on WebDriverAgent).
+  String get classAttribute;
+
+  /// Whether an element of [className] accepts typed text.
+  bool isEditableClass(String className);
+
+  static const _focusHint = 'Focus a text field first (native_tap on it, or '
+      'Flutter tap for a Flutter TextField), or pass a selector for the '
+      'field.';
+
+  /// Types into the focused field: W3C `element/active`, then send keys.
+  ///
+  /// The focused element must be a text field: after e.g. a Tab press the
+  /// focus may sit on a button, and send keys would then fail or — on
+  /// UIAutomator2 — report success without typing anything.
+  @override
+  Future<void> typeText(String text, {bool clear = false}) async {
+    final String elementId;
+    try {
+      elementId = await client.activeElement(sessionId);
+    } on WebDriverException catch (error) {
+      if (!isNoSuchElement(error)) rethrow;
+      throw NativeElementNotFoundException('keyboard focus', hint: _focusHint);
+    }
+
+    final className = await _classOf(elementId);
+    if (className != null && !isEditableClass(className)) {
+      throw NativeElementNotFoundException(
+        'keyboard focus on a text field (focus is on $className)',
+        hint: _focusHint,
+      );
+    }
+    await typeInto(elementId, text, clear: clear);
+  }
+
+  /// Class of [elementId], or null when the server cannot report it — then
+  /// typing proceeds unchecked rather than blocking unusual fields.
+  Future<String?> _classOf(String elementId) async {
+    try {
+      final value =
+          await client.elementAttribute(sessionId, elementId, classAttribute);
+      return value == null || value.isEmpty ? null : value;
+    } on WebDriverException {
+      return null;
+    }
+  }
+
+  /// Types [text] into the WebDriver element [elementId], clearing it first
+  /// when [clear] is set.
+  Future<void> typeInto(
+    String elementId,
+    String text, {
+    required bool clear,
+  }) async {
+    if (clear) await client.elementClear(sessionId, elementId);
+    if (text.isNotEmpty) {
+      await client.elementSendKeys(sessionId, elementId, text);
+    }
+  }
+
+  /// Whether [error] means "no matching element" on either server.
+  static bool isNoSuchElement(WebDriverException error) =>
+      error.error == 'no such element' || error.httpStatus == 404;
 
   /// How long [isServerResponding] waits before treating the server as
   /// gone. Generous, because WebDriverAgent can be slow while busy and a

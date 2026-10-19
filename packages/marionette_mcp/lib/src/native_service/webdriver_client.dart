@@ -182,6 +182,87 @@ class WebDriverClient {
     );
   }
 
+  /// Clears the value of the editable element [elementId].
+  Future<void> elementClear(String sessionId, String elementId) async {
+    await _request('POST', '/session/$sessionId/element/$elementId/clear');
+  }
+
+  /// Returns attribute [name] of element [elementId], or null when the
+  /// server has no value for it (`GET .../element/{id}/attribute/{name}`).
+  Future<String?> elementAttribute(
+    String sessionId,
+    String elementId,
+    String name,
+  ) async {
+    final value = await _request(
+      'GET',
+      '/session/$sessionId/element/$elementId/attribute/$name',
+    );
+    return value?.toString();
+  }
+
+  /// Returns the id of the element that has keyboard focus
+  /// (`GET /session/{id}/element/active`).
+  ///
+  /// Throws [WebDriverException] (`no such element`) when nothing is focused.
+  Future<String> activeElement(String sessionId) async {
+    final result = await _request('GET', '/session/$sessionId/element/active');
+    if (result is Map<String, dynamic>) {
+      final elementId = result[w3cElementKey] ?? result['ELEMENT'];
+      if (elementId is String && elementId.isNotEmpty) return elementId;
+    }
+    throw const WebDriverException(
+      'No focused element',
+      error: 'no such element',
+    );
+  }
+
+  /// Presses an Android key by [keycode] (`KeyEvent.KEYCODE_*`) through
+  /// UIAutomator2's `appium/device/press_keycode`.
+  Future<void> uia2PressKeycode(String sessionId, int keycode) async {
+    await _request(
+      'POST',
+      '/session/$sessionId/appium/device/press_keycode',
+      body: {'keycode': keycode},
+    );
+  }
+
+  /// Presses an iOS hardware button (`home`, `volumeUp`, `volumeDown`)
+  /// through WDA's `wda/pressButton`.
+  Future<void> wdaPressButton(String sessionId, String name) async {
+    await _request(
+      'POST',
+      '/session/$sessionId/wda/pressButton',
+      body: {'name': name},
+    );
+  }
+
+  /// Types [text] into whatever has keyboard focus through WDA's `wda/keys`.
+  /// Special characters such as `\n` (return) and `\b` (backspace) press
+  /// the corresponding keys.
+  Future<void> wdaKeys(String sessionId, String text) async {
+    await _request(
+      'POST',
+      '/session/$sessionId/wda/keys',
+      body: {
+        'value': [text],
+      },
+    );
+  }
+
+  /// Asks WDA to dismiss the software keyboard, trying the keys named in
+  /// [keyNames] (e.g. `Done`, `return`) when it has no generic way.
+  Future<void> wdaDismissKeyboard(
+    String sessionId, {
+    List<String> keyNames = const [],
+  }) async {
+    await _request(
+      'POST',
+      '/session/$sessionId/wda/keyboard/dismiss',
+      body: {if (keyNames.isNotEmpty) 'keyNames': keyNames},
+    );
+  }
+
   /// Performs raw W3C actions (https://www.w3.org/TR/webdriver/#actions).
   ///
   /// [actions] is the list of input source objects sent as the `actions`

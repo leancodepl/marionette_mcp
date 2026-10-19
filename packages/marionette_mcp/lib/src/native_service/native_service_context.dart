@@ -7,6 +7,7 @@ import 'package:marionette_mcp/src/native_service/recovering_native_connector.da
 import 'package:marionette_mcp/src/native_service/tools/connection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
+import 'package:marionette_mcp/src/native_service/tools/keyboard_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/text_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -76,6 +77,7 @@ final class NativeServiceContext {
     registerNativeInspectionTools(server, this);
     registerNativeGestureTools(server, this);
     registerNativeTextTools(server, this);
+    registerNativeKeyboardTools(server, this);
     registerNativeScreenshotTools(server, this);
   }
 

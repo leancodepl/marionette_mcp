@@ -48,8 +48,12 @@ class _KeyboardScreenState extends State<KeyboardScreen> {
           children: [
             Text(
               'Each field opens a different native keyboard. Tap a field to focus '
-              'it, then use native_get_elements / native_tap on keyboard keys. '
-              'The keyboard is not in the Flutter tree — use native_take_screenshot '
+              'it, then type with native_enter_text (no selector = focused field) '
+              'and press keys with native_press_key (enter, backspace, tab). iOS '
+              'also exposes keyboard keys to native_get_elements / native_tap; '
+              'Android does not. Hide the keyboard with native_hide_keyboard — it '
+              'works with Done (Title) but not with the number pad on iOS. The '
+              'keyboard is not in the Flutter tree — use native_take_screenshot '
               'to verify it is open.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),

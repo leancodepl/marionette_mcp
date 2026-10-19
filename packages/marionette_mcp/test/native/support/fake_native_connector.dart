@@ -57,7 +57,13 @@ class FakeNativeConnector implements NativeConnector {
 
   final List<({int x, int y})> taps = [];
   final List<NativeElement> tappedElements = [];
-  final List<({NativeElement element, String text})> enteredText = [];
+  final List<({NativeElement element, String text, bool clear})> enteredText =
+      [];
+  final List<({String text, bool clear})> typedText = [];
+  final List<NativeKey> pressedKeys = [];
+
+  /// Result of [isKeyboardShown]; [hideKeyboard] sets it to false.
+  bool keyboardShown = false;
   final List<({int startX, int startY, int endX, int endY})> swipes = [];
   int getElementsCalls = 0;
   int disposeCalls = 0;
@@ -95,9 +101,39 @@ class FakeNativeConnector implements NativeConnector {
   }
 
   @override
-  Future<void> enterText(NativeElement element, String text) async {
+  Future<void> enterText(
+    NativeElement element,
+    String text, {
+    bool clear = false,
+  }) async {
     _maybeThrow();
-    enteredText.add((element: element, text: text));
+    enteredText.add((element: element, text: text, clear: clear));
+  }
+
+  @override
+  Future<void> typeText(String text, {bool clear = false}) async {
+    _maybeThrow();
+    typedText.add((text: text, clear: clear));
+  }
+
+  @override
+  Future<void> pressKey(NativeKey key) async {
+    _maybeThrow();
+    pressedKeys.add(key);
+  }
+
+  @override
+  Future<bool> isKeyboardShown() async {
+    _maybeThrow();
+    return keyboardShown;
+  }
+
+  @override
+  Future<bool> hideKeyboard() async {
+    _maybeThrow();
+    final wasShown = keyboardShown;
+    keyboardShown = false;
+    return wasShown;
   }
 
   @override

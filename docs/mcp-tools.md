@@ -61,7 +61,9 @@ Tools for system / native UI outside the Flutter widget tree (permission dialogs
 | `native_get_elements` | Return the native UI hierarchy as JSON (`elements`, optional `foregroundApp`). `bounds` are in screenshot pixels on every platform ([D2](./native-lane-decisions.md#d2)). |
 | `native_tap` | Tap an element chosen by a selector (`text`, `textContains`, `id`, `type`, optional `index`) or at `x`/`y` in screenshot pixels. An ambiguous selector fails and lists the candidates ([D1](./native-lane-decisions.md#d1)). |
 | `native_scroll` | Swipe in a `direction` from screen center (default) or optional `startX`/`startY`; optionally scroll until an element matching `text` / `textContains` / `id` / `type` is visible. |
-| `native_enter_text` | Type `text` into a native field chosen by a selector (`label`, `textContains`, `id`, `type`, optional `index`). |
+| `native_enter_text` | Type `text` into a native field chosen by a selector (`label`, `textContains`, `id`, `type`, optional `index`), or — without a selector — into the field that has keyboard focus. Text is appended; `clear: true` empties the field first ([D14](./native-lane-decisions.md#d14)). |
+| `native_press_key` | Press a system / hardware key: `back`, `home`, `enter`, `backspace`, `tab`, `recents`, `volume_up`, `volume_down`. `back`, `recents` and `tab` are Android-only; the iOS Simulator has only `home` of the hardware buttons. |
+| `native_hide_keyboard` | Hide the software keyboard if it is shown and report whether it was. Android presses Back only while the keyboard is shown; iOS uses the keyboard's Done / dismiss key and fails with a hint when there is none ([D14](./native-lane-decisions.md#d14)). |
 | `native_take_screenshot` | Returns a base64 inline PNG of the full device screen via the native session (system UI, WebViews). When `MARIONETTE_SCREENSHOTS_DIR` is set, also saves the PNG to that directory and includes the absolute path alongside the inline image. |
 
 ### Dev workflow

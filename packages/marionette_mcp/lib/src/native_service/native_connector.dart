@@ -3,6 +3,10 @@
 /// implementations.
 library;
 
+import 'package:marionette_mcp/src/native_service/native_key.dart';
+
+export 'package:marionette_mcp/src/native_service/native_key.dart';
+
 /// Rectangle in **screenshot pixels**: the pixel grid of the image returned
 /// by `native_take_screenshot`, on every platform.
 ///
@@ -163,8 +167,28 @@ abstract class NativeConnector {
   /// Taps at ([x], [y]) in screenshot pixels.
   Future<void> tapAt(int x, int y);
 
-  /// Focuses [element] and types [text] into it.
-  Future<void> enterText(NativeElement element, String text);
+  /// Focuses [element] and types [text] into it; [clear] empties the field
+  /// first.
+  Future<void> enterText(
+    NativeElement element,
+    String text, {
+    bool clear = false,
+  });
+
+  /// Types [text] into the field that currently has keyboard focus; [clear]
+  /// empties it first. Throws `NativeElementNotFoundException` when no field
+  /// is focused.
+  Future<void> typeText(String text, {bool clear = false});
+
+  /// Presses a system / hardware [key]. Throws `NativeUnsupportedException`
+  /// for keys the platform does not have.
+  Future<void> pressKey(NativeKey key);
+
+  /// Whether the software keyboard is currently shown.
+  Future<bool> isKeyboardShown();
+
+  /// Hides the software keyboard; returns false when it was not shown.
+  Future<bool> hideKeyboard();
 
   /// Swipes from ([startX], [startY]) to ([endX], [endY]) in screenshot
   /// pixels over [durationMs] milliseconds.
