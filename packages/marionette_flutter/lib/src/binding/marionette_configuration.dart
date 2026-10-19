@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/services/log_collector.dart';
 
@@ -289,6 +290,9 @@ class MarionetteConfiguration {
     return switch (widget) {
       Checkbox() ||
       CheckboxListTile() ||
+      CupertinoCheckbox() ||
+      CupertinoRadio() ||
+      CupertinoSwitch() ||
       DropdownButton() ||
       DropdownButtonFormField() ||
       FloatingActionButton() ||
@@ -340,6 +344,9 @@ class MarionetteConfiguration {
   static bool _isBuiltInInteractiveType(Type type) {
     return type == Checkbox ||
         type == CheckboxListTile ||
+        type == CupertinoCheckbox ||
+        type == CupertinoRadio ||
+        type == CupertinoSwitch ||
         type == DropdownButton ||
         type == DropdownButtonFormField ||
         type == ElevatedButton ||
