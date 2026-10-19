@@ -281,6 +281,23 @@ void main() {
       expect(reconnects, 1);
     });
 
+    test('an operation that fails after dispose does not reconnect', () async {
+      final release = Completer<void>();
+      final inner = _BlockingConnector(release.future);
+      final connector = wrap(inner);
+
+      final pending = connector.getNativeElements();
+      await connector.dispose();
+      release.complete();
+
+      await expectLater(pending, throwsA(isA<NativeNotConnectedException>()));
+      expect(reconnects, 0, reason: 'no new session after dispose');
+      await expectLater(
+        connector.getNativeElements(),
+        throwsA(isA<NativeNotConnectedException>()),
+      );
+    });
+
     test('dispose disposes the current connector', () async {
       final inner = FakeNativeConnector();
       final connector = wrap(inner);
@@ -294,4 +311,20 @@ void main() {
       );
     });
   });
+}
+
+/// Its read waits for [release], then fails like a closed HTTP client.
+class _BlockingConnector extends FakeNativeConnector {
+  _BlockingConnector(this.release);
+
+  final Future<void> release;
+
+  @override
+  Future<List<NativeElement>> getNativeElements() async {
+    await release;
+    throw const WebDriverException(
+      'Connection closed before full header was received',
+      error: webDriverConnectionLost,
+    );
+  }
 }

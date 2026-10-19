@@ -23,7 +23,7 @@ Screenshots: take_screenshots and native_take_screenshot always return base64 in
 
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 
-Native lane: Prefer Flutter tools for in-app widgets. Use native_connect / native_get_elements / native_tap / native_scroll / native_enter_text / native_take_screenshot only when the target is absent from the Flutter tree or a system dialog/permission UI covers the app. Use native_take_screenshot (not take_screenshots) to visually capture those system surfaces before dismissing them. Native coordinates (x/y, startX/startY, bounds) are screenshot pixels — the pixel grid of native_take_screenshot — on every platform; never mix them with Flutter logical coordinates. Native tools take a selector (text, textContains, id, type, index); if it matches several elements they fail and list the candidates, so pass index or a more specific selector. The software keyboard can cover parts of the app (e.g. a bottom navigation bar): call native_hide_keyboard after typing when you need them. To type into a field that is focused but not visible to native_get_elements (Flutter fields on Android), use native_enter_text without a selector. Use native_wait_for instead of fixed delays when a system dialog or delayed content is expected. native_get_elements reports a text field's label as text and its typed content as value. To find an item in a nested list, use native_scroll with within (the list's selector) and a target selector; it stops when the end of the list is reached. Gestures: native_long_press, native_double_tap, native_pinch, native_swipe. Device shortcuts work without tapping system UI: native_permissions (grant/revoke/reset a permission instead of answering a dialog), native_app (activate brings the app back after a share sheet, browser or Settings), native_open_url (deep links), native_notifications, native_device_info, native_set_orientation. They act on the app under test by default; revoking a permission or terminating the app ends the Flutter connection — reconnect afterwards. Use native_permissions to set up a permission state when the dialog is not what you are testing; when the dialog itself is under test, reset the permission with native_permissions first, then answer the dialog with native_wait_for + native_tap.
+Native lane: Prefer Flutter tools for in-app widgets. Use native_connect / native_get_elements / native_tap / native_scroll / native_enter_text / native_take_screenshot only when the target is absent from the Flutter tree or a system dialog/permission UI covers the app. Use native_take_screenshot (not take_screenshots) to visually capture those system surfaces before dismissing them. Native coordinates (x/y, startX/startY, bounds) are screenshot pixels — the pixel grid of native_take_screenshot — on every platform; never mix them with Flutter logical coordinates. Native tools take a selector (text, textContains, id, type, index); if it matches several elements they fail and list the candidates, so pass index or a more specific selector. The software keyboard can cover parts of the app (e.g. a bottom navigation bar): call native_hide_keyboard after typing when you need them. To type into a field that is focused but not visible to native_get_elements (Flutter fields on Android), use native_enter_text without a selector. Use native_wait_for instead of fixed delays when a system dialog or delayed content is expected. native_get_elements reports a text field's label as text and its typed content as value. To find an item in a nested list, use native_scroll with within (the list's selector) and a target selector; it stops when the end of the list is reached. Gestures: native_long_press, native_double_tap, native_pinch, native_swipe. Device shortcuts work without tapping system UI: native_permissions (grant/revoke/reset a permission instead of answering a dialog), native_app (activate brings the app back after a share sheet, browser or Settings), native_open_url (deep links), native_notifications, native_device_info, native_set_orientation. They act on the app under test by default; revoking a permission or terminating the app ends the Flutter connection — reconnect afterwards. Use native_permissions to set up a permission state when the dialog is not what you are testing; when the dialog itself is under test, reset the permission with native_permissions first, then answer the dialog with native_wait_for + native_tap. For a platform view that neither tree shows (camera preview, map, video), take the bounds of a nearby Flutter element from get_interactive_elements and convert them with native_map_flutter_rect before a native gesture — never reuse Flutter coordinates directly. Web content of a WebView is visible only to the native lane.
 ''';
 
 /// Runs the Marionette MCP server with the given configuration.
@@ -38,7 +38,9 @@ Future<int> runMcpServer({
   setupLogging(logLevel, logFile);
 
   final vmService = VmServiceContext();
-  final native = NativeServiceContext();
+  final native = NativeServiceContext(
+    flutterViewMetrics: vmService.connector.getViewMetrics,
+  );
 
   final server = McpServer(
     const Implementation(name: 'marionette-mcp', version: version),
@@ -57,10 +59,18 @@ Future<int> runMcpServer({
   vmService.registerTools(server);
   native.registerTools(server);
 
+  // Both lanes hold connections that keep the process alive: a native
+  // session and the VM service WebSocket (without disconnecting it the
+  // server never exits on stdin EOF while an app is connected).
+  Future<void> disposeLanes() async {
+    await native.dispose();
+    await vmService.connector.disconnect();
+  }
+
   if (ssePort != null) {
-    return _runSseServer(server, ssePort, native);
+    return _runSseServer(server, ssePort, disposeLanes);
   } else {
-    return _runStdioServer(server, native);
+    return _runStdioServer(server, disposeLanes);
   }
 }
 
@@ -96,7 +106,9 @@ String _formatTime(DateTime time) {
 }
 
 Future<int> _runStdioServer(
-    McpServer server, NativeServiceContext native) async {
+  McpServer server,
+  Future<void> Function() disposeLanes,
+) async {
   final logger = logging.Logger('main');
 
   final transport = StdioServerTransport();
@@ -120,7 +132,7 @@ Future<int> _runStdioServer(
   } catch (e, st) {
     logger.severe('Error when starting the Stdio transport', e, st);
     exitSignal.dispose();
-    await native.dispose();
+    await disposeLanes();
     return 1;
   }
 
@@ -142,7 +154,7 @@ Future<int> _runStdioServer(
   // Release the signal subscriptions so the event loop can drain and the
   // process actually exits on the stdin-EOF path.
   exitSignal.dispose();
-  await native.dispose();
+  await disposeLanes();
   await server.close();
   await transport.close();
   logger.info('Stopped');
@@ -152,7 +164,7 @@ Future<int> _runStdioServer(
 Future<int> _runSseServer(
   McpServer server,
   int ssePort,
-  NativeServiceContext native,
+  Future<void> Function() disposeLanes,
 ) async {
   final logger = logging.Logger('main');
   final sseServerManager = SseServerManager(server);
@@ -179,7 +191,7 @@ Future<int> _runSseServer(
     logger.severe('Error when waiting for MCP client connection', e, st);
     return 1;
   } finally {
-    await native.dispose();
+    await disposeLanes();
   }
 
   logger.info('Stopped');

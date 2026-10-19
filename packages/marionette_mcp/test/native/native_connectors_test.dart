@@ -74,6 +74,22 @@ void main() {
       );
     });
 
+    test('lowers the UIAutomator2 idle wait for the session (D18)', () async {
+      server.onValue('POST', '/session/sess-1/appium/settings', null);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      expect(
+        server
+            .requestsTo('POST', '/session/sess-1/appium/settings')
+            .single
+            .body,
+        {
+          'settings': {'waitForIdleTimeout': 500},
+        },
+      );
+    });
+
     test('getNativeElements parses the page source', () async {
       server.onValue(
         'GET',

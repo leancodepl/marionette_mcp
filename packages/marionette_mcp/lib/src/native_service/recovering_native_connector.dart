@@ -52,6 +52,11 @@ final class RecoveringNativeConnector implements NativeConnector {
   /// In-flight re-establish shared by concurrent callers.
   Future<NativeConnector>? _reconnecting;
 
+  /// Set by [dispose]: an operation still running then (e.g. a read that a
+  /// tool stopped waiting for) fails with the closed connection, and that
+  /// must not start a new session (docs/native-lane-decisions.md#d3).
+  bool _disposed = false;
+
   @override
   Future<List<NativeElement>> getNativeElements() =>
       _read((c) => c.getNativeElements());
@@ -164,6 +169,7 @@ final class RecoveringNativeConnector implements NativeConnector {
 
   @override
   Future<void> dispose() async {
+    _disposed = true;
     final inner = _inner;
     _inner = null;
     _reconnectPending = false;
@@ -194,6 +200,7 @@ final class RecoveringNativeConnector implements NativeConnector {
     } on WebDriverException catch (error) {
       final loss = _sessionLossOf(error);
       if (loss == null) rethrow;
+      if (_disposed) throw const NativeNotConnectedException();
 
       if (!isRead && loss == _SessionLoss.connectionLost) {
         _reconnectPending = true;
@@ -222,6 +229,7 @@ final class RecoveringNativeConnector implements NativeConnector {
   }
 
   Future<NativeConnector> _ready() async {
+    if (_disposed) throw const NativeNotConnectedException();
     final inner = _inner;
     if (_reconnectPending) return _replace(inner);
     final reconnecting = _reconnecting;

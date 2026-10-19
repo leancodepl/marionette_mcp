@@ -701,6 +701,7 @@ Future<CallToolResult> handleNativeScroll(
       );
     }
 
+    var unchangedSwipes = 0;
     for (var swipes = 0;; swipes++) {
       if (elements.any((e) => e.isVisible && target.matches(e))) {
         return CallToolResult(
@@ -724,7 +725,9 @@ Future<CallToolResult> handleNativeScroll(
       final before = _contentSignature(elements, area);
       await swipeOnce();
       elements = await _settledElements(connector, area);
-      if (_contentSignature(elements, area) == before) {
+      unchangedSwipes =
+          _contentSignature(elements, area) == before ? unchangedSwipes + 1 : 0;
+      if (unchangedSwipes == _endOfContentSwipes) {
         throw NativeElementNotFoundException(
           '${target.describe()}: reached the end of the content after '
           '${swipes + 1} swipe(s) ${direction.wireName} $inArea',
@@ -735,6 +738,12 @@ Future<CallToolResult> handleNativeScroll(
     }
   });
 }
+
+/// Consecutive swipes without a visible change that mean the end of the
+/// content. One is not enough: while a swipe crosses a large uniform area
+/// (an empty block, a big image, a WebView spacer) the tree looks the same
+/// although the content moved (docs/native-lane-decisions.md#d16).
+const _endOfContentSwipes = 2;
 
 /// Most UI-tree reads spent waiting for a fling to stop after a swipe.
 const _maxSettleReads = 6;

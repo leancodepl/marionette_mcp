@@ -15,10 +15,12 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D10](#d10) | UIAutomator2 local port and server reuse | Accepted |
 | [D11](#d11) | Starting and activating apps | Accepted |
 | [D12](#d12) | Device operations outside WebDriver | Accepted |
+| [D13](#d13) | Bridge from Flutter coordinates to the native lane | Accepted |
 | [D14](#d14) | Software keyboard and key presses | Accepted |
 | [D15](#d15) | Element state and the label / content of text fields | Accepted |
 | [D16](#d16) | Scrolling to an element and waiting for one | Accepted |
 | [D17](#d17) | Changing permissions without the system dialog | Accepted |
+| [D18](#d18) | UIAutomator2 idle wait | Accepted |
 
 ---
 
@@ -165,6 +167,12 @@ Most losses happen between calls (the server died while the agent was thinking),
 - iOS Simulator 26.4: WebDriverAgent terminated with `simctl terminate` during a session — the next read (≈ 3.4 s) and the next tap (≈ 3.7 s) both succeeded after an automatic restart of WebDriverAgent; no `xcodebuild` process was left after `native_disconnect`.
 - Android emulator (API 35): UIAutomator2 force-stopped during a session — the next read succeeded after an automatic restart (≈ 1.8 s). Without the pre-action probe, the next *action* failed with "may or may not have been performed", because behind `adb forward` a dead server surfaces as `connection lost` (after sending), never as `server unreachable`. This led to adding the probe; with it, a tap after UIAutomator2 was force-stopped succeeded after an automatic restart (≈ 3.1 s), and a tap on a healthy server took ≈ 0.16 s, as before. Same on API 28: read after force-stop ≈ 1.8 s, tap after force-stop ≈ 1.8 s with exactly one re-establish in the log; the first page source from a freshly restarted server took ≈ 1.4 s (server warm-up, not a reconnect), the next ≈ 70 ms.
 - During verification the first implementation treated "connection refused" as "action may have happened"; since a refused connection means the request was never sent, the unreachable case was split out and made retryable (the version described above).
+
+---
+
+### Follow-up (unit 7, 2026-10-19)
+
+An operation still running when the connector was disposed — a read that `native_wait_for` had stopped waiting for — failed with "connection closed" once shutdown closed the HTTP client. The decorator took that for a lost session and **started a new one after `dispose()`**, launching UIAutomator2's instrumentation again and keeping the MCP server process alive after stdin EOF. A disposed decorator now never re-establishes: such failures, and later calls, end with `NativeNotConnectedException`. Verified: the same sequence now exits immediately; unit test for a failure arriving after dispose.
 
 ---
 
@@ -408,6 +416,46 @@ Separation of concerns, simple fakes (`FakeNativeDevice`), and the same device o
 
 ---
 
+<a id="d13"></a>
+
+## D13 — Bridge from Flutter coordinates to the native lane
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_map_flutter_rect`; `marionette.getViewMetrics` in `marionette_flutter`; `VmServiceConnector.getViewMetrics`, `NativeServiceContext.flutterViewMetrics`.
+
+### Context and dilemma
+
+Some targets are invisible to both trees — a camera preview, a map without accessibility, a video surface — but the widgets around them (or hosting them) are known to the Flutter lane. The Flutter lane reports logical pixels of the Flutter view, the native lane screenshot pixels of the device ([D2](#d2)); mixing them by hand is the classic agent mistake (a 2.75× or 3× error). Converting needs the view's pixel ratio and its position on screen, which no single lane knows.
+
+### Options considered
+
+1. Let the agent multiply by a ratio it reads somewhere.
+2. Derive the ratio natively (Android `wm density`, iOS display scale) and assume the view starts at (0, 0).
+3. A dedicated tool combining both lanes: the Flutter view's logical size from a new extension, its position and size on screen from the native tree.
+
+### Decision
+
+Option 3. `marionette.getViewMetrics` returns the implicit view's `devicePixelRatio`, physical size, logical size and padding. `native_map_flutter_rect` (`x`, `y`, optional `width`/`height` in Flutter logical pixels) finds the Flutter view in the native tree — Android: the app's `android:id/content` container (the FlutterView fills it and reports itself only as a `FrameLayout`; the largest one wins so a dialog's own content does not), iOS: the application element — and maps with scale = native view size ÷ logical view size plus the view's offset. It returns `rect`, `center`, `scale` and the view it used. Notes are added when the view is not found (then it assumes (0, 0)), when the native size differs from Flutter's physical size by more than 4 px, or when the center falls outside the screen. The tool is read-only and needs both `connect` and `native_connect`.
+
+### Rationale
+
+One tested conversion instead of arithmetic in the agent's head; the scale comes from the actual on-screen view, so it also holds if the two lanes disagree about density, and the size check catches split-screen or embedded views.
+
+### Consequences
+
+- The Flutter lane must be connected; the binding version check already guarantees the extension exists.
+- Only the implicit (first) Flutter view is supported — enough for apps without multi-view.
+- The tool converts coordinates; finding the target is still up to the agent (e.g. the area between two known widgets around a camera preview).
+
+### Verification
+
+- Android API 35 (scale 3.0, view 1280×2856 at (0, 0)) and iOS 26.4 (scale 3.0, view 1320×2868): the Flutter `Text` "Double tap here" mapped to centers (640, 1896) and (660, 1986) — exactly the centers of the same widget's native nodes (48 + 1184/2, 1752 + 288/2 and 48 + 1224/2, 1842 + 288/2); a native double tap at the mapped point incremented the counter, read back through the Flutter lane.
+- Android API 28 with a 3-button navigation bar (Flutter view 1080×2028 at (0, 0) on a 1080×2160 screen, scale 2.75): the mapped "Double tap here" text starts at y = 1661 px and its container at 1584 px, as in the native tree (whose node is clipped by the tab bar); the "Settings" tab label maps to x = 945, the native button's center. A native double tap and a native tap at the mapped points incremented the counter and switched to the Settings tab.
+- Camera preview on the Android emulator renders (screenshot) but is in neither tree, which is the case this tool exists for.
+- Unit tests: the mapping (scale and offset), view detection on both platforms, missing / mismatched view and off-screen notes, missing Flutter lane; `viewMetricsOf` in `marionette_flutter`.
+
+---
+
 <a id="d14"></a>
 
 ## D14 — Software keyboard and key presses
@@ -554,6 +602,13 @@ Correctness first: a search that silently skips its target, or a "found" that ca
 - Off-screen check: on iOS "Show message in 2 s" is listed at (0, 0, 0×0) before scrolling; it is now found only after a swipe.
 - Unit tests cover zero-size matches, settling, the slow held drag, end detection (whole screen and container only), the 60% / 80% shares, `maxSwipes`, `within` validation, and every `native_wait_for` path.
 
+### Follow-up (unit 7, 2026-10-19)
+
+- **iOS off-screen elements with real coordinates.** WebDriverAgent lists a WebView's whole page, e.g. "Section 2" at y = 4851 px on a 2868 px screen; the zero-size rule did not catch it, so a search would have reported it as found. `parseWdaSource` now keeps only elements that overlap the application element (the screen) and clips partly visible ones to it — as UIAutomator does — so the center is always on screen. A clipped element no longer matches WDA's geometry XPath, so lookups for typing / element screenshots fall back to id or label for it. An element covered by another one (a photo under the picker's toolbar) is still considered visible: the tree does not say what is on top.
+- **End of content needs two unchanged swipes.** In a WebView page with a 900 px empty block, one swipe inside the block left the visible tree identical (only the block, clipped to the viewport) although the page moved, and the search stopped with "reached the end". The end is now reported after two consecutive swipes without a visible change; a real end costs one extra swipe (verified on Android and iOS: the search crosses the block, a missing target still stops at the end).
+- **`native_wait_for` honours `timeoutMs`.** The loop checked the deadline only between reads, so one slow read could stretch the wait: a read takes up to 10 s on an Android screen that never goes idle without [D18](#d18), and 3–4 s next to iOS system pickers. Each read is now limited to the remaining time; if no read finished at all the error says so, otherwise it is the regular "not found within …". (An 8 s wait that once returned after 259 s was the Mac going to sleep — macOS power log: idle sleep 19:14:45–19:19:05 — not the device; nothing in the tool can prevent that.)
+- **Sheets.** On iOS a downward swipe (`native_scroll direction=down`) while a sheet's content is already at its top dismisses the whole sheet (seen in the photo picker) — a native gesture, not a bug; inside sheets, search in the direction of unseen content.
+
 ---
 
 <a id="d17"></a>
@@ -606,4 +661,47 @@ Option (c) is the only per-app reset that keeps app data. Detecting termination 
 - iOS 26.4 (iPhone 17 Pro Max), Device & permissions screen: `reset all` → every group "denied" and "Request contacts" shows the dialog again; `grant all` (service by service) → camera, microphone, location, contacts, calendar "granted"; `grant photos` → unsupported (a "Request photos" tap after `simctl privacy grant photos` still showed "Limit Access… / Allow Full Access / Don't Allow"); `revoke camera` → "permanentlyDenied". Before the per-service change, `grant all` granted location only.
 - Android API 35, Device & permissions screen: `grant all` → camera, microphone, photos, location, contacts, calendar "granted" ("photos (storage)" stays denied: `READ_EXTERNAL_STORAGE` is declared up to API 32 only); `reset all` → all "denied", "Request location" shows the dialog again.
 - Unit tests: mapping per API level, declared-permission filtering, reset with and without flag clearing, never `reset-permissions`, typed failures, termination reporting.
+
+---
+
+<a id="d18"></a>
+
+## D18 — UIAutomator2 idle wait
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `AndroidNativeConnector.connect` (`waitForIdleTimeout` setting), every Android read and action.
+
+### Context and dilemma
+
+Before each tree read and action, UIAutomator2 waits until the UI has been idle, for at most `waitForIdleTimeout` — 10 000 ms by default. On a screen with continuous animation (a playing video, a map, a picker loading thumbnails) the UI is never idle, so **every** read took the full 10 s; one `native_get_elements` on the video screen took 10.1 s, and a search or wait doing several reads took a minute or more. Lowering the wait risks reading the tree in the middle of a screen transition. (A 259 s `native_wait_for` seen while investigating was the host Mac sleeping, not this setting — see the [D16](#d16) follow-up.)
+
+### Options considered
+
+Measured on the video player screen (Android API 35, video playing), three reads each:
+
+| `waitForIdleTimeout` | Read time |
+| --- | --- |
+| 10 000 ms (default) | 10 121, 10 074, 10 084 ms |
+| 1 000 ms | 1 083, 1 093, 1 104 ms |
+| 0 ms | 16, 15, 13 ms |
+
+### Decision
+
+Set `waitForIdleTimeout` to **500 ms** right after the session is created (`POST /session/{id}/appium/settings`). Failing to set it is logged and does not fail the connect.
+
+### Rationale
+
+On static screens the setting changes nothing — the wait ends as soon as the UI is idle. 500 ms still waits out ordinary transitions (~300 ms), so a read right after navigation sees the new screen; 0 would read mid-animation. Scroll searches compare consecutive reads ([D16](#d16)), so they tolerate a shorter wait.
+
+### Consequences
+
+- On continuously animating screens each read costs ~0.5 s instead of 10 s.
+- A transition longer than 500 ms can be read mid-way; tools that act on a target found that way may need `native_wait_for` first.
+- The value is set again for every session, including one re-established by [D3](#d3). Whether UIAutomator2 keeps it after the session ends is **unverified**; if settings live in the server process, a later session of another tool on the same reused server ([D10](#d10)) would inherit 500 ms until the server restarts.
+
+### Verification
+
+- After the change, reads on the playing video screen take ~0.55–0.6 s through the MCP server; `native_wait_for` there finds an element in 0.6 s.
+- Re-measured later on API 35 after ruling out the host sleeping: playing video — 10 046 / 8 982 / 10 115 ms with the default, 576 / 602 / 609 ms with 500 ms; a static screen — 22 / 18 / 21 ms vs 15 / 16 / 14 ms (no difference).
+- Unit test: the session posts `{"settings": {"waitForIdleTimeout": 500}}`.
 

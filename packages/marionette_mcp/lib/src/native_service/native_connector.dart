@@ -3,6 +3,8 @@
 /// implementations.
 library;
 
+import 'dart:math' show max, min;
+
 import 'package:marionette_mcp/src/native_service/native_device.dart';
 import 'package:marionette_mcp/src/native_service/native_key.dart';
 
@@ -152,21 +154,23 @@ class NativeElement {
 
   /// This element with [bounds] multiplied by [factor] (see
   /// [NativeBounds.scaled]).
-  NativeElement scaled(double factor) => factor == 1
-      ? this
-      : NativeElement(
-          className: className,
-          clickable: clickable,
-          bounds: bounds.scaled(factor),
-          text: text,
-          resourceId: resourceId,
-          value: value,
-          enabled: enabled,
-          focused: focused,
-          checked: checked,
-          selected: selected,
-          scrollable: scrollable,
-        );
+  NativeElement scaled(double factor) =>
+      factor == 1 ? this : withBounds(bounds.scaled(factor));
+
+  /// This element with [newBounds].
+  NativeElement withBounds(NativeBounds newBounds) => NativeElement(
+        className: className,
+        clickable: clickable,
+        bounds: newBounds,
+        text: text,
+        resourceId: resourceId,
+        value: value,
+        enabled: enabled,
+        focused: focused,
+        checked: checked,
+        selected: selected,
+        scrollable: scrollable,
+      );
 
   /// Whether the element occupies screen space. Flutter on iOS keeps
   /// off-screen semantics nodes in the tree with zero-size bounds at (0, 0);
@@ -627,7 +631,7 @@ List<NativeElement> parseWdaSource(String xml) {
         _wdaScrollableTypes.contains(tag.substring(_wdaTypePrefix.length));
   });
 
-  return nodes.map((attributes) {
+  final elements = nodes.map((attributes) {
     final name = attributes['name'] ?? '';
     final tag = attributes[uiNodeTagKey]!;
     final type = tag.startsWith(_wdaTypePrefix)
@@ -661,6 +665,25 @@ List<NativeElement> parseWdaSource(String xml) {
       scrollable: _wdaScrollableTypes.contains(type),
     );
   }).toList();
+
+  // WebDriverAgent also lists elements scrolled out of view — a WebView's
+  // whole page with real coordinates below the screen, Flutter's off-screen
+  // nodes as 0×0 at (0, 0) — and reports full bounds of partly visible
+  // ones. Keep what overlaps the application (the screen) and clip it to
+  // the screen, as UIAutomator does, so the center is always a tappable
+  // point (docs/native-lane-decisions.md#d16).
+  final screen = elements
+      .where((e) => e.className == 'XCUIElementTypeApplication')
+      .map((e) => e.bounds)
+      .firstOrNull;
+  if (screen == null) return elements;
+  return [
+    for (final element in elements)
+      if (element.className == 'XCUIElementTypeApplication')
+        element
+      else if (_overlaps(element.bounds, screen))
+        element.withBounds(_clip(element.bounds, screen)),
+  ];
 }
 
 /// WDA emits integer coordinates, but tolerate decimal strings too.
@@ -668,3 +691,24 @@ int _parseWdaInt(String? value) {
   if (value == null) return 0;
   return int.tryParse(value) ?? double.tryParse(value)?.round() ?? 0;
 }
+
+/// The part of [a] inside [b] (assumes they overlap).
+NativeBounds _clip(NativeBounds a, NativeBounds b) {
+  final left = max(a.x, b.x);
+  final top = max(a.y, b.y);
+  final right = min(a.x + a.width, b.x + b.width);
+  final bottom = min(a.y + a.height, b.y + b.height);
+  return NativeBounds(
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  );
+}
+
+/// Whether [a] and [b] share a non-empty area.
+bool _overlaps(NativeBounds a, NativeBounds b) =>
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y < b.y + b.height &&
+    b.y < a.y + a.height;

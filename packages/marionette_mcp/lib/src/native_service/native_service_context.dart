@@ -4,6 +4,7 @@ import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/recovering_native_connector.dart';
+import 'package:marionette_mcp/src/native_service/tools/bridge_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/connection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/device_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
@@ -60,9 +61,16 @@ Future<NativeConnector> _connectPlatform(
 final class NativeServiceContext {
   NativeServiceContext({
     NativeConnectorFactory? connectorFactory,
+    this.flutterViewMetrics,
     logging.Logger? logger,
   })  : _connectorFactory = connectorFactory ?? _connectPlatform,
         logger = logger ?? logging.Logger('NativeServiceContext');
+
+  /// Reads the Flutter view metrics from the Flutter lane
+  /// (`marionette.getViewMetrics`), for tools that bridge both lanes
+  /// (docs/native-lane-decisions.md#d13). Null when the Flutter lane is not
+  /// available in this server.
+  final Future<Map<String, dynamic>> Function()? flutterViewMetrics;
 
   final NativeConnectorFactory _connectorFactory;
 
@@ -128,6 +136,7 @@ final class NativeServiceContext {
     registerNativeKeyboardTools(server, this);
     registerNativeScreenshotTools(server, this);
     registerNativeDeviceTools(server, this);
+    registerNativeBridgeTools(server, this);
   }
 
   /// Replaces any active session with a new one for [platform].

@@ -229,6 +229,19 @@ class WebDriverClient {
     );
   }
 
+  /// Updates UIAutomator2 server settings (`POST .../appium/settings`),
+  /// e.g. `waitForIdleTimeout`.
+  Future<void> uia2UpdateSettings(
+    String sessionId,
+    Map<String, Object> settings,
+  ) async {
+    await _request(
+      'POST',
+      '/session/$sessionId/appium/settings',
+      body: {'settings': settings},
+    );
+  }
+
   /// Presses an Android key by [keycode] (`KeyEvent.KEYCODE_*`) through
   /// UIAutomator2's `appium/device/press_keycode`.
   Future<void> uia2PressKeycode(String sessionId, int keycode) async {

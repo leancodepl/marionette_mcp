@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Marionette WebView form</title>
+  <style>
+    body { font-family: -apple-system, Roboto, sans-serif; margin: 16px; }
+    label { display: block; margin-top: 12px; }
+    input[type=text], input[type=password], select { width: 100%; font-size: 16px; padding: 8px; box-sizing: border-box; }
+    button { margin-top: 16px; font-size: 16px; padding: 10px 20px; }
+    #result { margin-top: 16px; font-weight: bold; }
+    #spacer { height: 900px; }
+  </style>
+</head>
+<body>
+  <h1>WebView form</h1>
+  <p>Local page for native-lane checks (§2): fields, checkbox, select, button, link.</p>
+  <form id="form" onsubmit="submitForm(); return false;">
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" placeholder="Your name" aria-label="Name">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" placeholder="Password" aria-label="Password">
+    <label><input id="terms" type="checkbox" aria-label="Accept terms"> Accept terms</label>
+    <label for="color">Color</label>
+    <select id="color" aria-label="Color">
+      <option>Red</option>
+      <option>Green</option>
+      <option>Blue</option>
+    </select>
+    <button id="submit" type="submit">Submit form</button>
+  </form>
+  <p id="result" role="status">Result: none</p>
+  <p><a id="link" href="#section-2" onclick="linkTapped()">Jump to section 2</a></p>
+  <div id="spacer"></div>
+  <h2 id="section-2">Section 2</h2>
+  <p>Bottom of the page.</p>
+  <script>
+    function submitForm() {
+      var name = document.getElementById('name').value;
+      var terms = document.getElementById('terms').checked;
+      var color = document.getElementById('color').value;
+      var password = document.getElementById('password').value.length;
+      document.getElementById('result').textContent =
+        'Result: name=' + name + ', terms=' + terms + ', color=' + color +
+        ', password length=' + password;
+    }
+    function linkTapped() {
+      document.getElementById('result').textContent = 'Result: link tapped';
+    }
+  </script>
+</body>
+</html>

@@ -9,8 +9,8 @@ A multi-page Flutter app demonstrating **`call_custom_extension`** with Marionet
 | `/` | Home | Welcome screen |
 | `/profile` | Profile | User profile |
 | `/testing` | Testing | Native-lane test cases hub |
-| `/testing/webview` | WebView | Embedded browser (§2) |
-| `/testing/platform-views` | Platform views | Native controls, camera, Google Maps, video (§1) |
+| `/testing/webview` | WebView | Local HTML form (default, no network) or the marionette_mcp website (§2) |
+| `/testing/platform-views` | Platform views | Native controls, camera, Google Maps (needs an API key), video (§1) |
 | `/testing/permission-dialogs` | Permission dialogs | OS permission prompts (§3) |
 | `/testing/pickers-and-sheets` | Pickers & sheets | File, photo, camera, share (§4) |
 | `/testing/keyboard` | Keyboard / IME | Numeric, return, done keyboards (§8) |
@@ -65,6 +65,10 @@ opens Device & permissions, which shows the query (`from=link`). On iOS the syst
 ## Permissions on iOS
 
 The app declares camera, photos, microphone, location (when in use), contacts and calendar. The project builds plugins with Swift Package Manager, where `permission_handler_apple` enables a permission only when its usage-description key is in `ios/Runner/Info.plist` (the `PERMISSION_*` macros in `ios/Podfile` apply to CocoaPods builds only). After adding or removing such a key, delete `~/Library/Developer/Xcode/DerivedData/Runner-*` before building — otherwise the permission stays "denied" and no dialog appears.
+
+## Google Maps key
+
+The map screen needs a Maps API key: `google.maps.api.key=…` in `android/local.properties` and `GOOGLE_MAPS_API_KEY` in `ios/Runner/Info.plist` (do not commit a real key). Without one the map stays blank, shows no marker and reports no camera changes.
 
 ## Running
 

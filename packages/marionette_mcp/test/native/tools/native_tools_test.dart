@@ -478,7 +478,29 @@ void main() {
       );
 
       expect(result, _isToolError(contains('reached the end')));
-      expect(connector.swipes, hasLength(2));
+      // One swipe that moves, then two without a visible change.
+      expect(connector.swipes, hasLength(3));
+    });
+
+    test('one unchanged swipe (a uniform area) does not end the search',
+        () async {
+      // Screen 1 and 2 look the same (a blank block fills the viewport),
+      // screen 3 shows the target.
+      final blank = nativeElement(text: 'spacer');
+      final connector = FakeNativeConnector(
+        screens: [
+          [blank],
+          [blank],
+          [nativeElement(text: 'Target')],
+        ],
+      );
+
+      final result = await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'up', 'text': 'Target'},
+      );
+
+      expect(result, _isToolSuccess(contains('after 2 swipe(s)')));
     });
 
     test('swipes inside the within container', () async {
@@ -537,11 +559,11 @@ void main() {
 
       expect(result, _isToolError(contains('reached the end')));
       // A search swipe covers 60% of the container, as a slow held drag.
-      expect(
-        connector.swipes.single,
-        (startX: 500, startY: 400, endX: 500, endY: 100),
-      );
-      expect(connector.swipeHolds.single, 300);
+      expect(connector.swipes, [
+        for (var i = 0; i < 2; i++)
+          (startX: 500, startY: 400, endX: 500, endY: 100),
+      ]);
+      expect(connector.swipeHolds, [300, 300]);
     });
 
     test('validates within and maxSwipes', () async {
@@ -800,6 +822,19 @@ void main() {
       expect(result, _isToolSuccess(contains('"state":"gone"')));
     });
 
+    test('a read slower than the timeout does not stretch the wait', () async {
+      final connector = _SlowConnector(const Duration(seconds: 2));
+
+      final stopwatch = Stopwatch()..start();
+      final result = await handleNativeWaitFor(
+        _contextWith(connector),
+        {'text': 'X', 'timeoutMs': 200},
+      );
+
+      expect(stopwatch.elapsedMilliseconds, lessThan(1500));
+      expect(result, _isToolError(contains('did not finish within 200ms')));
+    });
+
     test('times out with a hint', () async {
       final connector = FakeNativeConnector.single([nativeElement(text: 'A')]);
 
@@ -977,4 +1012,17 @@ void main() {
       expect(result, _isToolError(contains('No native element')));
     });
   });
+}
+
+/// A connector whose UI-tree reads take [delay].
+class _SlowConnector extends FakeNativeConnector {
+  _SlowConnector(this.delay);
+
+  final Duration delay;
+
+  @override
+  Future<List<NativeElement>> getNativeElements() async {
+    await Future<void>.delayed(delay);
+    return const [];
+  }
 }

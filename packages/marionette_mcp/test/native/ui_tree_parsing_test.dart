@@ -418,4 +418,20 @@ void _unitTests() {
       expect(json, containsPair('scrollable', true));
     });
   });
+
+  test('WDA: elements outside the application (screen) are dropped', () {
+    final elements = parseWdaSource('''
+<XCUIElementTypeApplication name="Counter" label="Counter" x="0" y="0" width="440" height="956">
+  <XCUIElementTypeStaticText label="On screen" x="16" y="900" width="100" height="40"/>
+  <XCUIElementTypeStaticText label="Partly visible" x="16" y="940" width="100" height="40"/>
+  <XCUIElementTypeStaticText label="Section 2" x="16" y="1617" width="106" height="30"/>
+  <XCUIElementTypeStaticText label="Flutter off-screen" x="0" y="0" width="0" height="0"/>
+</XCUIElementTypeApplication>''');
+
+    expect(elements.map((e) => e.text),
+        ['Counter', 'On screen', 'Partly visible']);
+    // Partly visible: clipped to the screen, so the center is on it.
+    expect(elements[2].bounds.toJson(),
+        {'x': 16, 'y': 940, 'width': 100, 'height': 16});
+  });
 }

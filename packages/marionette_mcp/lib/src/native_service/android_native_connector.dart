@@ -1,3 +1,4 @@
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/android_native_device.dart';
@@ -6,6 +7,8 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/xpath.dart';
+
+final _logger = logging.Logger('AndroidNativeConnector');
 
 /// Android implementation of [NativeConnector] backed by UIAutomator2.
 final class AndroidNativeConnector extends WebDriverNativeConnector {
@@ -28,18 +31,24 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   ///
   /// A [bootstrap] passed in is not disposed by this connector; the caller
   /// keeps ownership. [adb] defaults to a client for [serial].
+  /// How long UIAutomator2 waits for the UI to become idle before reading
+  /// the tree or acting. Its default (10 s) made every read on a screen with
+  /// continuous animation (video, map, loading thumbnails) take 10 s; 500 ms
+  /// still waits out ordinary transitions (docs/native-lane-decisions.md#d18).
+  static const waitForIdleTimeoutMs = 500;
+
   static Future<AndroidNativeConnector> connect({
     String? serial,
     NativeServerBootstrap? bootstrap,
     AdbClient? adb,
-  }) {
+  }) async {
     final ownsBootstrap = bootstrap == null;
     final ownedBootstrap =
         ownsBootstrap ? AndroidBootstrap(serial: serial) : null;
     final resolvedBootstrap = bootstrap ?? ownedBootstrap!;
     final resolvedAdb = adb ?? ownedBootstrap?.adb ?? AdbClient(serial: serial);
 
-    return WebDriverNativeConnector.openSession(
+    final connector = await WebDriverNativeConnector.openSession(
       bootstrap: resolvedBootstrap,
       ownsBootstrap: ownsBootstrap,
       capabilities: const {
@@ -54,6 +63,16 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
         adb: resolvedAdb,
       ),
     );
+    try {
+      await connector.client.uia2UpdateSettings(
+        connector.sessionId,
+        const {'waitForIdleTimeout': waitForIdleTimeoutMs},
+      );
+    } on WebDriverException catch (error) {
+      // A slower session is still a working one.
+      _logger.warning('Could not set waitForIdleTimeout: $error');
+    }
+    return connector;
   }
 
   @override

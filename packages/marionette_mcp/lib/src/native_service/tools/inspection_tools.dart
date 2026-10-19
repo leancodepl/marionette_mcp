@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
@@ -189,9 +190,48 @@ Future<CallToolResult> handleNativeWaitFor(
       '${state.name} (timeout ${timeoutMs}ms)');
   return runTool(logger, 'native wait for', () async {
     final connector = context.requireConnector();
+    // A system surface in front of the app is the usual reason an element
+    // never appears, so the error names the foreground app.
+    Future<Never> timedOut() async {
+      final foregroundApp = await connector.foregroundApp
+          .then<String?>((value) => value, onError: (Object _) => null);
+      final inApp = foregroundApp == null ? '' : ' in $foregroundApp';
+      throw switch (state) {
+        NativeWaitState.visible => NativeElementNotFoundException(
+            '${selector.describe()} within ${timeoutMs}ms$inApp',
+            hint: 'Call native_get_elements to see the current screen, or '
+                'raise timeoutMs if the element appears later.',
+          ),
+        NativeWaitState.gone => NativeOperationFailedException(
+            'Native element ${selector.describe()} is still visible after '
+            '${timeoutMs}ms.',
+            hint: 'Dismiss it (e.g. native_tap) or raise timeoutMs.',
+          ),
+      };
+    }
+
     final stopwatch = Stopwatch()..start();
+    var reads = 0;
     while (true) {
-      final elements = await connector.getNativeElements();
+      // One read can be slow (a server waiting for an animating UI to go
+      // idle); never let it stretch the wait past timeoutMs.
+      final budget = timeoutMs - stopwatch.elapsedMilliseconds;
+      final List<NativeElement> elements;
+      try {
+        elements = await connector
+            .getNativeElements()
+            .timeout(Duration(milliseconds: budget > 0 ? budget : 1));
+      } on TimeoutException {
+        // Earlier reads worked: the element just did not change in time.
+        if (reads > 0) return timedOut();
+        throw NativeOperationFailedException(
+          'Reading the native UI tree did not finish within ${timeoutMs}ms, '
+          'so ${selector.describe()} could not be checked.',
+          hint: 'The screen may be animating continuously (video, map); '
+              'raise timeoutMs or check with native_take_screenshot.',
+        );
+      }
+      reads++;
       final match =
           elements.where((e) => e.isVisible && selector.matches(e)).firstOrNull;
       final done = switch (state) {
@@ -209,25 +249,7 @@ Future<CallToolResult> handleNativeWaitFor(
       }
 
       final remaining = timeoutMs - stopwatch.elapsedMilliseconds;
-      if (remaining <= 0) {
-        // A system surface in front of the app is the usual reason an
-        // element never appears.
-        final foregroundApp = await connector.foregroundApp
-            .then<String?>((value) => value, onError: (Object _) => null);
-        final inApp = foregroundApp == null ? '' : ' in $foregroundApp';
-        throw switch (state) {
-          NativeWaitState.visible => NativeElementNotFoundException(
-              '${selector.describe()} within ${timeoutMs}ms$inApp',
-              hint: 'Call native_get_elements to see the current screen, or '
-                  'raise timeoutMs if the element appears later.',
-            ),
-          NativeWaitState.gone => NativeOperationFailedException(
-              'Native element ${selector.describe()} is still visible after '
-              '${timeoutMs}ms.',
-              hint: 'Dismiss it (e.g. native_tap) or raise timeoutMs.',
-            ),
-        };
-      }
+      if (remaining <= 0) return timedOut();
       await Future<void>.delayed(
         Duration(milliseconds: remaining < intervalMs ? remaining : intervalMs),
       );
