@@ -14,6 +14,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _nameValue = '';
   String _emailValue = '';
   String _bioValue = '';
+  bool _acceptTerms = false;
+  // Tristate: null is the indeterminate "mixed" state.
+  bool? _newsletter;
   bool _isFormValid = false;
 
   void _recomputeFormState() {
@@ -114,6 +117,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 12),
             Text('bio_field onChanged: "$_bioValue"'),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              key: const ValueKey('terms_checkbox'),
+              title: const Text('Accept terms (CheckboxListTile)'),
+              value: _acceptTerms,
+              onChanged: (value) {
+                setState(() {
+                  _acceptTerms = value ?? false;
+                });
+              },
+            ),
+            Row(
+              children: [
+                Checkbox(
+                  key: const ValueKey('newsletter_checkbox'),
+                  tristate: true,
+                  value: _newsletter,
+                  onChanged: (value) {
+                    setState(() {
+                      _newsletter = value;
+                    });
+                  },
+                ),
+                const Text('Newsletter (tristate Checkbox)'),
+              ],
+            ),
             const SizedBox(height: 16),
             const TextField(
               key: ValueKey('readonly_field'),

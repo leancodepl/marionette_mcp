@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
@@ -143,11 +144,29 @@ class ElementTreeFinder {
     // carries a keyless text field's only human-readable handle (`text` holds
     // the entered value, empty for a blank field). Surface the label/hint so
     // such fields stay identifiable. TextFormField has no public `decoration`,
-    // so this only applies to TextField.
-    if (widget is TextField) {
-      final label = widget.decoration?.labelText ?? widget.decoration?.hintText;
-      if (label != null && label.isNotEmpty) {
-        data['label'] = label;
+    // so its label is read off the TextField it builds.
+    final label = _extractFieldLabel(element);
+    if (label != null) {
+      data['label'] = label;
+    }
+
+    // Unlike Switch, most toggles (Checkbox, Radio, the *ListTile variants, the
+    // Cupertino controls) declare none of their state as diagnostics, so
+    // without this a checked box looks like an empty one. Only an element that
+    // owns its toggle reports it: one that stops traversal (the toggle inside
+    // is not listed on its own) or a RadioListTile, the one built-in toggle
+    // tile that passes through. A GestureDetector or InkWell wrapping a row
+    // must not claim the state of the checkbox inside it.
+    if (isInteractive &&
+        (configuration.shouldStopAtElement(element) ||
+            widget is RadioListTile)) {
+      final toggle = _findToggleState(element);
+      if (toggle != null) {
+        // A tristate checkbox's indeterminate "mixed" state is a `null`
+        // value, reported as the string 'null' — neither checked nor
+        // unchecked. A radio's own `value` is the option it stands for, so
+        // whether it is the chosen one is reported as `selected`.
+        data[toggle.isRadio ? 'selected' : 'value'] = '${toggle.value}';
       }
     }
 
@@ -186,6 +205,55 @@ class ElementTreeFinder {
     }
 
     return data;
+  }
+
+  /// The label or hint of a `TextField`, or of the `TextField` a
+  /// `TextFormField` builds; null for anything else.
+  static String? _extractFieldLabel(Element element) {
+    final widget = element.widget;
+    TextField? field = widget is TextField ? widget : null;
+    if (field == null && widget is TextFormField) {
+      void visit(Element child) {
+        if (field != null) return;
+        final inner = child.widget;
+        if (inner is TextField) {
+          field = inner;
+          return;
+        }
+        child.visitChildren(visit);
+      }
+
+      element.visitChildren(visit);
+    }
+    final label = field?.decoration?.labelText ?? field?.decoration?.hintText;
+    return label == null || label.isEmpty ? null : label;
+  }
+
+  /// The state of the first toggle at or below [element], read off its
+  /// [ToggleableStateMixin] — the state every Material and Cupertino checkbox,
+  /// switch and radio is built on. For a radio its `value` already says
+  /// whether it is selected, whether the app uses a `RadioGroup` or the
+  /// deprecated `groupValue`; the widget alone cannot tell with a
+  /// `RadioGroup`, which Flutter 3.27 lacks. Null when there is no toggle.
+  static ({bool? value, bool isRadio})? _findToggleState(Element element) {
+    ({bool? value, bool isRadio})? found;
+    void visit(Element child, bool inRadio) {
+      if (found != null) return;
+      final inner = child.widget;
+      final isRadio = inRadio ||
+          inner is Radio ||
+          inner is RadioListTile ||
+          inner is CupertinoRadio;
+      if (child is StatefulElement && child.state is ToggleableStateMixin) {
+        final state = child.state as ToggleableStateMixin;
+        found = (value: state.value, isRadio: isRadio);
+        return;
+      }
+      child.visitChildren((grandchild) => visit(grandchild, isRadio));
+    }
+
+    visit(element, false);
+    return found;
   }
 
   /// Whether [value] is a primitive worth keeping in the property dump.
