@@ -22,7 +22,7 @@ A complete `main.dart` that wires all of these together is at the [bottom of thi
 
 With no configuration, Marionette recognizes the standard Flutter widgets.
 
-**Interactive (returned by `get_interactive_elements`, targetable by `tap`):** `Checkbox`, `CheckboxListTile`, `DropdownButton`, `DropdownButtonFormField`, `ElevatedButton`, `FilledButton`, `FloatingActionButton`, `GestureDetector`, `IconButton`, `InkWell`, `OutlinedButton`, `PopupMenuButton`, `Radio`, `RadioListTile`, `Slider`, `Switch`, `SwitchListTile`, `TextButton`, `TextField`, `TextFormField`, `ButtonStyleButton`.
+**Interactive (returned by `get_interactive_elements`, targetable by `tap`):** `Checkbox`, `CheckboxListTile`, `CupertinoCheckbox`, `CupertinoRadio`, `CupertinoSwitch`, `DropdownButton`, `DropdownButtonFormField`, `ElevatedButton`, `FilledButton`, `FloatingActionButton`, `GestureDetector`, `IconButton`, `InkWell`, `OutlinedButton`, `PopupMenuButton`, `Radio`, `RadioListTile`, `Slider`, `Switch`, `SwitchListTile`, `TextButton`, `TextField`, `TextFormField`, `ButtonStyleButton`.
 
 Generic widgets (`DropdownButton<String>`, `Radio<int>`, …) and subclasses (such as the button returned by `ElevatedButton.icon`, or your own `class MyButton extends ElevatedButton`) are recognized too.
 

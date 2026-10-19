@@ -1,6 +1,7 @@
 # Unreleased
 
-- Fix `get_interactive_elements` not reporting form state an agent needs to tell a filled form from an empty one: `Checkbox` and `CheckboxListTile` now report their `value` (`true`, `false`, or `null` for the tristate mixed state), a `TextField`/`TextFormField` built without a `controller` now reports the typed text, and a `TextFormField` reports the `label` of the `TextField` it builds. An app's own `extractText` still takes precedence for controller-less fields
+- Fix `get_interactive_elements` not reporting form state an agent needs to tell a filled form from an empty one: checkboxes and switches (`Checkbox`, `CheckboxListTile`, `SwitchListTile`, `CupertinoCheckbox`, `CupertinoSwitch`) now report their `value` (`true`, `false`, or `null` for the tristate mixed state), radios (`Radio`, `RadioListTile`, `CupertinoRadio`) report whether they are `selected`, with a `RadioGroup` too, a `TextField`/`TextFormField` built without a `controller` now reports the typed text, and a `TextFormField` reports the `label` of the `TextField` it builds. An app's own `extractText` still takes precedence for controller-less fields
+- `CupertinoCheckbox`, `CupertinoRadio` and `CupertinoSwitch` are recognized as interactive out of the box
 
 # 0.7.0
 
