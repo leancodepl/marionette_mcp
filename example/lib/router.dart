@@ -11,6 +11,7 @@ import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/testing/camera_platform_view_screen.dart';
+import 'screens/testing/gestures_screen.dart';
 import 'screens/testing/google_maps_platform_view_screen.dart';
 import 'screens/testing/native_controls_platform_view_screen.dart';
 import 'screens/testing/keyboard_screen.dart';
@@ -35,6 +36,7 @@ const availablePages = <String, String>{
   'permission_dialogs': '/testing/permission-dialogs',
   'pickers_and_sheets': '/testing/pickers-and-sheets',
   'keyboard': '/testing/keyboard',
+  'gestures': '/testing/gestures',
   'settings': '/settings',
   'items': '/settings/items',
   'about': '/settings/about',
@@ -74,8 +76,7 @@ final router = GoRouter(
                 ),
                 GoRoute(
                   path: 'camera',
-                  builder: (context, state) =>
-                      const CameraPlatformViewScreen(),
+                  builder: (context, state) => const CameraPlatformViewScreen(),
                 ),
                 GoRoute(
                   path: 'google-maps',
@@ -100,6 +101,10 @@ final router = GoRouter(
             GoRoute(
               path: 'keyboard',
               builder: (context, state) => const KeyboardScreen(),
+            ),
+            GoRoute(
+              path: 'gestures',
+              builder: (context, state) => const GesturesScreen(),
             ),
           ],
         ),

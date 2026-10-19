@@ -191,10 +191,9 @@ void main() {
     test('native controls with the keyboard open hide the tab bar', () {
       final controls = Fixture('android', 'android35_native_controls');
 
-      expect(
-        controls.select(const NativeSelector(type: 'EditText')).text,
-        'API 35',
-      );
+      // A filled field keeps its hint as text; the content is its value.
+      final field = controls.select(const NativeSelector(type: 'EditText'));
+      expect((field.text, field.value), ('Type here (native)', 'API 35'));
       expect(
         controls.elements.where((e) => e.text?.contains('Tab 3 of 4') ?? false),
         isEmpty,
@@ -306,6 +305,35 @@ void main() {
         greaterThan(keyboard.screen.height ~/ 2),
         reason: 'the keyboard is at the bottom of the screen',
       );
+    });
+  });
+
+  group('element state on captured trees (N-01)', () {
+    test('Android 9: the focused field, the selected tab, a scroll view', () {
+      final keyboard = Fixture('android', 'android28_keyboard');
+      final fields = keyboard.elements
+          .where((e) => e.className == 'android.widget.EditText')
+          .toList();
+
+      expect(fields.where((e) => e.focused == true), hasLength(1));
+      expect(fields.map((e) => e.value), everyElement(isNull),
+          reason: 'empty fields show their hint, not a value');
+      expect(keyboard.elements.where((e) => e.scrollable), isNotEmpty);
+
+      final home = Fixture('android', 'android28_home');
+      expect(home.elements.where((e) => e.selected), hasLength(1));
+    });
+
+    test('iOS 26: placeholder and tab state are not reported as value', () {
+      final keyboard = Fixture('ios', 'ios26_keyboard');
+
+      final field = keyboard.select(const NativeSelector(id: 'native_input'));
+      expect(field.value, isNull);
+      expect(field.text, 'Type here (native)');
+
+      final tab = keyboard.select(const NativeSelector(textContains: 'Tab 3'));
+      expect((tab.selected, tab.value), (true, null));
+      expect(keyboard.elements.map((e) => e.value), everyElement(isNull));
     });
   });
 }

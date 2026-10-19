@@ -26,6 +26,15 @@ const _noSuchElement = FakeResponse.error(
   return (x: move['x'] as int, y: move['y'] as int);
 }
 
+/// Pointer action lists of a W3C actions request, one per finger.
+List<List<Map<String, dynamic>>> _fingers(RecordedRequest request) => [
+      for (final source in request.body!['actions'] as List)
+        [
+          for (final action in (source as Map)['actions'] as List)
+            action as Map<String, dynamic>,
+        ],
+    ];
+
 void main() {
   late FakeWebDriverServer server;
   late FakeServerBootstrap bootstrap;
@@ -342,6 +351,98 @@ void main() {
       });
     });
 
+    group('gestures (N-06)', () {
+      setUp(() => server.onValue('POST', '/session/sess-1/actions', null));
+
+      test('longPress holds the finger down for the duration', () async {
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.longPress(100, 200, durationMs: 800);
+
+        final [finger] = _fingers(
+          server.requestsTo('POST', '/session/sess-1/actions').single,
+        );
+        expect(finger.map((a) => a['type']), [
+          'pointerMove',
+          'pointerDown',
+          'pause',
+          'pointerUp',
+        ]);
+        expect((finger[0]['x'], finger[0]['y']), (100, 200));
+        expect(finger[2]['duration'], 800);
+      });
+
+      test('doubleTap sends both taps in one request', () async {
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.doubleTap(10, 20, delayMs: 120);
+
+        final [finger] = _fingers(
+          server.requestsTo('POST', '/session/sess-1/actions').single,
+        );
+        expect(finger.where((a) => a['type'] == 'pointerDown'), hasLength(2));
+        expect(finger[4], {'type': 'pause', 'duration': 120});
+      });
+
+      test('pinch moves two fingers apart horizontally', () async {
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.pinch(
+          centerX: 500,
+          centerY: 1000,
+          startSpan: 200,
+          endSpan: 600,
+        );
+
+        final [left, right] = _fingers(
+          server.requestsTo('POST', '/session/sess-1/actions').single,
+        );
+        expect((left[0]['x'], right[0]['x']), (400, 600));
+        expect((left[2]['x'], right[2]['x']), (200, 800));
+        expect(left[2]['y'], 1000);
+      });
+    });
+
+    test('takeElementScreenshot finds the element by class and bounds',
+        () async {
+      server
+        ..onValue('POST', '/session/sess-1/element', {w3cElementKey: 'e-1'})
+        ..onValue('GET', '/session/sess-1/element/e-1/screenshot', 'png');
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      final png = await connector.takeElementScreenshot(
+        nativeElement(x: 10, y: 20, width: 100, height: 50),
+      );
+
+      expect(png, 'png');
+      expect(
+        server
+            .requestsTo('POST', '/session/sess-1/element')
+            .single
+            .body!['value'],
+        "//*[@class='android.widget.Button' and "
+        '@bounds="[10,20][110,70]"]',
+      );
+    });
+
+    test('takeElementScreenshot reports an element that is gone', () async {
+      server.on('POST', '/session/sess-1/element', (_) => _noSuchElement);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await expectLater(
+        connector.takeElementScreenshot(nativeElement(id: 'logo')),
+        throwsA(isA<NativeElementNotFoundException>()),
+      );
+      // Geometry first, then the resource id.
+      expect(
+          server.requestsTo('POST', '/session/sess-1/element'), hasLength(2));
+    });
+
     test('isServerResponding reflects /status', () async {
       final connector = await connect();
       addTearDown(connector.dispose);
@@ -467,6 +568,57 @@ void main() {
           as Map)['actions'] as List;
       expect((swipe.first as Map)['y'], 500);
       expect((swipe[2] as Map)['y'], 100);
+    });
+
+    test('gestures convert screenshot pixels to points', () async {
+      server.onValue('POST', '/session/sess-1/actions', null);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await connector.longPress(300, 600);
+      await connector.pinch(
+        centerX: 600,
+        centerY: 1200,
+        startSpan: 600,
+        endSpan: 300,
+      );
+
+      final [press, pinch] =
+          server.requestsTo('POST', '/session/sess-1/actions');
+      final [finger] = _fingers(press);
+      expect((finger[0]['x'], finger[0]['y']), (100, 200));
+      final [left, right] = _fingers(pinch);
+      expect((left[0]['x'], right[0]['x']), (100, 300));
+      expect((left[2]['x'], right[2]['x']), (150, 250));
+      expect(left[0]['y'], 400);
+    });
+
+    test('takeElementScreenshot finds the element by geometry in points',
+        () async {
+      server
+        ..onValue('POST', '/session/sess-1/element', {w3cElementKey: 'e-1'})
+        ..onValue('GET', '/session/sess-1/element/e-1/screenshot', 'png');
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await connector.takeElementScreenshot(
+        nativeElement(
+          type: 'XCUIElementTypeImage',
+          x: 30,
+          y: 60,
+          width: 300,
+          height: 150,
+        ),
+      );
+
+      expect(
+        server
+            .requestsTo('POST', '/session/sess-1/element')
+            .single
+            .body!['value'],
+        '//XCUIElementTypeImage[@x=10 and @y=20 and @width=100 and '
+        '@height=50]',
+      );
     });
 
     test('getScreen reports the screen in screenshot pixels', () async {
@@ -738,6 +890,45 @@ void main() {
           );
         });
       }
+
+      test('a keyboard parked below the screen is not shown', () async {
+        // Seen on iOS 18.6: dismissed while the field kept focus, the
+        // keyboard stays in the tree at y = screen height.
+        server.onValue(
+          'GET',
+          '/session/sess-1/source',
+          '<XCUIElementTypeApplication x="0" y="0" width="440" height="956">'
+              '<XCUIElementTypeKeyboard visible="false" x="0" y="956" '
+              'width="440" height="243"/></XCUIElementTypeApplication>',
+        );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        expect(await connector.isKeyboardShown(), isFalse);
+        expect(await connector.hideKeyboard(), isFalse);
+        expect(
+          server.requestsTo(
+            'POST',
+            '/session/sess-1/wda/keyboard/dismiss',
+          ),
+          isEmpty,
+        );
+      });
+
+      test('an on-screen keyboard is shown', () {
+        expect(
+          wdaKeyboardOnScreen(
+            '<XCUIElementTypeApplication x="0" y="0" width="440" '
+            'height="956"><XCUIElementTypeKeyboard x="0" y="665" '
+            'width="440" height="291"/></XCUIElementTypeApplication>',
+          ),
+          isTrue,
+        );
+        expect(
+          wdaKeyboardOnScreen('<XCUIElementTypeApplication height="956"/>'),
+          isFalse,
+        );
+      });
 
       test('hideKeyboard is a no-op without a keyboard', () async {
         sourceWithKeyboard([false]);

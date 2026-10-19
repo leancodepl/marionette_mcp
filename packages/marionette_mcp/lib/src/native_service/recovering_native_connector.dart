@@ -11,10 +11,11 @@ typedef NativeReconnect = Future<NativeConnector> Function();
 ///
 /// Every operation is classified by its method:
 /// - reads ([getNativeElements], [foregroundApp], [takeScreenshot],
-///   [getScreen], [isKeyboardShown]) are
+///   [takeElementScreenshot], [getScreen], [isKeyboardShown]) are
 ///   retried once on a fresh session whenever the session was lost;
 /// - actions ([tapElement], [tapAt], [enterText], [typeText], [pressKey],
-///   [hideKeyboard], [swipe]) first check
+///   [hideKeyboard], [swipe], [longPress], [doubleTap], [pinch]) first
+///   check
 ///   [isServerResponding]; a server that is already gone is replaced before
 ///   the action is sent. An action is retried only when it certainly did
 ///   not run — the server answered `invalid session id`, or no connection
@@ -98,6 +99,7 @@ final class RecoveringNativeConnector implements NativeConnector {
     required int endX,
     required int endY,
     int durationMs = 300,
+    int holdMs = 0,
   }) =>
       _act(
         (c) => c.swipe(
@@ -106,8 +108,39 @@ final class RecoveringNativeConnector implements NativeConnector {
           endX: endX,
           endY: endY,
           durationMs: durationMs,
+          holdMs: holdMs,
         ),
       );
+
+  @override
+  Future<void> longPress(int x, int y, {int durationMs = 600}) =>
+      _act((c) => c.longPress(x, y, durationMs: durationMs));
+
+  @override
+  Future<void> doubleTap(int x, int y, {int delayMs = 100}) =>
+      _act((c) => c.doubleTap(x, y, delayMs: delayMs));
+
+  @override
+  Future<void> pinch({
+    required int centerX,
+    required int centerY,
+    required int startSpan,
+    required int endSpan,
+    int durationMs = 500,
+  }) =>
+      _act(
+        (c) => c.pinch(
+          centerX: centerX,
+          centerY: centerY,
+          startSpan: startSpan,
+          endSpan: endSpan,
+          durationMs: durationMs,
+        ),
+      );
+
+  @override
+  Future<String> takeElementScreenshot(NativeElement element) =>
+      _read((c) => c.takeElementScreenshot(element));
 
   /// Health probe of the current connector; never triggers recovery.
   @override

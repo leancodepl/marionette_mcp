@@ -156,6 +156,7 @@ void main() {
       expect(steps[0], {
         'type': 'pointerMove',
         'duration': 0,
+        'origin': 'viewport',
         'x': 10,
         'y': 20,
       });

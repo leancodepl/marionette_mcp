@@ -70,7 +70,8 @@ class NativeScreen {
 
 /// A single element of the native UI hierarchy.
 ///
-/// Produced by [parseAndroidUiDump] / [parseWdaSource] and consumed by
+/// State fields and the label / content split of text fields are described
+/// in docs/native-lane-decisions.md#d15. Produced by [parseAndroidUiDump] / [parseWdaSource] and consumed by
 /// [NativeConnector] implementations and the MCP tool layer.
 class NativeElement {
   const NativeElement({
@@ -79,9 +80,16 @@ class NativeElement {
     required this.bounds,
     this.text,
     this.resourceId,
+    this.value,
+    this.enabled = true,
+    this.focused,
+    this.checked,
+    this.selected = false,
+    this.scrollable = false,
   });
 
-  /// Visible text or accessibility description, if any.
+  /// Visible text or accessibility description, if any. For an empty text
+  /// field this is its placeholder / hint.
   final String? text;
 
   /// Android `resource-id` or iOS accessibility identifier (`name`), if any.
@@ -97,6 +105,30 @@ class NativeElement {
   /// On-screen rectangle in screenshot pixels.
   final NativeBounds bounds;
 
+  /// Content of an editable field (what was typed), when it differs from a
+  /// placeholder. Null for empty fields and non-editable elements. On iOS a
+  /// Flutter field's [text] is its label, so this is the only place its
+  /// content appears.
+  final String? value;
+
+  /// False for disabled controls.
+  final bool enabled;
+
+  /// Whether the element has input focus; null when the platform does not
+  /// report focus (iOS).
+  final bool? focused;
+
+  /// On/off state of a switch, checkbox or radio button; null for elements
+  /// that cannot be checked.
+  final bool? checked;
+
+  /// Whether the element is selected (e.g. the current tab).
+  final bool selected;
+
+  /// Whether the element is a scrollable container (useful as `within` for
+  /// native_scroll).
+  final bool scrollable;
+
   /// This element with [bounds] multiplied by [factor] (see
   /// [NativeBounds.scaled]).
   NativeElement scaled(double factor) => factor == 1
@@ -107,7 +139,18 @@ class NativeElement {
           bounds: bounds.scaled(factor),
           text: text,
           resourceId: resourceId,
+          value: value,
+          enabled: enabled,
+          focused: focused,
+          checked: checked,
+          selected: selected,
+          scrollable: scrollable,
         );
+
+  /// Whether the element occupies screen space. Flutter on iOS keeps
+  /// off-screen semantics nodes in the tree with zero-size bounds at (0, 0);
+  /// those are not visible (docs/native-lane-decisions.md#d16).
+  bool get isVisible => bounds.width > 0 && bounds.height > 0;
 
   /// Center of [bounds] in screenshot pixels — the natural tap target.
   ({int x, int y}) get center => (
@@ -117,13 +160,20 @@ class NativeElement {
 
   /// JSON shape mirroring the Flutter lane's `get_interactive_elements`
   /// output (`type`, `text`, `id`, `bounds`, `clickable`) so agents can
-  /// consume both lanes uniformly.
+  /// consume both lanes uniformly. State fields are only included when they
+  /// carry information (not default), to keep the output small.
   Map<String, dynamic> toJson() => {
         'type': className,
         if (text != null) 'text': text,
+        if (value != null) 'value': value,
         if (resourceId != null) 'id': resourceId,
         'bounds': bounds.toJson(),
         'clickable': clickable,
+        if (!enabled) 'enabled': false,
+        if (focused == true) 'focused': true,
+        if (checked != null) 'checked': checked,
+        if (selected) 'selected': true,
+        if (scrollable) 'scrollable': true,
       };
 }
 
@@ -192,13 +242,38 @@ abstract class NativeConnector {
 
   /// Swipes from ([startX], [startY]) to ([endX], [endY]) in screenshot
   /// pixels over [durationMs] milliseconds.
+  ///
+  /// With [holdMs] > 0 the finger rests at the end for that long before
+  /// lifting, so the content moves exactly the swipe distance without a
+  /// fling.
   Future<void> swipe({
     required int startX,
     required int startY,
     required int endX,
     required int endY,
     int durationMs = 300,
+    int holdMs = 0,
   });
+
+  /// Presses at ([x], [y]) in screenshot pixels and holds for [durationMs].
+  Future<void> longPress(int x, int y, {int durationMs = 600});
+
+  /// Taps twice at ([x], [y]) with [delayMs] between the taps.
+  Future<void> doubleTap(int x, int y, {int delayMs = 100});
+
+  /// Two-finger pinch centered on ([centerX], [centerY]): the fingers start
+  /// [startSpan] screenshot pixels apart (horizontally) and move to
+  /// [endSpan] apart over [durationMs]. `endSpan > startSpan` zooms in.
+  Future<void> pinch({
+    required int centerX,
+    required int centerY,
+    required int startSpan,
+    required int endSpan,
+    int durationMs = 500,
+  });
+
+  /// Captures a PNG of just [element] (base64), in screenshot pixels.
+  Future<String> takeElementScreenshot(NativeElement element);
 
   /// Captures a PNG of the full device screen (system dialogs included)
   /// and returns it as a base64-encoded string.
@@ -364,11 +439,22 @@ final _androidBoundsPattern = RegExp(r'\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]');
 /// Flutter lane's "interactive or meaningful" filter.
 ///
 /// [NativeElement.text] is the first non-empty of `text`, `content-desc` and
-/// `hint`: an empty text field is identified by its placeholder (e.g.
-/// "Amount"), which is what the user sees.
+/// `hint`. For a text field the order is `hint`, `content-desc`, `text`: the
+/// field keeps its label (Flutter puts the label in `hint`) whether or not
+/// it has content, and the content goes to [NativeElement.value] — the same
+/// split as on iOS, so a selector for a field still matches after typing.
 List<NativeElement> parseAndroidUiDump(String xml) {
+  bool isField(Map<String, String> attributes) {
+    final className = attributes['class'] ?? '';
+    return className.contains('EditText') ||
+        className.contains('AutoCompleteTextView');
+  }
+
   String? visibleText(Map<String, String> attributes) {
-    for (final key in const ['text', 'content-desc', 'hint']) {
+    final keys = isField(attributes)
+        ? const ['hint', 'content-desc', 'text']
+        : const ['text', 'content-desc', 'hint'];
+    for (final key in keys) {
       final value = attributes[key] ?? '';
       if (value.isNotEmpty) return value;
     }
@@ -378,19 +464,38 @@ List<NativeElement> parseAndroidUiDump(String xml) {
   final nodes = parseUiTree(xml, isRelevant: (attributes) {
     final resourceId = attributes['resource-id'] ?? '';
     return attributes['clickable'] == 'true' ||
+        attributes['scrollable'] == 'true' ||
         visibleText(attributes) != null ||
         resourceId.isNotEmpty;
   });
 
   return nodes.map((attributes) {
     final resourceId = attributes['resource-id'] ?? '';
+    final className = attributes['class'] ?? attributes[uiNodeTagKey]!;
+    final rawText = attributes['text'] ?? '';
+    // An editable field's `text` is its content, unless it is showing the
+    // hint (`showing-hint`, Android 8+).
+    final value = isField(attributes) &&
+            rawText.isNotEmpty &&
+            attributes['showing-hint'] != 'true' &&
+            rawText != attributes['hint']
+        ? rawText
+        : null;
 
     return NativeElement(
-      className: attributes['class'] ?? attributes[uiNodeTagKey]!,
+      className: className,
       text: visibleText(attributes),
       resourceId: resourceId.isNotEmpty ? resourceId : null,
       clickable: attributes['clickable'] == 'true',
       bounds: _parseAndroidBounds(attributes['bounds']),
+      value: value,
+      enabled: attributes['enabled'] != 'false',
+      focused: attributes['focused'] == 'true',
+      checked: attributes['checkable'] == 'true'
+          ? attributes['checked'] == 'true'
+          : null,
+      selected: attributes['selected'] == 'true',
+      scrollable: attributes['scrollable'] == 'true',
     );
   }).toList();
 }
@@ -427,10 +532,28 @@ const _wdaInteractiveTypes = {
 
 const _wdaTypePrefix = 'XCUIElementType';
 
+/// XCUI types whose `value` is an on/off state (`"1"` / `"0"`).
+const _wdaToggleTypes = {'Switch', 'CheckBox', 'Toggle'};
+
+/// XCUI text-entry types.
+const _wdaFieldTypes = {
+  'TextField',
+  'SecureTextField',
+  'TextView',
+  'SearchField',
+};
+
+/// XCUI types whose `value` is user content worth reporting.
+const _wdaValueTypes = {..._wdaFieldTypes, 'Slider'};
+
+/// XCUI container types that scroll.
+const _wdaScrollableTypes = {'ScrollView', 'Table', 'CollectionView'};
+
 /// Parses WebDriverAgent source XML (tags named `XCUIElementType*`) into
 /// [NativeElement]s.
 ///
-/// `label` (falling back to `value`) maps to [NativeElement.text], `name`
+/// `label` (falling back to `value`; for text fields to `placeholderValue`
+/// first) maps to [NativeElement.text], `name`
 /// to [NativeElement.resourceId], and the tag name to
 /// [NativeElement.className]. An element counts as clickable when it is
 /// enabled and its type is one of the typical interactive XCUI types.
@@ -446,26 +569,50 @@ List<NativeElement> parseWdaSource(String xml) {
         _wdaInteractiveTypes.contains(type);
   }
 
+  // A field is named by its label, else its placeholder; its content is
+  // reported as `value` (see below), so typing does not rename it.
   String? textOf(Map<String, String> attributes) {
-    final label = attributes['label'] ?? '';
-    if (label.isNotEmpty) return label;
-    final value = attributes['value'] ?? '';
-    if (value.isNotEmpty) return value;
+    final tag = attributes[uiNodeTagKey]!;
+    final isField = tag.startsWith(_wdaTypePrefix) &&
+        _wdaFieldTypes.contains(tag.substring(_wdaTypePrefix.length));
+    final keys = isField
+        ? const ['label', 'placeholderValue', 'value']
+        : const ['label', 'value'];
+    for (final key in keys) {
+      final text = attributes[key] ?? '';
+      if (text.isNotEmpty) return text;
+    }
     return null;
   }
 
   final nodes = parseUiTree(xml, isRelevant: (attributes) {
     if (!attributes[uiNodeTagKey]!.startsWith(_wdaTypePrefix)) return false;
     final name = attributes['name'] ?? '';
+    final tag = attributes[uiNodeTagKey]!;
     return isClickable(attributes) ||
         textOf(attributes) != null ||
-        name.isNotEmpty;
+        name.isNotEmpty ||
+        _wdaScrollableTypes.contains(tag.substring(_wdaTypePrefix.length));
   });
 
   return nodes.map((attributes) {
     final name = attributes['name'] ?? '';
+    final tag = attributes[uiNodeTagKey]!;
+    final type = tag.startsWith(_wdaTypePrefix)
+        ? tag.substring(_wdaTypePrefix.length)
+        : tag;
+    final rawValue = attributes['value'] ?? '';
+    final isToggle = _wdaToggleTypes.contains(type);
+    // Other types use `value` for unrelated state (a selected tab button
+    // reports "1"), and an empty field reports its placeholder as `value`.
+    final value = _wdaValueTypes.contains(type) &&
+            rawValue.isNotEmpty &&
+            rawValue != attributes['placeholderValue']
+        ? rawValue
+        : null;
+
     return NativeElement(
-      className: attributes[uiNodeTagKey]!,
+      className: tag,
       text: textOf(attributes),
       resourceId: name.isNotEmpty ? name : null,
       clickable: isClickable(attributes),
@@ -475,6 +622,11 @@ List<NativeElement> parseWdaSource(String xml) {
         width: _parseWdaInt(attributes['width']),
         height: _parseWdaInt(attributes['height']),
       ),
+      value: value,
+      enabled: attributes['enabled'] != 'false',
+      checked: isToggle ? rawValue == '1' : null,
+      selected: (attributes['traits'] ?? '').contains('Selected'),
+      scrollable: _wdaScrollableTypes.contains(type),
     );
   }).toList();
 }

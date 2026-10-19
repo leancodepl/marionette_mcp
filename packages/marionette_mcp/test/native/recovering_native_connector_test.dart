@@ -132,6 +132,27 @@ void main() {
       expect(inner.typedText, [(text: 'x', clear: false)]);
     });
 
+    test('gestures are actions, element screenshots are reads', () async {
+      final inner = FakeNativeConnector();
+      final connector = wrap(inner);
+
+      await connector.takeElementScreenshot(nativeElement(id: 'logo'));
+      expect(inner.healthChecks, 0, reason: 'a screenshot is a read');
+
+      await connector.longPress(1, 2);
+      await connector.doubleTap(1, 2);
+      await connector.pinch(
+        centerX: 1,
+        centerY: 2,
+        startSpan: 100,
+        endSpan: 200,
+      );
+      expect(inner.healthChecks, 3, reason: 'each gesture probes first');
+      expect(inner.longPresses, hasLength(1));
+      expect(inner.doubleTaps, hasLength(1));
+      expect(inner.pinches, hasLength(1));
+    });
+
     test('reads do not probe the server first', () async {
       final inner = FakeNativeConnector();
       final connector = wrap(inner);

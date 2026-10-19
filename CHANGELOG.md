@@ -11,6 +11,12 @@
 - Native lane: add `native_press_key` (back, home, enter, backspace, tab, recents, volume_up, volume_down) and `native_hide_keyboard`; `native_enter_text` types into the focused field when no selector is given and accepts `clear` ([D14](docs/native-lane-decisions.md#d14))
 - Native lane: re-establish a lost device-side session automatically once; reads are retried, actions check that the server responds first and are only repeated when they certainly did not run ([D3](docs/native-lane-decisions.md#d3))
 - Native lane (iOS): `native_connect` with the `udid` of a simulator that is not booted now fails immediately with a hint, instead of `xcodebuild` silently booting it headless
+- Native lane: `native_get_elements` reports element state — `value` (text field content), `enabled`, `focused` (Android), `checked`, `selected`, `scrollable` — only when it carries information, and accepts filters (`text`, `textContains`, `id`, `type`, `clickableOnly`, `includeForegroundApp`). On iOS the typed content of a Flutter field is now visible ([D15](docs/native-lane-decisions.md#d15))
+- **Breaking (native lane, Android):** a filled text field keeps its label (hint) as `text`; its content moved to `value`, matching iOS. Selectors by label keep finding the field after typing ([D15](docs/native-lane-decisions.md#d15))
+- Native lane: add `native_wait_for` (visible / gone with timeout), `native_long_press`, `native_double_tap`, `native_pinch` and `native_swipe` (start and end coordinates)
+- Native lane: `native_scroll` can swipe inside a container (`within`), takes `maxSwipes`, stops at the end of the content, ignores off-screen (zero-size) matches, and searches with slow drags that do not fling past the target ([D16](docs/native-lane-decisions.md#d16))
+- Native lane (iOS): `native_hide_keyboard` no longer fails when the keyboard is already hidden — a dismissed keyboard stays in the WebDriverAgent tree below the screen and was reported as shown ([D14](docs/native-lane-decisions.md#d14))
+- Native lane: `native_take_screenshot` captures a single element when given a selector ([D6](docs/native-lane-decisions.md#d6))
 - Native lane (Android): pick a free local port for UIAutomator2 (or `MARIONETTE_UIA2_PORT`), reuse a healthy server already forwarded for the device, install APKs only when they changed, and verify downloaded APKs against pinned SHA-256 checksums ([D10](docs/native-lane-decisions.md#d10))
 
 # 0.6.0

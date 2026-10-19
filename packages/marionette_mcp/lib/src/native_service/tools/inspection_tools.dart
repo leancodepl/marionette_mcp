@@ -1,59 +1,244 @@
 import 'dart:convert';
 
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
+import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+
+const _defaultWaitTimeoutMs = 10000;
+const _maxWaitTimeoutMs = 60000;
+const _defaultWaitIntervalMs = 500;
+const _minWaitIntervalMs = 50;
+
+/// What `native_wait_for` waits for.
+enum NativeWaitState {
+  /// At least one element matches.
+  visible,
+
+  /// No element matches.
+  gone;
+
+  static NativeWaitState? tryParse(Object? raw) => switch (raw) {
+        null || 'visible' => visible,
+        'gone' => gone,
+        _ => null,
+      };
+}
 
 /// Registers native UI hierarchy inspection tools.
 void registerNativeInspectionTools(
   McpServer server,
   NativeServiceContext context,
 ) {
-  server.registerTool(
-    'native_get_elements',
-    description: 'Returns the native UI hierarchy as JSON: '
-        '{ elements: [...], foregroundApp: string? }. '
-        'Each element has type, optional text/id, bounds in screenshot '
-        'pixels (the pixel grid of native_take_screenshot), and clickable. '
-        'Elements are listed in UI-tree order; the index selector of other '
-        'native tools counts matches in this order. '
-        'Use when the target is missing from '
-        'get_interactive_elements or a system surface covers the app. '
-        'foregroundApp (Android package / iOS bundle id) helps detect '
-        'permission controllers and other system UIs on top of the Flutter '
-        'app. Prefer Flutter get_interactive_elements first. '
-        '$nativeRoutingPreferFlutter '
-        'Requires native_connect.',
-    annotations: const ToolAnnotations(
-      title: 'Get Native Elements',
-      readOnlyHint: true,
-      idempotentHint: true,
-    ),
-    inputSchema: const ToolInputSchema(properties: {}),
-    callback: (args, extra) => handleNativeGetElements(context),
-  );
+  server
+    ..registerTool(
+      'native_get_elements',
+      description: 'Returns the native UI hierarchy as JSON: '
+          '{ elements: [...], foregroundApp: string? }. '
+          'Each element has type, optional text/id, bounds in screenshot '
+          'pixels (the pixel grid of native_take_screenshot), and clickable; '
+          'state is included only when it carries information: value (typed '
+          'content of a field — on iOS the only place a Flutter field shows '
+          'it), enabled: false, focused: true (Android only), checked '
+          '(switches, checkboxes, radios), selected: true, scrollable: true '
+          '(containers usable as native_scroll within). '
+          'Elements are listed in UI-tree order; the index selector of other '
+          'native tools counts matches in this order. '
+          'Optional filters (text, textContains, id, type, clickableOnly) '
+          'shrink the output on busy screens. '
+          'Use when the target is missing from get_interactive_elements or a '
+          'system surface covers the app. foregroundApp (Android package / '
+          'iOS bundle id) helps detect permission controllers and other '
+          'system UIs on top of the Flutter app. Prefer Flutter '
+          'get_interactive_elements first. '
+          '$nativeRoutingPreferFlutter '
+          'Requires native_connect.',
+      annotations: const ToolAnnotations(
+        title: 'Get Native Elements',
+        readOnlyHint: true,
+        idempotentHint: true,
+      ),
+      inputSchema: ToolInputSchema(
+        properties: {
+          ...nativeSelectorProperties(withIndex: false),
+          'clickableOnly': JsonSchema.boolean(
+            description: 'Return only clickable elements (default false).',
+          ),
+          'includeForegroundApp': JsonSchema.boolean(
+            description: 'Include foregroundApp (default true). Skipping it '
+                'saves a device call.',
+          ),
+        },
+      ),
+      callback: (args, extra) => handleNativeGetElements(context, args),
+    )
+    ..registerTool(
+      'native_wait_for',
+      description: 'Waits until a native element matching the selector (text, '
+          'textContains, id, type — values from native_get_elements) is '
+          'visible, or with state "gone" until none matches. Polls the native '
+          'UI tree every intervalMs (default $_defaultWaitIntervalMs) for up '
+          'to timeoutMs (default $_defaultWaitTimeoutMs, max '
+          '$_maxWaitTimeoutMs). Returns the first matching element for '
+          '"visible". Use it instead of fixed sleeps for system dialogs, '
+          'toasts, and screens that appear after a delay. '
+          '$nativeRoutingPreferFlutter '
+          'Requires native_connect.',
+      annotations: const ToolAnnotations(
+        title: 'Native Wait For',
+        readOnlyHint: true,
+      ),
+      inputSchema: ToolInputSchema(
+        properties: {
+          ...nativeSelectorProperties(withIndex: false),
+          'state': JsonSchema.string(
+            description: '"visible" (default) or "gone".',
+          ),
+          'timeoutMs': JsonSchema.integer(
+            description: 'Maximum wait in milliseconds (default '
+                '$_defaultWaitTimeoutMs, max $_maxWaitTimeoutMs).',
+          ),
+          'intervalMs': JsonSchema.integer(
+            description: 'Pause between checks in milliseconds (default '
+                '$_defaultWaitIntervalMs, min $_minWaitIntervalMs).',
+          ),
+        },
+      ),
+      callback: (args, extra) => handleNativeWaitFor(context, args),
+    );
 }
 
 /// Handles `native_get_elements`.
 Future<CallToolResult> handleNativeGetElements(
-  NativeServiceContext context,
-) {
+  NativeServiceContext context, [
+  Map<String, dynamic> args = const {},
+]) {
   final logger = context.logger;
-  logger.info('Getting native elements');
+  final filter = nativeSelectorFromArgs(args);
+  final clickableOnly = args['clickableOnly'] == true;
+  final includeForegroundApp = args['includeForegroundApp'] != false;
+
+  logger.info('Getting native elements (filter: ${filter.describe()}, '
+      'clickableOnly: $clickableOnly)');
   return runTool(logger, 'get native elements', () async {
     final connector = context.requireConnector();
     // foregroundApp is a diagnostic hint: fetch it alongside the tree and
     // report null rather than failing the whole call when it is unavailable.
-    final foregroundApp = connector.foregroundApp
-        .then<String?>((value) => value, onError: (Object _) => null);
-    final elements = await connector.getNativeElements();
+    final foregroundApp = includeForegroundApp
+        ? connector.foregroundApp
+            .then<String?>((value) => value, onError: (Object _) => null)
+        : null;
+    final elements = (await connector.getNativeElements()).where(
+      (element) =>
+          (!clickableOnly || element.clickable) && filter.matches(element),
+    );
     final payload = <String, dynamic>{
       'elements': elements.map((e) => e.toJson()).toList(),
-      'foregroundApp': await foregroundApp,
+      if (foregroundApp != null) 'foregroundApp': await foregroundApp,
     };
     return CallToolResult(
       content: [TextContent(text: jsonEncode(payload))],
     );
   });
 }
+
+/// Handles `native_wait_for` (docs/native-lane-decisions.md#d16).
+Future<CallToolResult> handleNativeWaitFor(
+  NativeServiceContext context,
+  Map<String, dynamic> args,
+) async {
+  final logger = context.logger;
+  final selector = nativeSelectorFromArgs(args);
+  final state = NativeWaitState.tryParse(args['state']);
+  final timeoutMs = intArg(args, 'timeoutMs') ?? _defaultWaitTimeoutMs;
+  final intervalMs = intArg(args, 'intervalMs') ?? _defaultWaitIntervalMs;
+
+  if (selector.isEmpty) {
+    return invalidArguments(
+      'native_wait_for requires a selector (text, textContains, id, type).',
+    );
+  }
+  if (state == null) {
+    return invalidArguments(
+      'native_wait_for state must be "visible" or "gone".',
+    );
+  }
+  if (timeoutMs <= 0 || timeoutMs > _maxWaitTimeoutMs) {
+    return invalidArguments(
+      'Parameter "timeoutMs" must be between 1 and $_maxWaitTimeoutMs.',
+    );
+  }
+  if (intervalMs < _minWaitIntervalMs) {
+    return invalidArguments(
+      'Parameter "intervalMs" must be at least $_minWaitIntervalMs.',
+    );
+  }
+
+  logger.info('Native waiting for ${selector.describe()} to be '
+      '${state.name} (timeout ${timeoutMs}ms)');
+  return runTool(logger, 'native wait for', () async {
+    final connector = context.requireConnector();
+    final stopwatch = Stopwatch()..start();
+    while (true) {
+      final elements = await connector.getNativeElements();
+      final match =
+          elements.where((e) => e.isVisible && selector.matches(e)).firstOrNull;
+      final done = switch (state) {
+        NativeWaitState.visible => match != null,
+        NativeWaitState.gone => match == null,
+      };
+      if (done) {
+        return _waitResult(selector, state, stopwatch.elapsedMilliseconds,
+            match: match);
+      }
+
+      final remaining = timeoutMs - stopwatch.elapsedMilliseconds;
+      if (remaining <= 0) {
+        // A system surface in front of the app is the usual reason an
+        // element never appears.
+        final foregroundApp = await connector.foregroundApp
+            .then<String?>((value) => value, onError: (Object _) => null);
+        final inApp = foregroundApp == null ? '' : ' in $foregroundApp';
+        throw switch (state) {
+          NativeWaitState.visible => NativeElementNotFoundException(
+              '${selector.describe()} within ${timeoutMs}ms$inApp',
+              hint: 'Call native_get_elements to see the current screen, or '
+                  'raise timeoutMs if the element appears later.',
+            ),
+          NativeWaitState.gone => NativeOperationFailedException(
+              'Native element ${selector.describe()} is still visible after '
+              '${timeoutMs}ms.',
+              hint: 'Dismiss it (e.g. native_tap) or raise timeoutMs.',
+            ),
+        };
+      }
+      await Future<void>.delayed(
+        Duration(milliseconds: remaining < intervalMs ? remaining : intervalMs),
+      );
+    }
+  });
+}
+
+CallToolResult _waitResult(
+  NativeSelector selector,
+  NativeWaitState state,
+  int elapsedMs, {
+  NativeElement? match,
+}) =>
+    CallToolResult(
+      content: [
+        TextContent(
+          text: jsonEncode({
+            'state': state.name,
+            'selector': selector.describe(),
+            'elapsedMs': elapsedMs,
+            if (match != null) 'element': match.toJson(),
+          }),
+        ),
+      ],
+    );

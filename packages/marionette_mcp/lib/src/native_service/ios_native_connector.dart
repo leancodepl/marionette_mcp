@@ -146,7 +146,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     bool clear = false,
   }) async {
     // One lookup serves both the focusing click and the typing.
-    final elementId = await _tryFindElement(element);
+    final elementId = await locateElement(element);
     if (elementId == null) {
       throw WebDriverException(
         'Could not locate element to type into '
@@ -200,8 +200,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
 
   @override
   Future<bool> isKeyboardShown() async =>
-      (await client.getPageSource(sessionId))
-          .contains('<XCUIElementTypeKeyboard');
+      wdaKeyboardOnScreen(await client.getPageSource(sessionId));
 
   /// Keys that dismiss the keyboard without editing the text. `return` is
   /// deliberately absent: in a multi-line field it inserts a newline.
@@ -236,7 +235,8 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   /// Locates the WDA element for [element]: first by its type and exact
   /// geometry from the same UI tree (unique even when ids or labels repeat),
   /// then by accessibility id (`name`) or visible label/text.
-  Future<String?> _tryFindElement(NativeElement element) async {
+  @override
+  Future<String?> locateElement(NativeElement element) async {
     try {
       return await client.findElement(
         sessionId,
@@ -277,6 +277,39 @@ final class IosNativeConnector extends WebDriverNativeConnector {
 
     return null;
   }
+}
+
+/// Whether WDA page source [xml] contains a keyboard that is on screen.
+///
+/// A hidden keyboard can stay in the tree, parked just below the screen
+/// (`y` equal to the application height, `visible="false"`) — e.g. when
+/// it was dismissed while the field kept focus. Mere presence would report
+/// it as shown and make `hideKeyboard` fail. The keyboard counts as shown
+/// when it has a size and its top edge is above the bottom of the
+/// application (the screen). Missing geometry is treated as shown.
+/// `visible` alone is not used: WDA reports it inconsistently (tabs covered
+/// by the keyboard are `visible="false"` while on screen).
+bool wdaKeyboardOnScreen(String xml) {
+  final nodes = parseUiTree(
+    xml,
+    isRelevant: (attributes) {
+      final tag = attributes[uiNodeTagKey];
+      return tag == 'XCUIElementTypeKeyboard' ||
+          tag == 'XCUIElementTypeApplication';
+    },
+  );
+  final screenHeight = nodes
+      .where((n) => n[uiNodeTagKey] == 'XCUIElementTypeApplication')
+      .map((n) => double.tryParse(n['height'] ?? ''))
+      .firstOrNull;
+  return nodes
+      .where((n) => n[uiNodeTagKey] == 'XCUIElementTypeKeyboard')
+      .any((keyboard) {
+    final y = double.tryParse(keyboard['y'] ?? '');
+    final height = double.tryParse(keyboard['height'] ?? '');
+    if (y == null || height == null || screenHeight == null) return true;
+    return height > 0 && y < screenHeight;
+  });
 }
 
 /// Reads a bundle identifier from WDA page source when [wdaActiveAppInfo] is

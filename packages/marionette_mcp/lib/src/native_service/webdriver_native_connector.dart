@@ -100,6 +100,7 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     required int endX,
     required int endY,
     int durationMs = 300,
+    int holdMs = 0,
   }) {
     return client.swipe(
       sessionId,
@@ -108,11 +109,98 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
       endX: toServerUnits(endX),
       endY: toServerUnits(endY),
       durationMs: durationMs,
+      holdMs: holdMs,
     );
+  }
+
+  /// How long a finger stays down for a single tap of [doubleTap].
+  static const _tapPressMs = 50;
+
+  @override
+  Future<void> longPress(int x, int y, {int durationMs = 600}) {
+    final sx = toServerUnits(x);
+    final sy = toServerUnits(y);
+    return client.touchActions(sessionId, [
+      [
+        TouchStep.move(sx, sy),
+        TouchStep.down(),
+        TouchStep.pause(durationMs),
+        TouchStep.up(),
+      ],
+    ]);
+  }
+
+  @override
+  Future<void> doubleTap(int x, int y, {int delayMs = 100}) {
+    final sx = toServerUnits(x);
+    final sy = toServerUnits(y);
+    // One action sequence keeps the gap exact; two separate taps would add
+    // a round trip (tens of ms on WDA) and could exceed the double-tap
+    // timeout.
+    return client.touchActions(sessionId, [
+      [
+        TouchStep.move(sx, sy),
+        TouchStep.down(),
+        TouchStep.pause(_tapPressMs),
+        TouchStep.up(),
+        TouchStep.pause(delayMs),
+        TouchStep.down(),
+        TouchStep.pause(_tapPressMs),
+        TouchStep.up(),
+      ],
+    ]);
+  }
+
+  @override
+  Future<void> pinch({
+    required int centerX,
+    required int centerY,
+    required int startSpan,
+    required int endSpan,
+    int durationMs = 500,
+  }) {
+    final cx = toServerUnits(centerX);
+    final cy = toServerUnits(centerY);
+    final startHalf = toServerUnits(startSpan) ~/ 2;
+    final endHalf = toServerUnits(endSpan) ~/ 2;
+    List<Map<String, dynamic>> finger(int direction) => [
+          TouchStep.move(cx + direction * startHalf, cy),
+          TouchStep.down(),
+          TouchStep.move(
+            cx + direction * endHalf,
+            cy,
+            durationMs: durationMs,
+          ),
+          TouchStep.up(),
+        ];
+    return client.touchActions(sessionId, [finger(-1), finger(1)]);
   }
 
   @override
   Future<String> takeScreenshot() => client.takeScreenshot(sessionId);
+
+  /// Finds the server-side id of [element] (an element from the current UI
+  /// tree) by its exact geometry, or null when it is no longer on screen
+  /// (docs/native-lane-decisions.md#d6).
+  Future<String?> locateElement(NativeElement element);
+
+  @override
+  Future<String> takeElementScreenshot(NativeElement element) async {
+    final elementId = await locateElement(element);
+    if (elementId == null) {
+      throw NativeElementNotFoundException(
+        _describeForLookup(element),
+        hint: 'The screen changed; call native_get_elements and retry.',
+      );
+    }
+    return client.elementScreenshot(sessionId, elementId);
+  }
+
+  static String _describeForLookup(NativeElement element) => [
+        element.className,
+        if (element.text != null) 'text="${element.text}"',
+        if (element.resourceId != null) 'id="${element.resourceId}"',
+      ].join(' ');
 
   /// Name of the element attribute holding its class (`className` on
   /// UIAutomator2, `type` on WebDriverAgent).

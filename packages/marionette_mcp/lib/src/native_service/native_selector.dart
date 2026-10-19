@@ -15,8 +15,9 @@ final class NativeSelector {
     this.index,
   });
 
-  /// Exact visible text (Android `text` / `content-desc`, iOS `label` /
-  /// `value`), compared verbatim.
+  /// Exact [NativeElement.text] (Android `text` / `content-desc`, iOS
+  /// `label` / `value`; a text field's label or placeholder), compared
+  /// verbatim.
   final String? text;
 
   /// Case-insensitive substring of the visible text.

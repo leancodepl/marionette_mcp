@@ -95,6 +95,14 @@ void main() {
         <String, Future<CallToolResult> Function(NativeServiceContext)>{
       'native_get_elements': handleNativeGetElements,
       'native_take_screenshot': handleNativeTakeScreenshot,
+      'native_wait_for': (c) => handleNativeWaitFor(c, {'text': 'OK'}),
+      'native_long_press': (c) => handleNativeLongPress(c, {'text': 'OK'}),
+      'native_double_tap': (c) => handleNativeDoubleTap(c, {'x': 1, 'y': 1}),
+      'native_pinch': (c) => handleNativePinch(c, {'scale': 2}),
+      'native_swipe': (c) => handleNativeSwipe(
+            c,
+            {'startX': 1, 'startY': 1, 'endX': 2, 'endY': 2},
+          ),
       'native_tap': (c) => handleNativeTap(c, {'text': 'OK'}),
       'native_scroll': (c) => handleNativeScroll(c, {'direction': 'up'}),
       'native_enter_text': (c) =>
@@ -144,6 +152,40 @@ void main() {
         (jsonDecode(_text(result)) as Map<String, dynamic>)['foregroundApp'],
         isNull,
       );
+    });
+
+    test('includes element state and filters elements', () async {
+      final context = _contextWith(
+        FakeNativeConnector.single([
+          nativeElement(text: 'Wi-Fi', type: 'Switch', checked: true),
+          nativeElement(
+            text: 'Name',
+            type: 'android.widget.EditText',
+            value: 'Zażółć',
+            enabled: false,
+          ),
+          nativeElement(text: 'Title', clickable: false),
+        ]),
+      );
+
+      final result = await handleNativeGetElements(context, {
+        'textContains': 'a',
+        'clickableOnly': true,
+        'includeForegroundApp': false,
+      });
+      final payload = jsonDecode(_text(result)) as Map<String, dynamic>;
+
+      expect(payload.containsKey('foregroundApp'), isFalse);
+      final elements = payload['elements'] as List<dynamic>;
+      expect(elements, hasLength(1));
+      expect(elements.single, {
+        'type': 'android.widget.EditText',
+        'text': 'Name',
+        'value': 'Zażółć',
+        'bounds': {'x': 0, 'y': 0, 'width': 100, 'height': 50},
+        'clickable': true,
+        'enabled': false,
+      });
     });
 
     test('propagates tree errors', () async {
@@ -334,9 +376,11 @@ void main() {
     });
 
     test('gives up after the maximum number of swipes', () async {
-      final connector = FakeNativeConnector.single([
-        nativeElement(text: 'Item 1', width: 1000, height: 2000),
-      ]);
+      final connector = FakeNativeConnector(
+        screens: [
+          for (var i = 0; i <= 12; i++) [nativeElement(text: 'Item $i')],
+        ],
+      );
 
       final result = await handleNativeScroll(
         _contextWith(connector),
@@ -345,6 +389,171 @@ void main() {
 
       expect(result, _isToolError(contains('after 10 swipe(s)')));
       expect(connector.swipes, hasLength(10));
+    });
+
+    test('a zero-size (off-screen) match does not count as found', () async {
+      final connector = FakeNativeConnector(
+        screens: [
+          [
+            nativeElement(text: 'Item 1'),
+            nativeElement(text: 'Target', width: 0, height: 0),
+          ],
+          [nativeElement(text: 'Target', y: 500)],
+        ],
+      );
+
+      final result = await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'up', 'text': 'Target'},
+      );
+
+      expect(result, _isToolSuccess(contains('after 1 swipe(s)')));
+    });
+
+    test('waits for the content to settle after a swipe', () async {
+      // Reads 1-3 happen after the swipe while the list is still flinging.
+      final connector = FakeNativeConnector()
+        ..onGetElements = (call) => [
+              if (call > 0)
+                nativeElement(
+                  text: 'Target',
+                  y: switch (call) { 1 => 900, 2 => 700, _ => 650 },
+                ),
+            ];
+
+      final result = await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'up', 'text': 'Target'},
+      );
+
+      expect(result, _isToolSuccess(contains('after 1 swipe(s)')));
+      expect(connector.getElementsCalls, 5);
+      expect(connector.swipeHolds, [300], reason: 'no fling while searching');
+    });
+
+    test('maxSwipes limits the search', () async {
+      final connector = FakeNativeConnector(
+        screens: [
+          for (var i = 0; i <= 5; i++) [nativeElement(text: 'Item $i')],
+        ],
+      );
+
+      final result = await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'up', 'text': 'Missing', 'maxSwipes': 3},
+      );
+
+      expect(result, _isToolError(contains('after 3 swipe(s)')));
+      expect(connector.swipes, hasLength(3));
+    });
+
+    test('stops at the end of the content', () async {
+      final connector = FakeNativeConnector(
+        screens: [
+          [nativeElement(text: 'Item 1')],
+          [nativeElement(text: 'Item 2')],
+        ],
+      );
+
+      final result = await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'up', 'text': 'Missing'},
+      );
+
+      expect(result, _isToolError(contains('reached the end')));
+      expect(connector.swipes, hasLength(2));
+    });
+
+    test('swipes inside the within container', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(
+          type: 'android.view.View',
+          id: 'chips',
+          clickable: false,
+          scrollable: true,
+          y: 1000,
+          width: 1000,
+          height: 100,
+        ),
+      ]);
+
+      final context = _contextWith(connector);
+      final result = await handleNativeScroll(context, {
+        'direction': 'left',
+        'within': {'id': 'chips'},
+      });
+      await handleNativeScroll(context, {
+        'direction': 'left',
+        'within': {'id': 'chips'},
+        'distance': 200,
+      });
+
+      expect(result, _isToolSuccess(contains('within id="chips"')));
+      // Centered on the container, 80% of its width unless distance is set.
+      expect(connector.swipes, [
+        (startX: 900, startY: 1050, endX: 100, endY: 1050),
+        (startX: 600, startY: 1050, endX: 400, endY: 1050),
+      ]);
+    });
+
+    test('compares only the container content for the end', () async {
+      var clock = 0;
+      final connector = FakeNativeConnector()
+        ..onGetElements = (_) => [
+              nativeElement(
+                type: 'android.view.View',
+                id: 'list',
+                clickable: false,
+                height: 500,
+                width: 1000,
+              ),
+              nativeElement(text: 'Row 1', y: 100),
+              // Outside the container; changes on every read.
+              nativeElement(text: '12:0${clock++}', y: 1500),
+            ];
+
+      final result = await handleNativeScroll(_contextWith(connector), {
+        'direction': 'up',
+        'text': 'Row 99',
+        'within': {'id': 'list'},
+      });
+
+      expect(result, _isToolError(contains('reached the end')));
+      // A search swipe covers 60% of the container, as a slow held drag.
+      expect(
+        connector.swipes.single,
+        (startX: 500, startY: 400, endX: 500, endY: 100),
+      );
+      expect(connector.swipeHolds.single, 300);
+    });
+
+    test('validates within and maxSwipes', () async {
+      final context = _contextWith(FakeNativeConnector());
+
+      expect(
+        await handleNativeScroll(context, {'direction': 'up', 'within': 'x'}),
+        _isToolError(contains('selector object')),
+      );
+      expect(
+        await handleNativeScroll(context, {
+          'direction': 'up',
+          'within': <String, dynamic>{},
+        }),
+        _isToolError(contains('at least one of')),
+      );
+      expect(
+        await handleNativeScroll(context, {
+          'direction': 'up',
+          'within': {'id': 'list'},
+          'startX': 1,
+          'startY': 1,
+        }),
+        _isToolError(contains('not both')),
+      );
+      expect(
+        await handleNativeScroll(context, {'direction': 'up', 'maxSwipes': 0}),
+        _isToolError(contains('maxSwipes')),
+      );
     });
   });
 
@@ -506,6 +715,249 @@ void main() {
         await handleNativeHideKeyboard(context),
         _isToolSuccess('Keyboard was not shown'),
       );
+    });
+  });
+
+  group('native_wait_for', () {
+    test('validates the selector, state, timeout and interval', () async {
+      final context = _contextWith(FakeNativeConnector());
+
+      expect(
+        await handleNativeWaitFor(context, {}),
+        _isToolError(contains('requires a selector')),
+      );
+      expect(
+        await handleNativeWaitFor(context, {'text': 'OK', 'state': 'shown'}),
+        _isToolError(contains('"visible" or "gone"')),
+      );
+      expect(
+        await handleNativeWaitFor(context, {'text': 'OK', 'timeoutMs': 60001}),
+        _isToolError(contains('timeoutMs')),
+      );
+      expect(
+        await handleNativeWaitFor(context, {'text': 'OK', 'intervalMs': 10}),
+        _isToolError(contains('intervalMs')),
+      );
+    });
+
+    test('returns the element once it appears', () async {
+      final connector = FakeNativeConnector()
+        ..onGetElements =
+            (call) => call < 2 ? [] : [nativeElement(text: 'Delayed message')];
+
+      final result = await handleNativeWaitFor(_contextWith(connector), {
+        'textContains': 'delayed',
+        'intervalMs': 50,
+      });
+
+      expect(result, _isToolSuccess(contains('"text":"Delayed message"')));
+      expect(connector.getElementsCalls, 3);
+    });
+
+    test('ignores zero-size (off-screen) matches', () async {
+      final connector = FakeNativeConnector()
+        ..onGetElements = (call) => [
+              nativeElement(text: 'Banner', width: call < 1 ? 0 : 100),
+            ];
+
+      final visible = await handleNativeWaitFor(
+        _contextWith(connector),
+        {'text': 'Banner', 'intervalMs': 50},
+      );
+
+      expect(visible, _isToolSuccess(contains('"state":"visible"')));
+      expect(connector.getElementsCalls, 2);
+    });
+
+    test('waits until the element is gone', () async {
+      final connector = FakeNativeConnector()
+        ..onGetElements =
+            (call) => call < 1 ? [nativeElement(text: 'Loading')] : [];
+
+      final result = await handleNativeWaitFor(_contextWith(connector), {
+        'text': 'Loading',
+        'state': 'gone',
+        'intervalMs': 50,
+      });
+
+      expect(result, _isToolSuccess(contains('"state":"gone"')));
+    });
+
+    test('times out with a hint', () async {
+      final connector = FakeNativeConnector.single([nativeElement(text: 'A')]);
+
+      final visible = await handleNativeWaitFor(_contextWith(connector), {
+        'text': 'B',
+        'timeoutMs': 120,
+        'intervalMs': 50,
+      });
+      final gone = await handleNativeWaitFor(_contextWith(connector), {
+        'text': 'A',
+        'state': 'gone',
+        'timeoutMs': 120,
+        'intervalMs': 50,
+      });
+
+      expect(
+        visible,
+        _isToolError(contains('within 120ms in com.example.app')),
+      );
+      expect(gone, _isToolError(contains('still visible after 120ms')));
+    });
+  });
+
+  group('native_long_press and native_double_tap', () {
+    test('press the center of the selected element', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'Long press here', x: 100, y: 200),
+      ]);
+      final context = _contextWith(connector);
+
+      expect(
+        await handleNativeLongPress(context, {
+          'textContains': 'long press',
+          'durationMs': 1000,
+        }),
+        _isToolSuccess(contains('long-pressed')),
+      );
+      expect(
+        await handleNativeDoubleTap(context, {'text': 'Long press here'}),
+        _isToolSuccess(contains('double-tapped')),
+      );
+
+      expect(connector.longPresses.single, (x: 150, y: 225, durationMs: 1000));
+      expect(connector.doubleTaps.single, (x: 150, y: 225, delayMs: 100));
+    });
+
+    test('accept coordinates and validate arguments', () async {
+      final connector = FakeNativeConnector();
+      final context = _contextWith(connector);
+
+      await handleNativeLongPress(context, {'x': 5, 'y': 6});
+      expect(connector.longPresses.single, (x: 5, y: 6, durationMs: 600));
+
+      expect(
+        await handleNativeLongPress(context, {'text': 'A', 'x': 1, 'y': 1}),
+        _isToolError(contains('not both')),
+      );
+      expect(
+        await handleNativeLongPress(context, {}),
+        _isToolError(contains('requires either')),
+      );
+      expect(
+        await handleNativeLongPress(context, {'x': 1, 'y': 1, 'durationMs': 5}),
+        _isToolError(contains('durationMs')),
+      );
+      expect(
+        await handleNativeDoubleTap(context, {'x': 1}),
+        _isToolError(contains('both x and y')),
+      );
+    });
+  });
+
+  group('native_pinch', () {
+    test('zooms in around the element with fingers inside it', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'Pinch here', x: 100, y: 500, width: 800),
+      ]);
+
+      final result = await handleNativePinch(
+        _contextWith(connector),
+        {'text': 'Pinch here', 'scale': 2},
+      );
+
+      expect(result, _isToolSuccess(contains('scale 2')));
+      final pinch = connector.pinches.single;
+      expect((pinch.centerX, pinch.centerY), (500, 525));
+      expect(pinch.startSpan, lessThanOrEqualTo(640));
+      expect(pinch.endSpan, pinch.startSpan * 2);
+      expect(pinch.endSpan, lessThanOrEqualTo(800));
+    });
+
+    test('defaults to the screen center and zooms out', () async {
+      final connector = FakeNativeConnector();
+
+      await handleNativePinch(_contextWith(connector), {'scale': 0.5});
+
+      final pinch = connector.pinches.single;
+      expect((pinch.centerX, pinch.centerY), (500, 1000));
+      expect((pinch.startSpan, pinch.endSpan), (800, 400));
+    });
+
+    test('validates scale and refuses pinches without room', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'Tiny', width: 40),
+      ]);
+      final context = _contextWith(connector);
+
+      for (final scale in [null, 1, 0.01, 11]) {
+        expect(
+          await handleNativePinch(context, {'scale': scale}),
+          _isToolError(contains('scale between 0.1 and 10')),
+        );
+      }
+      expect(
+        await handleNativePinch(context, {'text': 'Tiny', 'scale': 0.5}),
+        _isToolError(contains('Not enough room')),
+      );
+      expect(connector.pinches, isEmpty);
+    });
+  });
+
+  group('native_swipe', () {
+    test('swipes between the given points', () async {
+      final connector = FakeNativeConnector();
+
+      final result = await handleNativeSwipe(_contextWith(connector), {
+        'startX': 1,
+        'startY': 1000,
+        'endX': 800,
+        'endY': 1000,
+      });
+
+      expect(result, _isToolSuccess(contains('(800, 1000)')));
+      expect(
+        connector.swipes.single,
+        (startX: 1, startY: 1000, endX: 800, endY: 1000),
+      );
+    });
+
+    test('requires all four coordinates', () async {
+      expect(
+        await handleNativeSwipe(
+          _contextWith(FakeNativeConnector()),
+          {'startX': 1, 'startY': 1, 'endX': 2},
+        ),
+        _isToolError(contains('requires startX, startY, endX and endY')),
+      );
+    });
+  });
+
+  group('native_take_screenshot of an element', () {
+    test('captures the selected element', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'Logo', id: 'logo'),
+      ]);
+
+      final result = await handleNativeTakeScreenshot(_contextWith(connector), {
+        'id': 'logo',
+      });
+
+      expect(result.isError, isFalse);
+      expect(connector.elementScreenshots.single.resourceId, 'logo');
+      expect(
+        result.content.whereType<ImageContent>().single.data,
+        'fake-element-png-base64',
+      );
+    });
+
+    test('reports a missing element', () async {
+      final result = await handleNativeTakeScreenshot(
+        _contextWith(FakeNativeConnector()),
+        {'id': 'logo'},
+      );
+
+      expect(result, _isToolError(contains('No native element')));
     });
   });
 }

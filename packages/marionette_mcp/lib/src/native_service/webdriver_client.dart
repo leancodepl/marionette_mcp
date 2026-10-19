@@ -187,6 +187,18 @@ class WebDriverClient {
     await _request('POST', '/session/$sessionId/element/$elementId/clear');
   }
 
+  /// PNG (base64) of just element [elementId]
+  /// (`GET /session/{id}/element/{eid}/screenshot`), in the same pixel grid
+  /// as [takeScreenshot] on both servers.
+  Future<String> elementScreenshot(String sessionId, String elementId) async {
+    final value = await _request(
+      'GET',
+      '/session/$sessionId/element/$elementId/screenshot',
+    );
+    if (value is String && value.isNotEmpty) return value;
+    throw const WebDriverException('Element screenshot was empty');
+  }
+
   /// Returns attribute [name] of element [elementId], or null when the
   /// server has no value for it (`GET .../element/{id}/attribute/{name}`).
   Future<String?> elementAttribute(
@@ -278,9 +290,27 @@ class WebDriverClient {
     );
   }
 
+  /// Performs a touch gesture with one pointer per entry of [fingers], all
+  /// running in parallel. Each finger is a list of W3C pointer actions; see
+  /// [TouchStep] for building them. Coordinates are in server units.
+  Future<void> touchActions(
+    String sessionId,
+    List<List<Map<String, dynamic>>> fingers,
+  ) =>
+      performActions(sessionId, [
+        for (final (i, steps) in fingers.indexed)
+          {
+            'type': 'pointer',
+            'id': 'finger${i + 1}',
+            'parameters': {'pointerType': 'touch'},
+            'actions': steps,
+          },
+      ]);
+
   /// Convenience swipe built on [performActions]: a single pointer
   /// sequence that presses down at ([startX], [startY]) and moves to
-  /// ([endX], [endY]) over [durationMs] milliseconds.
+  /// ([endX], [endY]) over [durationMs] milliseconds, then keeps the finger
+  /// still for [holdMs] before lifting it (no fling when > 0).
   ///
   /// Coordinates are in the server's own units (pixels for UIAutomator2,
   /// points for WebDriverAgent).
@@ -291,32 +321,17 @@ class WebDriverClient {
     required int endX,
     required int endY,
     int durationMs = 300,
-  }) async {
-    await performActions(sessionId, [
-      {
-        'type': 'pointer',
-        'id': 'finger1',
-        'parameters': {'pointerType': 'touch'},
-        'actions': [
-          {
-            'type': 'pointerMove',
-            'duration': 0,
-            'x': startX,
-            'y': startY,
-          },
-          {'type': 'pointerDown', 'button': 0},
-          {
-            'type': 'pointerMove',
-            'duration': durationMs,
-            'origin': 'viewport',
-            'x': endX,
-            'y': endY,
-          },
-          {'type': 'pointerUp', 'button': 0},
+    int holdMs = 0,
+  }) =>
+      touchActions(sessionId, [
+        [
+          TouchStep.move(startX, startY),
+          TouchStep.down(),
+          TouchStep.move(endX, endY, durationMs: durationMs),
+          if (holdMs > 0) TouchStep.pause(holdMs),
+          TouchStep.up(),
         ],
-      },
-    ]);
-  }
+      ]);
 
   /// Returns the window size from UIAutomator2's
   /// `GET /session/{id}/window/current/size` (pixels). UIAutomator2 does not
@@ -515,4 +530,27 @@ class WebDriverClient {
       (bytes[offset + 2] << 8) |
       bytes[offset + 3];
   return (width: readUint32(16), height: readUint32(20));
+}
+
+/// Builders for the W3C pointer actions passed to
+/// [WebDriverClient.touchActions].
+abstract final class TouchStep {
+  /// Moves the finger to ([x], [y]) over [durationMs].
+  static Map<String, dynamic> move(int x, int y, {int durationMs = 0}) => {
+        'type': 'pointerMove',
+        'duration': durationMs,
+        'origin': 'viewport',
+        'x': x,
+        'y': y,
+      };
+
+  /// Puts the finger down at its current position.
+  static Map<String, dynamic> down() => {'type': 'pointerDown', 'button': 0};
+
+  /// Lifts the finger.
+  static Map<String, dynamic> up() => {'type': 'pointerUp', 'button': 0};
+
+  /// Keeps the finger where it is (down or up) for [durationMs].
+  static Map<String, dynamic> pause(int durationMs) =>
+      {'type': 'pause', 'duration': durationMs};
 }

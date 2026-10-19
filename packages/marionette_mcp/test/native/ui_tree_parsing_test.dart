@@ -117,7 +117,7 @@ void main() {
       ]);
     });
 
-    test('an empty field is labelled by its hint', () {
+    test('a field is labelled by its hint, empty or filled', () {
       final elements = parseAndroidUiDump(
         '<hierarchy>'
         '<android.widget.EditText class="android.widget.EditText" text="" '
@@ -127,7 +127,8 @@ void main() {
         '</hierarchy>',
       );
 
-      expect(elements.map((e) => e.text), ['Amount', '42']);
+      expect(elements.map((e) => e.text), ['Amount', 'Amount']);
+      expect(elements.map((e) => e.value), [null, '42']);
     });
 
     test('drops non-interactive empty container nodes', () {
@@ -331,6 +332,90 @@ void _unitTests() {
 
     test('returns null for unrelated output', () {
       expect(parseWmSize('error: closed'), isNull);
+    });
+  });
+
+  group('element state (N-01)', () {
+    test('Android: field content, focus, checked, selected, scrollable', () {
+      final elements = parseAndroidUiDump('''
+<hierarchy>
+  <node class="android.widget.EditText" text="Zażółć" hint="Name"
+      showing-hint="false" focused="true" clickable="true" enabled="true"
+      bounds="[0,0][100,50]"/>
+  <node class="android.widget.EditText" text="Search" hint="Search"
+      showing-hint="true" clickable="true" bounds="[0,50][100,100]"/>
+  <node class="android.widget.Switch" text="" content-desc="Wi-Fi"
+      checkable="true" checked="true" clickable="true"
+      bounds="[0,100][100,150]"/>
+  <node class="android.widget.Button" text="Disabled" enabled="false"
+      clickable="true" checkable="false" checked="false"
+      bounds="[0,150][100,200]"/>
+  <node class="android.widget.FrameLayout" content-desc="Home" selected="true"
+      clickable="true" bounds="[0,200][100,250]"/>
+  <node class="androidx.recyclerview.widget.RecyclerView" scrollable="true"
+      clickable="false" bounds="[0,250][100,400]"/>
+</hierarchy>''');
+
+      expect(elements, hasLength(6));
+      final [typed, hint, toggle, disabled, tab, list] = elements;
+      expect((typed.value, typed.focused), ('Zażółć', true));
+      expect((hint.value, hint.text), (null, 'Search'));
+      expect(toggle.checked, isTrue);
+      expect((disabled.enabled, disabled.checked), (false, null));
+      expect(tab.selected, isTrue);
+      expect(list.scrollable, isTrue);
+      expect(list.toJson()['scrollable'], isTrue);
+      expect(disabled.toJson(), containsPair('enabled', false));
+      expect(tab.toJson().containsKey('enabled'), isFalse);
+    });
+
+    test('iOS: value only for inputs, switches checked, selected trait', () {
+      final elements = parseWdaSource('''
+<XCUIElementTypeApplication>
+  <XCUIElementTypeTextField value="typed" label="Name" placeholderValue="Name"
+      enabled="true" x="0" y="0" width="10" height="10"/>
+  <XCUIElementTypeTextField value="Search" label="" placeholderValue="Search"
+      name="search" enabled="true" x="0" y="10" width="10" height="10"/>
+  <XCUIElementTypeSwitch value="0" label="Wi-Fi" enabled="true"
+      x="0" y="20" width="10" height="10"/>
+  <XCUIElementTypeButton value="1" label="Testing" traits="Selected, Button"
+      enabled="true" x="0" y="30" width="10" height="10"/>
+  <XCUIElementTypeButton label="Disabled action" enabled="false"
+      x="0" y="40" width="10" height="10"/>
+  <XCUIElementTypeScrollView enabled="true" x="0" y="50" width="10"
+      height="10"/>
+</XCUIElementTypeApplication>''');
+
+      expect(elements, hasLength(6));
+      final [typed, empty, toggle, tab, disabled, scroll] = elements;
+      expect((typed.text, typed.value), ('Name', 'typed'));
+      expect(empty.value, isNull);
+      expect((toggle.checked, toggle.value), (false, null));
+      expect((tab.selected, tab.value, tab.checked), (true, null, null));
+      expect(disabled.enabled, isFalse);
+      expect(scroll.scrollable, isTrue);
+      expect(typed.focused, isNull, reason: 'WDA does not report focus');
+    });
+
+    test('scaled keeps the state', () {
+      const element = NativeElement(
+        className: 'XCUIElementTypeSwitch',
+        clickable: true,
+        bounds: NativeBounds(x: 1, y: 1, width: 1, height: 1),
+        value: 'v',
+        enabled: false,
+        checked: true,
+        selected: true,
+        scrollable: true,
+      );
+
+      final json = element.scaled(3).toJson();
+
+      expect(json, containsPair('value', 'v'));
+      expect(json, containsPair('enabled', false));
+      expect(json, containsPair('checked', true));
+      expect(json, containsPair('selected', true));
+      expect(json, containsPair('scrollable', true));
     });
   });
 }

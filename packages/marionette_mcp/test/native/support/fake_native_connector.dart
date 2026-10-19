@@ -8,6 +8,10 @@ NativeElement nativeElement({
   String? text,
   String? id,
   bool clickable = true,
+  String? value,
+  bool enabled = true,
+  bool? checked,
+  bool scrollable = false,
   int x = 0,
   int y = 0,
   int width = 100,
@@ -18,13 +22,18 @@ NativeElement nativeElement({
       text: text,
       resourceId: id,
       clickable: clickable,
+      value: value,
+      enabled: enabled,
+      checked: checked,
+      scrollable: scrollable,
       bounds: NativeBounds(x: x, y: y, width: width, height: height),
     );
 
 /// In-memory [NativeConnector] that records every interaction.
 ///
 /// [screens] is the UI tree sequence: the connector shows `screens[n]` after
-/// `n` swipes (the last screen repeats), which models scrolling.
+/// `n` swipes (the last screen repeats), which models scrolling. Assign
+/// [onGetElements] to change the screen over time instead.
 class FakeNativeConnector implements NativeConnector {
   FakeNativeConnector({
     List<List<NativeElement>>? screens,
@@ -65,6 +74,17 @@ class FakeNativeConnector implements NativeConnector {
   /// Result of [isKeyboardShown]; [hideKeyboard] sets it to false.
   bool keyboardShown = false;
   final List<({int startX, int startY, int endX, int endY})> swipes = [];
+
+  /// `holdMs` of each entry in [swipes].
+  final List<int> swipeHolds = [];
+  final List<({int x, int y, int durationMs})> longPresses = [];
+  final List<({int x, int y, int delayMs})> doubleTaps = [];
+  final List<({int centerX, int centerY, int startSpan, int endSpan})> pinches =
+      [];
+  final List<NativeElement> elementScreenshots = [];
+
+  /// When set, replaces [screens]: called with the call count (from 0).
+  List<NativeElement> Function(int call)? onGetElements;
   int getElementsCalls = 0;
   int disposeCalls = 0;
 
@@ -77,8 +97,9 @@ class FakeNativeConnector implements NativeConnector {
   @override
   Future<List<NativeElement>> getNativeElements() async {
     _maybeThrow();
+    final dynamicScreen = onGetElements?.call(getElementsCalls);
     getElementsCalls++;
-    return screens[min(swipes.length, screens.length - 1)];
+    return dynamicScreen ?? screens[min(swipes.length, screens.length - 1)];
   }
 
   @override
@@ -143,9 +164,47 @@ class FakeNativeConnector implements NativeConnector {
     required int endX,
     required int endY,
     int durationMs = 300,
+    int holdMs = 0,
   }) async {
     _maybeThrow();
     swipes.add((startX: startX, startY: startY, endX: endX, endY: endY));
+    swipeHolds.add(holdMs);
+  }
+
+  @override
+  Future<void> longPress(int x, int y, {int durationMs = 600}) async {
+    _maybeThrow();
+    longPresses.add((x: x, y: y, durationMs: durationMs));
+  }
+
+  @override
+  Future<void> doubleTap(int x, int y, {int delayMs = 100}) async {
+    _maybeThrow();
+    doubleTaps.add((x: x, y: y, delayMs: delayMs));
+  }
+
+  @override
+  Future<void> pinch({
+    required int centerX,
+    required int centerY,
+    required int startSpan,
+    required int endSpan,
+    int durationMs = 500,
+  }) async {
+    _maybeThrow();
+    pinches.add((
+      centerX: centerX,
+      centerY: centerY,
+      startSpan: startSpan,
+      endSpan: endSpan,
+    ));
+  }
+
+  @override
+  Future<String> takeElementScreenshot(NativeElement element) async {
+    _maybeThrow();
+    elementScreenshots.add(element);
+    return 'fake-element-png-base64';
   }
 
   @override

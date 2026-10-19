@@ -52,6 +52,14 @@ class TestingScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/testing/keyboard'),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.touch_app_outlined),
+            title: const Text('Gestures & inspection'),
+            subtitle: const Text('State, gestures, waiting, scrolling'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/gestures'),
+          ),
         ],
       ),
     );

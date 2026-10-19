@@ -9,8 +9,11 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D1](#d1) | Ambiguous element selectors | Accepted |
 | [D2](#d2) | Coordinate space of the native lane | Accepted |
 | [D3](#d3) | Automatic recovery of a lost session | Accepted |
+| [D6](#d6) | Screenshot of part of the screen | Accepted |
 | [D10](#d10) | UIAutomator2 local port and server reuse | Accepted |
 | [D14](#d14) | Software keyboard and key presses | Accepted |
+| [D15](#d15) | Element state and the label / content of text fields | Accepted |
+| [D16](#d16) | Scrolling to an element and waiting for one | Accepted |
 
 ---
 
@@ -160,6 +163,44 @@ Most losses happen between calls (the server died while the agent was thinking),
 
 ---
 
+<a id="d6"></a>
+
+## D6 — Screenshot of part of the screen
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_take_screenshot` (selector mode); `NativeConnector.takeElementScreenshot`, `WebDriverClient.elementScreenshot`.
+
+### Context and dilemma
+
+A full screenshot costs the agent many tokens, and often only one platform view, dialog or icon matters. Cropping an arbitrary rectangle inside Marionette needs PNG decoding and encoding — a new dependency (e.g. `image`) or a hand-written codec — while `marionette_mcp` avoids new dependencies.
+
+### Options considered
+
+1. The `image` package and cropping any rectangle.
+2. A hand-written PNG decoder.
+3. Only an element screenshot through the server's W3C endpoint (`GET /session/{id}/element/{eid}/screenshot`); rectangles postponed.
+
+### Decision
+
+Option 3. `native_take_screenshot` accepts the shared selector ([D1](#d1)); the selected element is located on the server and captured with the W3C element-screenshot endpoint. The element is located by its exact geometry from the same UI tree — UIAutomator2: class plus `@bounds="[x1,y1][x2,y2]"`; WebDriverAgent: type plus `@x/@y/@width/@height` in points — with the resource id as a fallback, so a repeated id or label cannot select another element. An arbitrary rectangle is not supported.
+
+### Rationale
+
+No new dependency, and the element case covers the main use (a platform view, a dialog). Locating by geometry reuses the approach that already fixed wrong-element taps on iOS ([D1](#d1)).
+
+### Consequences
+
+- No screenshot of an area without an element (e.g. part of a camera preview that has no accessibility node); to be reconsidered if the need appears.
+- The element must still be on screen; if the tree changed between selection and capture the tool fails with "call native_get_elements and retry".
+
+### Verification
+
+- Endpoint probed live on both servers: UIAutomator2 (API 28) and WebDriverAgent (iOS 18.6) return a PNG of the element; on iOS in pixels, not points.
+- Through the MCP server: Android API 28 — the pinch target (992×510 bounds) gives a 992×510 PNG; iOS 18.6 — the double-tap target (1224×288) gives 1224×288, the `horizontal_list` container 1224×190. The full screenshot is unchanged.
+- Unit tests cover the geometry XPath on both platforms, the id fallback and the "element is gone" error.
+
+---
+
 <a id="d10"></a>
 
 ## D10 — UIAutomator2 local port and server reuse
@@ -245,7 +286,8 @@ No operation may have a hidden side effect: an unconditional Back would navigate
 ### Consequences
 
 - Some iOS keyboards (number pad, default keyboard of a plain `UITextField`) cannot be hidden by the tool; the agent gets a hint instead.
-- On iOS the typed text of a field labelled by Flutter (`label="Title"`) is reported as the label, not the value, in `native_get_elements` — to be addressed by the richer element model (N-01).
+- On iOS, `clear: true` (W3C element clear in WebDriverAgent) hides the keyboard while the field keeps focus; typing afterwards still works. Tapping a field that already has focus does not bring the keyboard back — tap another control (or unfocus) first.
+- On iOS the typed text of a field labelled by Flutter (`label="Title"`) is reported as the label, not the value, in `native_get_elements` — to be addressed by the richer element model (N-01). *Resolved by [D15](#d15): the content is reported as `value`.*
 
 ### Verification
 
@@ -259,4 +301,102 @@ No operation may have a hidden side effect: an unconditional Back would navigate
 - Live, Android API 35 (follow-up): Polish characters in both modes, `clear` through a selector, `enter` inserts a newline in a multi-line field and submits a single-line one (the keyboard closes), `tab` moves focus to the next field, typing with nothing focused fails with the hint.
 - Live, iOS 18.6: focused typing appends and backspace deletes; the Flutter `Title` field (Done key) is hidden; the number pad and a plain `UITextField` fail fast (≈ 4 s, of which most is WDA trying keys) with the hint; home works; back / recents / volume are reported as unsupported.
 - Unit tests cover keycode mapping, Back never sent without a keyboard, polling and failure, iOS key mapping, dismiss key names without `return`, fail-fast without polling, focused typing with clear, and decorator classification.
+- Follow-up (2026-10-19, iOS 18.6): `native_hide_keyboard` failed with "no Done / dismiss key" after a field was cleared. Cause: the iOS keyboard check only looked for `XCUIElementTypeKeyboard` in the page source, but a hidden keyboard stays in the tree, parked just below the screen (`y` = application height, `visible="false"`; screenshots confirmed no keyboard on screen). Hiding then tried to dismiss a keyboard that was not there. The keyboard now counts as shown only when it has a size and its top edge is above the bottom of the application; `visible` is not used because WDA reports it inconsistently. The Done key itself was enabled in the empty field, which ruled out the first guess (`enablesReturnKeyAutomatically`). Verified live: in that state the tool reports "Keyboard was not shown"; with a keyboard on screen (empty or filled field) it hides it. Unit tests cover the parked keyboard and an on-screen one.
+
+---
+
+<a id="d15"></a>
+
+## D15 — Element state and the label / content of text fields
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_get_elements` (fields `value`, `enabled`, `focused`, `checked`, `selected`, `scrollable`; filters); `NativeElement`, `parseAndroidUiDump`, `parseWdaSource`; the `text` selector of every element-targeting tool.
+
+### Context and dilemma
+
+Agents could see what an element says, but not its state: whether a switch is on, a button disabled, a field focused, or what was typed into a field. iOS made the last one impossible: a Flutter field labelled "Title" reported only the label, and its content was nowhere ([D14](#d14)). Android did the opposite — once something was typed, `text` became the content and the label disappeared, so `native_enter_text label="Title"` stopped finding the field it had just typed into. Both servers expose state attributes, but with different names and with traps (see below). The output also must not grow much: every `native_get_elements` call is paid for in tokens.
+
+### Options considered
+
+- **Shape:** (a) the raw attribute maps of each platform; (b) one platform-neutral set of fields, each emitted only when it carries information.
+- **Field text:** (a) `text` is whatever the platform reports (content on Android once typed, label on iOS); (b) `text` is the label or placeholder, the content goes to a separate `value` — on both platforms.
+- **iOS `value`:** (a) report `value` for every element; (b) only for input types.
+
+### Decision
+
+- `NativeElement` gains `value`, `enabled`, `focused`, `checked`, `selected`, `scrollable`. JSON includes them only when non-default: `value` when present, `enabled: false`, `focused: true`, `checked` for checkable elements (both `true` and `false`), `selected: true`, `scrollable: true`.
+- **Text fields keep their label in `text`** and report their content in `value`: Android takes `hint` → `content-desc` → `text` for `EditText` / `AutoCompleteTextView` (Flutter puts the label in `hint`, which stays after typing); `value` is `text` unless it is the hint (`showing-hint`, or equal to `hint`). iOS takes `label` → `placeholderValue` → `value` for text fields; `value` is reported unless it equals `placeholderValue` (an empty field reports its placeholder as its value).
+- iOS `value` is reported only for text fields and sliders. Other types use it for unrelated state: a selected tab button reports `value="1"`, the keyboard's "Next keyboard" key reports the list of keyboards.
+- `checked`: Android `checked` when `checkable="true"`; iOS `value` "1"/"0" of `Switch` / `CheckBox` / `Toggle` (a Flutter `CheckboxListTile` is an iOS `Switch`). `selected`: Android attribute, iOS `Selected` in `traits`. `focused`: Android only — WebDriverAgent has no focus attribute, so it is absent rather than `false`. `scrollable`: Android attribute; iOS `ScrollView` / `Table` / `CollectionView`. Scrollable containers are always listed, even without text or id, so they can serve as `native_scroll` `within`.
+- `native_get_elements` accepts the selector fields (`text`, `textContains`, `id`, `type`) as filters, `clickableOnly`, and `includeForegroundApp` (default `true`; `false` saves a device call). Android `package` per element and an explicit `index` field from the plan were not added: `foregroundApp` already tells a system surface apart, and the tree order is the index.
+
+### Rationale
+
+One shape for both platforms is what lets an agent use the same reasoning everywhere; omitting defaults keeps the output close to its previous size. The label/content split makes a field's identity stable — the selector that typed into it still finds it — and is what iOS already did for labels, so Android was aligned to it rather than the other way round.
+
+### Consequences
+
+- **Behaviour change (Android):** a filled field's `text` is now its label (e.g. `Title`), not its content (`Gęś 2`); a selector on the content must use the label instead, and the content is in `value`. Native fields without a hint fall back to `content-desc`, then the content.
+- `native_tap` / `native_enter_text` selectors match `text` only, not `value`.
+- iOS keeps off-screen Flutter semantics nodes in the tree with zero-size bounds at (0, 0). They are still listed (they are part of the tree), but [D16](#d16) does not count them as visible.
+
+### Verification
+
+- Fixtures: the API 28 keyboard screen has exactly one focused field and no values; the API 35 native field reports `text` "Type here (native)" and `value` "API 35"; the API 28 home tab is `selected`; on iOS 26 the native field's placeholder and the selected tab's `value="1"` are not reported as values.
+- Live through the MCP server, Android API 28 and iOS 18.6 (Testing → Gestures & inspection): the Wi-Fi switch and the terms checkbox report `checked` and change after `native_tap`, "Disabled action" reports `enabled: false`, the Testing tab `selected: true`, the page and the two lists `scrollable: true`; filters (`textContains`, `type`, `clickableOnly`, `includeForegroundApp: false`) return only the matching elements.
+- Live, Keyboard screen, both platforms: after `native_enter_text label="Title" text="Gęś"` and appending `" 2"`, the field is `text: "Title"`, `value: "Gęś 2"`; selecting it by `label="Title"` keeps working; after `clear` the value disappears. On iOS this closes the gap noted in [D14](#d14).
+- Unit tests cover both parsers (state, field label/value, iOS value types), `scaled` keeping the state, JSON omission of defaults, and the filters.
+
+---
+
+<a id="d16"></a>
+
+## D16 — Scrolling to an element and waiting for one
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_scroll` (target search, `within`, `maxSwipes`), `native_wait_for`; `NativeElement.isVisible`; `NativeConnector.swipe` (`holdMs`).
+
+### Context and dilemma
+
+`native_scroll` with a target swiped up to ten times and then failed, without knowing whether the list had ended; it could only swipe the middle of the screen, not a nested list; and it reported "found" as soon as the target was anywhere in the tree. Live tests on the new example screen showed three more problems:
+
+- On iOS, Flutter keeps off-screen items in the tree as zero-size nodes at (0, 0), so a target far below the fold was "found" after zero swipes.
+- `native_scroll` returned while the list was still flinging; the agent then tapped the reported position, and on iOS a tap during scroll momentum only stops the scroll — the button was not pressed and a `native_wait_for` for its effect timed out.
+- On iOS one 300 ms swipe moved a list by about 2.4× the finger distance (more than the list's height), so the search skipped over the target and stopped at the end of the list.
+
+Waiting had the same root: agents used fixed sleeps for dialogs and delayed content.
+
+### Options considered
+
+- **Visibility:** trust tree membership; use WDA's `visible` attribute (unreliable: tabs covered by the keyboard report `visible="false"`); or require non-zero bounds.
+- **End of list:** a fixed number of swipes; or compare what is visible before and after a swipe.
+- **Settling:** a fixed delay after each swipe; or re-read the tree until it stops changing.
+- **Momentum:** a quick swipe (fast, but overshoots); a swipe that rests before lifting (removes momentum on Android, only reduces it on iOS: 300 ms + 200 ms rest still moved the content ≈ 1.7× the finger distance); a slow drag with a rest (≈ 0.85–1.2× on iOS).
+
+### Decision
+
+- An element counts as visible only with non-zero width and height (`NativeElement.isVisible`); `native_scroll` and `native_wait_for` ignore invisible matches.
+- **Searching swipes are slow drags:** 1 s movement, then the finger rests 300 ms before lifting (`holdMs`). Inside a `within` container a search swipe covers 60% of it by default, so even with iOS's residual momentum the content moves less than one container height and no item is skipped. A plain swipe (no target) stays a quick 300 ms swipe of 400 px, or 80% of a `within` container.
+- After every search swipe the tree is re-read until two consecutive reads agree (at most six reads), so the reported state is the settled one.
+- **End of list:** if the visible content of the area (texts and positions of visible elements whose center lies in the screen or `within` container) did not change after a swipe, the search stops with "reached the end of the content". Comparing only the container ignores e.g. a clock elsewhere on screen.
+- `within` takes a selector of the container (resolved with [D1](#d1) rules); the swipe is centered on it. `maxSwipes` defaults to 10 (max 50). `within` and `startX`/`startY` are mutually exclusive.
+- `native_wait_for` polls `getNativeElements` every `intervalMs` (default 500, min 50) until a visible match exists (`state: visible`, returns the element) or none does (`state: gone`), up to `timeoutMs` (default 10 000, max 60 000). On timeout it names the foreground app, because a system surface on top is the usual reason.
+
+### Rationale
+
+Correctness first: a search that silently skips its target, or a "found" that cannot be tapped, is worse than a slower one. The slow drag was measured to be the only variant that stays close to the finger distance on iOS; the 60% share leaves margin for the remaining momentum. Comparing visible content needs no platform knowledge and also catches lists whose end is not reported as an attribute.
+
+### Consequences
+
+- Searching is slower: ≈ 2 s per swipe on Android API 28 and ≈ 2.3 s on iOS 18.6 including the settle reads. In a 60-row list (a row ≈ 25% of the container) reaching row 45 takes about 10 swipes; agents scrolling far should raise `maxSwipes`.
+- A swipe that does not move the content (wrong direction at the start of the list, or a swipe in a non-scrollable area) ends the search early with "reached the end" — that is the intended signal to try the opposite direction or a `within` container.
+- A plain `native_scroll` may still fling; an agent that taps right after it should read the elements again first (or use a target).
+- Off-screen zero-size nodes still appear in `native_get_elements`; `native_tap` on one would tap (0, 0). Tracked in the plan status as a follow-up.
+
+### Verification
+
+- Live through the MCP server, Android API 28 and iOS 18.6, Gestures & inspection screen: scrolling the page to "Show message in 2 s", tapping it and `native_wait_for` "Delayed message" (`visible`, ≈ 2.5–2.9 s) and then `gone` (≈ 4 s) work; a missing element times out naming `com.example.counter`. Before the settle step, the same sequence failed on iOS (tap during momentum).
+- `within` the horizontal list: "Chip 17" found going left, "Chip 2" going back right; "Chip 99" stops with "reached the end"; the page itself does not move. `within` the vertical list: "Row 22" (7–8 swipes) and "Row 45" (10 swipes) found on both platforms; "Row 99" stops at the end. Before the slow drag, iOS skipped "Row 30" and "Row 45" and stopped at row 60.
+- Off-screen check: on iOS "Show message in 2 s" is listed at (0, 0, 0×0) before scrolling; it is now found only after a swipe.
+- Unit tests cover zero-size matches, settling, the slow held drag, end detection (whole screen and container only), the 60% / 80% shares, `maxSwipes`, `within` validation, and every `native_wait_for` path.
 

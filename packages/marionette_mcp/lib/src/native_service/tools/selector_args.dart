@@ -13,7 +13,8 @@ Map<String, JsonSchema> nativeSelectorProperties({
     {
       textKey: JsonSchema.string(
         description: 'Exact visible text (Android text/content-desc, iOS '
-            'label/value) as returned by native_get_elements.',
+            'label/value; for a text field its label or placeholder, not '
+            'its content) as returned in "text" by native_get_elements.',
       ),
       'textContains': JsonSchema.string(
         description: 'Case-insensitive part of the visible text.',
