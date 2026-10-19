@@ -76,6 +76,10 @@ const _maxSimilar = 5;
 /// Resolves [selector] against [elements] (a UI tree in document order).
 ///
 /// - All criteria are combined with AND.
+/// - Only visible elements count ([NativeElement.isVisible]): Flutter on iOS
+///   keeps off-screen nodes in the tree with zero size at (0, 0), and acting
+///   on one would hit the top-left corner. A target that exists only off
+///   screen fails with a hint to scroll (docs/native-lane-decisions.md#d16).
 /// - With [NativeSelector.index], returns that match (0-based, tree order,
 ///   counting all matches); out of range throws
 ///   [NativeElementNotFoundException].
@@ -89,7 +93,8 @@ NativeElement selectElement(
   List<NativeElement> elements,
   NativeSelector selector,
 ) {
-  final matches = elements.where(selector.matches).toList();
+  final matches =
+      elements.where((e) => e.isVisible && selector.matches(e)).toList();
 
   final index = selector.index;
   if (index != null) {
@@ -102,6 +107,13 @@ NativeElement selectElement(
 
   if (matches.length == 1) return matches.single;
   if (matches.isEmpty) {
+    if (elements.any(selector.matches)) {
+      throw NativeElementNotFoundException(
+        '${selector.describe()} on screen',
+        hint: 'It exists but is scrolled out of view. Bring it on screen '
+            'with native_scroll (pass the same selector as the target).',
+      );
+    }
     throw NativeElementNotFoundException(
       selector.describe(),
       similar: _similarTexts(elements, selector),

@@ -10,10 +10,15 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D2](#d2) | Coordinate space of the native lane | Accepted |
 | [D3](#d3) | Automatic recovery of a lost session | Accepted |
 | [D6](#d6) | Screenshot of part of the screen | Accepted |
+| [D7](#d7) | Default app for device shortcuts | Accepted |
+| [D9](#d9) | Granularity of device shortcut tools | Accepted |
 | [D10](#d10) | UIAutomator2 local port and server reuse | Accepted |
+| [D11](#d11) | Starting and activating apps | Accepted |
+| [D12](#d12) | Device operations outside WebDriver | Accepted |
 | [D14](#d14) | Software keyboard and key presses | Accepted |
 | [D15](#d15) | Element state and the label / content of text fields | Accepted |
 | [D16](#d16) | Scrolling to an element and waiting for one | Accepted |
+| [D17](#d17) | Changing permissions without the system dialog | Accepted |
 
 ---
 
@@ -201,6 +206,78 @@ No new dependency, and the element case covers the main use (a platform view, a 
 
 ---
 
+<a id="d7"></a>
+
+## D7 — Default app for device shortcuts
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_permissions`, `native_app`, `native_notifications action=push` (`appId`); `NativeServiceContext.defaultAppId`, `isSystemAppId`.
+
+### Context and dilemma
+
+Shortcuts act on an app and need its Android package name or iOS bundle id. Requiring it in every call makes the agent hunt for an identifier it rarely knows; guessing from the current foreground app is wrong exactly when shortcuts are needed — a permission dialog, a picker or the browser is in front.
+
+### Options considered
+
+1. `appId` always required.
+2. Default to the current foreground app.
+3. Default to the first non-system app seen in the foreground during the session, always overridable.
+
+### Decision
+
+Option 3. The session remembers the first foreground app that is not a system app; that is the default `appId`, and every result names the app it acted on. The foreground app is observed at `native_connect`, in `native_get_elements`, `native_device_info`, a successful `native_wait_for` (only while the default is unknown, so it costs nothing afterwards), and right before a shortcut needs it. An explicit non-system `appId` also becomes the default when none is known — the agent has named the app under test. When nothing is known, the tool fails and asks for `appId`. System apps are recognised by prefix: `com.android.`, `com.google.android.`, common OEM prefixes (`com.samsung.`, `com.sec.android.`, `com.miui.`, `com.xiaomi.`, `com.huawei.`, `com.oppo.`, `com.coloros.`), `android`, and `com.apple.`.
+
+### Rationale
+
+An agent normally connects with the app on screen, so the default is right; option 2 would be wrong in the very situations shortcuts exist for.
+
+### Consequences
+
+- The prefix list needs maintenance; Google apps (e.g. Chrome `com.android.chrome`) count as system, so they can only be targeted with an explicit `appId` — acceptable, since they are never the app under test.
+- A session started while a system surface is in front has no default until the app is seen.
+
+### Verification
+
+- Live: sessions started with the launcher, Chrome or a SpringBoard alert in front had no default; the first runs showed that observing only at `native_connect` / `native_get_elements` was not enough (an agent waiting with `native_wait_for` and then calling `native_app` got "pass appId"), which added the observation in `native_wait_for`, before a shortcut, and for an explicit `appId`.
+- Unit tests: system prefixes, first app wins, lazy lookup, `native_wait_for` observation, explicit `appId`, reset on disconnect.
+
+---
+
+<a id="d9"></a>
+
+## D9 — Granularity of device shortcut tools
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_permissions`, `native_app`, `native_notifications`, `native_device_info`, `native_set_orientation`, `native_set_location`, `native_open_url`.
+
+### Context and dilemma
+
+Every MCP tool costs space in the agent's context (name, description, schema). One tool per operation is the clearest schema but multiplies the tool count.
+
+### Options considered
+
+1. One tool per operation (`native_grant_permission`, `native_revoke_permission`, …).
+2. Topic tools with an `action` parameter.
+
+### Decision
+
+Option 2: `native_permissions` (grant / revoke / reset), `native_app` (activate / background / terminate / restart), `native_notifications` (open / close / push). Operations with different annotations stay separate: `native_device_info` is read-only, `native_set_orientation` and `native_set_location` change state, `native_open_url` has a single parameter. Invalid `action` × parameter combinations are rejected in the handler before any device call. Biometrics (`native_biometrics`, S-05) is postponed to unit 8, where the example app gets a screen to verify it on.
+
+### Rationale
+
+Fewer tools in context; consistent with `native_scroll` (one tool, several modes) and with the read-only annotation that agents and hosts use.
+
+### Consequences
+
+- Dependent parameters must be validated precisely; each combination has a unit test.
+- `native_app` has no separate `launch`: on both platforms starting a running app brings back its existing instance ([D11](#d11)), so `activate` covers both; `restart` gives a fresh start.
+
+### Verification
+
+- Unit tests for every action and invalid combination; all tools exercised live on Android API 28, API 35 and iOS 18.6.
+
+---
+
 <a id="d10"></a>
 
 ## D10 — UIAutomator2 local port and server reuse
@@ -251,6 +328,83 @@ Zero configuration in the common single-device case (still port 8200), correct b
   - With a listener on 8200, the forward used 8201; `MARIONETTE_UIA2_PORT=8250` used 8250; `MARIONETTE_UIA2_PORT=8200` while busy and `MARIONETTE_UIA2_PORT=abc` failed immediately with a hint.
   - A second process connected in ≈ 0.1 s by reusing the running server and left it running on disconnect; the first process's next call took ≈ 1.9 s because its session had been replaced (see consequences).
 - Android emulator (API 28): `sha256sum` is available and both installed APK hashes equal the pinned ones; two consecutive connects did not reinstall (`lastUpdateTime` unchanged, connect ≈ 1.7 s); the forward exists only during the session.
+
+---
+
+<a id="d11"></a>
+
+## D11 — Starting and activating apps
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_app action=activate|restart`; `NativeDevice.activateApp`.
+
+### Context and dilemma
+
+Returning to the app after a share sheet, browser or Settings must not restart it — the agent's state would be lost. Android offers `monkey` (simple, but meant for random testing) and `am start` (needs the activity name); iOS offers `simctl launch` and WebDriverAgent's `/wda/apps/*`.
+
+### Options considered
+
+- Android: `monkey -p <pkg> -c LAUNCHER 1`; `cmd package resolve-activity --brief` + `am start -n`.
+- iOS: WDA `/wda/apps/activate`; `xcrun simctl launch`.
+
+### Decision
+
+- **Android:** `cmd package resolve-activity --brief <pkg>` → `am start -n <activity>`, falling back to `monkey` for unusual manifests; a missing app fails with a hint.
+- **iOS:** `simctl launch`; WDA app endpoints are not needed.
+- `terminate`: Android `am force-stop`, iOS `simctl terminate` ("found nothing to terminate" is reported as "was not running"). `background`: the Home key through the session.
+
+### Rationale
+
+Both mechanisms are official and predictable, and — verified — bring back the existing instance instead of creating a new one.
+
+### Consequences
+
+- `activate` never restarts a running app; `restart` is the explicit fresh start.
+- `terminate` / `restart` end the Flutter lane connection; the results say so.
+
+### Verification
+
+- Android API 28: on the Keyboard screen → Home → `am start -n` printed "Activity not started, its current task has been brought to the front", one activity record in the task, the Keyboard screen kept.
+- iOS 18.6: the backgrounded app (pid 55167) on the Keyboard screen came back with the same pid and screen after `simctl launch`.
+- Live through the MCP server on API 35 and iOS 18.6: `background` → `activate` returns to the same screen; `restart` starts on Home; `terminate` twice reports "was not running" the second time.
+
+---
+
+<a id="d12"></a>
+
+## D12 — Device operations outside WebDriver
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `NativeDevice` (`AndroidNativeDevice` on `AdbClient`, `IosNativeDevice` on `SimctlClient`), `NativeConnector.device`, the device shortcut tools.
+
+### Context and dilemma
+
+Shortcuts (permissions, URLs, app lifecycle, location) run through `adb` / `simctl`, not the WebDriver session. Adding them to `NativeConnector` would bloat the interface that is responsible for UI, and its session-recovery decorator.
+
+### Options considered
+
+1. More methods on `NativeConnector`.
+2. A separate `NativeDevice` interface reachable through `connector.device`.
+
+### Decision
+
+Option 2. `NativeDevice` covers info, permissions, URLs, app activate / terminate / running state, notification shade, push and location. Operations that need the UI stay on the connector and are combined in the tool layer: `background` presses Home, iOS Notification Center is opened and closed by swipes (no command exists), orientation uses W3C `/orientation`. The iOS device needs the simulator UDID, which the connector takes from `IosBootstrap.resolvedUdid`. The recovering decorator passes `device` through without recovery — it does not use the session. Failures are typed (`NativeOperationFailedException`, `NativeUnsupportedException`) with hints.
+
+### Rationale
+
+Separation of concerns, simple fakes (`FakeNativeDevice`), and the same device operations can later serve the CLI without a WebDriver session.
+
+### Consequences
+
+- iOS shortcuts work on the Simulator only (`simctl`); physical iPhones need X-02.
+- iOS Notification Center contents are visible to `native_get_elements` when it is opened over the home screen (SpringBoard is the active app), but not when opened over the app — WebDriverAgent keeps reporting the app's tree; a screenshot shows them.
+
+### Verification
+
+- Endpoints / commands verified before implementation: `pm grant|revoke`, `pm clear-permission-flags` (API 35; absent on API 28), `cmd package resolve-activity`, `am start`, `cmd statusbar expand-notifications|collapse` (API 28, 35), `pidof`, `adb emu geo fix` ("OK"); `simctl privacy` (services listed by Xcode 26.4; `camera` accepted although unlisted, `notifications` fails, `photos` recorded but ignored by the full-access Photo Library API, `grant all` partial on iOS 26.4 — see [D17](#d17)), `simctl openurl|launch|terminate|push|location`, `launchctl list` inside the simulator; W3C `/orientation` on UIAutomator2 and WebDriverAgent (screen size and bounds follow the rotation).
+- Live through the MCP server on Android API 28, API 35 and iOS 18.6: device info, deep link `marionette-example://app/testing/gestures` (cold and warm start; iOS asks "Open in …?" first), https URL in the browser and back with `activate`, notification shade open / close (Android shade contents in the tree), iOS push with Polish characters visible as a banner and in Notification Center, orientation in both directions, location accepted.
+- iOS Notification Center: the first close gesture (swipe up in the middle) only scrolled the list; closing now swipes up from the bottom edge. Rotation is refused while Notification Center is in front ("Unable To Rotate Device"); that error is now typed with a hint to close it.
+- Unit tests for both devices on scripted processes, all tools on fakes.
 
 ---
 
@@ -391,7 +545,7 @@ Correctness first: a search that silently skips its target, or a "found" that ca
 - Searching is slower: ≈ 2 s per swipe on Android API 28 and ≈ 2.3 s on iOS 18.6 including the settle reads. In a 60-row list (a row ≈ 25% of the container) reaching row 45 takes about 10 swipes; agents scrolling far should raise `maxSwipes`.
 - A swipe that does not move the content (wrong direction at the start of the list, or a swipe in a non-scrollable area) ends the search early with "reached the end" — that is the intended signal to try the opposite direction or a `within` container.
 - A plain `native_scroll` may still fling; an agent that taps right after it should read the elements again first (or use a target).
-- Off-screen zero-size nodes still appear in `native_get_elements`; `native_tap` on one would tap (0, 0). Tracked in the plan status as a follow-up.
+- Off-screen zero-size nodes still appear in `native_get_elements`; `native_tap` on one would tap (0, 0). Tracked in the plan status as a follow-up. *Follow-up (2026-10-19): selectors of every tool now match only visible elements — a target that exists only off screen fails with a hint to `native_scroll` to it — and `native_get_elements` leaves zero-size nodes out, so `index` counts what is listed ([D1](#d1)).*
 
 ### Verification
 
@@ -399,4 +553,57 @@ Correctness first: a search that silently skips its target, or a "found" that ca
 - `within` the horizontal list: "Chip 17" found going left, "Chip 2" going back right; "Chip 99" stops with "reached the end"; the page itself does not move. `within` the vertical list: "Row 22" (7–8 swipes) and "Row 45" (10 swipes) found on both platforms; "Row 99" stops at the end. Before the slow drag, iOS skipped "Row 30" and "Row 45" and stopped at row 60.
 - Off-screen check: on iOS "Show message in 2 s" is listed at (0, 0, 0×0) before scrolling; it is now found only after a swipe.
 - Unit tests cover zero-size matches, settling, the slow held drag, end detection (whole screen and container only), the 60% / 80% shares, `maxSwipes`, `within` validation, and every `native_wait_for` path.
+
+---
+
+<a id="d17"></a>
+
+## D17 — Changing permissions without the system dialog
+
+- **Status:** Accepted (2026-10-19)
+- **Applies to:** `native_permissions`; `NativeDevice.setPermission`, `androidPermissionNames`, `iosPrivacyService`.
+
+### Context and dilemma
+
+A test often needs a known permission state (granted, denied, or "never asked") before it starts, and an agent may want to skip a dialog. Both platforms have commands for it, with traps found while verifying them:
+
+- `pm reset-permissions -p <pkg>` from the plan does not exist: the command takes no package (API 28 and 35 help: "Revert all runtime permissions to their default state") and silently resets **every app** on the device.
+- `pm revoke` kills the app's process; most `simctl privacy` changes terminate the iOS app too. The Flutter lane loses its connection.
+- Permission groups have different names per platform and API level (photos: `READ_EXTERNAL_STORAGE` before API 33, `READ_MEDIA_*` after; notifications need no permission before API 33). `pm grant` of a permission the app does not declare fails.
+- Xcode 26.4's `simctl privacy` cannot change notifications.
+- `simctl privacy grant photos` records the app as allowed (`kTCCServicePhotos = 2` in the simulator's TCC database), but the full-access Photo Library API of iOS 14+ ignores it: the app still shows the "full access" dialog (seen on iOS 18.6 and 26.4).
+- `simctl privacy grant all` on iOS 26.4 grants only some services (location, in the example app); `reset all` resets all of them.
+
+### Options considered
+
+- Reset on Android: (a) `pm reset-permissions` (global); (b) `pm clear` (wipes app data); (c) `pm revoke` + `pm clear-permission-flags <pkg> <perm> user-set user-fixed`.
+- Names: platform names in the tool, or one shared set mapped per platform.
+- App termination: ignore, document only, or detect and report.
+
+### Decision
+
+- One shared set: `camera`, `microphone`, `photos`, `location`, `contacts`, `calendar`, `notifications`, `all`. Android maps each to its permissions for the device's API level and changes only those the app declares (from `dumpsys package`); none declared → an error naming the missing manifest entries. iOS maps to `simctl privacy` services (`camera` works although its help does not list it).
+- **Reset on Android** is option (c): revoke, then clear the flags that record "user set" / "don't ask again", so the app asks again. On Android 9 (no `clear-permission-flags`) the permission is revoked and the result explains that a "don't ask again" choice cannot be undone without reinstalling.
+- Unsupported combinations fail with a hint: notifications before API 33 ("nothing to change"), notifications on the iOS Simulator and grant / revoke of photos on iOS ("answer the dialog with `native_tap`", e.g. "Allow Full Access"); reset of iOS photos works.
+- On iOS, grant / revoke of `all` changes camera, microphone, location, contacts and calendar one by one and notes that photos and notifications were skipped; reset of `all` uses `simctl privacy reset all`.
+- The tool checks whether the app was running before the change and is not after it (`pidof`; `launchctl list` in the simulator) and then says the change terminated it and that the Flutter lane must reconnect.
+
+### Rationale
+
+Option (c) is the only per-app reset that keeps app data. Detecting termination turns a confusing "Flutter connection lost" into an explained, expected effect.
+
+### Consequences
+
+- On Android 9 a full reset needs a reinstall (stated in the result).
+- Libraries may interpret groups differently: on API 28, `permission_handler` reports `Permission.photos` as denied even after `photos` (`READ_EXTERNAL_STORAGE`) is granted, because before Android 13 it maps photos to storage; the tool changes the platform permission, not a library's view.
+- A system permission alert stays on screen after its app has been terminated by a change (seen on iOS); the agent has to dismiss it.
+
+### Verification
+
+- Android API 35: after "Don't allow" twice the app no longer showed the dialog (flags `USER_SET|USER_FIXED`); after `reset` the dialog appeared again; after `grant` no dialog and the status was "granted"; `revoke` reported that it terminated the app. Reset of a permission that was not granted does not kill the app, and the tool reports no termination.
+- Android API 28: `reset` revokes and returns the explanation; `notifications` → unsupported with hint; `location` (not in the manifest) → manifest error.
+- iOS 18.6: `grant camera` → status "granted", no dialog; `reset camera` → app terminated (reported), dialog shown again; `notifications` → unsupported with hint; `reset all` works.
+- iOS 26.4 (iPhone 17 Pro Max), Device & permissions screen: `reset all` → every group "denied" and "Request contacts" shows the dialog again; `grant all` (service by service) → camera, microphone, location, contacts, calendar "granted"; `grant photos` → unsupported (a "Request photos" tap after `simctl privacy grant photos` still showed "Limit Access… / Allow Full Access / Don't Allow"); `revoke camera` → "permanentlyDenied". Before the per-service change, `grant all` granted location only.
+- Android API 35, Device & permissions screen: `grant all` → camera, microphone, photos, location, contacts, calendar "granted" ("photos (storage)" stays denied: `READ_EXTERNAL_STORAGE` is declared up to API 32 only); `reset all` → all "denied", "Request location" shows the dialog again.
+- Unit tests: mapping per API level, declared-permission filtering, reset with and without flag clearing, never `reset-permissions`, typed failures, termination reporting.
 

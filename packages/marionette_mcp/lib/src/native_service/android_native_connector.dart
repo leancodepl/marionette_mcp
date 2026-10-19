@@ -1,5 +1,6 @@
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
+import 'package:marionette_mcp/src/native_service/android_native_device.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
@@ -14,9 +15,13 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     required super.bootstrap,
     required super.ownsBootstrap,
     required AdbClient adb,
-  }) : _adb = adb;
+  })  : _adb = adb,
+        device = AndroidNativeDevice(adb);
 
   final AdbClient _adb;
+
+  @override
+  final NativeDevice device;
 
   /// Starts UIAutomator2 (unless [bootstrap] is given) and opens a WebDriver
   /// session.

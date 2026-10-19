@@ -621,6 +621,28 @@ void main() {
       );
     });
 
+    test('a refused rotation becomes a typed error with a hint', () async {
+      server.on(
+        'POST',
+        '/session/sess-1/orientation',
+        (_) => const FakeResponse.error(
+          'unknown error',
+          'Unable To Rotate Device',
+          status: HttpStatus.internalServerError,
+        ),
+      );
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await expectLater(
+        connector.setOrientation(NativeOrientation.landscape),
+        throwsA(
+          isA<NativeOperationFailedException>()
+              .having((e) => e.hint, 'hint', contains('native_notifications')),
+        ),
+      );
+    });
+
     test('getScreen reports the screen in screenshot pixels', () async {
       final connector = await connect();
       addTearDown(connector.dispose);

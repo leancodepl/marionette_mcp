@@ -133,13 +133,19 @@ Future<CallToolResult> handleNativeGetElements(
         ? connector.foregroundApp
             .then<String?>((value) => value, onError: (Object _) => null)
         : null;
+    // Off-screen (zero-size) nodes are left out, as for every selector
+    // (docs/native-lane-decisions.md#d16), so index counts what is listed.
     final elements = (await connector.getNativeElements()).where(
       (element) =>
-          (!clickableOnly || element.clickable) && filter.matches(element),
+          element.isVisible &&
+          (!clickableOnly || element.clickable) &&
+          filter.matches(element),
     );
+    final foreground = await foregroundApp;
+    context.observeForegroundApp(foreground);
     final payload = <String, dynamic>{
       'elements': elements.map((e) => e.toJson()).toList(),
-      if (foregroundApp != null) 'foregroundApp': await foregroundApp,
+      if (foregroundApp != null) 'foregroundApp': foreground,
     };
     return CallToolResult(
       content: [TextContent(text: jsonEncode(payload))],
@@ -193,6 +199,11 @@ Future<CallToolResult> handleNativeWaitFor(
         NativeWaitState.gone => match == null,
       };
       if (done) {
+        // The app under test is often first seen here (docs/
+        // native-lane-decisions.md#d7); free once it is known.
+        if (state == NativeWaitState.visible) {
+          await context.observeForegroundAppIfUnknown();
+        }
         return _waitResult(selector, state, stopwatch.elapsedMilliseconds,
             match: match);
       }

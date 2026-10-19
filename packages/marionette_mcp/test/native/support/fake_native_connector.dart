@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' show min;
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
@@ -42,13 +43,20 @@ class FakeNativeConnector implements NativeConnector {
     this.screenshot = 'fake-png-base64',
     this.screen = const NativeScreen(width: 1000, height: 2000, scale: 1),
     this.error,
-  }) : screens = screens ?? [const []];
+    FakeNativeDevice? device,
+  })  : screens = screens ?? [const []],
+        device = device ?? FakeNativeDevice();
 
   /// Shorthand for a connector with a single, static screen.
   FakeNativeConnector.single(List<NativeElement> elements)
       : this(screens: [elements]);
 
   final List<List<NativeElement>> screens;
+
+  @override
+  final FakeNativeDevice device;
+
+  NativeOrientation orientation = NativeOrientation.portrait;
   String? foregroundAppValue;
   Object? foregroundAppError;
   String screenshot;
@@ -214,6 +222,18 @@ class FakeNativeConnector implements NativeConnector {
   }
 
   @override
+  Future<NativeOrientation> getOrientation() async {
+    _maybeThrow();
+    return orientation;
+  }
+
+  @override
+  Future<void> setOrientation(NativeOrientation orientation) async {
+    _maybeThrow();
+    this.orientation = orientation;
+  }
+
+  @override
   Future<NativeScreen> getScreen() async {
     _maybeThrow();
     return screen;
@@ -249,4 +269,92 @@ class FakeServerBootstrap implements NativeServerBootstrap {
   Future<void> dispose() async {
     disposeCalls++;
   }
+}
+
+/// In-memory [NativeDevice] that records every call.
+class FakeNativeDevice implements NativeDevice {
+  FakeNativeDevice({
+    this.deviceInfo = const NativeDeviceInfo(
+      osVersion: 'Android 9',
+      apiLevel: 28,
+      model: 'Pixel 3',
+      isEmulator: true,
+      id: 'emulator-5554',
+    ),
+  });
+
+  NativeDeviceInfo deviceInfo;
+
+  /// Thrown by the next call, when set.
+  Object? error;
+
+  /// Result of [setPermission].
+  NativePermissionChange permissionChange =
+      const NativePermissionChange(nativeNames: ['android.permission.CAMERA']);
+
+  /// Apps reported as running; [activateApp] adds, [terminateApp] removes.
+  final Set<String> runningApps = {};
+
+  /// App ids whose process a permission change kills.
+  bool permissionChangeKillsApp = false;
+
+  final List<String> calls = [];
+
+  void _record(String call) {
+    final pending = error;
+    if (pending != null) throw pending;
+    calls.add(call);
+  }
+
+  @override
+  Future<NativeDeviceInfo> info() async {
+    _record('info');
+    return deviceInfo;
+  }
+
+  @override
+  Future<NativePermissionChange> setPermission(
+    NativePermissionAction action,
+    NativePermission permission,
+    String appId,
+  ) async {
+    _record('permission ${action.name} ${permission.name} $appId');
+    if (permissionChangeKillsApp) runningApps.remove(appId);
+    return permissionChange;
+  }
+
+  @override
+  Future<void> openUrl(String url) async => _record('openUrl $url');
+
+  @override
+  Future<void> activateApp(String appId) async {
+    _record('activate $appId');
+    runningApps.add(appId);
+  }
+
+  @override
+  Future<bool> terminateApp(String appId) async {
+    _record('terminate $appId');
+    return runningApps.remove(appId);
+  }
+
+  @override
+  Future<bool?> isAppRunning(String appId) async => runningApps.contains(appId);
+
+  @override
+  Future<void> openNotifications() async => _record('openNotifications');
+
+  @override
+  Future<void> closeNotifications() async => _record('closeNotifications');
+
+  @override
+  Future<void> pushNotification(
+    String appId,
+    Map<String, dynamic> payload,
+  ) async =>
+      _record('push $appId ${jsonEncode(payload)}');
+
+  @override
+  Future<void> setLocation(double latitude, double longitude) async =>
+      _record('location $latitude,$longitude');
 }

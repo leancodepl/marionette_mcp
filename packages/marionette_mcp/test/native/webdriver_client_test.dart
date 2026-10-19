@@ -133,6 +133,20 @@ void main() {
       );
     });
 
+    test('orientation get and set', () async {
+      server
+        ..onValue('GET', '/session/sess-1/orientation', 'LANDSCAPE')
+        ..onValue('POST', '/session/sess-1/orientation', null);
+
+      expect(await client.getOrientation('sess-1'), 'LANDSCAPE');
+      await client.setOrientation('sess-1', 'PORTRAIT');
+
+      expect(
+        server.requestsTo('POST', '/session/sess-1/orientation').single.body,
+        {'orientation': 'PORTRAIT'},
+      );
+    });
+
     test('swipe builds W3C pointer actions via performActions', () async {
       server.onValue('POST', '/session/sess-1/actions', null);
 

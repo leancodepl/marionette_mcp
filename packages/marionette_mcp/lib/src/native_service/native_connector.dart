@@ -3,9 +3,30 @@
 /// implementations.
 library;
 
+import 'package:marionette_mcp/src/native_service/native_device.dart';
 import 'package:marionette_mcp/src/native_service/native_key.dart';
 
+export 'package:marionette_mcp/src/native_service/native_device.dart';
 export 'package:marionette_mcp/src/native_service/native_key.dart';
+
+/// Screen orientation, as named by W3C WebDriver.
+enum NativeOrientation {
+  portrait('PORTRAIT'),
+  landscape('LANDSCAPE');
+
+  const NativeOrientation(this.wireName);
+
+  /// Value of the WebDriver `orientation` endpoint.
+  final String wireName;
+
+  static NativeOrientation? tryParse(Object? raw) {
+    final normalized = raw is String ? raw.toLowerCase().trim() : null;
+    for (final value in values) {
+      if (value.name == normalized) return value;
+    }
+    return null;
+  }
+}
 
 /// Rectangle in **screenshot pixels**: the pixel grid of the image returned
 /// by `native_take_screenshot`, on every platform.
@@ -285,6 +306,17 @@ abstract class NativeConnector {
 
   /// Current screen size in screenshot pixels and the server-unit scale.
   Future<NativeScreen> getScreen();
+
+  /// Current screen orientation.
+  Future<NativeOrientation> getOrientation();
+
+  /// Rotates the screen to [orientation]; [getScreen] and element bounds
+  /// follow the new orientation.
+  Future<void> setOrientation(NativeOrientation orientation);
+
+  /// Operations on the device that do not use the UI session (permissions,
+  /// app lifecycle, URLs …); see docs/native-lane-decisions.md#d12.
+  NativeDevice get device;
 
   /// Whether the device-side server answers a health check right now.
   ///

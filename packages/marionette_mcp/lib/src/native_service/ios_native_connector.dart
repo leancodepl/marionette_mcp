@@ -1,6 +1,8 @@
 import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
+import 'package:marionette_mcp/src/native_service/ios_native_device.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/simctl_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/xpath.dart';
@@ -19,7 +21,22 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     required super.sessionId,
     required super.bootstrap,
     required super.ownsBootstrap,
-  });
+    required String? udid,
+  }) : _udid = udid;
+
+  final String? _udid;
+
+  /// Device operations through `simctl` for the simulator WDA runs on.
+  /// Throws when the simulator is unknown (a custom bootstrap without a
+  /// udid).
+  @override
+  late final NativeDevice device = _udid == null
+      ? throw const NativeUnsupportedException(
+          'The simulator of this session is unknown, so device operations '
+          'are unavailable.',
+          hint: 'Call native_connect with udid.',
+        )
+      : IosNativeDevice(SimctlClient(), _udid);
 
   /// Screenshot pixels per point; read by [_loadScale] during [connect].
   double _scale = 1;
@@ -51,6 +68,9 @@ final class IosNativeConnector extends WebDriverNativeConnector {
         sessionId: sessionId,
         bootstrap: resolvedBootstrap,
         ownsBootstrap: ownsBootstrap,
+        udid: resolvedBootstrap is IosBootstrap
+            ? resolvedBootstrap.resolvedUdid ?? udid
+            : udid,
       ),
     );
     try {

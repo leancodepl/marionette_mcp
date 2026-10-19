@@ -60,6 +60,14 @@ class TestingScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/testing/gestures'),
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.phone_android_outlined),
+            title: const Text('Device & permissions'),
+            subtitle: const Text('Permissions, orientation, deep links'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/device'),
+          ),
         ],
       ),
     );

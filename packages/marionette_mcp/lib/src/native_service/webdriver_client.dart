@@ -333,6 +333,23 @@ class WebDriverClient {
         ],
       ]);
 
+  /// Screen orientation (`PORTRAIT` / `LANDSCAPE`) from
+  /// `GET /session/{id}/orientation`.
+  Future<String> getOrientation(String sessionId) async {
+    final value = await _request('GET', '/session/$sessionId/orientation');
+    if (value is String) return value;
+    throw WebDriverException('Unexpected orientation: $value');
+  }
+
+  /// Rotates the screen (`POST /session/{id}/orientation`).
+  Future<void> setOrientation(String sessionId, String orientation) async {
+    await _request(
+      'POST',
+      '/session/$sessionId/orientation',
+      body: {'orientation': orientation},
+    );
+  }
+
   /// Returns the window size from UIAutomator2's
   /// `GET /session/{id}/window/current/size` (pixels). UIAutomator2 does not
   /// implement the W3C `window/rect`.

@@ -47,6 +47,27 @@
 			</array>
 		</dict>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>marionette-example</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>marionette-example</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Native-lane testing: calendar permission state (Device &amp; permissions screen).</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Native-lane testing: calendar permission state (Device &amp; permissions screen).</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Native-lane testing: contacts permission state (Device &amp; permissions screen).</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Native-lane testing: location permission state (Device &amp; permissions screen).</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Native-lane testing: microphone permission state (Device &amp; permissions screen).</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app uses the camera for profile pictures and native-lane testing demos.</string>
 	<key>GOOGLE_MAPS_API_KEY</key>

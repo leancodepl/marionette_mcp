@@ -11,11 +11,12 @@ typedef NativeReconnect = Future<NativeConnector> Function();
 ///
 /// Every operation is classified by its method:
 /// - reads ([getNativeElements], [foregroundApp], [takeScreenshot],
-///   [takeElementScreenshot], [getScreen], [isKeyboardShown]) are
+///   [takeElementScreenshot], [getScreen], [getOrientation],
+///   [isKeyboardShown]) are
 ///   retried once on a fresh session whenever the session was lost;
 /// - actions ([tapElement], [tapAt], [enterText], [typeText], [pressKey],
-///   [hideKeyboard], [swipe], [longPress], [doubleTap], [pinch]) first
-///   check
+///   [hideKeyboard], [swipe], [longPress], [doubleTap], [pinch],
+///   [setOrientation]) first check
 ///   [isServerResponding]; a server that is already gone is replaced before
 ///   the action is sent. An action is retried only when it certainly did
 ///   not run — the server answered `invalid session id`, or no connection
@@ -141,6 +142,20 @@ final class RecoveringNativeConnector implements NativeConnector {
   @override
   Future<String> takeElementScreenshot(NativeElement element) =>
       _read((c) => c.takeElementScreenshot(element));
+
+  @override
+  Future<NativeOrientation> getOrientation() =>
+      _read((c) => c.getOrientation());
+
+  @override
+  Future<void> setOrientation(NativeOrientation orientation) =>
+      _act((c) => c.setOrientation(orientation));
+
+  /// Device of the current connector. Device operations do not use the
+  /// WebDriver session, so they need no recovery.
+  @override
+  NativeDevice get device =>
+      (_inner ?? (throw const NativeNotConnectedException())).device;
 
   /// Health probe of the current connector; never triggers recovery.
   @override

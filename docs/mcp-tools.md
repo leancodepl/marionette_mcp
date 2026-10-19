@@ -52,7 +52,7 @@ Custom extensions that declare an `inputSchema` are promoted to **first-class, i
 
 ### Native lane
 
-Tools for system / native UI outside the Flutter widget tree (permission dialogs, OS sheets, embedded WebViews). All native tools use the `native_` prefix. Call `native_connect` first.
+Tools for system / native UI outside the Flutter widget tree (permission dialogs, OS sheets, embedded WebViews) and device shortcuts (permissions, URLs, app lifecycle). All native tools use the `native_` prefix. Call `native_connect` first. Shortcuts that take `appId` default to the app under test — the first non-system app seen in the foreground in the session ([D7](./native-lane-decisions.md#d7)).
 
 | Tool | Description |
 | --- | --- |
@@ -70,6 +70,13 @@ Tools for system / native UI outside the Flutter widget tree (permission dialogs
 | `native_press_key` | Press a system / hardware key: `back`, `home`, `enter`, `backspace`, `tab`, `recents`, `volume_up`, `volume_down`. `back`, `recents` and `tab` are Android-only; the iOS Simulator has only `home` of the hardware buttons. |
 | `native_hide_keyboard` | Hide the software keyboard if it is shown and report whether it was. Android presses Back only while the keyboard is shown; iOS uses the keyboard's Done / dismiss key and fails with a hint when there is none ([D14](./native-lane-decisions.md#d14)). |
 | `native_take_screenshot` | Returns a base64 inline PNG of the full device screen via the native session (system UI, WebViews), or — with a selector — of just that element ([D6](./native-lane-decisions.md#d6)). When `MARIONETTE_SCREENSHOTS_DIR` is set, also saves the PNG to that directory and includes the absolute path alongside the inline image. |
+| `native_permissions` | Grant, revoke or reset (ask again) a permission without the system dialog: `camera`, `microphone`, `photos`, `location`, `contacts`, `calendar`, `notifications`, `all`. Android changes only permissions the app declares; reset on Android 9 cannot undo "don't ask again". Revoking on Android and most iOS changes terminate the app — the result says so. The iOS Simulator cannot change notifications, nor grant / revoke photos (reset works) ([D17](./native-lane-decisions.md#d17)). |
+| `native_open_url` | Open a URL with the system handler — a web page, or a deep link / custom scheme (iOS may ask "Open in …?" first). |
+| `native_app` | `activate` (start, or bring back the running instance with its state), `background`, `terminate`, `restart` ([D11](./native-lane-decisions.md#d11)). |
+| `native_notifications` | `open` / `close` the notification shade (Android) or Notification Center (iOS, by swipe); `push` a simulated push notification (iOS Simulator). |
+| `native_device_info` | Platform, OS version, API level, model, emulator flag, id, screen, orientation, foreground app and the default `appId`. |
+| `native_set_orientation` | Rotate to `portrait` or `landscape`; screen size and bounds follow. |
+| `native_set_location` | Simulated GPS position (Android emulator, iOS Simulator). |
 
 ### Dev workflow
 

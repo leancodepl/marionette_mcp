@@ -179,6 +179,32 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   @override
   Future<String> takeScreenshot() => client.takeScreenshot(sessionId);
 
+  @override
+  Future<NativeOrientation> getOrientation() async {
+    final raw = await client.getOrientation(sessionId);
+    return NativeOrientation.tryParse(raw) ??
+        (throw WebDriverException('Unknown orientation "$raw"'));
+  }
+
+  @override
+  Future<void> setOrientation(NativeOrientation orientation) async {
+    try {
+      await client.setOrientation(sessionId, orientation.wireName);
+    } on WebDriverException catch (error) {
+      // WDA: "Unable To Rotate Device" while e.g. Notification Center or
+      // the lock screen is in front; both servers also refuse when the app
+      // supports only one orientation.
+      if (error.httpStatus != 500 && error.error != 'unknown error') rethrow;
+      throw NativeOperationFailedException(
+        'The screen cannot be rotated to ${orientation.name} now: '
+        '${error.message}',
+        hint: 'Close system surfaces in front (native_notifications '
+            'action=close) and check that the app supports this '
+            'orientation.',
+      );
+    }
+  }
+
   /// Finds the server-side id of [element] (an element from the current UI
   /// tree) by its exact geometry, or null when it is no longer on screen
   /// (docs/native-lane-decisions.md#d6).

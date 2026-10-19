@@ -186,6 +186,30 @@ void main() {
       );
     });
 
+    test('off-screen (zero-size) elements never match (D16)', () {
+      final offScreen = nativeElement(text: 'Row 40', width: 0, height: 0);
+      final onScreen = nativeElement(text: 'Row 4', y: 300);
+
+      expect(
+        selectElement(
+          [offScreen, onScreen],
+          const NativeSelector(textContains: 'Row 4'),
+        ),
+        same(onScreen),
+        reason: 'not ambiguous: the off-screen row does not count',
+      );
+      expect(
+        () => selectElement(
+          [offScreen, onScreen],
+          const NativeSelector(text: 'Row 40'),
+        ),
+        throwsA(
+          isA<NativeElementNotFoundException>()
+              .having((e) => e.hint, 'hint', contains('native_scroll')),
+        ),
+      );
+    });
+
     test('describe renders every criterion', () {
       expect(
         const NativeSelector(

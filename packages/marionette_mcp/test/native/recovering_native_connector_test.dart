@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:logging/logging.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
-import 'package:marionette_mcp/src/native_service/native_key.dart';
 import 'package:marionette_mcp/src/native_service/recovering_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:test/test.dart';
@@ -151,6 +151,23 @@ void main() {
       expect(inner.longPresses, hasLength(1));
       expect(inner.doubleTaps, hasLength(1));
       expect(inner.pinches, hasLength(1));
+    });
+
+    test('orientation: get is a read, set an action; device passes through',
+        () async {
+      final inner = FakeNativeConnector();
+      final connector = wrap(inner);
+
+      await connector.getOrientation();
+      expect(inner.healthChecks, 0);
+      await connector.setOrientation(NativeOrientation.landscape);
+      expect(inner.healthChecks, 1);
+      expect(inner.orientation, NativeOrientation.landscape);
+      expect(connector.device, same(inner.device));
+
+      await connector.dispose();
+      expect(
+          () => connector.device, throwsA(isA<NativeNotConnectedException>()));
     });
 
     test('reads do not probe the server first', () async {

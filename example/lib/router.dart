@@ -11,6 +11,7 @@ import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/testing/camera_platform_view_screen.dart';
+import 'screens/testing/device_screen.dart';
 import 'screens/testing/gestures_screen.dart';
 import 'screens/testing/google_maps_platform_view_screen.dart';
 import 'screens/testing/native_controls_platform_view_screen.dart';
@@ -37,6 +38,7 @@ const availablePages = <String, String>{
   'pickers_and_sheets': '/testing/pickers-and-sheets',
   'keyboard': '/testing/keyboard',
   'gestures': '/testing/gestures',
+  'device': '/testing/device',
   'settings': '/settings',
   'items': '/settings/items',
   'about': '/settings/about',
@@ -105,6 +107,10 @@ final router = GoRouter(
             GoRoute(
               path: 'gestures',
               builder: (context, state) => const GesturesScreen(),
+            ),
+            GoRoute(
+              path: 'device',
+              builder: (context, state) => const DeviceScreen(),
             ),
           ],
         ),

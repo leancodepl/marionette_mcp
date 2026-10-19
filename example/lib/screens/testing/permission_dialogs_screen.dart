@@ -6,7 +6,8 @@ class PermissionDialogsScreen extends StatefulWidget {
   const PermissionDialogsScreen({super.key});
 
   @override
-  State<PermissionDialogsScreen> createState() => _PermissionDialogsScreenState();
+  State<PermissionDialogsScreen> createState() =>
+      _PermissionDialogsScreenState();
 }
 
 class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
@@ -69,14 +70,17 @@ class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
             padding: const EdgeInsets.all(16),
             child: Text(
               'Trigger system permission dialogs via permission_handler. '
-              'Reset between runs: adb shell pm reset-permissions (Android) or '
-              'xcrun simctl privacy booted reset all <bundle id> (iOS).',
+              'Reset between runs with native_permissions action=reset '
+              '(e.g. permission=camera), or skip a dialog with action=grant. '
+              'Revoking (Android) and most changes on iOS close the app — '
+              'bring it back with native_app action=activate.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
           SwitchListTile(
             title: const Text('Notifications'),
-            subtitle: Text(_statusLine('Push notifications', _notificationStatus)),
+            subtitle:
+                Text(_statusLine('Push notifications', _notificationStatus)),
             value: notificationGranted,
             onChanged: _requesting == Permission.notification
                 ? null

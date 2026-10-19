@@ -5,6 +5,7 @@ import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/recovering_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/tools/connection_tools.dart';
+import 'package:marionette_mcp/src/native_service/tools/device_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/keyboard_tools.dart';
@@ -71,6 +72,53 @@ final class NativeServiceContext {
   /// Active native connector, or null when disconnected.
   NativeConnector? connector;
 
+  /// Platform of the active session; null when disconnected.
+  NativePlatform? platform;
+
+  /// App the device shortcuts act on when no `appId` is given: the first
+  /// foreground app of the session that is not a system app
+  /// (docs/native-lane-decisions.md#d7).
+  String? defaultAppId;
+
+  /// Remembers [foregroundApp] as [defaultAppId] if none is known yet and
+  /// it is not a system app.
+  void observeForegroundApp(String? foregroundApp) {
+    if (defaultAppId != null || foregroundApp == null) return;
+    if (isSystemAppId(foregroundApp)) return;
+    defaultAppId = foregroundApp;
+  }
+
+  /// Reads the foreground app into [defaultAppId] while it is unknown.
+  /// Best-effort and free once the default is known.
+  Future<void> observeForegroundAppIfUnknown() async {
+    final active = connector;
+    if (defaultAppId != null || active == null) return;
+    try {
+      observeForegroundApp(await active.foregroundApp);
+    } catch (_) {
+      // Only a default for later shortcuts.
+    }
+  }
+
+  /// [appId] when given, else [defaultAppId] (looking at the foreground app
+  /// first while it is unknown); throws when neither is known. An explicit
+  /// non-system [appId] also becomes the default when none is known yet —
+  /// the agent named the app under test.
+  Future<String> resolveAppId(String? appId) async {
+    if (appId != null && appId.isNotEmpty) {
+      observeForegroundApp(appId);
+      return appId;
+    }
+    await observeForegroundAppIfUnknown();
+    return defaultAppId ??
+        (throw const NativeOperationFailedException(
+          'No appId given and the app under test is not known yet (no '
+          'non-system app has been in the foreground in this session).',
+          hint: 'Pass appId (Android package name / iOS bundle id), or bring '
+              'the app to the front and call native_get_elements once.',
+        ));
+  }
+
   /// Registers all native-lane MCP tools with [server].
   void registerTools(McpServer server) {
     registerNativeConnectionTools(server, this);
@@ -79,6 +127,7 @@ final class NativeServiceContext {
     registerNativeTextTools(server, this);
     registerNativeKeyboardTools(server, this);
     registerNativeScreenshotTools(server, this);
+    registerNativeDeviceTools(server, this);
   }
 
   /// Replaces any active session with a new one for [platform].
@@ -107,6 +156,12 @@ final class NativeServiceContext {
       },
     );
     connector = recovering;
+    this.platform = platform;
+    try {
+      observeForegroundApp(await recovering.foregroundApp);
+    } catch (_) {
+      // Only a default for later shortcuts; never fail the connect.
+    }
     return recovering;
   }
 
@@ -123,6 +178,8 @@ final class NativeServiceContext {
   Future<void> dispose() async {
     final active = connector;
     connector = null;
+    platform = null;
+    defaultAppId = null;
     if (active != null) {
       await active.dispose();
     }

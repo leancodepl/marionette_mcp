@@ -154,6 +154,23 @@ void main() {
       );
     });
 
+    test('leaves out off-screen (zero-size) elements', () async {
+      final context = _contextWith(
+        FakeNativeConnector.single([
+          nativeElement(text: 'Visible'),
+          nativeElement(text: 'Off screen', width: 0, height: 0),
+        ]),
+      );
+
+      final payload = jsonDecode(_text(await handleNativeGetElements(context)))
+          as Map<String, dynamic>;
+
+      expect(
+        (payload['elements'] as List).map((e) => (e as Map)['text']),
+        ['Visible'],
+      );
+    });
+
     test('includes element state and filters elements', () async {
       final context = _contextWith(
         FakeNativeConnector.single([
