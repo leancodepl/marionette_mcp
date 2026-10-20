@@ -1,4 +1,4 @@
-<a href="https://leancode.co/?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp" align="center">
+<a href="https://marionette.leancode.co/?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp" align="center">
   <img alt="marionette_mcp" src="https://github.com/user-attachments/assets/12726942-57b3-4967-a1c8-bea06b397500" />
 </a>
 
@@ -7,31 +7,15 @@
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 [![marionette_mcp pub.dev badge](https://img.shields.io/pub/v/marionette_mcp)](https://pub.dev/packages/marionette_mcp)
 
-**"Playwright MCP/Cursor Browser, but for Flutter apps"**
+**Your agent's hands and eyes on a running Flutter app.**
 
-Marionette MCP enables AI agents (Claude Code, Copilot, Cursor, Gemini CLI, and more) to inspect and interact with running Flutter applications. It connects your AI agent directly to a running app via the Model Context Protocol (MCP), so it can see the widget tree, tap elements, enter text, scroll, and capture screenshots for automated AI-driven smoke testing and interaction.
+Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP client to the Flutter app you run in debug mode. The agent sees the screen, taps, types, scrolls, reads the logs, hot reloads, and writes a report of what it did. If you know Playwright MCP: this is that, for Flutter.
 
-Marionette MCP keeps the surface area intentionally small. It exposes only a handful of high-signal actions and returns the minimum actionable data, which helps keep prompts focused and context sizes under control.
+**[Website](https://marionette.leancode.co)** · **[Docs](https://marionette.leancode.co/docs)** · [Video](https://youtu.be/JYsFDbKTJ54) · [Article](https://leancode.co/blog/marionette-mcp-in-flutter-apps?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-readme)
 
-## Learn more about Marionette MCP:
+## Quick start
 
-- Video: [Clicking Through Your App with Marionette MCP](https://youtu.be/JYsFDbKTJ54)
-- Article: [Marionette MCP - Your Flutter AI Agent That Interacts With Running Apps](https://leancode.co/blog/marionette-mcp-in-flutter-apps?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-readme)
-
-## Demo
-
-![](https://github.com/leancodepl/marionette_mcp_attachments/blob/master/promo.gif)
-
-## Marionette MCP vs Flutter MCP
-
-The official [Dart & Flutter MCP server](https://docs.flutter.dev/ai/mcp-server) focuses on **development-time** tasks: searching pub.dev, managing dependencies, analyzing code, and inspecting runtime errors. It can also drive the UI, but it does so through Flutter Driver, which introduces extra instrumentation in your app. Marionette MCP focuses solely (and in an opinionated way) on **runtime interaction**: tapping buttons, entering text, scrolling, and taking screenshots, while requiring minimal changes to your app. Use Flutter MCP to build your app, use Marionette MCP to test and interact with it with minimal code changes.
-
-## Quick Start
-
-> [!NOTE]
-> Your Flutter app must be prepared to be compatible with Marionette. The steps below are the short version — the [Getting Started guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/getting-started.md) walks through each one.
-
-1. **Prepare your app** — add `marionette_flutter` and initialize `MarionetteBinding` in `main.dart`:
+1. Add the package to your app and initialize the binding in debug builds:
 
    ```bash
    flutter pub add marionette_flutter
@@ -48,101 +32,66 @@ The official [Dart & Flutter MCP server](https://docs.flutter.dev/ai/mcp-server)
    }
    ```
 
-2. **Install the bridge** — activate the MCP server (for the CLI alternative, see the [CLI guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md)):
+2. Give your agent a bridge: the MCP server or the `marionette` CLI, whichever you prefer ([every agent](https://marionette.leancode.co/docs#bridge)):
 
    ```bash
+   # MCP server, registered with Claude Code
    dart pub global activate marionette_mcp
-   ```
-
-3. **Configure your AI tool** — e.g. for Claude Code:
-
-   ```bash
    claude mcp add --transport stdio marionette -- marionette_mcp
+
+   # or the CLI
+   dart pub global activate marionette_cli
    ```
 
-   Other tools (Cursor, Gemini CLI, Copilot, Antigravity): see [Configuring your AI tool](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md#configuring-your-ai-tool).
+3. Run the app with `flutter run` and paste the `ws://…/ws` VM service URI it prints into the prompt, or ask the agent to run the app itself:
 
-4. **Run your app in debug mode** — `flutter run`, then copy the VM service URI from the console (e.g. `ws://127.0.0.1:9101/ws`).
-
-5. **Connect and interact** — ask your agent to connect using that URI and start driving the app.
+   > Connect to ws://127.0.0.1:9101/…/ws. On Profile, a malformed email must show an error and keep Submit disabled, and a valid one must submit.
 
 > [!IMPORTANT]
-> Standard Material widgets work out of the box. **If your app uses a custom design system, configuration is required** — otherwise the agent can't see or tap your custom buttons and fields. Start with the [Production Setup Checklist](https://github.com/leancodepl/marionette_mcp/blob/main/docs/configuration.md#production-setup-checklist).
+> Flutter's own widgets work as is. **A custom design system needs one configuration step**, or the agent cannot see your buttons and fields: see [Configure](https://marionette.leancode.co/docs/configure).
 
-## What you can do
+## What the agent can do
 
-Once connected, an agent can drive your app with a small, focused toolset: inspect the widget tree (`get_interactive_elements`), `tap` / `secondary_tap` / `double_tap` / `long_press` / `swipe` / `pinch_zoom` / `scroll_to`, `enter_text`, `press_back_button`, `take_screenshots`, read `get_logs`, and `hot_reload`. Full list: [MCP Tools](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md).
+| | Tools |
+| --- | --- |
+| **See** | `get_interactive_elements`, `take_screenshots` |
+| **Act** | `tap`, `enter_text`, `scroll_to`, `swipe`, `long_press`, `double_tap`, `pinch_zoom`, `press_key`, `press_back_button` |
+| **Verify** | `get_logs`, `set_device_config` (text scale, bold text, dark mode) |
+| **Iterate** | `hot_reload`, `hot_restart` |
+| **Extend** | your app's own actions, registered with `registerMarionetteExtension` |
 
-Your app can also expose its own actions to the agent via [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) — navigate by route name, seed test data, toggle feature flags, and more.
+With `MarionetteConfiguration(enableSessionReports: true)`, every run leaves a folder: a `steps.md` the server writes, one line per tool call, and a `report.md` the agent writes from it. See [Reports](https://marionette.leancode.co/docs/reports).
 
-Some real-world prompts:
-
-> "I implemented the Forgot Password screen — connect, navigate to login, tap 'Forgot Password', enter a valid email, submit, and check the logs that the API call fired."
-
-> "I refactored the routing. Run a smoke test: cycle through all bottom-nav tabs and verify each screen loads without exceptions in the logs."
-
-> "Investigate the unresponsive 'Clear Cache' button on Settings — find it via `get_interactive_elements`, tap it, and analyze the logs."
+The `marionette` CLI drives the app with the same actions as shell commands: see [Drive](https://marionette.leancode.co/docs/drive#cli).
 
 ## Agent Skill
 
-`marionette_flutter` ships an [Agent Skill](https://agentskills.io) — a `SKILL.md` file that teaches
-an agent how to prepare an app for Marionette and drive it, so it doesn't need this README in
-context: [`marionette-flutter-drive-app`](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette-flutter-drive-app/SKILL.md)
-covers adding the dependency, initializing `MarionetteBinding`, `MarionetteConfiguration` for a
-custom design system, log collection, and device-config opt-in, then the full tool/CLI reference,
-when (and when not) to reach for Marionette, and custom extensions.
-
-It lives inside the `marionette_flutter` package itself, following Dart's
-[package skills](https://dart.dev/tools/pub/package-skills) convention, so once the package is a
-dependency of your app, Dart's own tooling can install it:
+`marionette_flutter` ships an [Agent Skill](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette-flutter-drive-app/SKILL.md) that teaches an agent to set up an app for Marionette, drive it and write the report:
 
 ```bash
-flutter pub add marionette_flutter  # if not already a dependency
-dart run skills@ get
+dart run skills@ get                     # in an app that depends on marionette_flutter
+npx skills add leancodepl/marionette_mcp # without the Dart toolchain
 ```
-
-`skills@` runs straight from pub.dev — nothing to add to your `pubspec.yaml`. It detects the agent
-from your project and installs into the folder that agent reads (`.claude/skills/` for Claude
-Code, `.cursor/skills/` for Cursor, `.github/skills/` for GitHub Copilot, `.agents/skills/` for
-Codex and other agents that follow the same convention); pass `--agent <name>` to force one. After
-upgrading `marionette_flutter`, run `dart run skills@ get` again to pick up any changes.
-
-No Dart CLI in your workflow, or want the skill without adding the package? Install it straight
-from this repo with [`skills`](https://github.com/vercel-labs/skills), which reads the file
-directly off GitHub — no Flutter/Dart toolchain, and no need for `marionette_flutter` to be a
-dependency yet:
-
-```bash
-npx skills add leancodepl/marionette_mcp
-```
-
-Or copy the file above directly into your agent's skills folder — e.g.
-`.claude/skills/marionette-flutter-drive-app/SKILL.md` for Claude Code.
 
 ## Documentation
 
-| Guide | What's inside |
+| Page | What is inside |
 | --- | --- |
-| [Getting Started](https://github.com/leancodepl/marionette_mcp/blob/main/docs/getting-started.md) | Zero-to-driving in 5 steps. |
-| [Flutter Setup](https://github.com/leancodepl/marionette_mcp/blob/main/docs/flutter-setup.md) | The binding, debug-only init, the single-binding rule. |
-| [Configuration](https://github.com/leancodepl/marionette_mcp/blob/main/docs/configuration.md) | **Custom design systems, production checklist, complete `main.dart`.** |
-| [Log Collection](https://github.com/leancodepl/marionette_mcp/blob/main/docs/logging.md) | Wire up `get_logs` (`logging`, `logger`, or custom). |
-| [Semantics](https://github.com/leancodepl/marionette_mcp/blob/main/docs/semantics.md) | Make custom-painted / rich content readable to agents. |
-| [MCP Tools](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md) | Full tool reference + AI-tool configuration. |
-| [Session Reports](https://github.com/leancodepl/marionette_mcp/blob/main/docs/session-reports.md) | The session directory, `steps.md`, screenshot sink, and the `report.md` handoff. |
-| [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) | Expose app-specific actions as agent tools via `registerMarionetteExtension`. |
-| [CLI](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md) | Drive Marionette from any shell-capable agent. |
-| [Troubleshooting](https://github.com/leancodepl/marionette_mcp/blob/main/docs/troubleshooting.md) | Common gotchas and limitations. |
+| [Start](https://marionette.leancode.co/docs) | Setup, every agent's config, the first prompt, the example app, FAQ |
+| [Concepts](https://marionette.leancode.co/docs/concepts) | How the agent sees a screen, selectors, compaction, the single-binding rule |
+| [Configure](https://marionette.leancode.co/docs/configure) | Custom design systems, Semantics, logs, device config, custom extensions |
+| [Drive](https://marionette.leancode.co/docs/drive) | Prompts for common jobs, every tool with its CLI command, the CLI |
+| [Reports](https://marionette.leancode.co/docs/reports) | Session folders, `steps.md`, `report.md`, the verdict |
 
 ## Packages
 
 | Package | Role |
 | --- | --- |
-| [`marionette_flutter`](https://pub.dev/packages/marionette_flutter) | The binding you add to your Flutter app. **Required.** |
-| [`marionette_mcp`](https://pub.dev/packages/marionette_mcp) | MCP server bridging AI agents to your running app. |
-| [`marionette_cli`](https://pub.dev/packages/marionette_cli) | CLI alternative for shell-only / restricted environments. |
-| [`marionette_logging`](https://pub.dev/packages/marionette_logging) | `LogCollector` adapter for the `logging` package. |
-| [`marionette_logger`](https://pub.dev/packages/marionette_logger) | `LogCollector` adapter for the `logger` package. |
+| [`marionette_flutter`](https://pub.dev/packages/marionette_flutter) | The binding in your app. **Required.** |
+| [`marionette_mcp`](https://pub.dev/packages/marionette_mcp) | The MCP server your agent runs. |
+| [`marionette_cli`](https://pub.dev/packages/marionette_cli) | The `marionette` CLI, for shell-only agents. |
+| [`marionette_logging`](https://pub.dev/packages/marionette_logging) | Log collection from the `logging` package. |
+| [`marionette_logger`](https://pub.dev/packages/marionette_logger) | Log collection from the `logger` package. |
 
 ---
 
@@ -154,20 +103,9 @@ Or copy the file above directly into your agent's skills folder — e.g.
   </a>
 </div>
 
-This package is built with 💙 by **[LeanCode](https://leancode.co?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)**.
-We are **top-tier experts** focused on Flutter Enterprise solutions.
-
-### Why LeanCode?
-
-- **Creators of [Patrol](https://patrol.leancode.co/?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)** – the next-gen testing framework for Flutter.
-
-- **Production-Ready** – We use this package in apps with millions of users.
-- **Full-Cycle Product Development** – We take your product from scratch to long-term maintenance.
+Marionette is built by **[LeanCode](https://leancode.co?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)**, the creators of [Patrol](https://patrol.leancode.co/?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp), the testing framework for Flutter. We build Flutter products from scratch to long-term maintenance.
 
 <div align="center">
-  <br />
-
-**Need help with your Flutter project?**
 
 [**👉 Hire our team**](https://leancode.co/get-estimate?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-mcp)
 &nbsp;&nbsp;•&nbsp;&nbsp;
