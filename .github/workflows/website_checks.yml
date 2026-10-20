@@ -1,0 +1,55 @@
+name: Website checks
+
+# Checks website/ on every pull request that touches it. Netlify builds and
+# deploys the site itself, through its GitHub App: a Deploy Preview for each
+# pull request, and production on every push to main (website/netlify.toml).
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      # The site shows the package version, read from marionette_mcp's pubspec.
+      - 'packages/marionette_mcp/pubspec.yaml'
+      - '.github/workflows/website_checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Analyze and check assets
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: website
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1.7.2
+        with:
+          sdk: '3.13'
+
+      - name: Download pub dependencies
+        run: dart pub get
+
+      - name: Run analyzer
+        run: dart analyze --fatal-infos
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed .
+
+      # Renders the icons and the social card again in a pinned Chrome for
+      # Testing, regenerates favicon.svg and the manifest, and compares them
+      # with the committed files, so web/ cannot drift from the palette, the
+      # OgCard component or the stylesheet the card is built with.
+      - name: Compare with committed assets
+        run: dart test
