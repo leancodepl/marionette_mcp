@@ -357,4 +357,8 @@ class FakeNativeDevice implements NativeDevice {
   @override
   Future<void> setLocation(double latitude, double longitude) async =>
       _record('location $latitude,$longitude');
+
+  @override
+  Future<void> biometrics(NativeBiometricAction action) async =>
+      _record('biometrics ${action.name}');
 }

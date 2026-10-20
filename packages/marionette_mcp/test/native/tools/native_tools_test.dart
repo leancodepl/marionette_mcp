@@ -171,6 +171,29 @@ void main() {
       );
     });
 
+    test('lists a toast although it has no bounds (D19)', () async {
+      final context = _contextWith(
+        FakeNativeConnector.single([
+          nativeElement(text: 'Visible'),
+          nativeElement(
+            type: 'android.widget.Toast',
+            text: 'Saved',
+            clickable: false,
+            width: 0,
+            height: 0,
+          ),
+        ]),
+      );
+
+      final payload = jsonDecode(_text(await handleNativeGetElements(context)))
+          as Map<String, dynamic>;
+
+      expect(
+        (payload['elements'] as List).map((e) => (e as Map)['text']),
+        ['Visible', 'Saved'],
+      );
+    });
+
     test('includes element state and filters elements', () async {
       final context = _contextWith(
         FakeNativeConnector.single([
@@ -806,6 +829,33 @@ void main() {
 
       expect(visible, _isToolSuccess(contains('"state":"visible"')));
       expect(connector.getElementsCalls, 2);
+    });
+
+    test('finds a toast and waits until it is gone (D19)', () async {
+      final connector = FakeNativeConnector()
+        ..onGetElements = (call) => [
+              if (call < 1)
+                nativeElement(
+                  type: 'android.widget.Toast',
+                  text: 'Saved',
+                  clickable: false,
+                  width: 0,
+                  height: 0,
+                ),
+            ];
+      final context = _contextWith(connector);
+
+      expect(
+        await handleNativeWaitFor(context, {'text': 'Saved'}),
+        _isToolSuccess(contains('"state":"visible"')),
+      );
+      expect(
+        await handleNativeWaitFor(
+          context,
+          {'text': 'Saved', 'state': 'gone', 'intervalMs': 50},
+        ),
+        _isToolSuccess(contains('"state":"gone"')),
+      );
     });
 
     test('waits until the element is gone', () async {

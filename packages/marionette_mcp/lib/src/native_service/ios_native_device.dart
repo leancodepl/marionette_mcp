@@ -166,6 +166,34 @@ final class IosNativeDevice implements NativeDevice {
         () => _simctl.setLocation(udid, latitude, longitude),
       );
 
+  /// The Simulator's Features → Face ID / Touch ID menu posts these
+  /// notifications; `notifyutil` posts the same ones. Matches are sent for
+  /// both Face ID (`pearl`) and Touch ID (`fingerTouch`): a simulator only
+  /// listens to its own.
+  @override
+  Future<void> biometrics(NativeBiometricAction action) => _guard(
+        'notifyutil',
+        () async {
+          const enrollment = 'com.apple.BiometricKit.enrollmentChanged';
+          switch (action) {
+            case NativeBiometricAction.enroll:
+              await _simctl.notify(udid, enrollment, state: 1);
+            case NativeBiometricAction.unenroll:
+              await _simctl.notify(udid, enrollment, state: 0);
+            case NativeBiometricAction.match:
+            case NativeBiometricAction.nonMatch:
+              final suffix =
+                  action == NativeBiometricAction.match ? 'match' : 'nomatch';
+              for (final sensor in const ['pearl', 'fingerTouch']) {
+                await _simctl.notify(
+                  udid,
+                  'com.apple.BiometricKit_Sim.$sensor.$suffix',
+                );
+              }
+          }
+        },
+      );
+
   Future<T> _guard<T>(String what, Future<T> Function() operation) async {
     try {
       return await operation();

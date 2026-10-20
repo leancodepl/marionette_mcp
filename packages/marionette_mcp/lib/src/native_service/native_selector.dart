@@ -107,6 +107,13 @@ NativeElement selectElement(
 
   if (matches.length == 1) return matches.single;
   if (matches.isEmpty) {
+    if (elements.any((e) => e.isToast && selector.matches(e))) {
+      throw NativeElementNotFoundException(
+        '${selector.describe()} that can be acted on',
+        hint: 'It is a toast: it can be read (native_get_elements, '
+            'native_wait_for) but not tapped, and it disappears by itself.',
+      );
+    }
     if (elements.any(selector.matches)) {
       throw NativeElementNotFoundException(
         '${selector.describe()} on screen',

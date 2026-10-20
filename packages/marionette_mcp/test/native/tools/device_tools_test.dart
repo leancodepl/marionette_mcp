@@ -219,7 +219,7 @@ void main() {
       );
       expect(
         await handleNativeApp(context, {'action': 'terminate'}),
-        _isToolSuccess('$_app was not running.'),
+        _isToolSuccess(startsWith('$_app was not running.')),
       );
       expect(
         await handleNativeApp(context, {'action': 'restart', 'appId': 'x.y'}),
@@ -232,6 +232,20 @@ void main() {
         'terminate x.y',
         'activate x.y',
       ]);
+    });
+
+    test('terminate says Android also removed the notifications', () async {
+      final android = _text(
+        await handleNativeApp(context, {'action': 'terminate'}),
+      );
+      await context.connect(NativePlatform.ios);
+      final ios = _text(
+        await handleNativeApp(context, {'action': 'terminate'}),
+      );
+
+      expect(android, contains('notifications were removed'));
+      expect(android, contains('action=background'));
+      expect(ios, isNot(contains('notifications')));
     });
 
     test('background presses home', () async {
@@ -268,6 +282,18 @@ void main() {
         (startX: 500, startY: 1999, endX: 500, endY: 1000),
       ]);
       expect(device.calls, isEmpty);
+    });
+
+    test('iOS says a notification opens with a swipe, Android does not',
+        () async {
+      final android =
+          _text(await handleNativeNotifications(context, {'action': 'open'}));
+      await context.connect(NativePlatform.ios);
+      final ios =
+          _text(await handleNativeNotifications(context, {'action': 'open'}));
+
+      expect(android, isNot(contains('swipe it right')));
+      expect(ios, contains('swipe it right with native_swipe'));
     });
 
     test('push builds an alert payload or takes a full one', () async {
@@ -352,6 +378,32 @@ void main() {
     });
   });
 
+  group('native_biometrics', () {
+    test('passes the action to the device', () async {
+      expect(
+        await handleNativeBiometrics(context, {'action': 'match'}),
+        _isToolSuccess(contains('Simulated a matching')),
+      );
+      expect(
+        await handleNativeBiometrics(context, {'action': 'nonMatch'}),
+        _isToolSuccess(contains('non-matching')),
+      );
+      await handleNativeBiometrics(context, {'action': 'enroll'});
+      expect(device.calls, [
+        'biometrics match',
+        'biometrics nonMatch',
+        'biometrics enroll',
+      ]);
+    });
+
+    test('rejects unknown actions', () async {
+      expect(
+        await handleNativeBiometrics(context, {'action': 'touch'}),
+        _isToolError(contains('"match", "nonMatch"')),
+      );
+    });
+  });
+
   test('device tools tell the agent to connect first', () async {
     final disconnected = NativeServiceContext();
     for (final call in [
@@ -365,6 +417,7 @@ void main() {
           handleNativeSetOrientation(disconnected, {'orientation': 'portrait'}),
       () => handleNativeSetLocation(
           disconnected, {'latitude': 1, 'longitude': 1}),
+      () => handleNativeBiometrics(disconnected, {'action': 'match'}),
     ]) {
       expect(await call(), _isToolError(contains('native_connect')));
     }

@@ -186,6 +186,24 @@ void main() {
       );
     });
 
+    test('a toast is never a target, and the error says why (D19)', () {
+      final toast = nativeElement(
+        type: 'android.widget.Toast',
+        text: 'Saved',
+        clickable: false,
+        width: 0,
+        height: 0,
+      );
+
+      expect(
+        () => selectElement([toast], const NativeSelector(text: 'Saved')),
+        throwsA(
+          isA<NativeElementNotFoundException>()
+              .having((e) => e.hint, 'hint', contains('toast')),
+        ),
+      );
+    });
+
     test('off-screen (zero-size) elements never match (D16)', () {
       final offScreen = nativeElement(text: 'Row 40', width: 0, height: 0);
       final onScreen = nativeElement(text: 'Row 4', y: 300);

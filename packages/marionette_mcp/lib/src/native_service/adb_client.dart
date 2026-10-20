@@ -111,6 +111,20 @@ class AdbClient {
     }
   }
 
+  /// Share of its window the software keyboard covers (0–1), from the
+  /// `InputMethod` window in `dumpsys window windows`; null when it cannot
+  /// be read. Near 0 when Gboard shows only its floating toolbar (a
+  /// hardware keyboard is attached). Never throws.
+  Future<double?> keyboardCoverage() async {
+    try {
+      final result = await shell(const ['dumpsys', 'window', 'windows']);
+      if (result.exitCode != 0) return null;
+      return parseKeyboardCoverage(processStdout(result));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Package that owns the focused window (a system dialog when one covers
   /// the app), or null when it cannot be determined. Never throws.
   ///
@@ -185,4 +199,25 @@ String? parseForegroundPackage(String dumpsysOutput) {
     if (match != null) return match.group(1);
   }
   return null;
+}
+
+final _imeWindowHeight = RegExp(r'Requested w=\d+ h=(\d+)');
+final _imeContentInsets = RegExp(r'mGivenContentInsets=\[\d+,(\d+)\]');
+
+/// Share of the `InputMethod` window the keyboard covers, from
+/// `dumpsys window windows`: the window spans the screen and its content
+/// inset marks where the keyboard starts, so the keyboard height is the
+/// window height minus that inset.
+double? parseKeyboardCoverage(String dumpsys) {
+  final start =
+      dumpsys.indexOf(RegExp(r'Window #\d+ Window\{[^}]* InputMethod\}'));
+  if (start == -1) return null;
+  final next = dumpsys.indexOf(RegExp(r'Window #\d+ '), start + 1);
+  final block = dumpsys.substring(start, next == -1 ? dumpsys.length : next);
+  final height =
+      int.tryParse(_imeWindowHeight.firstMatch(block)?.group(1) ?? '');
+  final insetTop =
+      int.tryParse(_imeContentInsets.firstMatch(block)?.group(1) ?? '');
+  if (height == null || insetTop == null || height <= 0) return null;
+  return ((height - insetTop) / height).clamp(0, 1).toDouble();
 }

@@ -64,6 +64,8 @@
 	<string>Native-lane testing: calendar permission state (Device &amp; permissions screen).</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Native-lane testing: contacts permission state (Device &amp; permissions screen).</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Native-lane testing: biometric sign-in (Auth UI screen).</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Native-lane testing: location permission state (Device &amp; permissions screen).</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -72,6 +74,8 @@
 	<string>This app uses the camera for profile pictures and native-lane testing demos.</string>
 	<key>GOOGLE_MAPS_API_KEY</key>
 	<string>RANDOM_KEY</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Native-lane testing: App Tracking Transparency prompt (Native dialogs screen).</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app accesses your photo library so you can choose a profile picture.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

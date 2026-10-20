@@ -48,6 +48,28 @@ enum NativePermissionAction {
   }
 }
 
+/// Simulated biometric event on an emulator / simulator.
+enum NativeBiometricAction {
+  /// Register a face / fingerprint so apps see biometrics as available.
+  enroll,
+
+  /// Remove it again.
+  unenroll,
+
+  /// A recognised face / finger.
+  match,
+
+  /// An unrecognised face / finger.
+  nonMatch;
+
+  static NativeBiometricAction? tryParse(Object? raw) {
+    for (final value in values) {
+      if (value.name == raw) return value;
+    }
+    return null;
+  }
+}
+
 /// Outcome of [NativeDevice.setPermission].
 class NativePermissionChange {
   const NativePermissionChange({
@@ -139,6 +161,10 @@ abstract interface class NativeDevice {
 
   /// Sets the simulated GPS position (emulators and simulators only).
   Future<void> setLocation(double latitude, double longitude);
+
+  /// Simulates a biometric event (emulators and simulators only); see
+  /// docs/native-lane-decisions.md#d20.
+  Future<void> biometrics(NativeBiometricAction action);
 }
 
 /// Whether [appId] belongs to the system (launcher, permission dialogs,

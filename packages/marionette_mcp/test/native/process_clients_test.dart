@@ -277,4 +277,28 @@ void main() {
       );
     });
   });
+
+  group('parseKeyboardCoverage', () {
+    test('floating toolbar covers nothing, a full keyboard a large part', () {
+      expect(
+        parseKeyboardCoverage('''
+  Window #7 Window{ad0968f u0 InputMethod}:
+    Requested w=1280 h=2700 mLayoutSeq=577
+    mGivenContentInsets=[0,2700][0,0] mGivenVisibleInsets=[0,2700][0,0]
+'''),
+        0,
+      );
+      expect(
+        parseKeyboardCoverage('''
+  Window #6 Window{a1 u0 InputMethod}:
+    Requested w=1080 h=2028 mLayoutSeq=12
+    mGivenContentInsets=[0,1215][0,0]
+  Window #7 Window{b2 u0 com.example/.Main}:
+    mGivenContentInsets=[0,0][0,0]
+'''),
+        closeTo(0.4, 0.01),
+      );
+      expect(parseKeyboardCoverage('no ime here'), isNull);
+    });
+  });
 }

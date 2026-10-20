@@ -330,6 +330,29 @@ void main() {
       );
     });
 
+    test('biometrics: finger 1 matches, 2 does not; enroll explains', () async {
+      await device.biometrics(NativeBiometricAction.match);
+      await device.biometrics(NativeBiometricAction.nonMatch);
+      expect(runner.adbCommands, [
+        ['emu', 'finger', 'touch', '1'],
+        ['emu', 'finger', 'touch', '2'],
+      ]);
+      await expectLater(
+        device.biometrics(NativeBiometricAction.enroll),
+        throwsA(
+          isA<NativeUnsupportedException>()
+              .having((e) => e.hint, 'hint', contains('locksettings')),
+        ),
+      );
+      final physical = AndroidNativeDevice(
+        AdbClient(serial: 'R58M123', processRunner: runner.call),
+      );
+      await expectLater(
+        physical.biometrics(NativeBiometricAction.match),
+        throwsA(isA<NativeUnsupportedException>()),
+      );
+    });
+
     test('info reads system properties', () async {
       sdk(28);
       runner
@@ -486,6 +509,18 @@ void main() {
       });
 
       expect(sent, '{"aps":{"alert":"Hi"}}');
+    });
+
+    test('biometrics post the Simulator notifications', () async {
+      await device.biometrics(NativeBiometricAction.enroll);
+      await device.biometrics(NativeBiometricAction.match);
+
+      expect(simctl().map((c) => c.sublist(3).join(' ')), [
+        'notifyutil -s com.apple.BiometricKit.enrollmentChanged 1',
+        'notifyutil -p com.apple.BiometricKit.enrollmentChanged',
+        'notifyutil -p com.apple.BiometricKit_Sim.pearl.match',
+        'notifyutil -p com.apple.BiometricKit_Sim.fingerTouch.match',
+      ]);
     });
 
     test('notification center needs a gesture', () {

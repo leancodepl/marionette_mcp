@@ -98,6 +98,24 @@ void main() {
       expect(clickableEmpty.resourceId, isNull);
     });
 
+    test('keeps the toast UIAutomator2 adds without bounds (D19)', () {
+      final elements = parseAndroidUiDump(
+        '<hierarchy>'
+        '<node class="android.widget.Button" clickable="true" text="Save" '
+        'bounds="[0,0][100,50]"/>'
+        '<android.widget.Toast index="1" package="com.android.settings" '
+        'class="android.widget.Toast" text="Saved" displayed="true" />'
+        '</hierarchy>',
+      );
+
+      final toast = elements.last;
+      expect(toast.text, 'Saved');
+      expect(toast.isToast, isTrue);
+      expect(toast.isVisible, isFalse);
+      expect(toast.isListed, isTrue);
+      expect(elements.first.isToast, isFalse);
+    });
+
     test('decodes entities and numeric character references in one pass', () {
       final elements = parseAndroidUiDump(
         '<hierarchy>'
@@ -433,5 +451,17 @@ void _unitTests() {
     // Partly visible: clipped to the screen, so the center is on it.
     expect(elements[2].bounds.toJson(),
         {'x': 16, 'y': 940, 'width': 100, 'height': 16});
+  });
+
+  test('WDA: identical duplicate elements are listed once', () {
+    final elements = parseWdaSource('''
+<XCUIElementTypeApplication name="Counter" label="Counter" x="0" y="0" width="440" height="956">
+  <XCUIElementTypeButton name="cancel" label="Cancel" enabled="true" x="76" y="532" width="288" height="48"/>
+  <XCUIElementTypeButton name="cancel" label="Cancel" enabled="true" x="76" y="532" width="288" height="48"/>
+  <XCUIElementTypeButton name="cancel" label="Cancel" enabled="true" x="76" y="600" width="288" height="48"/>
+</XCUIElementTypeApplication>''');
+
+    expect(elements.where((e) => e.text == 'Cancel'), hasLength(2),
+        reason: 'same label elsewhere on screen is a different element');
   });
 }

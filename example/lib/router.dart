@@ -11,8 +11,13 @@ import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/testing/camera_platform_view_screen.dart';
+import 'screens/testing/auth_screen.dart';
 import 'screens/testing/device_screen.dart';
 import 'screens/testing/gestures_screen.dart';
+import 'screens/testing/native_dialogs_screen.dart';
+import 'screens/testing/native_screen_screen.dart';
+import 'screens/testing/notifications_screen.dart';
+import 'screens/testing/oauth_screen.dart';
 import 'screens/testing/google_maps_platform_view_screen.dart';
 import 'screens/testing/native_controls_platform_view_screen.dart';
 import 'screens/testing/keyboard_screen.dart';
@@ -39,6 +44,11 @@ const availablePages = <String, String>{
   'keyboard': '/testing/keyboard',
   'gestures': '/testing/gestures',
   'device': '/testing/device',
+  'native_dialogs': '/testing/native-dialogs',
+  'native_screen': '/testing/native-screen',
+  'notifications': '/testing/notifications',
+  'auth': '/testing/auth',
+  'oauth': '/testing/oauth',
   'settings': '/settings',
   'items': '/settings/items',
   'about': '/settings/about',
@@ -111,6 +121,26 @@ final router = GoRouter(
             GoRoute(
               path: 'device',
               builder: (context, state) => const DeviceScreen(),
+            ),
+            GoRoute(
+              path: 'native-dialogs',
+              builder: (context, state) => const NativeDialogsScreen(),
+            ),
+            GoRoute(
+              path: 'native-screen',
+              builder: (context, state) => const NativeScreenScreen(),
+            ),
+            GoRoute(
+              path: 'notifications',
+              builder: (context, state) => const NotificationsScreen(),
+            ),
+            GoRoute(
+              path: 'auth',
+              builder: (context, state) => const AuthScreen(),
+            ),
+            GoRoute(
+              path: 'oauth',
+              builder: (context, state) => const OAuthScreen(),
             ),
           ],
         ),

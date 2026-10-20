@@ -78,6 +78,40 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   @override
   List<NativeElement> parseSource(String xml) => parseAndroidUiDump(xml);
 
+  /// How long a tree read keeps retrying while a toast is on screen; a long
+  /// toast stays 3.5 s.
+  static const toastRetryWindow = Duration(seconds: 5);
+
+  /// While a toast is shown, UIAutomator2 fails every page source with
+  /// "Cannot set AccessibilityNodeInfo's field 'mSealed'" (seen on API 35;
+  /// on API 28 it adds the toast to the tree instead). Reads are retried
+  /// until it is gone (docs/native-lane-decisions.md#d19).
+  @override
+  Future<List<NativeElement>> getNativeElements() async {
+    final stopwatch = Stopwatch()..start();
+    while (true) {
+      try {
+        return await super.getNativeElements();
+      } on WebDriverException catch (error) {
+        if (!isToastReadFailure(error)) rethrow;
+        if (stopwatch.elapsed >= toastRetryWindow) {
+          throw NativeOperationFailedException(
+            'The UI tree cannot be read right now: $error',
+            hint: 'A toast is probably on screen — on this Android version '
+                'UIAutomator2 cannot read the tree until it disappears, nor '
+                'list the toast. Read the toast with native_take_screenshot, '
+                'then retry.',
+          );
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+    }
+  }
+
+  /// Whether [error] is UIAutomator2's failure while a toast is shown.
+  static bool isToastReadFailure(WebDriverException error) =>
+      error.message.contains("AccessibilityNodeInfo's field 'mSealed'");
+
   @override
   String get classAttribute => 'className';
 
@@ -186,11 +220,30 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     return shown;
   }
 
+  /// Keyboards covering less than this share of their window are Gboard's
+  /// floating toolbar (hardware keyboard attached), which does not consume
+  /// Back.
+  static const _floatingKeyboardCoverage = 0.1;
+
   /// Presses Back, which closes a shown IME without navigating. Back is
-  /// only sent when the keyboard is shown — otherwise it would navigate.
+  /// only sent when the keyboard is shown — otherwise it would navigate —
+  /// and not to Gboard's floating toolbar, which lets Back through to the
+  /// app (docs/native-lane-decisions.md#d14).
   @override
   Future<bool> hideKeyboard() async {
     if (!await isKeyboardShown()) return false;
+    final coverage = await _adb.keyboardCoverage();
+    if (coverage != null && coverage < _floatingKeyboardCoverage) {
+      throw const NativeOperationFailedException(
+        'The keyboard is shown only as a floating toolbar (a hardware '
+        'keyboard is attached); Back would close the current screen instead '
+        'of the keyboard, so nothing was pressed.',
+        hint: 'The toolbar covers little of the app. To remove it, unfocus '
+            'the field in the app (tap outside it, the app\'s Done button, '
+            'or via the Flutter lane), or start the emulator without a '
+            'hardware keyboard (AVD hw.keyboard=no).',
+      );
+    }
     await pressKey(NativeKey.back);
     for (var attempt = 0; attempt < 10; attempt++) {
       if (!await isKeyboardShown()) return true;

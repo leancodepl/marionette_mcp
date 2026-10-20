@@ -3,6 +3,7 @@
 /// implementations.
 library;
 
+import 'dart:convert' show jsonEncode;
 import 'dart:math' show max, min;
 
 import 'package:marionette_mcp/src/native_service/native_device.dart';
@@ -176,6 +177,14 @@ class NativeElement {
   /// off-screen semantics nodes in the tree with zero-size bounds at (0, 0);
   /// those are not visible (docs/native-lane-decisions.md#d16).
   bool get isVisible => bounds.width > 0 && bounds.height > 0;
+
+  /// An Android toast. UIAutomator2 adds the toast being shown to the tree
+  /// without bounds (seen on API 28; on API 35 the read fails instead), so it
+  /// can be read but not acted on (docs/native-lane-decisions.md#d19).
+  bool get isToast => className == 'android.widget.Toast';
+
+  /// Whether reading tools list the element: visible ones and toasts.
+  bool get isListed => isVisible || isToast;
 
   /// Center of [bounds] in screenshot pixels — the natural tap target.
   ({int x, int y}) get center => (
@@ -676,13 +685,23 @@ List<NativeElement> parseWdaSource(String xml) {
       .where((e) => e.className == 'XCUIElementTypeApplication')
       .map((e) => e.bounds)
       .firstOrNull;
-  if (screen == null) return elements;
+  final onScreen = screen == null
+      ? elements
+      : [
+          for (final element in elements)
+            if (element.className == 'XCUIElementTypeApplication')
+              element
+            else if (_overlaps(element.bounds, screen))
+              element.withBounds(_clip(element.bounds, screen)),
+        ];
+
+  // WDA can list the same element twice (seen with the buttons of the Face
+  // ID alert); identical copies would make every selector for it ambiguous
+  // (docs/native-lane-decisions.md#d1).
+  final seen = <String>{};
   return [
-    for (final element in elements)
-      if (element.className == 'XCUIElementTypeApplication')
-        element
-      else if (_overlaps(element.bounds, screen))
-        element.withBounds(_clip(element.bounds, screen)),
+    for (final element in onScreen)
+      if (seen.add(jsonEncode(element.toJson()))) element,
   ];
 }
 

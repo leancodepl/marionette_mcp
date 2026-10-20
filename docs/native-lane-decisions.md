@@ -21,6 +21,9 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D16](#d16) | Scrolling to an element and waiting for one | Accepted |
 | [D17](#d17) | Changing permissions without the system dialog | Accepted |
 | [D18](#d18) | UIAutomator2 idle wait | Accepted |
+| [D19](#d19) | Android toasts in the tree | Accepted |
+| [D20](#d20) | Simulated biometrics | Accepted |
+| [D21](#d21) | Opening a notification on iOS | Accepted |
 
 ---
 
@@ -66,6 +69,10 @@ For an agent, an error listing the candidates is cheaper than tapping the wrong 
 - Live, Android API 28 and 35, iOS 26.4 and 18.6: `native_tap text="Request"` on the example app's permission screen fails with two candidates; `index: 0` / `index: 1` open the camera / photos dialog respectively; "Tap me (native)" (button + label) resolves to the button.
 - Verification found that iOS `tapElement` re-located the element by its accessibility id, so `index: 1` tapped the *first* "Request" button (same id). This led to the "chosen element is the one acted on" rule above.
 
+
+### Follow-up (unit 8, 2026-10-20)
+
+- **Duplicate nodes from WebDriverAgent.** On iOS 26.4 the Face ID system alert (shown over the app by `local_auth`) is listed twice in the WDA page source — identical type, label, id and bounds — so `native_tap text="Cancel"` failed as ambiguous with two identical candidates. `parseWdaSource` now drops elements that are identical in every reported field; elements that differ in anything (another type, or the same label elsewhere on screen) are kept, and their ambiguity still fails with candidates. After the change the alert's "Cancel" is tapped directly. Unit test: two identical nodes become one, the same label at another position stays a separate element.
 ---
 
 <a id="d2"></a>
@@ -269,7 +276,7 @@ Every MCP tool costs space in the agent's context (name, description, schema). O
 
 ### Decision
 
-Option 2: `native_permissions` (grant / revoke / reset), `native_app` (activate / background / terminate / restart), `native_notifications` (open / close / push). Operations with different annotations stay separate: `native_device_info` is read-only, `native_set_orientation` and `native_set_location` change state, `native_open_url` has a single parameter. Invalid `action` × parameter combinations are rejected in the handler before any device call. Biometrics (`native_biometrics`, S-05) is postponed to unit 8, where the example app gets a screen to verify it on.
+Option 2: `native_permissions` (grant / revoke / reset), `native_app` (activate / background / terminate / restart), `native_notifications` (open / close / push). Operations with different annotations stay separate: `native_device_info` is read-only, `native_set_orientation` and `native_set_location` change state, `native_open_url` has a single parameter. Invalid `action` × parameter combinations are rejected in the handler before any device call. Biometrics (`native_biometrics`, S-05) is postponed to unit 8, where the example app gets a screen to verify it on. *Done in unit 8: `native_biometrics` with `match` / `nonMatch` / `enroll` / `unenroll` ([D20](#d20)).*
 
 ### Rationale
 
@@ -375,6 +382,11 @@ Both mechanisms are official and predictable, and — verified — bring back th
 - Android API 28: on the Keyboard screen → Home → `am start -n` printed "Activity not started, its current task has been brought to the front", one activity record in the task, the Keyboard screen kept.
 - iOS 18.6: the backgrounded app (pid 55167) on the Keyboard screen came back with the same pid and screen after `simctl launch`.
 - Live through the MCP server on API 35 and iOS 18.6: `background` → `activate` returns to the same screen; `restart` starts on Home; `terminate` twice reports "was not running" the second time.
+
+### Follow-up (unit 8, 2026-10-20)
+
+- **`terminate` on Android removes the app's notifications.** `am force-stop` cancels everything the app posted (API 35: 2 notification records before, 0 after), so "terminate, then open the app from its notification" cannot be tested that way; iOS `simctl terminate` keeps them. The result and the description of `native_app` now say so on Android and point to `action=background`. A cold start from a notification works when the system kills a background app (`adb shell am kill`): the notification stays, and tapping it starts the app with the payload.
+- Unit test: the Android result mentions the removed notifications and `action=background`, the iOS one does not.
 
 ---
 
@@ -504,6 +516,11 @@ No operation may have a hidden side effect: an unconditional Back would navigate
 - Live, iOS 18.6: focused typing appends and backspace deletes; the Flutter `Title` field (Done key) is hidden; the number pad and a plain `UITextField` fail fast (≈ 4 s, of which most is WDA trying keys) with the hint; home works; back / recents / volume are reported as unsupported.
 - Unit tests cover keycode mapping, Back never sent without a keyboard, polling and failure, iOS key mapping, dismiss key names without `return`, fail-fast without polling, focused typing with clear, and decorator classification.
 - Follow-up (2026-10-19, iOS 18.6): `native_hide_keyboard` failed with "no Done / dismiss key" after a field was cleared. Cause: the iOS keyboard check only looked for `XCUIElementTypeKeyboard` in the page source, but a hidden keyboard stays in the tree, parked just below the screen (`y` = application height, `visible="false"`; screenshots confirmed no keyboard on screen). Hiding then tried to dismiss a keyboard that was not there. The keyboard now counts as shown only when it has a size and its top edge is above the bottom of the application; `visible` is not used because WDA reports it inconsistently. The Done key itself was enabled in the empty field, which ruled out the first guess (`enablesReturnKeyAutomatically`). Verified live: in that state the tool reports "Keyboard was not shown"; with a keyboard on screen (empty or filled field) it hides it. Unit tests cover the parked keyboard and an on-screen one.
+
+### Follow-up (unit 8, 2026-10-20)
+
+- **Gboard's floating toolbar.** With a hardware keyboard attached (the emulator's default `hw.keyboard=yes`), Gboard shows only a small floating toolbar instead of the keyboard, and `dumpsys input_method` still reports `mInputShown=true`. Back does **not** close that toolbar: it reaches the app — on the native screen of the example app it closed both the IME and the Activity. `hideKeyboard` now measures how much of the IME window the keyboard covers (`dumpsys window`: the window's requested height `h` and `mGivenContentInsets` top `T` → (h − T) / h; a full keyboard covers about 40 % — API 28, 1215 of 2028 px inset — while the toolbar reports no cover at all: inset 2700 of 2700 px on API 35) and below 10 % fails with a hint (unfocus the field in the app, or start the emulator with `hw.keyboard=no`) instead of pressing Back. Unknown coverage (the window not found) keeps the old behaviour.
+- Verified live on Android API 35 (native screen of the example app, field focused, toolbar shown): `native_hide_keyboard` fails with the hint in 0.2 s and the native screen stays open. The on-screen keyboard path is unchanged (unit-tested; API 35 here always shows the toolbar). Unit tests cover the coverage parser and the guard.
 
 ---
 
@@ -704,4 +721,131 @@ On static screens the setting changes nothing — the wait ends as soon as the U
 - After the change, reads on the playing video screen take ~0.55–0.6 s through the MCP server; `native_wait_for` there finds an element in 0.6 s.
 - Re-measured later on API 35 after ruling out the host sleeping: playing video — 10 046 / 8 982 / 10 115 ms with the default, 576 / 602 / 609 ms with 500 ms; a static screen — 22 / 18 / 21 ms vs 15 / 16 / 14 ms (no difference).
 - Unit test: the session posts `{"settings": {"waitForIdleTimeout": 500}}`.
+
+---
+
+<a id="d19"></a>
+
+## D19 — Android toasts in the tree
+
+- **Status:** Accepted (2026-10-20)
+- **Applies to:** `AndroidNativeConnector.getNativeElements` (every Android read: `native_get_elements`, selectors, `native_wait_for`, `native_scroll`); `NativeElement.isToast` / `isListed`; `selectElement`.
+
+### Context and dilemma
+
+While a `Toast` is on screen (Android API 35, example app → Notifications → "Show Android toast"), every UIAutomator2 page source fails with HTTP 500 "Cannot set AccessibilityNodeInfo's field 'mSealed'". The toast itself is never in the tree: neither during nor after it, nor with UIAutomator2's `enableMultiWindows` setting, which lists the other windows but not the toast. A long toast lasts 3.5 s, a short one 2 s; any tool that reads the tree in that time failed with a raw WebDriver error.
+
+On API 28 the same moment looks different: UIAutomator2 logs "Adding toast message to root: …" and **adds** the toast to the page source as `<android.widget.Toast class="android.widget.Toast" text="…" displayed="true"/>` — with the wrong package (`com.android.settings`) and **without bounds**. The parser kept it as a zero-size element, which the off-screen rule ([D16](#d16)) then hid. The logcat line next to it ("Accessing hidden field …mSealed (light greylist, reflection)") shows the mechanism: UIAutomator2 builds the node by reflection on a hidden field, which API 28 still allows and API 35 blocks — hence the 500.
+
+### Options considered
+
+1. Pass the error through (the agent retries).
+2. Retry the read inside the connector for at most the length of a long toast, then fail with a hint.
+3. Turn on `enableMultiWindows` — rejected: it does not make the toast visible and does not stop the failure.
+4. For API 28: hide the boundless toast node (as before), or list it as a read-only element.
+
+### Decision
+
+Option 2. An Android read that fails with the `mSealed` message is retried every 500 ms for up to 5 s; after that the tool fails with `NativeOperationFailedException` explaining that a toast is probably on screen, that this Android version cannot list it, and that `native_take_screenshot` shows it. Other errors are not retried here ([D3](#d3) handles a lost session).
+
+Where UIAutomator2 does add the toast (API 28), it is **listed read-only**: `native_get_elements` and `native_wait_for` (visible and gone) include an `android.widget.Toast` element with `0×0` bounds, while selectors of acting tools never pick it — a tap targeted at it fails with "It is a toast: it can be read … but not tapped".
+
+### Rationale
+
+A toast is short and disappears on its own, so waiting it out is invisible to the agent apart from the time it takes; failing would make every action right after a toast flaky. Where the text is available it is the cheapest and most reliable check ("was the 'Saved' toast shown?"), so it is listed; it has no position, so acting on it is refused with an explanation instead of tapping (0, 0). Elsewhere the screenshot is the only way, so the hint names it.
+
+### Consequences
+
+- A read during a toast takes up to ~3.5 s instead of failing.
+- On API 35 toast text can only be checked visually (`native_take_screenshot`); on API 28 it is readable as text. Which API levels between them behave which way is unverified (API 29 AVD available; physical devices: checklist).
+- Android heads-up notification banners are not in the UIAutomator2 tree on API 35 (the notification is readable in the shade, `native_notifications open`).
+- The listed toast has `0×0` bounds and the wrong package; consumers must not use its position.
+
+### Verification
+
+- Live, Android API 35: a `native_get_elements` right after "Show Android toast" returned the tree after 3.6 s (before the change: HTTP 500); the screenshot shows the toast. After the read-only listing was added: unchanged (3.9 s, no toast element).
+- Live, Android API 28 (Pixel 3 emulator): reads during the toast take ~0.1 s (no failure); `native_wait_for textContains="Native toast"` → visible in 0.5 s (`android.widget.Toast`, 0×0); `native_get_elements` lists it; `native_tap` on it fails with the toast hint; `native_wait_for … state=gone` → gone after 3.3 s. Before the change the toast was not listed.
+- Unit tests: the read is retried until the toast is gone, gives up after the window with a typed error carrying the toast hint, and other server errors are not retried; the parser keeps the boundless toast node; `native_get_elements` lists it; `native_wait_for` finds it and waits until it is gone; a selector refuses it with the toast hint.
+
+---
+
+<a id="d20"></a>
+
+## D20 — Simulated biometrics
+
+- **Status:** Accepted (2026-10-20)
+- **Applies to:** `native_biometrics`; `NativeDevice.biometrics`, `NativeBiometricAction`; `SimctlClient.notify`.
+
+### Context and dilemma
+
+A biometric prompt (Face ID, Touch ID, `BiometricPrompt`) is system UI that a test cannot answer by tapping: it waits for a face or a finger. The simulator and the emulator can fake both, through different mechanisms, and enrollment works very differently:
+
+- **iOS Simulator:** the "Features → Face ID / Touch ID" menu posts Darwin notifications, which `simctl spawn <udid> notifyutil` can post too: `com.apple.BiometricKit.enrollmentChanged` with state 1 / 0 (enrolled / not), and `com.apple.BiometricKit_Sim.pearl.match` / `.nomatch` (Face ID) or `.fingerTouch.match` / `.nomatch` (Touch ID).
+- **Android emulator:** `adb emu finger touch <id>` simulates a finger with a given id. Enrollment needs a screen lock (`locksettings set-pin`) and the Settings enrollment wizard, which itself waits for finger touches; there is no command that enrolls directly. Physical devices offer neither.
+
+### Options considered
+
+1. One tool with `action`: `match`, `nonMatch`, `enroll`, `unenroll` (consistent with [D9](#d9)).
+2. Separate tools per action — more tools in context for a rarely used feature.
+3. Automate Android enrollment inside the tool (set a PIN, drive the Settings wizard) — fragile across API levels and OEM Settings, changes the device's lock screen without the user's consent.
+
+### Decision
+
+Option 1. iOS: `enroll` / `unenroll` post `enrollmentChanged` with state 1 / 0; `match` / `nonMatch` post both the Face ID and the Touch ID notification (the device has only one of them; the other is ignored). Android (emulator only): `match` touches finger 1, `nonMatch` finger 2; `enroll` / `unenroll` fail with `NativeUnsupportedException` and a hint describing the manual steps (`adb shell locksettings set-pin 1111`, then the Settings fingerprint wizard, answering its prompts with `native_biometrics match`). On a physical Android device every action is unsupported with a hint; iOS device operations work on the Simulator only (physical iPhone: X-02).
+
+### Rationale
+
+The prompt is the thing under test; faking the sensor is the only way to answer it. Android enrollment is a one-time device setup with side effects (a PIN), so it stays manual but documented in the result.
+
+### Consequences
+
+- A test must first enroll on iOS (state is kept by the simulator) or prepare the Android emulator once (fingerprint 1 enrolled; finger 2 never enrolled, so it is a reliable non-match).
+- iOS state persists across app reinstalls and sessions; `unenroll` makes `local_auth` report "no biometrics enrolled".
+
+### Verification
+
+- Live, iOS 26.4 (iPhone 17 Pro Max), Auth screen: `unenroll` → "enrolled: false"; `enroll` → "enrolled: true"; "Authenticate" shows the Face ID prompt; `match` → "Biometric result: success"; `nonMatch` → "Face Not Recognised" alert, its "Cancel" → "UserCancelled".
+- Live, Android API 35 emulator: after `locksettings set-pin 1111`, the Settings wizard enrolled a fingerprint with `native_biometrics match` answering its touches; the app's `BiometricPrompt` appears in the tree; `match` → success; `nonMatch` → "Not recognized" in the prompt; Back → failed. `enroll` returns the hint.
+- Unit tests: notifyutil arguments per action, emulator finger ids, enroll hint, the action passed by the tool, and rejection of an unknown action.
+
+---
+
+<a id="d21"></a>
+
+## D21 — Opening a notification on iOS
+
+- **Status:** Accepted (2026-10-20)
+- **Applies to:** `native_notifications` (iOS result text and description); agent instructions.
+
+### Context and dilemma
+
+On the iOS Simulator (26.4 and 18.6) a tap on a notification in the Notification Center (the cover sheet that `native_notifications open` pulls down) does not open the app. SpringBoard's log for the tap: "Notification cell tap performing default action … Hinting side swipe instead of executing action … didExecute? NO". This happens with and without Face ID enrolled, with a WDA element tap and with a coordinate tap, and for both buttons that represent the notification (`ListCell`, `ShortLook.Platter.Content.Seamless`). A tap on the **banner** over the home screen opens the app. A swipe right across the notification in the Notification Center opens it as well.
+
+### Options considered
+
+1. Make `native_tap` swipe when the target is a notification cell — hidden behaviour in a generic tool.
+2. Add an `open` action with a selector to `native_notifications`.
+3. Document the gesture: in the tool description and in the iOS result of `action=open`.
+
+### Decision
+
+Option 3: the description says that a notification is opened with `native_tap` on Android and on an iOS banner, and with a swipe right (`native_swipe` across its bounds) in the iOS Notification Center; the iOS result of `open` repeats it.
+
+### Rationale
+
+The gesture is a platform behaviour, works with existing tools and is now discoverable where the agent reads notifications. A dedicated action can still be added if agents keep tapping.
+
+### Consequences
+
+- Agents must use different gestures for the same thing on the two platforms; the text says so where it matters.
+- Opened over a foreground app, the Notification Center is not in the WebDriverAgent tree (the app's elements are returned instead, seen on iOS 26.4); over the home screen it is. The iOS result of `open` therefore also tells the agent to send the app to the background first.
+- Not specific to iOS 26: iOS 18.6 behaves the same. iOS 18.6 also collapses the list into a "1 Notification" button at the bottom of the cover sheet; it must be tapped to expand the list — the iOS result says so. Whether a physical iPhone behaves the same is unverified (checklist; the cover sheet is the lock screen, where a real device asks to unlock).
+- Simulated push (`action=push`): the banner appears only when the app is already suspended. Pushed while the app is active — in front, or within about a second after `native_app action=background` — the app's notification delegate decides, and the example app's plugin shows nothing. The push result tells the agent to background the app a few seconds before pushing.
+
+### Verification
+
+- Live, iOS 26.4: banner tap → "Opened from notification: demo-payload"; Notification Center tap → nothing (log above); swipe right from x = 200 to 1100 across the notification → the app opens with the payload — also from a terminated app (cold start).
+- Live, iOS 18.6 (iPhone 16 Pro Max): "1 Notification" tapped to expand; tap on the notification → the same "Hinting side swipe" log; swipe right → the app opens with the payload.
+- Live, iOS 26.4, push: pushed 3 s after `background` → banner, tap → the app in front; pushed 0.5 s after `background` or in front → nothing shown.
+- Unit test: the iOS result contains the swipe hint, the Android one does not.
 

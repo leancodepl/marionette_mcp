@@ -79,6 +79,15 @@ class SimctlClient {
     return parseSimulatorInfo(processStdout(result), udid);
   }
 
+  /// Posts Darwin notification [name] inside simulator [udid]
+  /// (`notifyutil -p`), optionally setting its state first (`-s`).
+  Future<void> notify(String udid, String name, {int? state}) async {
+    if (state != null) {
+      await _simctl(['spawn', udid, 'notifyutil', '-s', name, '$state']);
+    }
+    await _simctl(['spawn', udid, 'notifyutil', '-p', name]);
+  }
+
   Future<void> _simctl(List<String> arguments) async {
     final fullArguments = ['simctl', ...arguments];
     final result = await _run('xcrun', fullArguments);

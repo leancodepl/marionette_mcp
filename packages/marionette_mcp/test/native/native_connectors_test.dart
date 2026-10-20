@@ -35,6 +35,17 @@ List<List<Map<String, dynamic>>> _fingers(RecordedRequest request) => [
         ],
     ];
 
+/// `dumpsys window windows` excerpt for Gboard's floating toolbar on API 35.
+const _floatingImeDumpsys = '''
+  Window #7 Window{ad0968f u0 InputMethod}:
+    mAttrs={(0,0)(fillxfill) gr=BOTTOM CENTER_VERTICAL ty=INPUT_METHOD}
+    Requested w=1280 h=2700 mLayoutSeq=577
+    mGivenContentInsets=[0,2700][0,0] mGivenVisibleInsets=[0,2700][0,0]
+  Window #8 Window{1b2c u0 com.example.counter/com.example.counter.MainActivity}:
+    Requested w=1280 h=2856 mLayoutSeq=577
+    mGivenContentInsets=[0,0][0,0]
+''';
+
 void main() {
   late FakeWebDriverServer server;
   late FakeServerBootstrap bootstrap;
@@ -88,6 +99,69 @@ void main() {
           'settings': {'waitForIdleTimeout': 500},
         },
       );
+    });
+
+    group('while a toast is shown (D19)', () {
+      const toastError = FakeResponse.error(
+        'unknown error',
+        "Cannot set AccessibilityNodeInfo's field 'mSealed' to 'true'",
+        status: HttpStatus.internalServerError,
+      );
+
+      test('tree reads are retried until the toast is gone', () async {
+        var calls = 0;
+        server.on('GET', '/session/sess-1/source', (_) {
+          calls++;
+          return calls <= 2
+              ? toastError
+              : const FakeResponse.value(
+                  '<hierarchy><node class="android.widget.Button" '
+                  'text="OK" clickable="true" bounds="[0,0][10,10]"/>'
+                  '</hierarchy>',
+                );
+        });
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        final elements = await connector.getNativeElements();
+
+        expect(elements.single.text, 'OK');
+        expect(calls, 3);
+      });
+
+      test('a toast that never goes away becomes a typed error', () async {
+        server.on('GET', '/session/sess-1/source', (_) => toastError);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.getNativeElements(),
+          throwsA(
+            isA<NativeOperationFailedException>()
+                .having((e) => e.hint, 'hint', contains('toast')),
+          ),
+        );
+      }, timeout: const Timeout(Duration(seconds: 20)));
+
+      test('other server errors are not retried', () async {
+        var calls = 0;
+        server.on('GET', '/session/sess-1/source', (_) {
+          calls++;
+          return const FakeResponse.error(
+            'unknown error',
+            'Something else went wrong',
+            status: HttpStatus.internalServerError,
+          );
+        });
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.getNativeElements(),
+          throwsA(isNot(isA<NativeOperationFailedException>())),
+        );
+        expect(calls, 1);
+      });
     });
 
     test('getNativeElements parses the page source', () async {
@@ -251,6 +325,28 @@ void main() {
 
         expect(await connector.hideKeyboard(), isTrue);
         expect(keycodes(), [4]);
+      });
+
+      test('hideKeyboard never presses Back for the floating toolbar',
+          () async {
+        // Gboard with a hardware keyboard attached: the IME window covers
+        // nothing, Back would go to the app (seen on API 35).
+        keyboardShown([true]);
+        runner.onAdb(
+          ['shell', 'dumpsys', 'window', 'windows'],
+          result: ok(_floatingImeDumpsys),
+        );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.hideKeyboard(),
+          throwsA(
+            isA<NativeOperationFailedException>()
+                .having((e) => e.message, 'message', contains('floating')),
+          ),
+        );
+        expect(keycodes(), isEmpty);
       });
 
       test('hideKeyboard fails when the IME stays open', () async {

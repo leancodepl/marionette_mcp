@@ -107,7 +107,8 @@ void registerNativeDeviceTools(
           'instance back to the front with its state — e.g. after a share '
           'sheet, browser or Settings), background (go to the home screen), '
           'terminate, restart (terminate + activate, a fresh start). '
-          'terminate and restart end the Flutter lane connection. '
+          'terminate and restart end the Flutter lane connection; on '
+          'Android they also remove the app\'s notifications (force-stop). '
           'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native App'),
       inputSchema: ToolInputSchema(
@@ -129,7 +130,10 @@ void registerNativeDeviceTools(
           'Center (iOS, by swipe); push sends a simulated push notification '
           'to the app (iOS Simulator only; the app must be allowed to show '
           'notifications). Read the notifications with native_get_elements '
-          'while the shade is open. Requires native_connect.',
+          'while the shade is open. To open a notification, native_tap it '
+          '(Android, iOS banner); in the iOS Notification Center a tap does '
+          'nothing — swipe it right with native_swipe. Requires '
+          'native_connect.',
       annotations: const ToolAnnotations(title: 'Native Notifications'),
       inputSchema: ToolInputSchema(
         properties: {
@@ -181,6 +185,25 @@ void registerNativeDeviceTools(
         required: ['orientation'],
       ),
       callback: (args, extra) => handleNativeSetOrientation(context, args),
+    )
+    ..registerTool(
+      'native_biometrics',
+      description: 'Simulates biometrics on an emulator / simulator: match (a '
+          'recognised face or finger) or nonMatch answers a biometric prompt '
+          'that is on screen (check it with native_get_elements first); '
+          'enroll / unenroll register a face or finger (iOS Simulator only — '
+          'on Android the result explains the Settings steps). Physical '
+          'devices: not possible. Requires native_connect.',
+      annotations: const ToolAnnotations(title: 'Native Biometrics'),
+      inputSchema: ToolInputSchema(
+        properties: {
+          'action': JsonSchema.string(
+            description: '"match", "nonMatch", "enroll" or "unenroll".',
+          ),
+        },
+        required: ['action'],
+      ),
+      callback: (args, extra) => handleNativeBiometrics(context, args),
     )
     ..registerTool(
       'native_set_location',
@@ -310,9 +333,16 @@ Future<CallToolResult> handleNativeApp(
       case NativeAppAction.terminate:
         final id = await appId();
         final wasRunning = await device.terminateApp(id);
+        // Android's force-stop also cancels the app's notifications and
+        // alarms (docs/native-lane-decisions.md#d11).
+        final notifications = context.platform == NativePlatform.android
+            ? ' Its notifications were removed too (Android force-stop); to '
+                'test opening the app from a notification, use '
+                'action=background instead.'
+            : '';
         return _text(wasRunning
-            ? 'Terminated $id. $_flutterLaneWarning'
-            : '$id was not running.');
+            ? 'Terminated $id.$notifications $_flutterLaneWarning'
+            : '$id was not running.$notifications');
       case NativeAppAction.restart:
         final id = await appId();
         await device.terminateApp(id);
@@ -363,8 +393,16 @@ Future<CallToolResult> handleNativeNotifications(
         } else {
           await connector.device.openNotifications();
         }
+        // The iOS Notification Center ignores taps on a notification (it
+        // only hints a side swipe; iOS 18.6 and 26.4); a swipe right opens it
+        // (docs/native-lane-decisions.md#d21).
         return _text('Opened the notifications. Read them with '
-            'native_get_elements; close with action=close.');
+            'native_get_elements; close with action=close.'
+            '${ios ? ' To open one, swipe it right with native_swipe — a tap '
+                'does nothing here. If only "N Notifications" is listed, tap '
+                'it first to expand the list. Opened over the app, the '
+                'Notification Center is not in the tree: send the app to the '
+                'background (native_app action=background) first.' : ''}');
       case NativeNotificationsAction.close:
         if (ios) {
           await _swipeNotificationCenter(connector, open: false);
@@ -384,8 +422,12 @@ Future<CallToolResult> handleNativeNotifications(
               },
             };
         await connector.device.pushNotification(appId, payload);
+        // While the app is active (in front, or for ~1 s after going to the
+        // background) the app itself decides whether a banner is shown.
         return _text('Sent a push notification to $appId. It shows as a '
-            'banner when the app is in the background.');
+            'banner when the app is in the background — send it there a few '
+            'seconds before pushing (native_app action=background); while '
+            'the app is active, the app decides whether to show it.');
     }
   });
 }
@@ -461,6 +503,37 @@ Future<CallToolResult> handleNativeSetOrientation(
     return _text('Orientation is now ${orientation.name}; screen '
         '${screen.width}x${screen.height} screenshot pixels. Read elements '
         'again — their bounds changed.');
+  });
+}
+
+/// Handles `native_biometrics` (docs/native-lane-decisions.md#d20).
+Future<CallToolResult> handleNativeBiometrics(
+  NativeServiceContext context,
+  Map<String, dynamic> args,
+) async {
+  final action = NativeBiometricAction.tryParse(args['action']);
+  if (action == null) {
+    return invalidArguments(
+      'native_biometrics action must be "match", "nonMatch", "enroll" or '
+      '"unenroll".',
+    );
+  }
+
+  final logger = context.logger;
+  logger.info('Native biometrics ${action.name}');
+  return runTool(logger, 'native biometrics', () async {
+    await context.requireConnector().device.biometrics(action);
+    return _text(switch (action) {
+      NativeBiometricAction.match ||
+      NativeBiometricAction.nonMatch =>
+        'Simulated a ${action == NativeBiometricAction.match ? '' : 'non-'}'
+            'matching face / finger. Check the result with '
+            'native_get_elements (the prompt closes on a match; a non-match '
+            'shows a retry dialog).',
+      NativeBiometricAction.enroll =>
+        'Enrolled a face / finger; apps now see biometrics as available.',
+      NativeBiometricAction.unenroll => 'Removed the enrolled face / finger.',
+    });
   });
 }
 

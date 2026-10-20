@@ -231,6 +231,41 @@ final class AndroidNativeDevice implements NativeDevice {
     _check(result, 'adb emu geo fix');
   }
 
+  /// `adb emu finger touch` on an emulator: finger 1 is the one enrolled
+  /// through Settings, finger 2 is never enrolled. Enrolling cannot be done
+  /// with a command.
+  @override
+  Future<void> biometrics(NativeBiometricAction action) async {
+    final serial = await _adb.resolveSerial();
+    if (serial == null || !serial.startsWith('emulator-')) {
+      throw const NativeUnsupportedException(
+        'Biometrics can only be simulated on an Android emulator.',
+        hint: 'On a physical device use a real finger.',
+      );
+    }
+    switch (action) {
+      case NativeBiometricAction.enroll:
+      case NativeBiometricAction.unenroll:
+        throw NativeUnsupportedException(
+          'Android has no command to ${action.name} a fingerprint.',
+          hint: action == NativeBiometricAction.enroll
+              ? 'Set a screen lock (adb shell locksettings set-pin 1111), '
+                  'open Settings → Security → Fingerprint (or start '
+                  'android.settings.FINGERPRINT_ENROLL), and answer every '
+                  '"touch the sensor" step with native_biometrics '
+                  'action=match.'
+              : 'Remove it in Settings → Security → Fingerprint.',
+        );
+      case NativeBiometricAction.match:
+      case NativeBiometricAction.nonMatch:
+        final finger = action == NativeBiometricAction.match ? '1' : '2';
+        _check(
+          await _adb.run(['emu', 'finger', 'touch', finger]),
+          'adb emu finger touch',
+        );
+    }
+  }
+
   Future<int> _sdkLevel() async =>
       _sdk ??= int.tryParse(await _prop('ro.build.version.sdk')) ?? 0;
 

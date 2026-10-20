@@ -135,10 +135,11 @@ Future<CallToolResult> handleNativeGetElements(
             .then<String?>((value) => value, onError: (Object _) => null)
         : null;
     // Off-screen (zero-size) nodes are left out, as for every selector
-    // (docs/native-lane-decisions.md#d16), so index counts what is listed.
+    // (docs/native-lane-decisions.md#d16), so index counts what is listed;
+    // a toast has no bounds but is listed (docs/native-lane-decisions.md#d19).
     final elements = (await connector.getNativeElements()).where(
       (element) =>
-          element.isVisible &&
+          element.isListed &&
           (!clickableOnly || element.clickable) &&
           filter.matches(element),
     );
@@ -233,7 +234,7 @@ Future<CallToolResult> handleNativeWaitFor(
       }
       reads++;
       final match =
-          elements.where((e) => e.isVisible && selector.matches(e)).firstOrNull;
+          elements.where((e) => e.isListed && selector.matches(e)).firstOrNull;
       final done = switch (state) {
         NativeWaitState.visible => match != null,
         NativeWaitState.gone => match == null,
