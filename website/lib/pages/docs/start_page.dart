@@ -60,7 +60,8 @@ class StartPage extends StatelessComponent {
       lead:
           'Five minutes from a plain Flutter app to an agent that taps '
           'through it. This page covers apps built from Material widgets; '
-          'a custom design system adds one step, in Configure.',
+          'a custom design system adds one step, in '
+          '[Configure](/docs/configure#interactive).',
       toc: _toc,
       structuredData: [faqStructuredData()],
       children: [
@@ -126,7 +127,7 @@ class StartPage extends StatelessComponent {
               '`MarionetteBinding` must be the only binding in the process. '
               'A test that calls `main()`, or a plugin such as Sentry that '
               'installs its own binding first, breaks this rule. See '
-              'Concepts for the fix.',
+              '[Concepts](/docs/concepts#binding) for the fix.',
               kind: .warning,
             ),
           ],
@@ -239,12 +240,13 @@ class StartPage extends StatelessComponent {
                 'the whole loop: look, act, look again.',
               ),
             ),
-            const p([
-              .text(
+            p(
+              rich(
                 'For a real task, name the screen, the precondition and the '
-                'goal. Drive has prompts for common jobs.',
+                'goal. [Drive](/docs/drive#prompts) has prompts for common '
+                'jobs.',
               ),
-            ]),
+            ),
           ],
         ),
         DocSection(
@@ -285,7 +287,8 @@ class StartPage extends StatelessComponent {
                 rich(
                   '`get_interactive_elements` lists your buttons and fields. '
                   'If your own widgets are missing, the configuration in '
-                  'Configure is the fix, not a bug.',
+                  '[Configure](/docs/configure#symptoms) is the fix, not a '
+                  'bug.',
                 ),
               ),
               li(
@@ -297,7 +300,8 @@ class StartPage extends StatelessComponent {
               li(
                 rich(
                   '`get_logs` returns lines. If it explains how to enable a '
-                  'log collector instead, wire one up in Configure.',
+                  'log collector instead, wire one up in '
+                  '[Configure](/docs/configure#logs).',
                 ),
               ),
             ]),

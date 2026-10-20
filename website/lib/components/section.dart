@@ -212,9 +212,23 @@ abstract final class Prose {
 }
 
 /// Renders [text], turning each backtick-quoted span into an inline code
-/// chip, so prose data can mention flags and identifiers without hand-built
-/// component lists.
-List<Component> rich(String text) => [
+/// chip and each `[label](/path)` into a link, so prose data can mention
+/// flags, identifiers and other pages without hand-built component lists.
+List<Component> rich(String text) {
+  final parts = <Component>[];
+  var start = 0;
+  for (final link in _link.allMatches(text)) {
+    parts
+      ..addAll(_code(text.substring(start, link.start)))
+      ..add(a(href: link[2]!, _code(link[1]!)));
+    start = link.end;
+  }
+  return parts..addAll(_code(text.substring(start)));
+}
+
+final _link = RegExp(r'\[([^\]]+)\]\(([^)\s]+)\)');
+
+List<Component> _code(String text) => [
   for (final (i, part) in text.split('`').indexed)
     if (part.isNotEmpty)
       if (i.isOdd) code([.text(part)]) else .text(part),

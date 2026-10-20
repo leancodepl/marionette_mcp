@@ -175,7 +175,16 @@ class DocsLayout extends StatelessComponent {
       ),
       css.media(_narrow, [css('&').styles(display: .none)]),
     ]),
-    css(_body.selector).styles(maxWidth: 52.rem),
+    css(_body.selector, [
+      css('&').styles(maxWidth: 52.rem),
+      // The global reset leaves links looking like text; in the prose they
+      // need to stand out. The pager and the sidebar style their own.
+      css('& :where(p, li, td, th) a').styles(
+        color: accentColor,
+        textDecoration: underlined,
+        raw: {'text-underline-offset': '0.15em'},
+      ),
+    ]),
     css(_head.selector, [
       css('& h1').styles(
         fontSize: const .expression('clamp(2.2rem, 4vw, 3rem)'),
