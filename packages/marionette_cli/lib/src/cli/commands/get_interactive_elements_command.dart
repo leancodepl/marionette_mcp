@@ -25,6 +25,11 @@ class ElementsCommand extends InstanceCommand {
     final response = await connector.getInteractiveElements();
     final elements = response['elements'] as List<dynamic>;
 
+    final warning = coveredAppWarning(
+      response,
+      nativeElements: 'marionette native-get-elements',
+    );
+    if (warning != null) stdout.writeln('$warning\n');
     stdout.writeln('Found ${elements.length} interactive element(s):\n');
 
     for (final element in elements) {

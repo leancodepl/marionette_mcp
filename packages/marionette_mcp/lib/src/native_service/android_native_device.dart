@@ -30,7 +30,7 @@ final class AndroidNativeDevice implements NativeDevice {
   /// See docs/native-lane-decisions.md#d17. grant / revoke use
   /// `pm grant|revoke`; reset revokes and clears the
   /// "user set" / "don't ask again" flags (`pm clear-permission-flags`, API
-  /// 29+), so the app asks again. `pm reset-permissions` is not used: it
+  /// 30+), so the app asks again. `pm reset-permissions` is not used: it
   /// ignores the package and resets every app on the device.
   @override
   Future<NativePermissionChange> setPermission(
@@ -77,7 +77,8 @@ final class AndroidNativeDevice implements NativeDevice {
     }
     if (!flagsCleared) {
       notes.add('Android $sdk cannot clear the "don\'t ask again" choice '
-          '(pm clear-permission-flags needs API 29+): the permission is '
+          '(pm clear-permission-flags needs Android 11, API 30): the '
+          'permission is '
           'revoked, but if the user had picked "don\'t ask again" the app '
           'will not ask. Reinstall the app for a full reset.');
     }

@@ -89,7 +89,7 @@ marionette native-take-screenshot --output ./system.png
 marionette native-disconnect
 ```
 
-`native-connect` starts the device-side server detached from the CLI, so it keeps running between commands, and saves the session in `~/.marionette/native/<name>.json`. Every `native-*` command attaches to it and reuses the WebDriver session — no per-command setup. `native-disconnect` stops the server it started. Use `--native-session <name>` to drive several devices at once (e.g. an Android phone and an iPhone in one script); `native-sessions` lists them. Use one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other (`native-connect` warns when it reuses another process's server). `marionette doctor` also checks the native lane: adb and devices, the UIAutomator2 APKs (checksum of the cached copies), booted simulators, the WebDriverAgent build, port 8100 taken by another program, orphaned servers and sessions whose server is gone. Design and measurements: [D4](./native-lane-decisions.md#d4).
+`native-connect` starts the device-side server detached from the CLI, so it keeps running between commands, and saves the session in `~/.marionette/native/<name>.json`. Every `native-*` command attaches to it and reuses the WebDriver session — no per-command setup. `native-disconnect` stops the server it started. Use `--native-session <name>` to drive several devices at once (e.g. an Android phone and an iPhone in one script); `native-sessions` lists them. Prefer one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other — both recover, but an action in flight can be interrupted (`native-connect` warns when it reuses another process's server). `marionette doctor` also checks the native lane: adb and devices, the UIAutomator2 APKs (checksum of the cached copies), booted simulators, the WebDriverAgent build, port 8100 taken by another program, orphaned servers and sessions whose server is gone. Design and measurements: [D4](./native-lane-decisions.md#d4).
 
 `native-map-flutter-rect` combines both lanes: pass `-i <instance>` or `--uri` to convert bounds from `get-interactive-elements` into native screenshot pixels for a gesture on a platform view.
 
@@ -99,7 +99,7 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 
 | Command | Purpose |
 | --- | --- |
-| `get-interactive-elements` | List interactive UI elements. |
+| `get-interactive-elements` | List interactive UI elements; warns when the app is not in front (system UI covers it). |
 | `tap` | Tap an element (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`). |
 | `secondary-tap` | Right-click a matching element (desktop only) (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`). |
 | `double-tap` | Double tap (`--key`, `--identifier`, `--text`, `--type`, or `--x`/`--y`, plus `--delay`). |

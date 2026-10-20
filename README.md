@@ -101,7 +101,7 @@ Marionette forwards a local port to UIAutomator2: by default the first free port
 export MARIONETTE_UIA2_PORT=8200
 ```
 
-If the device-side server (UIAutomator2 or WebDriverAgent) dies during a session, the next native call re-establishes it automatically. See [Native lane design decisions](docs/native-lane-decisions.md) for details.
+If the device-side server (UIAutomator2 or WebDriverAgent) dies during a session, the next native call re-establishes it automatically. See the [Native lane guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/native-lane.md) and the [design decisions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/native-lane-decisions.md) for details.
 
 ### Native lane requirements (iOS)
 
@@ -187,6 +187,7 @@ Some real-world prompts:
 | [Semantics](https://github.com/leancodepl/marionette_mcp/blob/main/docs/semantics.md) | Make custom-painted / rich content readable to agents. |
 | [MCP Tools](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md) | Full tool reference + AI-tool configuration. |
 | [Custom Extensions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/custom-extensions.md) | Expose app-specific actions as agent tools via `registerMarionetteExtension`. |
+| [Native lane](https://github.com/leancodepl/marionette_mcp/blob/main/docs/native-lane.md) | **System UI outside Flutter: dialogs, pickers, notifications, WebViews — setup, workflow, what each lane sees.** |
 | [CLI](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md) | Drive Marionette from any shell-capable agent. |
 | [Troubleshooting](https://github.com/leancodepl/marionette_mcp/blob/main/docs/troubleshooting.md) | Common gotchas and limitations. |
 

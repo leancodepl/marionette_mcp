@@ -52,16 +52,17 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     NativeServerBootstrap? bootstrap,
     AdbClient? adb,
     String? sessionId,
+    bool? ownsBootstrap,
   }) async {
-    final ownsBootstrap = bootstrap == null;
+    final owns = ownsBootstrap ?? bootstrap == null;
     final ownedBootstrap =
-        ownsBootstrap ? AndroidBootstrap(serial: serial) : null;
+        bootstrap == null ? AndroidBootstrap(serial: serial) : null;
     final resolvedBootstrap = bootstrap ?? ownedBootstrap!;
     final resolvedAdb = adb ?? ownedBootstrap?.adb ?? AdbClient(serial: serial);
 
     final connector = await WebDriverNativeConnector.openSession(
       bootstrap: resolvedBootstrap,
-      ownsBootstrap: ownsBootstrap,
+      ownsBootstrap: owns,
       capabilities: const {
         'platformName': 'Android',
         'appium:automationName': 'UiAutomator2',
@@ -71,7 +72,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
         client: client,
         sessionId: id,
         bootstrap: resolvedBootstrap,
-        ownsBootstrap: ownsBootstrap,
+        ownsBootstrap: owns,
         adb: resolvedAdb,
         sharedServer: resolvedBootstrap is SharedServerBootstrap &&
             !resolvedBootstrap.startedServer,
@@ -90,6 +91,13 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     }
     return connector;
   }
+
+  @override
+  Future<WebDriverNativeConnector> openOnSameServer(
+    NativeServerBootstrap bootstrap, {
+    required bool ownsBootstrap,
+  }) =>
+      connect(bootstrap: bootstrap, adb: _adb, ownsBootstrap: ownsBootstrap);
 
   @override
   List<NativeElement> parseSource(String xml) => parseAndroidUiDump(xml);

@@ -10,8 +10,10 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D2](#d2) | Coordinate space of the native lane | Accepted |
 | [D3](#d3) | Automatic recovery of a lost session | Accepted |
 | [D4](#d4) | Native session model of the CLI | Accepted |
+| [D5](#d5) | Heavy SDK views in a separate example app | Proposed (V-09 not started) |
 | [D6](#d6) | Screenshot of part of the screen | Accepted |
 | [D7](#d7) | Default app for device shortcuts | Accepted |
+| [D8](#d8) | Order of the large research topics | Proposed (X-01 / X-02 not started) |
 | [D9](#d9) | Granularity of device shortcut tools | Accepted |
 | [D10](#d10) | UIAutomator2 local port and server reuse | Accepted |
 | [D11](#d11) | Starting and activating apps | Accepted |
@@ -25,6 +27,7 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D19](#d19) | Android toasts in the tree | Accepted |
 | [D20](#d20) | Simulated biometrics | Accepted |
 | [D21](#d21) | Opening a notification on iOS | Accepted |
+| [D22](#d22) | Flutter lane while system UI covers the app | Accepted |
 
 ---
 
@@ -182,6 +185,13 @@ Most losses happen between calls (the server died while the agent was thinking),
 
 An operation still running when the connector was disposed — a read that `native_wait_for` had stopped waiting for — failed with "connection closed" once shutdown closed the HTTP client. The decorator took that for a lost session and **started a new one after `dispose()`**, launching UIAutomator2's instrumentation again and keeping the MCP server process alive after stdin EOF. A disposed decorator now never re-establishes: such failures, and later calls, end with `NativeNotConnectedException`. Verified: the same sequence now exits immediately; unit test for a failure arriving after dispose.
 
+### Follow-up (unit 10, 2026-10-20): a lost session on a healthy server
+
+`invalid session id` means the server answered and only the session is gone — on Android typically because another client (a CLI session, a second MCP server) took UIAutomator2's single session. Recovery treated it like a lost server: it disposed the connector, which stopped the server it had started, and started a new one; the asynchronous stop of the old instrumentation then killed the new server ("lost again right after re-establishing it", seen live in unit 9). Now, for `invalid session id`, the decorator first asks the connector to **open a new session on the same server** (`NativeConnector.reopenSession`); the server — and ownership of its bootstrap — moves to the new connector, and the old one only drops its lost session. If that fails, the full restart runs as before. A broken connection or an unreachable server still restarts (the server may be gone).
+
+- Live, Android API 35: an MCP server running while a CLI session took its session — both MCP reads succeeded on a reopened session (≈ 0.1 s), and the CLI's next command opened its own again (≈ 0.2 s); no server restart.
+- Unit tests: reopen instead of restart for `invalid session id`; fallback to a restart when reopening fails; no reopen for a lost connection; the Android connector's `reopenSession` opens a second session on the same server and hands the bootstrap over.
+
 ---
 
 <a id="d4"></a>
@@ -220,7 +230,7 @@ Measured: a detached server keeps working for at least 11 minutes with no host p
 ### Consequences
 
 - A detached server outlives a crashed or killed CLI; `marionette doctor` lists such servers as orphaned (`parent pid 1`, not in any session) with `kill <pid>` as the fix, and as owned when a process (e.g. an MCP server) holds them.
-- UIAutomator2 supports one session per device: an MCP server and a CLI session on the same Android device replace each other's sessions. Verified live: the CLI recreates its own and saves it, and since the D10 follow-up an MCP server that reused the CLI's server no longer stops it on exit; the MCP server's own recovery can fail while a CLI session takes its session (D10 follow-up, deferred D3 fix) — `native-connect` warns, and the docs say: one client per Android device at a time. On iOS both work side by side (WebDriverAgent survives session deletes).
+- UIAutomator2 supports one session per device: an MCP server and a CLI session on the same Android device replace each other's sessions. Verified live: the CLI recreates its own and saves it, and since the D10 follow-up an MCP server that reused the CLI's server no longer stops it on exit; since unit 10 the MCP server's recovery opens a new session on the same server ([D3](#d3) follow-up), so both keep working; an action in flight can still be interrupted — `native-connect` warns and the docs recommend one client per Android device at a time. On iOS both work side by side (WebDriverAgent survives session deletes).
 - Messages come from the shared handlers; the CLI rewrites tool names (`native_get_elements` → `native-get-elements`) in non-JSON output, and `help-ai` explains that a camelCase argument (`maxSwipes`) is the kebab-case option (`--max-swipes`).
 - New MCP tools need a matching CLI command and an entry in `help-ai`, written by hand — as for the Flutter lane.
 - The CLI depends on `marionette_mcp` internals (`src/native_service/…`), like its Flutter commands.
@@ -238,6 +248,41 @@ Measured: a detached server keeps working for at least 11 minutes with no host p
 - **Every command live (compiled CLI, API 35 and iOS 26.4):** gestures on elements and points (`native-tap`, `-double-tap`, `-long-press` → counters +1; `native-pinch` scale 2 → 1.63–1.64, 0.5 → 0.92), `native-swipe` (chips move; iOS edge swipe goes back), `native-scroll` with `--within-type` / `--within-index` both ways and the end-of-list error, text (`native-enter-text` with `--label`, focused, `--clear`, Polish characters; `native-press-key` backspace / home / volume; unsupported keys and the Gboard floating toolbar refused with hints), `native-wait-for` visible / gone, `native-take-screenshot` full (1280×2856 / 1320×2868) and element (1184×288 / 1224×288), `native-device-info`, `native-set-orientation`, `native-set-location`, `native-notifications` open / close / push (title-body and `--payload` JSON; Android push refused with a hint), `native-app` activate / background / terminate / restart, `native-permissions` grant / revoke (termination reported) / reset, `native-biometrics` match / nonMatch / enroll / unenroll (iOS) and the Android enroll hint, `native-map-flutter-rect` with `--uri` on both platforms (rect 72, 900, 300×150 on iOS), `native-connect` twice ("already connected") and with an unknown serial (error, no session saved).
 - **Argument mapping:** a unit test parses every option of the 20 tool commands and checks the result equals the tool arguments, with the MCP schema's names and int / double types.
 - Unit tests: detached starts on both platforms (pid, `-w`, no second start), `stopServer`, session reuse and replacement, `release` keeps the session; CLI registry, attach / reuse / replacement, missing session and dead server messages, usage errors, `native-sessions`, `native-disconnect` of a reused server, doctor findings.
+
+---
+
+<a id="d5"></a>
+
+## D5 — Heavy SDK views in a separate example app
+
+- **Status:** Proposed — the work it applies to (V-09) has not started.
+- **Applies to:** V-09 (§1c: `flutter_stripe` `CardField`, `google_mobile_ads`, a PDF view); a future `example_sdk/` app.
+
+### Context and dilemma
+
+Verifying the native lane on SDK views needs packages with their own requirements (minimum SDKs, Flutter versions, native configuration, keys). The main example app must keep working on the minimum supported Flutter (3.27 — dependencies there are pinned for it, see unit 8) and also serves as the `call_custom_extension` demo.
+
+### Options considered
+
+1. Add the packages to the main example app.
+2. A separate example app, `example_sdk/`, with its own `pubspec.yaml`.
+3. No repro.
+
+### Decision
+
+Option 2, when V-09 is taken up: a separate app with the same Testing-tab structure and instructions for its test keys.
+
+### Rationale
+
+The main example stays light and within the minimum Flutter version; dependency conflicts stay isolated.
+
+### Consequences
+
+A second app to maintain; it does not join the minimum-Flutter CI job.
+
+### Verification
+
+None yet.
 
 ---
 
@@ -313,6 +358,40 @@ An agent normally connects with the app on screen, so the default is right; opti
 
 - Live: sessions started with the launcher, Chrome or a SpringBoard alert in front had no default; the first runs showed that observing only at `native_connect` / `native_get_elements` was not enough (an agent waiting with `native_wait_for` and then calling `native_app` got "pass appId"), which added the observation in `native_wait_for`, before a shortcut, and for an explicit `appId`.
 - Unit tests: system prefixes, first app wins, lazy lookup, `native_wait_for` observation, explicit `appId`, reset on disconnect.
+
+---
+
+<a id="d8"></a>
+
+## D8 — Order of the large research topics
+
+- **Status:** Proposed — neither topic has started.
+- **Applies to:** X-01 (DOM access in WebViews) and X-02 (physical iPhones).
+
+### Context and dilemma
+
+Both topics are large; there is capacity for one at a time.
+
+### Options considered
+
+1. X-01 first: WebViews are part of everyday flows (sign-in, terms, web payments) and can be worked on with emulators and simulators.
+2. X-02 first: physical iPhones are needed for the camera and real biometrics, and for every device shortcut that currently uses `simctl`.
+
+### Decision
+
+Option 1, unless a client project needs physical iPhones sooner.
+
+### Rationale
+
+The native lane already reads and drives WebView content through accessibility (unit 7); DOM access would make it exact. Camera and biometrics are partly covered by simulator shortcuts ([D20](#d20)).
+
+### Consequences
+
+The iOS camera (§1b) and everything listed for iPhones in the physical-device checklist stay unverified until X-02.
+
+### Verification
+
+To do: confirm with client projects that none needs physical iPhones first; if one does, swap the order.
 
 ---
 
@@ -416,7 +495,7 @@ The iOS bootstrap has the same fast path as Android — a healthy WebDriverAgent
 
 - **Decision:** on Android a connector does not delete its session when its bootstrap reused a server (`SharedServerBootstrap.startedServer == false`); the owner ends the server. `marionette native-disconnect` likewise deletes the session only when its `native-connect` started the server. iOS is unaffected — WebDriverAgent keeps running when a session is deleted.
 - **Live after the change (API 35):** an MCP server reusing the CLI's server, then exiting → the CLI's server keeps running and its next command works; a CLI session reusing an MCP server, then `native-disconnect` → "left running".
-- **Still limited — one client per Android device at a time:** UIAutomator2 has a single session, so two clients take it from each other. A CLI command then simply opens a new session ([D4](#d4)), but the MCP server's recovery ([D3](#d3)) treats a lost session like a lost server: it disposes its connector (stopping the server it started) and starts a new one, and the asynchronous stop of the old instrumentation killed the new server ("lost again right after re-establishing it"). Recommended fix (deferred): when the server is healthy and only the session is gone, open a new session on the same server. `native-connect` warns when it reuses another process's server on Android.
+- **Two clients on one Android device:** UIAutomator2 has a single session, so they take it from each other. A CLI command opens a new session ([D4](#d4)); the MCP server's recovery first failed here — it restarted its server and the old instrumentation's stop killed the new one — and since unit 10 opens a new session on the same server instead ([D3](#d3), follow-up). Both now keep working, but an action of one client can be interrupted when the other takes the session at that moment, so one client per Android device remains the recommendation; `native-connect` warns when it reuses another process's server.
 - Unit tests: a session on a shared server is not deleted on dispose, one on an own server is; `native-disconnect` of a reused server sends no `DELETE`.
 
 ---
@@ -463,6 +542,10 @@ Both mechanisms are official and predictable, and — verified — bring back th
 - **`terminate` on Android removes the app's notifications.** `am force-stop` cancels everything the app posted (API 35: 2 notification records before, 0 after), so "terminate, then open the app from its notification" cannot be tested that way; iOS `simctl terminate` keeps them. The result and the description of `native_app` now say so on Android and point to `action=background`. A cold start from a notification works when the system kills a background app (`adb shell am kill`): the notification stays, and tapping it starts the app with the payload.
 - Unit test: the Android result mentions the removed notifications and `action=background`, the iOS one does not.
 
+### Follow-up (unit 10, 2026-10-20): deep links during a cold start
+
+A deep link sent right after `restart` (or `activate` of an app that was not running) is lost on Android: the Flutter app has no link handler yet while it starts, so the intent is dropped (seen in units 6 and 8). Reproduced 3/3 on API 35 (`restart` → `native_open_url` → the app stays on Home); with `native_wait_for` on the first screen in between, 3/3 opened the target screen. iOS queues the URL until the app is ready (2/2 worked without waiting). This is app / framework behaviour, so the tools say it: the `native_open_url` description and the Android `restart` result tell the agent to wait for the first screen first. Unit test: the hint is in the Android result only.
+
 ---
 
 <a id="d12"></a>
@@ -496,7 +579,7 @@ Separation of concerns, simple fakes (`FakeNativeDevice`), and the same device o
 
 ### Verification
 
-- Endpoints / commands verified before implementation: `pm grant|revoke`, `pm clear-permission-flags` (API 35; absent on API 28), `cmd package resolve-activity`, `am start`, `cmd statusbar expand-notifications|collapse` (API 28, 35), `pidof`, `adb emu geo fix` ("OK"); `simctl privacy` (services listed by Xcode 26.4; `camera` accepted although unlisted, `notifications` fails, `photos` recorded but ignored by the full-access Photo Library API, `grant all` partial on iOS 26.4 — see [D17](#d17)), `simctl openurl|launch|terminate|push|location`, `launchctl list` inside the simulator; W3C `/orientation` on UIAutomator2 and WebDriverAgent (screen size and bounds follow the rotation).
+- Endpoints / commands verified before implementation: `pm grant|revoke`, `pm clear-permission-flags` (API 35; absent on API 28 and — unit 10 — on API 29, so Android 11 / API 30+), `cmd package resolve-activity`, `am start`, `cmd statusbar expand-notifications|collapse` (API 28, 35), `pidof`, `adb emu geo fix` ("OK"); `simctl privacy` (services listed by Xcode 26.4; `camera` accepted although unlisted, `notifications` fails, `photos` recorded but ignored by the full-access Photo Library API, `grant all` partial on iOS 26.4 — see [D17](#d17)), `simctl openurl|launch|terminate|push|location`, `launchctl list` inside the simulator; W3C `/orientation` on UIAutomator2 and WebDriverAgent (screen size and bounds follow the rotation).
 - Live through the MCP server on Android API 28, API 35 and iOS 18.6: device info, deep link `marionette-example://app/testing/gestures` (cold and warm start; iOS asks "Open in …?" first), https URL in the browser and back with `activate`, notification shade open / close (Android shade contents in the tree), iOS push with Polish characters visible as a banner and in Notification Center, orientation in both directions, location accepted.
 - iOS Notification Center: the first close gesture (swipe up in the middle) only scrolled the list; closing now swipes up from the bottom edge. Rotation is refused while Notification Center is in front ("Unable To Rotate Device"); that error is now typed with a hint to close it.
 - Unit tests for both devices on scripted processes, all tools on fakes.
@@ -597,6 +680,10 @@ No operation may have a hidden side effect: an unconditional Back would navigate
 - **Gboard's floating toolbar.** With a hardware keyboard attached (the emulator's default `hw.keyboard=yes`), Gboard shows only a small floating toolbar instead of the keyboard, and `dumpsys input_method` still reports `mInputShown=true`. Back does **not** close that toolbar: it reaches the app — on the native screen of the example app it closed both the IME and the Activity. `hideKeyboard` now measures how much of the IME window the keyboard covers (`dumpsys window`: the window's requested height `h` and `mGivenContentInsets` top `T` → (h − T) / h; a full keyboard covers about 40 % — API 28, 1215 of 2028 px inset — while the toolbar reports no cover at all: inset 2700 of 2700 px on API 35) and below 10 % fails with a hint (unfocus the field in the app, or start the emulator with `hw.keyboard=no`) instead of pressing Back. Unknown coverage (the window not found) keeps the old behaviour.
 - Verified live on Android API 35 (native screen of the example app, field focused, toolbar shown): `native_hide_keyboard` fails with the hint in 0.2 s and the native screen stays open. The on-screen keyboard path is unchanged (unit-tested; API 35 here always shows the toolbar). Unit tests cover the coverage parser and the guard.
 
+
+### Follow-up (unit 10, 2026-10-20): a field that changes before typing
+
+`native_enter_text` with a selector sometimes failed although the field was there: on iOS right after a deep link the screen was still moving and WebDriverAgent reported "The previously found element … is not present in the current view anymore" (`stale element reference`); on Android a set-text action was once refused (`invalid element state`, deferred since unit 5). In both cases nothing was typed. The tool now waits 300 ms, finds the field again with the same selector and types once more; a second failure of this kind becomes a typed error with a hint to wait until the screen has settled. Seen live in the E2E runs on iOS 26.4: two of five runs needed the retry and passed. Unit tests: each of the three errors is retried once, a second one fails with the hint, other errors are not retried.
 ---
 
 <a id="d15"></a>
@@ -641,6 +728,10 @@ One shape for both platforms is what lets an agent use the same reasoning everyw
 - Live, Keyboard screen, both platforms: after `native_enter_text label="Title" text="Gęś"` and appending `" 2"`, the field is `text: "Title"`, `value: "Gęś 2"`; selecting it by `label="Title"` keeps working; after `clear` the value disappears. On iOS this closes the gap noted in [D14](#d14).
 - Unit tests cover both parsers (state, field label/value, iOS value types), `scaled` keeping the state, JSON omission of defaults, and the filters.
 
+
+### Follow-up (unit 10, 2026-10-20): the label of a focused field on iOS
+
+A focused Flutter text field on iOS reports its hint as a second line of the label (`Title` becomes `Title\nSingle line — keyboard shows Done`), so the exact `label` of `native_enter_text` stopped matching the field it had just focused — the retry above then failed with "No native element with text=\"Title\"". The `label` selector now also matches the first line of an element's text; the exact `text` of the other tools is unchanged (use `textContains` to read such a field). Unit test: a focused field is found by its label, a plain `text` selector stays exact. Verified in three E2E runs on iOS 26.4.
 ---
 
 <a id="d16"></a>
@@ -701,6 +792,10 @@ Correctness first: a search that silently skips its target, or a "found" that ca
 - **`native_wait_for` honours `timeoutMs`.** The loop checked the deadline only between reads, so one slow read could stretch the wait: a read takes up to 10 s on an Android screen that never goes idle without [D18](#d18), and 3–4 s next to iOS system pickers. Each read is now limited to the remaining time; if no read finished at all the error says so, otherwise it is the regular "not found within …". (An 8 s wait that once returned after 259 s was the Mac going to sleep — macOS power log: idle sleep 19:14:45–19:19:05 — not the device; nothing in the tool can prevent that.)
 - **Sheets.** On iOS a downward swipe (`native_scroll direction=down`) while a sheet's content is already at its top dismisses the whole sheet (seen in the photo picker) — a native gesture, not a bug; inside sheets, search in the direction of unseen content.
 
+### Follow-up (unit 10, 2026-10-20): slow reads next to iOS system pickers
+
+Reads with `UIDocumentPicker` open took 2.6–2.7 s each (75 KB page source) against 0.17 s on an app screen (10 KB), so a search in the picker takes tens of seconds. Measured on iOS 26.4 with WebDriverAgent's settings: waiting is not the cause — `waitForIdleTimeout` 0 and `animationCoolOffTimeout` 0 gave the same 2.7 s; a smaller `snapshotMaxDepth` (25 instead of 50) gave 2.0 s but can drop deep elements of real apps. The cost is the accessibility snapshot of the picker, a view of another process. **Decision:** keep the defaults and document it; searches in pickers are slow but correct. (Analogy to [D18](#d18) does not hold: there the cost was a wait, here it is the snapshot itself.)
+
 ---
 
 <a id="d17"></a>
@@ -730,7 +825,7 @@ A test often needs a known permission state (granted, denied, or "never asked") 
 ### Decision
 
 - One shared set: `camera`, `microphone`, `photos`, `location`, `contacts`, `calendar`, `notifications`, `all`. Android maps each to its permissions for the device's API level and changes only those the app declares (from `dumpsys package`); none declared → an error naming the missing manifest entries. iOS maps to `simctl privacy` services (`camera` works although its help does not list it).
-- **Reset on Android** is option (c): revoke, then clear the flags that record "user set" / "don't ask again", so the app asks again. On Android 9 (no `clear-permission-flags`) the permission is revoked and the result explains that a "don't ask again" choice cannot be undone without reinstalling.
+- **Reset on Android** is option (c): revoke, then clear the flags that record "user set" / "don't ask again", so the app asks again. Before Android 11 (no `clear-permission-flags` on API 28 and 29, checked in unit 10) the permission is revoked and the result explains that a "don't ask again" choice cannot be undone without reinstalling.
 - Unsupported combinations fail with a hint: notifications before API 33 ("nothing to change"), notifications on the iOS Simulator and grant / revoke of photos on iOS ("answer the dialog with `native_tap`", e.g. "Allow Full Access"); reset of iOS photos works.
 - On iOS, grant / revoke of `all` changes camera, microphone, location, contacts and calendar one by one and notes that photos and notifications were skipped; reset of `all` uses `simctl privacy reset all`.
 - The tool checks whether the app was running before the change and is not after it (`pidof`; `launchctl list` in the simulator) and then says the change terminated it and that the Flutter lane must reconnect.
@@ -741,7 +836,7 @@ Option (c) is the only per-app reset that keeps app data. Detecting termination 
 
 ### Consequences
 
-- On Android 9 a full reset needs a reinstall (stated in the result).
+- Before Android 11 (API 28, 29) a full reset needs a reinstall (stated in the result).
 - Libraries may interpret groups differently: on API 28, `permission_handler` reports `Permission.photos` as denied even after `photos` (`READ_EXTERNAL_STORAGE`) is granted, because before Android 13 it maps photos to storage; the tool changes the platform permission, not a library's view.
 - A system permission alert stays on screen after its app has been terminated by a change (seen on iOS); the agent has to dismiss it.
 
@@ -789,7 +884,7 @@ On static screens the setting changes nothing — the wait ends as soon as the U
 
 - On continuously animating screens each read costs ~0.5 s instead of 10 s.
 - A transition longer than 500 ms can be read mid-way; tools that act on a target found that way may need `native_wait_for` first.
-- The value is set again for every session, including one re-established by [D3](#d3). Whether UIAutomator2 keeps it after the session ends is **unverified**; if settings live in the server process, a later session of another tool on the same reused server ([D10](#d10)) would inherit 500 ms until the server restarts.
+- The value is set again for every session, including one re-established by [D3](#d3). *Verified in unit 10:* settings belong to the session, not the server — a new session of another client on the same running server reports the default `waitForIdleTimeout` of 10 000 ms, so nothing leaks to other tools.
 
 ### Verification
 
@@ -832,7 +927,7 @@ A toast is short and disappears on its own, so waiting it out is invisible to th
 ### Consequences
 
 - A read during a toast takes up to ~3.5 s instead of failing.
-- On API 35 toast text can only be checked visually (`native_take_screenshot`); on API 28 it is readable as text. Which API levels between them behave which way is unverified (API 29 AVD available; physical devices: checklist).
+- On API 35 toast text can only be checked visually (`native_take_screenshot`); on API 28 and 29 it is readable as text (API 29 checked in unit 10: listed in 26 ms, gone after 2.8 s, no read failure). Which of API 30–34 behave which way is unverified (physical devices: checklist).
 - Android heads-up notification banners are not in the UIAutomator2 tree on API 35 (the notification is readable in the shade, `native_notifications open`).
 - The listed toast has `0×0` bounds and the wrong package; consumers must not use its position.
 
@@ -923,4 +1018,54 @@ The gesture is a platform behaviour, works with existing tools and is now discov
 - Live, iOS 18.6 (iPhone 16 Pro Max): "1 Notification" tapped to expand; tap on the notification → the same "Hinting side swipe" log; swipe right → the app opens with the payload.
 - Live, iOS 26.4, push: pushed 3 s after `background` → banner, tap → the app in front; pushed 0.5 s after `background` or in front → nothing shown.
 - Unit test: the iOS result contains the swipe hint, the Android one does not.
+
+---
+
+<a id="d22"></a>
+
+## D22 — Flutter lane while system UI covers the app
+
+- **Status:** Accepted (2026-10-20)
+- **Applies to:** `marionette.interactiveElements` (`marionette_flutter`), `get_interactive_elements` (MCP) and `marionette get-interactive-elements` (CLI); `coveredAppWarning`.
+
+### Context and dilemma
+
+While a dialog, the notification shade, a biometric prompt, a browser or another native screen covers the app, `get_interactive_elements` still lists the Flutter widgets underneath as if they were reachable (checked for every kind of system UI in unit 8). An agent that only uses the Flutter lane taps them and nothing happens. The widget tree cannot know what is on top; the app's lifecycle state can, partly.
+
+### Options considered
+
+1. Only document it in the agent instructions.
+2. Report the app lifecycle state with the elements and warn when it is not `resumed`.
+3. Ask the native lane for the foreground app on every Flutter call — couples the lanes and needs a native session.
+
+### Decision
+
+Option 2. The binding adds `appLifecycleState` (`WidgetsBinding.lifecycleState`) to the `marionette.interactiveElements` response; when it is not `resumed`, the MCP tool and the CLI command put a warning first: the app is not in front, system UI or another screen covers it, the widgets may not be reachable — check `native_get_elements`. When `resumed`, nothing is claimed. An older binding sends no state and gets no warning.
+
+### Rationale
+
+The state is free to read and exact for the cases it covers; a warning where the agent reads the elements beats an instruction it may not apply. Claiming "not covered" on `resumed` would be wrong on iOS (below), so only the positive signal is used.
+
+### Consequences
+
+- iOS views presented inside the app's process — a `UIAlertController` shown by the app, the `ASWebAuthenticationSession` sheet — leave the app `resumed`, so they get no warning; the agent instructions cover them.
+- The binding's response grows by one field; tools that read the extension directly see it.
+
+### Verification
+
+Live through MCP, lifecycle state with each kind of system UI open:
+
+| System UI | Android API 35 | iOS 26.4 |
+| --- | --- | --- |
+| none | resumed | resumed |
+| alert from the app (`AlertDialog` / `UIAlertController`) | inactive | **resumed** |
+| permission dialog / alert | inactive | inactive |
+| native screen (Activity / full-screen view controller) | paused | paused |
+| notification shade / Notification Center | inactive | inactive |
+| biometric prompt | inactive | inactive |
+| browser sign-in (Custom Tab / consent alert / auth sheet) | paused | inactive / **resumed** |
+| back in the app | resumed | resumed |
+
+- With the Face ID prompt open, `get_interactive_elements` starts with "Warning: the app is not in front (lifecycle: inactive) …"; without it, no warning.
+- Unit tests: warning for `inactive` / `paused` / `hidden`, the CLI's command name, none for `resumed` or a missing state.
 

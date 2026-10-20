@@ -234,6 +234,16 @@ void main() {
       ]);
     });
 
+    test('restart on Android says to wait before a deep link', () async {
+      final android =
+          _text(await handleNativeApp(context, {'action': 'restart'}));
+      await context.connect(NativePlatform.ios);
+      final ios = _text(await handleNativeApp(context, {'action': 'restart'}));
+
+      expect(android, contains('before native_open_url'));
+      expect(ios, isNot(contains('native_open_url')));
+    });
+
     test('terminate says Android also removed the notifications', () async {
       final android = _text(
         await handleNativeApp(context, {'action': 'terminate'}),

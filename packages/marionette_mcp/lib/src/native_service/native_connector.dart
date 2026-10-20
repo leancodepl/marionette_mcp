@@ -348,6 +348,13 @@ abstract class NativeConnector {
   /// docs/native-lane-decisions.md#d3).
   Future<bool> isServerResponding();
 
+  /// Opens a new WebDriver session on the same, still running server and
+  /// returns a connector for it, which takes over the server; this one keeps
+  /// only its (lost) session. For a session taken over by another client
+  /// while the server is healthy (docs/native-lane-decisions.md#d3). Null
+  /// when the connector cannot do that.
+  Future<NativeConnector?> reopenSession();
+
   /// Ends the session and tears down any resources the connector started.
   Future<void> dispose();
 }

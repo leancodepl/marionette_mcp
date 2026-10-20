@@ -88,7 +88,10 @@ void registerNativeDeviceTools(
       description:
           'Opens a URL with the system handler: a web page in the browser, '
           'or a deep link / custom scheme in the app that handles it (e.g. '
-          'to return from an OAuth flow). Requires native_connect.',
+          'to return from an OAuth flow). On Android a link sent while the '
+          'app is still starting is lost — after native_app activate / '
+          'restart, wait for its first screen (native_wait_for) first. '
+          'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native Open URL'),
       inputSchema: ToolInputSchema(
         properties: {
@@ -347,8 +350,14 @@ Future<CallToolResult> handleNativeApp(
         final id = await appId();
         await device.terminateApp(id);
         await device.activateApp(id);
+        // On Android a deep link sent during the cold start is lost (the
+        // Flutter app has no link handler yet); iOS queues it.
+        final startingNote = context.platform == NativePlatform.android
+            ? ' Wait for its first screen (native_wait_for) before '
+                'native_open_url — a link sent while it starts is lost.'
+            : '';
         return _text('Restarted $id (fresh start). Reconnect the Flutter '
-            'lane with the Flutter connect tool.');
+            'lane with the Flutter connect tool.$startingNote');
     }
   });
 }

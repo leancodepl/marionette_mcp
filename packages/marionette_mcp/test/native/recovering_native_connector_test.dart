@@ -92,6 +92,49 @@ void main() {
       });
     }
 
+    group('a session lost on a healthy server (invalid session id)', () {
+      test('a new session is opened on the same server, no restart', () async {
+        final second = FakeNativeConnector(screenshot: 'reopened');
+        final first = FakeNativeConnector()
+          ..errorsOnce.add(_invalidSession)
+          ..reopened = second;
+        final connector = wrap(first);
+
+        expect(await connector.takeScreenshot(), 'reopened');
+        await connector.tapAt(5, 6);
+
+        expect(first.reopenCalls, 1);
+        expect(reconnects, 0, reason: 'the server is not restarted');
+        expect(first.disposeCalls, 1, reason: 'only its lost session');
+        expect(second.taps, [(x: 5, y: 6)]);
+      });
+
+      test('falls back to a restart when reopening is not possible', () async {
+        final first = FakeNativeConnector()
+          ..errorsOnce.add(_invalidSession)
+          ..reopenError = const WebDriverException('session not created');
+        replacements.add(FakeNativeConnector(screenshot: 'restarted'));
+        final connector = wrap(first);
+
+        expect(await connector.takeScreenshot(), 'restarted');
+        expect(first.reopenCalls, 1);
+        expect(reconnects, 1);
+      });
+
+      test('a lost connection still restarts (the server may be gone)',
+          () async {
+        final first = FakeNativeConnector()
+          ..errorsOnce.add(_unreachable)
+          ..reopened = FakeNativeConnector();
+        replacements.add(FakeNativeConnector(screenshot: 'restarted'));
+        final connector = wrap(first);
+
+        expect(await connector.takeScreenshot(), 'restarted');
+        expect(first.reopenCalls, 0);
+        expect(reconnects, 1);
+      });
+    });
+
     test('an action replaces a server that is already gone before acting',
         () async {
       final first = FakeNativeConnector()..serverResponding = false;

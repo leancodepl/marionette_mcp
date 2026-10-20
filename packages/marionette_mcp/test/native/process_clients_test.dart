@@ -218,6 +218,20 @@ void main() {
     test('returns null for unrelated output', () {
       expect(parseForegroundPackage('nothing here'), isNull);
     });
+
+    test('the notification shade is SystemUI, not the app below', () {
+      // API 35 with the shade open; older versions name it StatusBar.
+      const shade = '''
+  mCurrentFocus=Window{6bb05b2 u0 NotificationShade}
+  mFocusedApp=ActivityRecord{dc111be u0 com.example.counter/.MainActivity t110}''';
+
+      expect(parseForegroundPackage(shade), 'com.android.systemui');
+      expect(
+        parseForegroundPackage(
+            shade.replaceAll('NotificationShade', 'StatusBar')),
+        'com.android.systemui',
+      );
+    });
   });
 
   group('SimctlClient', () {

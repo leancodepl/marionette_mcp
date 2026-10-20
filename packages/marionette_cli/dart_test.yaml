@@ -1,0 +1,12 @@
+# Tests tagged `device` drive a real emulator / simulator (T-04). They are
+# left out of a plain `dart test`; run them with `dart test -P device`.
+tags:
+  device:
+    skip: "Needs an emulator / simulator: run with dart test -P device"
+
+presets:
+  device:
+    tags:
+      device:
+        skip: false
+    include_tags: device

@@ -515,9 +515,10 @@ native-get-elements when an action has no effect.
 Several devices at once: give each a name with
 `--native-session <name>` (before the command), e.g.
 `marionette --native-session iphone native-tap --text Allow`.
-One client per Android device at a time: UIAutomator2 has a single session,
-so an MCP server and a CLI session on the same device take it from each
-other (native-connect warns when it reuses another process's server).
+Prefer one client per Android device at a time: UIAutomator2 has a single
+session, so an MCP server and a CLI session on the same device take it from
+each other — both recover, but an action in flight can be interrupted
+(native-connect warns when it reuses another process's server).
 
 ### Selectors and coordinates
 
@@ -630,6 +631,16 @@ platforms — never Flutter logical pixels (use native-map-flutter-rect).
   toast waits until it is gone.
 - Android with a hardware keyboard shows Gboard's floating toolbar:
   native-hide-keyboard refuses (Back would close the screen).
+- Android: after native-app --action activate / restart, wait for the app's
+  first screen (native-wait-for) before native-open-url — a deep link sent
+  while the app starts is lost.
+- get-interactive-elements warns when the app is not in front (system UI or
+  another screen covers it). On iOS an alert or sheet shown by the app
+  itself gives no warning — if a Flutter action has no effect, check
+  native-get-elements.
+- A focused Flutter text field on iOS shows its hint as a second line of
+  its label; --label matches the first line, --text of
+  native-get-elements needs the whole text (use --text-contains).
 
 ## Exit Codes
 

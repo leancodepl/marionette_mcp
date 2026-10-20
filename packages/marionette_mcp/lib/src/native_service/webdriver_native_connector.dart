@@ -31,7 +31,10 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   final String sessionId;
 
   final NativeServerBootstrap _bootstrap;
-  final bool _ownsBootstrap;
+
+  /// Whether [dispose] disposes the bootstrap; handed to the connector
+  /// [reopenSession] returns.
+  bool _ownsBootstrap;
   bool _disposed = false;
 
   /// Whether [dispose] deletes the session. A subclass turns it off when
@@ -67,6 +70,21 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
       if (ownsBootstrap) await bootstrap.dispose();
       rethrow;
     }
+  }
+
+  /// A connector of the same platform for a new session on [bootstrap]'s
+  /// server, owning it when [ownsBootstrap].
+  Future<WebDriverNativeConnector> openOnSameServer(
+    NativeServerBootstrap bootstrap, {
+    required bool ownsBootstrap,
+  });
+
+  @override
+  Future<NativeConnector?> reopenSession() async {
+    final fresh =
+        await openOnSameServer(_bootstrap, ownsBootstrap: _ownsBootstrap);
+    _ownsBootstrap = false;
+    return fresh;
   }
 
   /// Whether the server still has session [sessionId] — read through a

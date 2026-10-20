@@ -204,6 +204,26 @@ void main() {
       );
     });
 
+    test('a label also matches the first line (focused field on iOS, D15)', () {
+      final focused = nativeElement(
+        type: 'XCUIElementTypeTextField',
+        text: 'Title\nSingle line — keyboard shows Done',
+      );
+
+      expect(
+        selectElement(
+          [focused],
+          const NativeSelector(text: 'Title', textMatchesFirstLine: true),
+        ),
+        same(focused),
+      );
+      expect(
+        () => selectElement([focused], const NativeSelector(text: 'Title')),
+        throwsA(isA<NativeElementNotFoundException>()),
+        reason: 'plain text selectors stay exact',
+      );
+    });
+
     test('off-screen (zero-size) elements never match (D16)', () {
       final offScreen = nativeElement(text: 'Row 40', width: 0, height: 0);
       final onScreen = nativeElement(text: 'Row 4', y: 300);

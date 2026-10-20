@@ -190,10 +190,18 @@ final _foregroundPackagePatterns = [
   RegExp(r'mFocusedApp=.*?\s([\w.]+)/[\w.$]+'),
 ];
 
+/// SystemUI windows named without a package: the notification shade
+/// (`NotificationShade`, Android 11+) and the status bar it belongs to on
+/// older versions.
+final _systemUiFocus =
+    RegExp(r'mCurrentFocus=Window\{\S+ u\d+ (NotificationShade|StatusBar)\}');
+
 /// Extracts the focused package from `dumpsys window windows` output,
 /// preferring the focused window over the focused activity so that system
-/// dialogs (e.g. the permission controller) are reported.
+/// dialogs (e.g. the permission controller) and the notification shade
+/// (`com.android.systemui`) are reported.
 String? parseForegroundPackage(String dumpsysOutput) {
+  if (_systemUiFocus.hasMatch(dumpsysOutput)) return 'com.android.systemui';
   for (final pattern in _foregroundPackagePatterns) {
     final match = pattern.firstMatch(dumpsysOutput);
     if (match != null) return match.group(1);

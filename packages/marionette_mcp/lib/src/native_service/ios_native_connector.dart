@@ -56,20 +56,21 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     NativeServerBootstrap? bootstrap,
     Map<String, dynamic>? capabilities,
     String? sessionId,
+    bool? ownsBootstrap,
   }) async {
-    final ownsBootstrap = bootstrap == null;
+    final owns = ownsBootstrap ?? bootstrap == null;
     final resolvedBootstrap = bootstrap ?? IosBootstrap(udid: udid);
 
     final connector = await WebDriverNativeConnector.openSession(
       bootstrap: resolvedBootstrap,
-      ownsBootstrap: ownsBootstrap,
+      ownsBootstrap: owns,
       capabilities: capabilities ?? const {'platformName': 'iOS'},
       sessionId: sessionId,
       create: (client, id) => IosNativeConnector._(
         client: client,
         sessionId: id,
         bootstrap: resolvedBootstrap,
-        ownsBootstrap: ownsBootstrap,
+        ownsBootstrap: owns,
         udid: resolvedBootstrap is IosBootstrap
             ? resolvedBootstrap.resolvedUdid ?? udid
             : udid,
@@ -83,6 +84,13 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     }
     return connector;
   }
+
+  @override
+  Future<WebDriverNativeConnector> openOnSameServer(
+    NativeServerBootstrap bootstrap, {
+    required bool ownsBootstrap,
+  }) =>
+      connect(udid: _udid, bootstrap: bootstrap, ownsBootstrap: ownsBootstrap);
 
   /// Reads the display scale from WDA's `wda/screen`; falls back to the
   /// screenshot width divided by the window width in points.

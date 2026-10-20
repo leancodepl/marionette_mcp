@@ -1,4 +1,6 @@
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
@@ -42,6 +44,18 @@ void registerNativeTextTools(
   );
 }
 
+/// Delay before the field is looked up again after [isChangedFieldError].
+const changedFieldRetryDelay = Duration(milliseconds: 300);
+
+/// Whether typing failed because the chosen field changed before anything
+/// was typed: replaced or moving while a screen transition runs (iOS "is not
+/// present in the current view anymore", `stale element reference`), or
+/// Android's set-text action refused (`invalid element state`).
+bool isChangedFieldError(WebDriverException error) =>
+    error.error == 'stale element reference' ||
+    error.error == 'invalid element state' ||
+    error.message.contains('is not present in the current view');
+
 /// Handles `native_enter_text`.
 Future<CallToolResult> handleNativeEnterText(
   NativeServiceContext context,
@@ -71,7 +85,29 @@ Future<CallToolResult> handleNativeEnterText(
     } else {
       final match =
           selectElement(await connector.getNativeElements(), selector);
-      await connector.enterText(match, input, clear: clear);
+      try {
+        await connector.enterText(match, input, clear: clear);
+      } on WebDriverException catch (error) {
+        if (!isChangedFieldError(error)) rethrow;
+        // The field was replaced or was still moving (a screen transition)
+        // and nothing was typed; find it again once
+        // (docs/native-lane-decisions.md#d14).
+        logger.info('Field changed before typing ($error); finding it again');
+        await Future<void>.delayed(changedFieldRetryDelay);
+        final again =
+            selectElement(await connector.getNativeElements(), selector);
+        try {
+          await connector.enterText(again, input, clear: clear);
+        } on WebDriverException catch (retryError) {
+          if (!isChangedFieldError(retryError)) rethrow;
+          throw NativeOperationFailedException(
+            'The field ${selector.describe()} kept changing; nothing was '
+            'typed. ($retryError)',
+            hint: 'Wait until the screen has settled (native_wait_for on an '
+                'element of the new screen), then retry.',
+          );
+        }
+      }
     }
     return CallToolResult(
       content: [TextContent(text: 'Successfully entered text into $target')],

@@ -9,6 +9,7 @@ import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/keyboard_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/text_tools.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
 
@@ -644,6 +645,72 @@ void main() {
       expect(result, _isToolSuccess(contains('the focused field')));
       expect(connector.typedText, [(text: '42', clear: true)]);
       expect(connector.enteredText, isEmpty);
+    });
+
+    group('a field that changed before typing (D14)', () {
+      final field = nativeElement(type: 'android.widget.EditText', id: 'f');
+      for (final (name, error) in [
+        (
+          'iOS: no longer in the view',
+          const WebDriverException(
+            'The previously found element "Title" is not present in the '
+            'current view anymore.',
+          ),
+        ),
+        (
+          'stale element reference',
+          const WebDriverException('gone', error: 'stale element reference'),
+        ),
+        (
+          'Android: invalid element state',
+          const WebDriverException(
+            "Cannot set the element to 'x'",
+            error: 'invalid element state',
+          ),
+        ),
+      ]) {
+        test('is found again and typed into once ($name)', () async {
+          final connector = FakeNativeConnector.single([field])
+            ..enterTextErrors.add(error);
+
+          final result = await handleNativeEnterText(
+            _contextWith(connector),
+            {'id': 'f', 'text': 'x'},
+          );
+
+          expect(result, _isToolSuccess(contains('Successfully entered')));
+          expect(connector.enteredText.single.text, 'x');
+          expect(connector.getElementsCalls, 2, reason: 'looked up again');
+        });
+      }
+
+      test('changing again fails with a hint, nothing typed', () async {
+        const changed =
+            WebDriverException('gone', error: 'stale element reference');
+        final connector = FakeNativeConnector.single([field])
+          ..enterTextErrors.addAll([changed, changed]);
+
+        final result = await handleNativeEnterText(
+          _contextWith(connector),
+          {'id': 'f', 'text': 'x'},
+        );
+
+        expect(result, _isToolError(contains('kept changing')));
+        expect(connector.enteredText, isEmpty);
+      });
+
+      test('other WebDriver errors are not retried', () async {
+        final connector = FakeNativeConnector.single([field])
+          ..enterTextErrors.add(const WebDriverException('boom'));
+
+        final result = await handleNativeEnterText(
+          _contextWith(connector),
+          {'id': 'f', 'text': 'x'},
+        );
+
+        expect(result.isError, isTrue);
+        expect(connector.getElementsCalls, 1);
+      });
     });
 
     test('passes clear to the selected field', () async {

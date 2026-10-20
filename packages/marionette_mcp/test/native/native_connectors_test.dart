@@ -127,6 +127,25 @@ void main() {
       expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
     });
 
+    test('reopenSession: a new session on the same server takes it over (D3)',
+        () async {
+      final owned = _SharedBootstrap(server.baseUrl, startedServer: true);
+      final first = await AndroidNativeConnector.connect(
+        bootstrap: owned,
+        adb: AdbClient(serial: 'emulator-5554', processRunner: runner.call),
+        ownsBootstrap: true,
+      );
+
+      final second = await first.reopenSession();
+      await first.dispose();
+
+      expect(second, isNotNull);
+      expect(server.requestsTo('POST', '/session'), hasLength(2));
+      expect(owned.disposeCalls, 0, reason: 'the server moved to the new one');
+      await second!.dispose();
+      expect(owned.disposeCalls, 1);
+    });
+
     group('reusing a session (D4)', () {
       Future<AndroidNativeConnector> connectTo(String sessionId) =>
           AndroidNativeConnector.connect(

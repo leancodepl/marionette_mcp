@@ -13,6 +13,7 @@ final class NativeSelector {
     this.id,
     this.type,
     this.index,
+    this.textMatchesFirstLine = false,
   });
 
   /// Exact [NativeElement.text] (Android `text` / `content-desc`, iOS
@@ -33,13 +34,18 @@ final class NativeSelector {
   /// Picks the n-th (0-based) of all matches, in UI-tree order.
   final int? index;
 
+  /// Whether [text] also matches the first line of a longer text — for a
+  /// field's label: a focused Flutter field on iOS reports its label with
+  /// the hint as a second line (docs/native-lane-decisions.md#d15).
+  final bool textMatchesFirstLine;
+
   /// Whether no matching criterion is set ([index] alone is not one).
   bool get isEmpty =>
       text == null && textContains == null && id == null && type == null;
 
   /// Whether [element] satisfies every criterion that is set.
   bool matches(NativeElement element) {
-    if (text != null && element.text != text) return false;
+    if (text != null && !_textMatches(element.text)) return false;
     if (id != null && element.resourceId != id) return false;
     final needle = textContains?.toLowerCase();
     if (needle != null &&
@@ -61,6 +67,12 @@ final class NativeSelector {
         if (type != null) 'type="$type"',
         if (index != null) 'index=$index',
       ].join(', ');
+
+  bool _textMatches(String? actual) =>
+      actual == text ||
+      (textMatchesFirstLine &&
+          actual != null &&
+          actual.split('\n').first == text);
 
   static bool _typeMatches(String className, String wanted) =>
       className == wanted ||

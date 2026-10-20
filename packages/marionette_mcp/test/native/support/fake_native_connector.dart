@@ -68,9 +68,18 @@ class FakeNativeConnector implements NativeConnector {
   /// Errors thrown by the next UI operations, one per call, before [error].
   final List<Object> errorsOnce = [];
 
+  /// Errors thrown by the next [enterText] calls only, one per call.
+  final List<Object> enterTextErrors = [];
+
   /// Result of [isServerResponding].
   bool serverResponding = true;
   int healthChecks = 0;
+
+  /// Result of [reopenSession] (null: not supported); [reopenError] makes it
+  /// throw instead.
+  NativeConnector? reopened;
+  Object? reopenError;
+  int reopenCalls = 0;
 
   final List<({int x, int y})> taps = [];
   final List<NativeElement> tappedElements = [];
@@ -135,6 +144,7 @@ class FakeNativeConnector implements NativeConnector {
     String text, {
     bool clear = false,
   }) async {
+    if (enterTextErrors.isNotEmpty) throw enterTextErrors.removeAt(0);
     _maybeThrow();
     enteredText.add((element: element, text: text, clear: clear));
   }
@@ -243,6 +253,13 @@ class FakeNativeConnector implements NativeConnector {
   Future<bool> isServerResponding() async {
     healthChecks++;
     return serverResponding;
+  }
+
+  @override
+  Future<NativeConnector?> reopenSession() async {
+    reopenCalls++;
+    if (reopenError case final error?) throw error;
+    return reopened;
   }
 
   @override

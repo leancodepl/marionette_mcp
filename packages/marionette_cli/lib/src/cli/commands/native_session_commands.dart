@@ -145,8 +145,9 @@ class NativeConnectCommand extends Command<int> {
       stdout.writeln(
         'Warning: another process (e.g. an MCP server) uses UIAutomator2 on '
         'this device. It has one session per device — while both are used, '
-        'each takes the session from the other and that process may fail. '
-        'Use one client per Android device at a time.',
+        'each takes the session from the other; both recover, but an action '
+        'in flight can be interrupted. Prefer one client per Android device '
+        'at a time.',
       );
     }
     return 0;

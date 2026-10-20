@@ -167,6 +167,10 @@ final class RecoveringNativeConnector implements NativeConnector {
   Future<bool> isServerResponding() async =>
       await _inner?.isServerResponding() ?? false;
 
+  /// Recovery is this decorator's job; it does not reopen on request.
+  @override
+  Future<NativeConnector?> reopenSession() async => null;
+
   @override
   Future<void> dispose() async {
     _disposed = true;
@@ -213,7 +217,13 @@ final class RecoveringNativeConnector implements NativeConnector {
       }
 
       _logger.info('Native session lost ($error); re-establishing it once');
-      inner = await _replace(inner);
+      // `invalid session id`: the server answered, only the session is gone
+      // (e.g. another client took UIAutomator2's single session) — open a
+      // new one there instead of restarting the server.
+      inner = await _replace(
+        inner,
+        reopen: loss == _SessionLoss.invalidSession,
+      );
       try {
         return await operation(inner);
       } on WebDriverException catch (retryError) {
@@ -239,22 +249,48 @@ final class RecoveringNativeConnector implements NativeConnector {
   }
 
   /// Replaces [broken] with a fresh connector, unless a concurrent call
-  /// already did (or is doing) so.
-  Future<NativeConnector> _replace(NativeConnector? broken) {
+  /// already did (or is doing) so. With [reopen], a new session on the same
+  /// server is tried first.
+  Future<NativeConnector> _replace(
+    NativeConnector? broken, {
+    bool reopen = false,
+  }) {
     final reconnecting = _reconnecting;
     if (reconnecting != null) return reconnecting;
     final current = _inner;
     if (current != null && !identical(current, broken) && !_reconnectPending) {
       return Future.value(current);
     }
-    return _reconnecting = _doReplace(broken).whenComplete(() {
+    return _reconnecting = _doReplace(broken, reopen: reopen).whenComplete(() {
       _reconnecting = null;
     });
   }
 
-  Future<NativeConnector> _doReplace(NativeConnector? broken) async {
+  Future<NativeConnector> _doReplace(
+    NativeConnector? broken, {
+    required bool reopen,
+  }) async {
     _reconnectPending = false;
     _inner = null;
+    if (reopen && broken != null) {
+      NativeConnector? reopened;
+      try {
+        reopened = await broken.reopenSession();
+      } catch (error) {
+        _logger.info('Could not open a new session on the same server '
+            '($error); restarting it');
+      }
+      if (reopened != null) {
+        try {
+          // Its server moved to [reopened]; only the lost session remains.
+          await broken.dispose();
+        } catch (_) {
+          // Best-effort, as below.
+        }
+        _inner = reopened;
+        return reopened;
+      }
+    }
     if (broken != null) {
       try {
         await broken.dispose();

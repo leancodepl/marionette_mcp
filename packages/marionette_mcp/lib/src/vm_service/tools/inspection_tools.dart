@@ -16,7 +16,7 @@ void registerInspectionTools(
     ..registerTool(
       'get_interactive_elements',
       description:
-          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Requires an active connection established via connect.',
+          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. When the app is not in front (a system dialog, the notification shade, a biometric prompt, a browser or a native screen covers it) the result starts with a warning: the listed widgets may not be reachable — use native_get_elements. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Get Interactive Elements',
         readOnlyHint: true,
@@ -29,8 +29,11 @@ void registerInspectionTools(
           final response = await connector.getInteractiveElements();
           final elements = response['elements'] as List<dynamic>;
 
-          final buffer = StringBuffer()
-            ..writeln('Found ${elements.length} interactive element(s):\n');
+          final buffer = StringBuffer();
+          if (coveredAppWarning(response) case final warning?) {
+            buffer.writeln('$warning\n');
+          }
+          buffer.writeln('Found ${elements.length} interactive element(s):\n');
 
           for (final element in elements) {
             buffer.writeln(formatElement(element as Map<String, dynamic>));
