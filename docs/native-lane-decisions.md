@@ -579,7 +579,7 @@ Separation of concerns, simple fakes (`FakeNativeDevice`), and the same device o
 
 ### Verification
 
-- Endpoints / commands verified before implementation: `pm grant|revoke`, `pm clear-permission-flags` (API 35; absent on API 28 and — unit 10 — on API 29, so Android 11 / API 30+), `cmd package resolve-activity`, `am start`, `cmd statusbar expand-notifications|collapse` (API 28, 35), `pidof`, `adb emu geo fix` ("OK"); `simctl privacy` (services listed by Xcode 26.4; `camera` accepted although unlisted, `notifications` fails, `photos` recorded but ignored by the full-access Photo Library API, `grant all` partial on iOS 26.4 — see [D17](#d17)), `simctl openurl|launch|terminate|push|location`, `launchctl list` inside the simulator; W3C `/orientation` on UIAutomator2 and WebDriverAgent (screen size and bounds follow the rotation).
+- Endpoints / commands verified before implementation: `pm grant|revoke`, `pm clear-permission-flags` (present on API 35; absent on API 28 and — unit 10 — on API 29; API 30–34 not checked, the tool detects it at run time), `cmd package resolve-activity`, `am start`, `cmd statusbar expand-notifications|collapse` (API 28, 35), `pidof`, `adb emu geo fix` ("OK"); `simctl privacy` (services listed by Xcode 26.4; `camera` accepted although unlisted, `notifications` fails, `photos` recorded but ignored by the full-access Photo Library API, `grant all` partial on iOS 26.4 — see [D17](#d17)), `simctl openurl|launch|terminate|push|location`, `launchctl list` inside the simulator; W3C `/orientation` on UIAutomator2 and WebDriverAgent (screen size and bounds follow the rotation).
 - Live through the MCP server on Android API 28, API 35 and iOS 18.6: device info, deep link `marionette-example://app/testing/gestures` (cold and warm start; iOS asks "Open in …?" first), https URL in the browser and back with `activate`, notification shade open / close (Android shade contents in the tree), iOS push with Polish characters visible as a banner and in Notification Center, orientation in both directions, location accepted.
 - iOS Notification Center: the first close gesture (swipe up in the middle) only scrolled the list; closing now swipes up from the bottom edge. Rotation is refused while Notification Center is in front ("Unable To Rotate Device"); that error is now typed with a hint to close it.
 - Unit tests for both devices on scripted processes, all tools on fakes.
@@ -825,7 +825,7 @@ A test often needs a known permission state (granted, denied, or "never asked") 
 ### Decision
 
 - One shared set: `camera`, `microphone`, `photos`, `location`, `contacts`, `calendar`, `notifications`, `all`. Android maps each to its permissions for the device's API level and changes only those the app declares (from `dumpsys package`); none declared → an error naming the missing manifest entries. iOS maps to `simctl privacy` services (`camera` works although its help does not list it).
-- **Reset on Android** is option (c): revoke, then clear the flags that record "user set" / "don't ask again", so the app asks again. Before Android 11 (no `clear-permission-flags` on API 28 and 29, checked in unit 10) the permission is revoked and the result explains that a "don't ask again" choice cannot be undone without reinstalling.
+- **Reset on Android** is option (c): revoke, then clear the flags that record "user set" / "don't ask again", so the app asks again. Where the command is missing (API 28 and 29, checked in unit 10; API 30–34 not checked) the permission is revoked and the result explains that a "don't ask again" choice cannot be undone without reinstalling.
 - Unsupported combinations fail with a hint: notifications before API 33 ("nothing to change"), notifications on the iOS Simulator and grant / revoke of photos on iOS ("answer the dialog with `native_tap`", e.g. "Allow Full Access"); reset of iOS photos works.
 - On iOS, grant / revoke of `all` changes camera, microphone, location, contacts and calendar one by one and notes that photos and notifications were skipped; reset of `all` uses `simctl privacy reset all`.
 - The tool checks whether the app was running before the change and is not after it (`pidof`; `launchctl list` in the simulator) and then says the change terminated it and that the Flutter lane must reconnect.
@@ -836,7 +836,7 @@ Option (c) is the only per-app reset that keeps app data. Detecting termination 
 
 ### Consequences
 
-- Before Android 11 (API 28, 29) a full reset needs a reinstall (stated in the result).
+- Without `clear-permission-flags` (API 28, 29; API 30–34 not checked) a full reset needs a reinstall (stated in the result).
 - Libraries may interpret groups differently: on API 28, `permission_handler` reports `Permission.photos` as denied even after `photos` (`READ_EXTERNAL_STORAGE`) is granted, because before Android 13 it maps photos to storage; the tool changes the platform permission, not a library's view.
 - A system permission alert stays on screen after its app has been terminated by a change (seen on iOS); the agent has to dismiss it.
 

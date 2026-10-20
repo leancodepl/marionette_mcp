@@ -191,8 +191,8 @@ final _foregroundPackagePatterns = [
 ];
 
 /// SystemUI windows named without a package: the notification shade
-/// (`NotificationShade`, Android 11+) and the status bar it belongs to on
-/// older versions.
+/// (`NotificationShade`, seen on API 35) and the status bar it belongs to on
+/// older versions (`StatusBar`, seen on API 29).
 final _systemUiFocus =
     RegExp(r'mCurrentFocus=Window\{\S+ u\d+ (NotificationShade|StatusBar)\}');
 
