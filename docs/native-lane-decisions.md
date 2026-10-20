@@ -796,6 +796,10 @@ Correctness first: a search that silently skips its target, or a "found" that ca
 
 Reads with `UIDocumentPicker` open took 2.6–2.7 s each (75 KB page source) against 0.17 s on an app screen (10 KB), so a search in the picker takes tens of seconds. Measured on iOS 26.4 with WebDriverAgent's settings: waiting is not the cause — `waitForIdleTimeout` 0 and `animationCoolOffTimeout` 0 gave the same 2.7 s; a smaller `snapshotMaxDepth` (25 instead of 50) gave 2.0 s but can drop deep elements of real apps. The cost is the accessibility snapshot of the picker, a view of another process. **Decision:** keep the defaults and document it; searches in pickers are slow but correct. (Analogy to [D18](#d18) does not hold: there the cost was a wait, here it is the snapshot itself.)
 
+### Follow-up (acceptance tests, 2026-10-20): a target a lazy list has not built
+
+The hint to scroll was given only for a target that exists off screen. In a lazy list (Flutter `ListView.builder`, Android `RecyclerView`) a far item is not in the tree at all — on the Gestures & inspection screen "Row 40" was absent on both platforms, not even as a zero-size node — so `native_tap text="Row 40"` only said to call `native_get_elements`. When nothing matches and a scrollable container is on screen, the hint now also suggests `native_scroll` with the same selector as the target. Unit test: a miss on a screen with a scrollable container hints to scroll, a miss on a screen without one does not. Live on Android API 35 and iOS 26.4: `native_tap text="Row 40"` before scrolling names `native_scroll`.
+
 ---
 
 <a id="d17"></a>

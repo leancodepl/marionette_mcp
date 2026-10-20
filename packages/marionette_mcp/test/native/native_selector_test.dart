@@ -111,6 +111,26 @@ void main() {
       );
     });
 
+    test('candidates escape line breaks in ids, as in texts', () {
+      // WDA reports a Flutter tab's label as its id, e.g. "Home\nTab 1 of 4".
+      final elements = [
+        nativeElement(text: 'Home\nTab 1 of 4', id: 'Home\nTab 1 of 4'),
+        nativeElement(text: 'Profile\nTab 2 of 4', id: 'Profile\nTab 2 of 4'),
+      ];
+
+      expect(
+        () =>
+            selectElement(elements, const NativeSelector(textContains: 'Tab')),
+        throwsA(
+          isA<NativeAmbiguousElementException>().having(
+            (e) => e.message,
+            'message',
+            contains(r'id="Home\nTab 1 of 4" clickable'),
+          ),
+        ),
+      );
+    });
+
     test('fails when several non-clickable elements match', () {
       final elements = [
         nativeElement(text: 'Note', clickable: false),
@@ -168,7 +188,26 @@ void main() {
           isA<NativeElementNotFoundException>()
               .having((e) => e.message, 'message', contains('text="home"'))
               .having((e) => e.hint, 'hint', contains(r'"Home\nTab 1 of 4"'))
-              .having((e) => e.hint, 'hint', isNot(contains('Settings'))),
+              .having((e) => e.hint, 'hint', isNot(contains('Settings')))
+              .having((e) => e.hint, 'hint', isNot(contains('native_scroll'))),
+        ),
+      );
+    });
+
+    test('no match on a screen with a list hints to scroll (D16)', () {
+      // A lazy list builds only the rows near the screen, so "Row 40" is not
+      // in the tree at all — not even as an off-screen node.
+      final elements = [
+        nativeElement(type: 'android.widget.ScrollView', scrollable: true),
+        nativeElement(text: 'Row 1'),
+      ];
+
+      expect(
+        () => selectElement(elements, const NativeSelector(text: 'Row 40')),
+        throwsA(
+          isA<NativeElementNotFoundException>()
+              .having((e) => e.hint, 'hint', contains('native_get_elements'))
+              .having((e) => e.hint, 'hint', contains('native_scroll')),
         ),
       );
     });

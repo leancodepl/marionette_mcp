@@ -100,7 +100,8 @@ const _maxSimilar = 5;
 ///   than one candidate remains, [NativeAmbiguousElementException] lists them
 ///   rather than guessing (docs/native-lane-decisions.md#d1).
 /// - No match throws [NativeElementNotFoundException] with up to five
-///   similar texts as a hint.
+///   similar texts as a hint, and a hint to scroll when a scrollable
+///   container is on screen (a lazy list does not build far items).
 NativeElement selectElement(
   List<NativeElement> elements,
   NativeSelector selector,
@@ -136,6 +137,7 @@ NativeElement selectElement(
     throw NativeElementNotFoundException(
       selector.describe(),
       similar: _similarTexts(elements, selector),
+      scrollable: elements.any((e) => e.isVisible && e.scrollable),
     );
   }
 
@@ -151,7 +153,8 @@ String _describe(NativeElement element) => [
       element.className,
       if (element.text != null)
         'text="${element.text!.replaceAll('\n', r'\n')}"',
-      if (element.resourceId != null) 'id="${element.resourceId}"',
+      if (element.resourceId != null)
+        'id="${element.resourceId!.replaceAll('\n', r'\n')}"',
       'clickable=${element.clickable}',
       'bounds=(${element.bounds.x}, ${element.bounds.y}, '
           '${element.bounds.width}x${element.bounds.height})',

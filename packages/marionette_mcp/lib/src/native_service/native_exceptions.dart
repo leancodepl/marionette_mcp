@@ -33,20 +33,26 @@ final class NativeNotConnectedException extends NativeLaneException {
 ///
 /// [similar] lists texts of elements that almost match (e.g. differ only in
 /// case or line breaks), to steer the agent to the right value.
+/// [scrollable] adds a hint to scroll: the screen has a list, and a lazy list
+/// builds only the items near the screen, so a far one is not in the tree.
 final class NativeElementNotFoundException extends NativeLaneException {
   NativeElementNotFoundException(
     String target, {
     List<String> similar = const [],
+    bool scrollable = false,
     String? hint,
   }) : super(
           'No native element with $target.',
           hint: hint ??
-              (similar.isEmpty
-                  ? 'Call native_get_elements and retry with a value from its '
-                      'output.'
-                  : 'Similar elements: ${similar.map(_quote).join(', ')}. '
-                      'Call native_get_elements and retry with a value from '
-                      'its output.'),
+              [
+                if (similar.isNotEmpty)
+                  'Similar elements: ${similar.map(_quote).join(', ')}.',
+                'Call native_get_elements and retry with a value from its '
+                    'output.',
+                if (scrollable)
+                  'If it is further in a list, bring it on screen with '
+                      'native_scroll (pass the same selector as the target).',
+              ].join(' '),
         );
 }
 
