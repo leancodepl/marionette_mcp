@@ -224,6 +224,15 @@ abstract interface class NativeServerBootstrap {
   Future<void> dispose();
 }
 
+/// A bootstrap that may reuse a server another process started
+/// (docs/native-lane-decisions.md#d10).
+abstract interface class SharedServerBootstrap
+    implements NativeServerBootstrap {
+  /// Whether [ensureServerReady] started the server, rather than reusing
+  /// one that was already running.
+  bool get startedServer;
+}
+
 /// A connected native automation session (UIAutomator2 on Android,
 /// WebDriverAgent on iOS).
 ///

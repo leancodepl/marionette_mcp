@@ -36,7 +36,7 @@ typedef PortProbe = Future<bool> Function(int port);
 /// [defaultLocalPort]. A healthy server behind an existing forward is reused
 /// and left running on [dispose], because another Marionette process owns
 /// it.
-class AndroidBootstrap implements NativeServerBootstrap {
+class AndroidBootstrap implements SharedServerBootstrap {
   AndroidBootstrap({
     this.serial,
     ProcessRunner? processRunner,
@@ -47,6 +47,8 @@ class AndroidBootstrap implements NativeServerBootstrap {
     Map<String, String>? environment,
     PortProbe? isPortFree,
     Map<String, String>? apkSha256,
+    this.detached = false,
+    ProcessStarter? detachedProcessStarter,
   })  : _adb = AdbClient(serial: serial, processRunner: processRunner),
         _start =
             processStarter ?? (processRunner == null ? Process.start : null),
@@ -55,7 +57,8 @@ class AndroidBootstrap implements NativeServerBootstrap {
         _explicitLocalPort = localPort,
         _environment = environment ?? Platform.environment,
         _isPortFree = isPortFree ?? _canBind,
-        _apkSha256 = apkSha256 ?? pinnedApkSha256;
+        _apkSha256 = apkSha256 ?? pinnedApkSha256,
+        _startDetached = detachedProcessStarter ?? _startDetachedProcess;
 
   static const uia2Version = '10.3.2';
   static const _releaseBaseUrl =
@@ -85,6 +88,27 @@ class AndroidBootstrap implements NativeServerBootstrap {
   };
 
   final String? serial;
+
+  /// Starts `adb shell am instrument -w` as a detached process that outlives
+  /// this one — for the CLI, whose commands are separate processes
+  /// (docs/native-lane-decisions.md#d4). Its pid is [detachedPid]. Without
+  /// `-w` the server starts too, but cannot create sessions ("null
+  /// UiAutomation"): the `am` process that provides UiAutomation is gone.
+  /// Stop such a server with [stopServer].
+  final bool detached;
+
+  final ProcessStarter _startDetached;
+
+  /// Pid of the detached `adb` process holding the instrumentation, if any.
+  int? get detachedPid => _detachedPid;
+  int? _detachedPid;
+
+  static Future<Process> _startDetachedProcess(
+    String executable,
+    List<String> arguments,
+  ) =>
+      Process.start(executable, arguments, mode: ProcessStartMode.detached);
+
   final AdbClient _adb;
   final ProcessStarter? _start;
   final ApkDownloader _downloader;
@@ -111,6 +135,9 @@ class AndroidBootstrap implements NativeServerBootstrap {
 
   /// Local port of the server, once [ensureServerReady] has chosen one.
   int? get localPort => _localPort;
+
+  @override
+  bool get startedServer => _ownsServer;
 
   /// Ensures UIAutomator2 is reachable and returns its local WebDriver URL.
   @override
@@ -311,6 +338,13 @@ class AndroidBootstrap implements NativeServerBootstrap {
     ];
 
     try {
+      final heldCommand = [...command.take(3), '-w', ...command.skip(3)];
+      if (detached) {
+        // A detached process has no stdio and no exit code to watch.
+        _detachedPid =
+            (await _startDetached('adb', _adb.argumentsFor(heldCommand))).pid;
+        return;
+      }
       final starter = _start;
       if (starter == null) {
         // A supplied ProcessRunner must see every ADB call in unit tests.
@@ -326,10 +360,7 @@ class AndroidBootstrap implements NativeServerBootstrap {
         return;
       }
 
-      final process = await starter(
-        'adb',
-        _adb.argumentsFor([...command.take(3), '-w', ...command.skip(3)]),
-      );
+      final process = await starter('adb', _adb.argumentsFor(heldCommand));
       _instrumentProcess = process;
       _instrumentExitCode = null;
       _instrumentStdout = process.stdout.listen((_) {});
@@ -400,6 +431,10 @@ class AndroidBootstrap implements NativeServerBootstrap {
 
     _instrumentProcess?.kill();
     _instrumentProcess = null;
+    if (_detachedPid case final pid?) {
+      Process.killPid(pid);
+      _detachedPid = null;
+    }
     await _instrumentStdout?.cancel();
     await _instrumentStderr?.cancel();
     _instrumentStdout = null;
@@ -425,6 +460,24 @@ class AndroidBootstrap implements NativeServerBootstrap {
     }
   }
 
+  /// Stops a UIAutomator2 server started on the device behind [adb] (e.g.
+  /// with [detached]) and removes the forward of local [port]. Best-effort.
+  static Future<void> stopServer(AdbClient adb, {int? port}) async {
+    for (final package in const [_testPackage, _serverPackage]) {
+      try {
+        await adb.shell(['am', 'force-stop', package]);
+      } catch (_) {
+        // The device may be gone; continue with the forward.
+      }
+    }
+    if (port == null) return;
+    try {
+      await adb.run(['forward', '--remove', 'tcp:$port']);
+    } catch (_) {
+      // Already removed, or adb is gone.
+    }
+  }
+
   static Future<String> _sha256Of(File file) async =>
       sha256.convert(await file.readAsBytes()).toString();
 
@@ -437,6 +490,23 @@ class AndroidBootstrap implements NativeServerBootstrap {
     } on SocketException {
       return false;
     }
+  }
+
+  /// Directory the UIAutomator2 APKs are downloaded to when no cache
+  /// directory is given.
+  static Directory get defaultCacheDir => _defaultCacheDir();
+
+  /// File names of the pinned UIAutomator2 APKs in the cache directory.
+  static const apkFileNames = [_serverApkName, _testApkName];
+
+  /// Whether the cached APK [fileName] in [cacheDir] matches its pinned
+  /// checksum; null when it is not cached. A mismatching copy is downloaded
+  /// again by [ensureServerReady].
+  static Future<bool?> cachedApkValid(
+      Directory cacheDir, String fileName) async {
+    final file = File('${cacheDir.path}/$fileName');
+    if (!await file.exists()) return null;
+    return await _sha256Of(file) == pinnedApkSha256[fileName];
   }
 
   static Directory _defaultCacheDir() {

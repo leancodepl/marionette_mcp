@@ -48,6 +48,9 @@ WebSocket connection, executes, and disconnects.
       --uri <ws-uri>       VM service WebSocket URI — bypasses registry,
                            mutually exclusive with --instance
       --timeout <seconds>  Connection timeout (default: 5)
+      --native-session <name>
+                           Native session for native-* commands
+                           (default: "default")
 
 ## Commands
 
@@ -444,7 +447,10 @@ to be running via `flutter run`.
 
 ### doctor
 
-Check connectivity of all registered instances.
+Check connectivity of all registered instances, then the native lane: adb
+and devices, the UIAutomator2 APKs (cache checksum), booted iOS Simulators,
+the WebDriverAgent build and port 8100 (macOS), orphaned device servers and
+native sessions.
 
   Example:
     marionette doctor
@@ -457,7 +463,17 @@ Check connectivity of all registered instances.
 
     Some instances are unreachable. Use "marionette unregister <name>" to remove stale entries.
 
-  Exit codes: 0 all reachable, 1 any unreachable
+    Native lane:
+      ✓ Android Debug Bridge version 1.0.41
+      ✓ Android device emulator-5554
+      ! No iOS Simulator is booted.
+          Fix: Run "open -a Simulator" or "xcrun simctl boot <udid>".
+      ✗ Orphaned WebDriverAgent (pid 4242): no native session or process owns it; it can block the port of a new session.
+          Fix: kill 4242
+
+  ✓ works, ! not set up (matters only for that platform), ✗ problem.
+
+  Exit codes: 0 all reachable and no problem, 1 otherwise
 
 ---
 
@@ -475,6 +491,145 @@ Run the Marionette MCP server (preserves original marionette_mcp behavior).
     marionette mcp --sse-port 3000
 
 ---
+
+## Native lane (system UI outside Flutter)
+
+Flutter commands only see the app's widget tree. Permission dialogs, system
+alerts, share sheets, pickers, notifications, browser sign-in, biometric
+prompts, native screens and WebView content are only reachable through the
+native-* commands (UIAutomator2 on Android, WebDriverAgent on an iOS
+Simulator). While system UI covers the app, get-interactive-elements still
+lists the Flutter widgets underneath as if they were reachable — check
+native-get-elements when an action has no effect.
+
+### Workflow
+
+1. `marionette native-connect --platform android [--serial <serial>]`
+   or `marionette native-connect --platform ios [--udid <udid>]`.
+   Starts the device-side server once (the first Android start downloads
+   it; iOS needs a prebuilt WebDriverAgent — see `marionette doctor`). The
+   server keeps running between commands.
+2. Run native-* commands. They reuse the session; no per-command setup.
+3. `marionette native-disconnect` when done (stops the server it started).
+
+Several devices at once: give each a name with
+`--native-session <name>` (before the command), e.g.
+`marionette --native-session iphone native-tap --text Allow`.
+One client per Android device at a time: UIAutomator2 has a single session,
+so an MCP server and a CLI session on the same device take it from each
+other (native-connect warns when it reuses another process's server).
+
+### Selectors and coordinates
+
+Element commands take a selector: `--text` (exact; `--label` in
+native-enter-text), `--text-contains`, `--id` (Android resource id / iOS
+accessibility identifier), `--type`, `--index`. All given options must
+match. If several elements match and only one is tappable, that one is
+used; otherwise the command fails and lists the candidates — add --index
+or a more specific option. Coordinates (--x/--y, --start-x …) are
+screenshot pixels, the pixel grid of native-take-screenshot, on both
+platforms — never Flutter logical pixels (use native-map-flutter-rect).
+
+### Session commands
+
+  native-connect --platform android|ios [--serial S] [--udid U]
+      Start or reuse the server and save the session. Exit 1 with the
+      reason and a hint when the device or server is not available.
+  native-sessions
+      List sessions: name, platform, device, URL, running / not running.
+  native-disconnect
+      Delete the session; stop the server if native-connect started it.
+
+### Commands (each mirrors the MCP tool native_<name>)
+
+  native-get-elements [selector without --index] [--clickable-only]
+                      [--no-include-foreground-app]
+      JSON {"elements": [...], "foregroundApp": "..."}; each element has
+      type, text, id, bounds {x, y, width, height} (screenshot pixels),
+      clickable, and state when informative: value (typed content),
+      enabled, focused, checked, selected, scrollable.
+  native-wait-for [selector without --index] [--state visible|gone]
+                  [--timeout-ms 10000] [--interval-ms 500]
+      Prints the element (visible) or the elapsed time (gone); exit 1 on
+      timeout, naming the foreground app.
+  native-tap <selector> | --x X --y Y
+  native-double-tap <selector> | --x X --y Y [--delay-ms 100]
+  native-long-press <selector> | --x X --y Y [--duration-ms 600]
+  native-pinch --scale S [<selector> | --x X --y Y] [--duration-ms D]
+      S > 1 zooms in, < 1 out (0.1–10).
+  native-swipe --start-x --start-y --end-x --end-y [--duration-ms 300]
+      iOS back gesture: start at x=1. It does not wait for the content to
+      settle — on iOS a tap right after a fling only stops the scrolling;
+      use native-wait-for (or native-scroll, which settles) before tapping.
+  native-scroll --direction up|down|left|right [target selector]
+                [--within-text|--within-text-contains|--within-id|
+                 --within-type|--within-index] [--max-swipes 10]
+                [--distance D] [--start-x X --start-y Y]
+      Direction is the finger's. With a target, swipes until it is visible
+      and stops at the end of the list; --within-* swipes inside that
+      container (nested lists, pickers).
+  native-enter-text --text T [--label|--text-contains|--id|--type|--index]
+                    [--clear]
+      Appends; without a selector types into the focused field (also
+      Flutter fields on Android).
+  native-press-key --key back|home|enter|backspace|tab|recents|volume_up|
+                         volume_down
+      back, recents, tab: Android only.
+  native-hide-keyboard
+  native-take-screenshot --output file.png [selector]
+  native-device-info
+      JSON: platform, OS, model, screen, orientation, foreground app,
+      default app id.
+  native-permissions --action grant|revoke|reset --permission camera|
+      microphone|photos|location|contacts|calendar|notifications|all
+      [--app-id ID]
+      Without the system dialog; reset makes the app ask again. Revoking
+      may terminate the app (the output says so).
+  native-open-url --url URL
+      Web page or deep link. iOS may ask "Open in …?": native-tap --text Open.
+  native-app --action activate|background|terminate|restart [--app-id ID]
+      On Android terminate / restart also remove the app's notifications.
+  native-notifications --action open|close|push [--title T] [--body B]
+                       [--payload JSON] [--app-id ID]
+      push: iOS Simulator; background the app a few seconds first.
+  native-set-orientation --orientation portrait|landscape
+  native-set-location --latitude LAT --longitude LON
+  native-biometrics --action match|nonMatch|enroll|unenroll
+      Answers a Face ID / Touch ID / fingerprint prompt on an emulator or
+      simulator; enroll / unenroll: iOS Simulator only.
+  native-map-flutter-rect --x X --y Y [--width W] [--height H]
+      With -i <instance> or --uri: converts Flutter bounds (from
+      get-interactive-elements) to screenshot pixels for a native gesture
+      on a platform view (camera preview, map, video).
+
+  --app-id defaults to the app under test: the first non-system app seen in
+  front in this session.
+
+  Messages and hints are shared with the MCP tools: an argument named in
+  camelCase (maxSwipes, timeoutMs, appId, action=close) is the option in
+  kebab case (--max-swipes, --timeout-ms, --app-id, --action close).
+
+  Examples:
+    marionette native-connect --platform android
+    marionette native-wait-for --text Allow --timeout-ms 5000
+    marionette native-tap --text Allow
+    marionette native-enter-text --label "User name" --text "Jan"
+    marionette native-scroll --direction up --within-id "File View" \
+        --text marionette_file_37.txt
+    marionette -i my-app native-map-flutter-rect --x 24 --y 300 \
+        --width 340 --height 200
+
+### Platform notes
+
+- iOS Notification Center: a tap on a notification does nothing; swipe it
+  right with native-swipe. A collapsed "N Notifications" button must be
+  tapped first. Opened over the app it is not in the tree — background the
+  app first. A banner can be tapped.
+- Android: toasts and heads-up banners are visible only on screenshots on
+  recent versions (older ones list toasts read-only); a tree read during a
+  toast waits until it is gone.
+- Android with a hardware keyboard shows Gboard's floating toolbar:
+  native-hide-keyboard refuses (Back would close the screen).
 
 ## Exit Codes
 
@@ -500,5 +655,6 @@ If a command fails with a connection error, the app may have stopped.
   when a widget has no ValueKey but does set an accessibility identifier
 - Run `get-interactive-elements` first to discover what's on screen before interacting
 - Instance names are alphanumeric with hyphens/underscores: [a-zA-Z0-9_-]+
-- Commands are stateless — each opens a fresh connection, so no session management needed
+- Flutter commands are stateless — each opens a fresh connection, so no session management needed
+- native-* commands share a session started by native-connect; run native-disconnect at the end
 ''';

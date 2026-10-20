@@ -9,6 +9,7 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | [D1](#d1) | Ambiguous element selectors | Accepted |
 | [D2](#d2) | Coordinate space of the native lane | Accepted |
 | [D3](#d3) | Automatic recovery of a lost session | Accepted |
+| [D4](#d4) | Native session model of the CLI | Accepted |
 | [D6](#d6) | Screenshot of part of the screen | Accepted |
 | [D7](#d7) | Default app for device shortcuts | Accepted |
 | [D9](#d9) | Granularity of device shortcut tools | Accepted |
@@ -183,6 +184,63 @@ An operation still running when the connector was disposed — a read that `nati
 
 ---
 
+<a id="d4"></a>
+
+## D4 — Native session model of the CLI
+
+- **Status:** Accepted (2026-10-20)
+- **Applies to:** `marionette native-*` commands (`marionette_cli`); `AndroidBootstrap` / `IosBootstrap` `detached` mode, `stopServer`; `WebDriverNativeConnector.openSession(sessionId:)` and `release()`.
+
+### Context and dilemma
+
+The MCP server is one long-lived process that holds the device-side server (`adb shell am instrument -w` for UIAutomator2, `xcodebuild test-without-building` for WebDriverAgent) for the whole session. The CLI starts a new process for every command. Starting the server per command takes seconds to a minute and a new WebDriverAgent run can close a visible system alert; tearing it down after every command would make the next one start from scratch. Three assumptions of the plan had to be checked first: that a server started without a holding host process keeps working, that a detached `xcodebuild` survives the CLI and can be stopped by pid, and whether WebDriver sessions expire when idle.
+
+### Options considered
+
+1. Bootstrap per command — simple, but each command costs seconds to a minute and closes alerts.
+2. A CLI daemon that holds the servers and proxies commands — works regardless of server behaviour; an extra process, IPC and lifecycle management.
+3. Servers detached from the CLI plus a session registry — commands talk to the WebDriver server directly by its saved URL and session id; no extra host process of ours.
+4. For the CLI commands themselves: generate them from the MCP tool definitions, or write them by hand like the existing Flutter commands, calling the shared tool handlers.
+
+### Decision
+
+- **Option 3.** `native-connect` starts the server detached and records `{platform, serial | udid, baseUrl, port, sessionId, defaultAppId, pid, startedServer}` in `~/.marionette/native/<name>.json` (atomic write, like the instance registry); `--native-session <name>` selects the entry (default `default`).
+  - **Android:** `adb shell am instrument -w …` started with `ProcessStartMode.detached` — the plan's `am instrument` **without** `-w` does not work (below).
+  - **iOS:** `xcodebuild test-without-building` started with `ProcessStartMode.detached`.
+  - Both record the pid. A server that was already running (MCP server, an earlier session) is reused and marked as not started by the session.
+- **Every command attaches** through a bootstrap that only checks `/status` of the saved URL (never starts anything) and **reuses the saved WebDriver session**: `openSession(sessionId:)` checks it with a cheap call (`GET /orientation`) and opens a new one only when the server no longer has it; the new id is saved. At the end the connector is `release()`d — the client closes, the session stays. The app under test (D7) is saved too.
+- **`native-disconnect`** deletes the session and, only if the session started the server, stops it: Android `force-stop` of both UIAutomator2 packages, forward removal and the held `adb` process; iOS SIGTERM (then SIGKILL) to `xcodebuild`. A pid is killed only while it still runs the expected command — pids are reused.
+- **Commands are written by hand** (`native-tap`, …, one per MCP tool, named like the MCP tool with dashes, options in kebab case) and call the **same handlers** as the MCP tools (`handleNativeTap(context, args)`), so validation, selectors, messages and hints are shared — the existing CLI pattern, where Flutter commands and MCP tools share `VmServiceConnector`. In the native lane most logic lives in the handlers, so they are the shared layer. `native_connect` / `native_disconnect` are replaced by the session commands.
+- A server that is no longer reachable (device rebooted) is reported with "run native-connect again"; nothing is restarted implicitly.
+
+### Rationale
+
+Measured: a detached server keeps working for at least 11 minutes with no host process of the CLI; session creation per command would cost about 1.2 s on Android (UIAutomator2 opens a UiAutomation connection per session) and 10–100 ms on iOS, while reusing a session costs one ~0.13 s check. Option 3 needs no daemon and keeps the commands independent processes, as the rest of the CLI. Calling the shared handlers avoids duplicating the native lane's logic, which — unlike the Flutter lane's — lives on the host side.
+
+### Consequences
+
+- A detached server outlives a crashed or killed CLI; `marionette doctor` lists such servers as orphaned (`parent pid 1`, not in any session) with `kill <pid>` as the fix, and as owned when a process (e.g. an MCP server) holds them.
+- UIAutomator2 supports one session per device: an MCP server and a CLI session on the same Android device replace each other's sessions. Verified live: the CLI recreates its own and saves it, and since the D10 follow-up an MCP server that reused the CLI's server no longer stops it on exit; the MCP server's own recovery can fail while a CLI session takes its session (D10 follow-up, deferred D3 fix) — `native-connect` warns, and the docs say: one client per Android device at a time. On iOS both work side by side (WebDriverAgent survives session deletes).
+- Messages come from the shared handlers; the CLI rewrites tool names (`native_get_elements` → `native-get-elements`) in non-JSON output, and `help-ai` explains that a camelCase argument (`maxSwipes`) is the kebab-case option (`--max-swipes`).
+- New MCP tools need a matching CLI command and an entry in `help-ai`, written by hand — as for the Flutter lane.
+- The CLI depends on `marionette_mcp` internals (`src/native_service/…`), like its Flutter commands.
+
+### Verification
+
+- **`am instrument` without `-w` (plan's assumption):** the server starts and answers `/status`, but every `POST /session` fails with "Got null UiAutomation from instrumentation" — the `am` process that provides UiAutomation is gone. An earlier test without `-w` that worked for 11 minutes had two stale `adb shell am instrument -w` host processes from earlier MCP runs still alive; without them it fails reproducibly.
+- **Detached `adb shell am instrument -w` (Android API 35):** after the starting process exited, the `adb` process ran under `launchd` (ppid 1) and sessions could be created; one session answered every minute for 11 minutes (≈ 0.13–0.15 s per check, no idle expiry).
+- **Detached `xcodebuild` (iOS 26.4):** healthy after 13 s, ppid 1 after the starter exited; session create 10–106 ms, page source ≈ 0.15–0.2 s; SIGTERM stopped `xcodebuild` in 2 s, the runner and the port with it.
+- **Session per command (Android, measured over 11 minutes):** create ≈ 1.15–1.2 s, source ≈ 0.11–0.13 s, delete ≈ 0.11–0.13 s.
+- **CLI live, Android API 35 and iOS 26.4 (compiled `marionette`):** `native-connect` from a clean device 4.4 s (Android) / 7.8 s (iOS); afterwards commands take 0.26–1.5 s each including process start (`native-tap` 0.26–0.5 s on Android, ≈ 1.25 s on iOS). The default app saved by `native-app --app-id` is used by a later `native-app --action activate` without it. `native-disconnect` stopped the held `adb` process, the server on the device and the forward (Android) and `xcodebuild`, WDA and port 8100 (iOS), and removed the entry.
+- **Plan acceptance — §3 permission dialogs only from the CLI, two devices at once** (`--native-session pixel` and `iphone`): `native-permissions --action reset --permission camera` → deep link to the permissions screen → `native-scroll` to "Request camera" → `native-tap` → `native-wait-for` the system dialog ("While using the app" / "Allow") → `native-tap` → status "camera: granted" on both platforms.
+- **Both lanes from the CLI:** `marionette --uri <vm-service> native-map-flutter-rect --x 0 --y 0 --width 100 --height 50` → `rect` 300×150, scale 3.0, Flutter view 1280×2856 (Android API 35); without `-i` / `--uri` the command is a usage error naming them.
+- **Orphaned server:** with the iOS session's registry entry deleted, `doctor` reported "Orphaned WebDriverAgent (pid …)" with `kill <pid>` as the fix; an MCP `native_connect` meanwhile reused that WDA (0.73 s, D10 follow-up); `kill` stopped it.
+- **Every command live (compiled CLI, API 35 and iOS 26.4):** gestures on elements and points (`native-tap`, `-double-tap`, `-long-press` → counters +1; `native-pinch` scale 2 → 1.63–1.64, 0.5 → 0.92), `native-swipe` (chips move; iOS edge swipe goes back), `native-scroll` with `--within-type` / `--within-index` both ways and the end-of-list error, text (`native-enter-text` with `--label`, focused, `--clear`, Polish characters; `native-press-key` backspace / home / volume; unsupported keys and the Gboard floating toolbar refused with hints), `native-wait-for` visible / gone, `native-take-screenshot` full (1280×2856 / 1320×2868) and element (1184×288 / 1224×288), `native-device-info`, `native-set-orientation`, `native-set-location`, `native-notifications` open / close / push (title-body and `--payload` JSON; Android push refused with a hint), `native-app` activate / background / terminate / restart, `native-permissions` grant / revoke (termination reported) / reset, `native-biometrics` match / nonMatch / enroll / unenroll (iOS) and the Android enroll hint, `native-map-flutter-rect` with `--uri` on both platforms (rect 72, 900, 300×150 on iOS), `native-connect` twice ("already connected") and with an unknown serial (error, no session saved).
+- **Argument mapping:** a unit test parses every option of the 20 tool commands and checks the result equals the tool arguments, with the MCP schema's names and int / double types.
+- Unit tests: detached starts on both platforms (pid, `-w`, no second start), `stopServer`, session reuse and replacement, `release` keeps the session; CLI registry, attach / reuse / replacement, missing session and dead server messages, usage errors, `native-sessions`, `native-disconnect` of a reused server, doctor findings.
+
+---
+
 <a id="d6"></a>
 
 ## D6 — Screenshot of part of the screen
@@ -343,6 +401,23 @@ Zero configuration in the common single-device case (still port 8200), correct b
   - With a listener on 8200, the forward used 8201; `MARIONETTE_UIA2_PORT=8250` used 8250; `MARIONETTE_UIA2_PORT=8200` while busy and `MARIONETTE_UIA2_PORT=abc` failed immediately with a hint.
   - A second process connected in ≈ 0.1 s by reusing the running server and left it running on disconnect; the first process's next call took ≈ 1.9 s because its session had been replaced (see consequences).
 - Android emulator (API 28): `sha256sum` is available and both installed APK hashes equal the pinned ones; two consecutive connects did not reinstall (`lastUpdateTime` unchanged, connect ≈ 1.7 s); the forward exists only during the session.
+
+### Follow-up (unit 9, 2026-10-20): reusing a running WebDriverAgent
+
+The iOS bootstrap has the same fast path as Android — a healthy WebDriverAgent already listening on the port is reused when it serves the requested simulator — but it never matched: it compared `udid` from `/wda/device/info`, and WebDriverAgent 16.15 reports no such field (only `uuid`, a per-app identifier, `AA2E9EB0-…` vs the simulator's `C34D5845-…`). Every running WDA, including one orphaned by an interrupted Marionette process (the deferred item from unit 4), therefore failed `native_connect` with `portConflict`. The check now falls back to the WDA runner app (`com.facebook.WebDriverAgentRunner.xctrunner`) running inside the requested simulator (`simctl spawn <udid> launchctl list`); simulators share the host's network, so only one WDA can listen on the port. A reported `udid` is still trusted first.
+
+- Live, iOS 26.4: with a WDA started outside the MCP server, `native_connect` reused it in 0.75 s (≈ 5 s with a fresh start) and left it running afterwards; before the fix the same call failed with "Port 8100 is already in use by WebDriverAgent attached to a different simulator".
+- Unit test: without a reported udid, WDA whose runner runs in the simulator is reused; for another simulator, `portConflict`.
+- **Port 8100 taken by another program** (not WebDriverAgent): the bootstrap used to launch WDA anyway and wait 60 s, then failed with "WebDriverAgent did not become ready … retry". It now checks that the port is free before launching and fails at once with `portConflict` and an `lsof` hint (live: 0.9 s instead of 60 s; unit test).
+
+### Follow-up (unit 9, 2026-10-20): a reused UIAutomator2 server must keep its session
+
+**UIAutomator2 10.3.2 stops itself when its current session is deleted** (log: `DeleteSession command` → `Stopping ServerInstrumentation` → instrumentation finished; deleting an unknown session id does not stop it). So a process that reused another process's server (the reuse path above) killed that server when it disconnected: an MCP server that reused the CLI's server stopped it on exit (seen live). This also corrects the verification bullet above ("A second process … left it running on disconnect") for this UIAutomator2 version.
+
+- **Decision:** on Android a connector does not delete its session when its bootstrap reused a server (`SharedServerBootstrap.startedServer == false`); the owner ends the server. `marionette native-disconnect` likewise deletes the session only when its `native-connect` started the server. iOS is unaffected — WebDriverAgent keeps running when a session is deleted.
+- **Live after the change (API 35):** an MCP server reusing the CLI's server, then exiting → the CLI's server keeps running and its next command works; a CLI session reusing an MCP server, then `native-disconnect` → "left running".
+- **Still limited — one client per Android device at a time:** UIAutomator2 has a single session, so two clients take it from each other. A CLI command then simply opens a new session ([D4](#d4)), but the MCP server's recovery ([D3](#d3)) treats a lost session like a lost server: it disposes its connector (stopping the server it started) and starts a new one, and the asynchronous stop of the old instrumentation killed the new server ("lost again right after re-establishing it"). Recommended fix (deferred): when the server is healthy and only the session is gone, open a new session on the same server. `native-connect` warns when it reuses another process's server on Android.
+- Unit tests: a session on a shared server is not deleted on dispose, one on an own server is; `native-disconnect` of a reused server sends no `DELETE`.
 
 ---
 

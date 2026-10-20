@@ -18,10 +18,20 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     required super.bootstrap,
     required super.ownsBootstrap,
     required AdbClient adb,
+    required bool sharedServer,
   })  : _adb = adb,
+        _sharedServer = sharedServer,
         device = AndroidNativeDevice(adb);
 
   final AdbClient _adb;
+  final bool _sharedServer;
+
+  /// UIAutomator2 (10.3.2) stops itself when its session is deleted, so a
+  /// session on a server another process started (D10 reuse — an MCP server,
+  /// a CLI session) is left alone; that process ends it
+  /// (docs/native-lane-decisions.md#d10).
+  @override
+  bool get deletesSessionOnDispose => !_sharedServer;
 
   @override
   final NativeDevice device;
@@ -41,6 +51,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     String? serial,
     NativeServerBootstrap? bootstrap,
     AdbClient? adb,
+    String? sessionId,
   }) async {
     final ownsBootstrap = bootstrap == null;
     final ownedBootstrap =
@@ -55,14 +66,19 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
         'platformName': 'Android',
         'appium:automationName': 'UiAutomator2',
       },
-      create: (client, sessionId) => AndroidNativeConnector._(
+      sessionId: sessionId,
+      create: (client, id) => AndroidNativeConnector._(
         client: client,
-        sessionId: sessionId,
+        sessionId: id,
         bootstrap: resolvedBootstrap,
         ownsBootstrap: ownsBootstrap,
         adb: resolvedAdb,
+        sharedServer: resolvedBootstrap is SharedServerBootstrap &&
+            !resolvedBootstrap.startedServer,
       ),
     );
+    // A reused session already has the setting.
+    if (connector.sessionId == sessionId) return connector;
     try {
       await connector.client.uia2UpdateSettings(
         connector.sessionId,

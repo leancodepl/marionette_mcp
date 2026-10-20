@@ -82,7 +82,12 @@ class IosBootstrap implements NativeServerBootstrap {
     Duration readyTimeout = const Duration(seconds: 60),
     Duration pollInterval = const Duration(milliseconds: 500),
     logging.Logger? logger,
+    this.detached = false,
+    ProcessStarter? detachedProcessStarter,
+    Future<bool> Function(int port)? isPortFree,
   })  : _udid = udid,
+        _isPortFree = isPortFree ?? canBindLoopbackPort,
+        _startDetached = detachedProcessStarter ?? _startDetachedProcess,
         _simctl = SimctlClient(processRunner: processRunner),
         _start = processStarter ?? Process.start,
         _wdaLocalPort = wdaLocalPort,
@@ -91,6 +96,25 @@ class IosBootstrap implements NativeServerBootstrap {
         _readyTimeout = readyTimeout,
         _pollInterval = pollInterval,
         _logger = logger ?? logging.Logger('IosBootstrap');
+
+  /// Starts `xcodebuild` as a detached process that outlives this one — for
+  /// the CLI, whose commands are separate processes
+  /// (docs/native-lane-decisions.md#d4). Its pid is [detachedPid]; [dispose]
+  /// leaves it running.
+  final bool detached;
+
+  final ProcessStarter _startDetached;
+  final Future<bool> Function(int port) _isPortFree;
+
+  /// Pid of the `xcodebuild` started in [detached] mode, if any.
+  int? get detachedPid => _detachedPid;
+  int? _detachedPid;
+
+  static Future<Process> _startDetachedProcess(
+    String executable,
+    List<String> arguments,
+  ) =>
+      Process.start(executable, arguments, mode: ProcessStartMode.detached);
 
   final String? _udid;
   final SimctlClient _simctl;
@@ -144,12 +168,27 @@ class IosBootstrap implements NativeServerBootstrap {
         'a different simulator than $_resolvedUdid.',
       );
     }
+    // Something else listening there would make WDA fail to bind and the
+    // health wait run into its timeout.
+    if (!await _isPortFree(_wdaLocalPort)) {
+      throw IosBootstrapException(
+        IosBootstrapFailure.portConflict,
+        'Port $_wdaLocalPort, which WebDriverAgent needs, is used by another '
+        'program.',
+        hint: 'Find it with "lsof -nP -iTCP:$_wdaLocalPort -sTCP:LISTEN" and '
+            'stop it, then retry.',
+      );
+    }
     final artifacts = _resolveWdaArtifacts();
     try {
       await _launchWda(artifacts, _resolvedUdid!);
       await _waitUntilHealthy(baseUri);
     } catch (_) {
       // Do not leave a half-started xcodebuild/WDA behind.
+      if (_detachedPid case final pid?) {
+        Process.killPid(pid);
+        _detachedPid = null;
+      }
       await dispose();
       rethrow;
     }
@@ -351,15 +390,28 @@ class IosBootstrap implements NativeServerBootstrap {
   Future<void> _launchViaXcodebuild(String xctestrunPath, String udid) async {
     // Standard Appium approach: run the already-built test without rebuilding.
     // WDA binds to localhost:8100 on the Mac when targeting a simulator.
+    final arguments = [
+      'test-without-building',
+      '-xctestrun',
+      xctestrunPath,
+      '-destination',
+      'platform=iOS Simulator,id=$udid',
+    ];
+    if (detached) {
+      try {
+        // A detached process has no stdio and no exit code to watch.
+        _detachedPid = (await _startDetached('xcodebuild', arguments)).pid;
+      } on ProcessException catch (error) {
+        throw IosBootstrapException(
+          IosBootstrapFailure.launch,
+          'Failed to start xcodebuild: ${error.message}',
+        );
+      }
+      return;
+    }
     final Process process;
     try {
-      process = await _start('xcodebuild', [
-        'test-without-building',
-        '-xctestrun',
-        xctestrunPath,
-        '-destination',
-        'platform=iOS Simulator,id=$udid',
-      ]);
+      process = await _start('xcodebuild', arguments);
     } on ProcessException catch (error) {
       throw IosBootstrapException(
         IosBootstrapFailure.launch,
@@ -405,17 +457,24 @@ class IosBootstrap implements NativeServerBootstrap {
     }
   }
 
+  /// Whether the WDA answering on [baseUri] runs on [expectedUdid].
+  ///
+  /// WDA 16 does not report the simulator UDID (`/wda/device/info` has a
+  /// per-app `uuid` only), so the check falls back to the runner app running
+  /// inside that simulator: simulators share the host network, so only one
+  /// WDA can listen on the port (docs/native-lane-decisions.md#d10).
   Future<bool> _wdaServesSimulator(Uri baseUri, String expectedUdid) async {
     final client = WebDriverClient(baseUri.toString());
     try {
       final info = await client.wdaDeviceInfo();
       final udid = info['udid'];
-      return udid is String && udid == expectedUdid;
+      if (udid is String) return udid == expectedUdid;
     } catch (_) {
-      return false;
+      // Fall through to the process check.
     } finally {
       client.close();
     }
+    return await _simctl.isAppRunning(expectedUdid, wdaRunnerBundleId) ?? false;
   }
 
   void _attachProcess(Process process) {

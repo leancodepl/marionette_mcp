@@ -73,7 +73,7 @@ The official [Dart & Flutter MCP server](https://docs.flutter.dev/ai/mcp-server)
 
 Once connected, an agent can drive your app with a small, focused toolset: inspect the widget tree (`get_interactive_elements`), `tap` / `secondary_tap` / `double_tap` / `long_press` / `swipe` / `pinch_zoom` / `scroll_to`, `enter_text`, `press_back_button`, `take_screenshots`, read `get_logs`, and `hot_reload`. Full list: [MCP Tools](https://github.com/leancodepl/marionette_mcp/blob/main/docs/mcp-tools.md).
 
-For UI **outside** the Flutter widget tree (system permission dialogs, OS sheets, webviews), use the native lane: `native_connect` with `platform` `android` | `ios`, then `native_get_elements` / `native_tap` / etc. Prefer Flutter tools when the target is an in-app widget.
+For UI **outside** the Flutter widget tree (system permission dialogs, OS sheets, webviews), use the native lane: `native_connect` with `platform` `android` | `ios`, then `native_get_elements` / `native_tap` / etc. Prefer Flutter tools when the target is an in-app widget. The CLI has the same native lane as `native-*` commands (`marionette native-connect --platform android`, `marionette native-tap --text Allow`) — see the [CLI guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/cli.md#native-lane-system-ui).
 
 ### Native lane requirements (Android)
 

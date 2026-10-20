@@ -56,3 +56,15 @@ void checkProcessResult(
     processMessage(result),
   );
 }
+
+/// Whether local [port] can be bound on the loopback interface — free for a
+/// server to listen on.
+Future<bool> canBindLoopbackPort(int port) async {
+  try {
+    final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
+    await socket.close();
+    return true;
+  } on SocketException {
+    return false;
+  }
+}

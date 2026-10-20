@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
 import 'package:test/test.dart';
 
@@ -215,6 +216,73 @@ void main() {
       await expectLater(
         bootstrap(downloader: (_) async => <int>[]).ensureServerReady(),
         failsWith(AndroidBootstrapFailure.download),
+      );
+    });
+
+    test(
+      'detached: holds the instrumentation in a detached process (D4)',
+      () async {
+        final launches = <List<String>>[];
+        final subject = AndroidBootstrap(
+          serial: 'emulator-5554',
+          processRunner: runner.call,
+          processStarter: (_, __) =>
+              throw StateError('a held process must not be started'),
+          downloader: (_) async => [1],
+          cacheDir: cacheDir,
+          localPort: server.port,
+          environment: const {},
+          apkSha256: const {},
+          isPortFree: (_) async => true,
+          detached: true,
+          detachedProcessStarter: (executable, arguments) async {
+            launches.add([executable, ...arguments]);
+            return _FakeProcess(4242);
+          },
+        );
+
+        await subject.ensureServerReady();
+
+        expect(launches.single.take(7), [
+          'adb',
+          '-s',
+          'emulator-5554',
+          'shell',
+          'am',
+          'instrument',
+          '-w',
+        ]);
+        expect(subject.detachedPid, 4242);
+        expect(
+          runner.adbCommands.where((cmd) => cmd.contains('instrument')),
+          isEmpty,
+          reason: 'not started a second time without -w',
+        );
+      },
+    );
+
+    test('cachedApkValid: missing, mismatching and pinned copies', () async {
+      const name = 'appium-uiautomator2-server-v10.3.2.apk';
+      expect(await AndroidBootstrap.cachedApkValid(cacheDir, name), isNull);
+
+      await File('${cacheDir.path}/$name').writeAsString('not an apk');
+      expect(await AndroidBootstrap.cachedApkValid(cacheDir, name), isFalse);
+    });
+
+    test('stopServer force-stops both packages and removes the forward',
+        () async {
+      await AndroidBootstrap.stopServer(
+        AdbClient(serial: 'emulator-5554', processRunner: runner.call),
+        port: 8299,
+      );
+
+      expect(
+        runner.adbCommands.where((cmd) => cmd.first != 'version'),
+        [
+          ['shell', 'am', 'force-stop', 'io.appium.uiautomator2.server.test'],
+          ['shell', 'am', 'force-stop', 'io.appium.uiautomator2.server'],
+          ['forward', '--remove', 'tcp:8299'],
+        ],
       );
     });
 
@@ -506,4 +574,15 @@ void _portSelectionTests() {
       );
     });
   });
+}
+
+/// A started process of which only the pid is used.
+class _FakeProcess implements Process {
+  _FakeProcess(this.pid);
+
+  @override
+  final int pid;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

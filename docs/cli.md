@@ -75,9 +75,27 @@ marionette unregister my-app
 marionette doctor              # Check connectivity of all instances
 ```
 
+## Native lane (system UI)
+
+Permission dialogs, system alerts, share sheets, pickers, notifications, browser sign-in, biometric prompts, native screens and WebView content are outside the Flutter widget tree. The `native-*` commands reach them — the same tools as the MCP server's `native_*` tools (UIAutomator2 on Android, WebDriverAgent on an iOS Simulator), with the same behaviour and messages.
+
+```bash
+marionette native-connect --platform android          # or: --platform ios [--udid <udid>]
+marionette native-wait-for --text "Allow" --timeout-ms 5000
+marionette native-tap --text "Allow"
+marionette native-get-elements --clickable-only       # JSON
+marionette native-permissions --action grant --permission camera
+marionette native-take-screenshot --output ./system.png
+marionette native-disconnect
+```
+
+`native-connect` starts the device-side server detached from the CLI, so it keeps running between commands, and saves the session in `~/.marionette/native/<name>.json`. Every `native-*` command attaches to it and reuses the WebDriver session — no per-command setup. `native-disconnect` stops the server it started. Use `--native-session <name>` to drive several devices at once (e.g. an Android phone and an iPhone in one script); `native-sessions` lists them. Use one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other (`native-connect` warns when it reuses another process's server). `marionette doctor` also checks the native lane: adb and devices, the UIAutomator2 APKs (checksum of the cached copies), booted simulators, the WebDriverAgent build, port 8100 taken by another program, orphaned servers and sessions whose server is gone. Design and measurements: [D4](./native-lane-decisions.md#d4).
+
+`native-map-flutter-rect` combines both lanes: pass `-i <instance>` or `--uri` to convert bounds from `get-interactive-elements` into native screenshot pixels for a gesture on a platform view.
+
 ## Command reference
 
-Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds>` (default 5).
+Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds>` (default 5), `--native-session <name>` (default `default`, for `native-*` commands).
 
 | Command | Purpose |
 | --- | --- |
@@ -100,6 +118,26 @@ Global options: `-i, --instance <name>`, `--uri <ws://...>`, `--timeout <seconds
 | `register <name> <uri>` | Register a named instance. |
 | `unregister [<name>` &#124; `--all` &#124; `--stale]` | Remove instance(s). |
 | `list` | List registered instances. |
-| `doctor` | Check connectivity of all instances. |
+| `doctor` | Check connectivity of all instances and the native lane setup. |
 | `help-ai` | Print the AI-oriented command reference. |
 | `mcp` | Run the MCP server (`-l/--log-level`, `--log-file`, `--sse-port`). |
+| `native-connect` | Start a native session (`--platform android\|ios`, `--serial`, `--udid`). |
+| `native-disconnect` | End the native session; stop the server it started. |
+| `native-sessions` | List native sessions and whether their servers run. |
+| `native-get-elements` | Native UI tree as JSON (selector filters, `--clickable-only`, `--no-include-foreground-app`). |
+| `native-wait-for` | Wait until an element is visible / gone (`--state`, `--timeout-ms`, `--interval-ms`). |
+| `native-tap`, `native-double-tap`, `native-long-press` | Gesture on an element (`--text`, `--text-contains`, `--id`, `--type`, `--index`) or at `--x`/`--y` (screenshot pixels). |
+| `native-pinch` | Two-finger pinch (`--scale`, element or point). |
+| `native-swipe` | Swipe between points (`--start-x`, `--start-y`, `--end-x`, `--end-y`, `--duration-ms`). |
+| `native-scroll` | Swipe in `--direction`, optionally until a target is visible; `--within-*` scrolls a container. |
+| `native-enter-text` | Type `--text` into a field (`--label`, `--text-contains`, `--id`, `--type`, `--index`) or the focused one; `--clear`. |
+| `native-press-key`, `native-hide-keyboard` | System keys; hide the software keyboard. |
+| `native-take-screenshot` | Screenshot of the screen or an element (`-o/--output`). |
+| `native-device-info` | Device facts as JSON. |
+| `native-permissions` | Grant / revoke / reset a permission without the dialog. |
+| `native-open-url` | Open a web page or deep link. |
+| `native-app` | Activate / background / terminate / restart an app. |
+| `native-notifications` | Open / close notifications; simulated push (iOS). |
+| `native-set-orientation`, `native-set-location` | Rotate; simulated GPS position. |
+| `native-biometrics` | Simulated Face ID / Touch ID / fingerprint (`match`, `nonMatch`, `enroll`, `unenroll`). |
+| `native-map-flutter-rect` | Flutter bounds → native screenshot pixels (needs `-i`/`--uri`). |

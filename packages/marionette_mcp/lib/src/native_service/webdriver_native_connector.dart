@@ -34,8 +34,16 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   final bool _ownsBootstrap;
   bool _disposed = false;
 
+  /// Whether [dispose] deletes the session. A subclass turns it off when
+  /// deleting would stop a server another process owns.
+  bool get deletesSessionOnDispose => true;
+
   /// Starts the server through [bootstrap], opens a session with
   /// [capabilities] and hands both to [create].
+  ///
+  /// With [sessionId], that session is reused while the server still has it
+  /// (the CLI keeps one session across its commands,
+  /// docs/native-lane-decisions.md#d4); otherwise a new one is opened.
   ///
   /// When opening the session fails, the client is closed and — if
   /// [ownsBootstrap] — the bootstrap disposed before the error propagates.
@@ -45,16 +53,33 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     required bool ownsBootstrap,
     required Map<String, dynamic> capabilities,
     required C Function(WebDriverClient client, String sessionId) create,
+    String? sessionId,
   }) async {
     final baseUri = await bootstrap.ensureServerReady();
     final client = WebDriverClient(baseUri.toString());
     try {
-      final sessionId = await client.createSession(capabilities: capabilities);
-      return create(client, sessionId);
+      final id = sessionId != null && await _sessionAlive(client, sessionId)
+          ? sessionId
+          : await client.createSession(capabilities: capabilities);
+      return create(client, id);
     } catch (_) {
       client.close();
       if (ownsBootstrap) await bootstrap.dispose();
       rethrow;
+    }
+  }
+
+  /// Whether the server still has session [sessionId] — read through a
+  /// cheap call both servers support.
+  static Future<bool> _sessionAlive(
+    WebDriverClient client,
+    String sessionId,
+  ) async {
+    try {
+      await client.getOrientation(sessionId);
+      return true;
+    } on WebDriverException {
+      return false;
     }
   }
 
@@ -302,14 +327,23 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   Future<bool> isServerResponding() =>
       client.status().timeout(serverResponseTimeout, onTimeout: () => false);
 
-  /// Deletes the session, closes the client and — when owned — disposes the
-  /// bootstrap. Idempotent.
+  /// Closes the client but keeps the session and the server, for a later
+  /// process to reuse them through `openSession(sessionId: …)` — the CLI
+  /// (docs/native-lane-decisions.md#d4). Afterwards [dispose] does nothing.
+  void release() {
+    if (_disposed) return;
+    _disposed = true;
+    client.close();
+  }
+
+  /// Deletes the session (see [deletesSessionOnDispose]), closes the client
+  /// and — when owned — disposes the bootstrap. Idempotent.
   @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
     try {
-      await client.deleteSession(sessionId);
+      if (deletesSessionOnDispose) await client.deleteSession(sessionId);
     } catch (_) {
       // Continue teardown when the server/session has already disappeared.
     } finally {

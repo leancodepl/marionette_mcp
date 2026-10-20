@@ -217,6 +217,37 @@ void main() {
       );
 
       test(
+        'without a reported udid, reuses WDA whose runner runs in the '
+        'simulator (WDA 16)',
+        () async {
+          wda.onValue('GET', '/wda/device/info', {'uuid': 'APP-VENDOR-ID'});
+          runner
+            ..on(
+              'xcrun',
+              ['simctl', 'spawn', 'SIM-A', 'launchctl', 'list'],
+              result: ok(
+                '43645\t0\tUIKitApplication:'
+                'com.facebook.WebDriverAgentRunner.xctrunner[a55b][rb-legacy]\n',
+              ),
+            )
+            ..on(
+              'xcrun',
+              ['simctl', 'spawn', 'SIM-B', 'launchctl', 'list'],
+              result: ok('-\t0\tcom.apple.Preferences\n'),
+            );
+
+          final uri = await bootstrap(udid: 'SIM-A', port: wda.port)
+              .ensureServerReady();
+          expect(uri.port, wda.port);
+          await expectLater(
+            bootstrap(udid: 'SIM-B', port: wda.port).ensureServerReady(),
+            failsWith(IosBootstrapFailure.portConflict, 'SIM-B'),
+          );
+        },
+        skip: !Platform.isMacOS ? _macOnly : false,
+      );
+
+      test(
         'throws portConflict when WDA on the port serves another simulator',
         () async {
           await expectLater(
@@ -227,6 +258,77 @@ void main() {
         skip: !Platform.isMacOS ? _macOnly : false,
       );
     });
+
+    test(
+      'a port taken by another program fails fast with portConflict',
+      () async {
+        await File('${cacheDir.path}/WDA.xctestrun').create();
+
+        await expectLater(
+          IosBootstrap(
+            udid: 'SIM-A',
+            processRunner: runner.call,
+            processStarter: (_, __) => throw StateError('must not launch'),
+            cacheDir: cacheDir,
+            wdaLocalPort: 18199,
+            isPortFree: (_) async => false,
+          ).ensureServerReady(),
+          throwsA(
+            isA<IosBootstrapException>()
+                .having((e) => e.failure, 'failure',
+                    IosBootstrapFailure.portConflict)
+                .having((e) => e.hint, 'hint', contains('lsof')),
+          ),
+        );
+      },
+      skip: !Platform.isMacOS ? _macOnly : false,
+    );
+
+    test(
+      'detached: starts xcodebuild detached and reports its pid (D4)',
+      () async {
+        final wda = await FakeWebDriverServer.start();
+        addTearDown(wda.close);
+        var started = false;
+        // Healthy only once xcodebuild has been started.
+        wda.on(
+          'GET',
+          '/status',
+          (_) => started
+              ? const FakeResponse.value({'ready': true})
+              : const FakeResponse.error('unknown error', 'starting'),
+        );
+        await File('${cacheDir.path}/WDA.xctestrun').create();
+        final launches = <List<String>>[];
+
+        final subject = IosBootstrap(
+          udid: 'SIM-A',
+          processRunner: runner.call,
+          processStarter: (_, __) =>
+              throw StateError('a held process must not be started'),
+          cacheDir: cacheDir,
+          wdaLocalPort: wda.port,
+          readyTimeout: const Duration(seconds: 2),
+          pollInterval: const Duration(milliseconds: 50),
+          // The fake WDA listens before it is "started".
+          isPortFree: (_) async => true,
+          detached: true,
+          detachedProcessStarter: (executable, arguments) async {
+            launches.add([executable, ...arguments]);
+            started = true;
+            return _FakeProcess(4242);
+          },
+        );
+
+        final uri = await subject.ensureServerReady();
+
+        expect(uri.port, wda.port);
+        expect(
+            launches.single.take(2), ['xcodebuild', 'test-without-building']);
+        expect(subject.detachedPid, 4242);
+      },
+      skip: !Platform.isMacOS ? _macOnly : false,
+    );
 
     test(
       'simctl launch failure throws launch with the XCTest hint',
@@ -258,4 +360,15 @@ void main() {
       skip: !Platform.isMacOS ? _macOnly : false,
     );
   });
+}
+
+/// A started process of which only the pid is used.
+class _FakeProcess implements Process {
+  _FakeProcess(this.pid);
+
+  @override
+  final int pid;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

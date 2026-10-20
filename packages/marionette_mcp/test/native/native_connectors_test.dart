@@ -101,6 +101,70 @@ void main() {
       );
     });
 
+    test(
+        'a session on a server another process started is not deleted '
+        '(D10)', () async {
+      final shared = _SharedBootstrap(server.baseUrl, startedServer: false);
+      final connector = await AndroidNativeConnector.connect(
+        bootstrap: shared,
+        adb: AdbClient(serial: 'emulator-5554', processRunner: runner.call),
+      );
+
+      await connector.dispose();
+
+      expect(server.requestsTo('DELETE', '/session/sess-1'), isEmpty);
+    });
+
+    test('a session on a server this bootstrap started is deleted', () async {
+      final own = _SharedBootstrap(server.baseUrl, startedServer: true);
+      final connector = await AndroidNativeConnector.connect(
+        bootstrap: own,
+        adb: AdbClient(serial: 'emulator-5554', processRunner: runner.call),
+      );
+
+      await connector.dispose();
+
+      expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
+    });
+
+    group('reusing a session (D4)', () {
+      Future<AndroidNativeConnector> connectTo(String sessionId) =>
+          AndroidNativeConnector.connect(
+            bootstrap: bootstrap,
+            adb: AdbClient(serial: 'emulator-5554', processRunner: runner.call),
+            sessionId: sessionId,
+          );
+
+      test('a live session is reused without a new session or settings',
+          () async {
+        server.onValue('GET', '/session/kept/orientation', 'PORTRAIT');
+
+        final connector = await connectTo('kept');
+        connector.release();
+
+        expect(connector.sessionId, 'kept');
+        expect(server.requestsTo('POST', '/session'), isEmpty);
+        expect(
+          server.requestsTo('POST', '/session/kept/appium/settings'),
+          isEmpty,
+        );
+        expect(server.requestsTo('DELETE', '/session/kept'), isEmpty,
+            reason: 'release keeps the session');
+      });
+
+      test('a session the server no longer has is replaced', () async {
+        final connector = await connectTo('gone');
+        addTearDown(connector.dispose);
+
+        expect(connector.sessionId, 'sess-1');
+        expect(server.requestsTo('POST', '/session'), hasLength(1));
+        expect(
+          server.requestsTo('POST', '/session/sess-1/appium/settings'),
+          hasLength(1),
+        );
+      });
+    });
+
     group('while a toast is shown (D19)', () {
       const toastError = FakeResponse.error(
         'unknown error',
@@ -1143,4 +1207,13 @@ String _pngHeader(int width, int height) {
     ...uint32(height),
     8, 6, 0, 0, 0, 0, 0, 0, 0, // rest of IHDR + CRC (unchecked)
   ]);
+}
+
+/// A bootstrap that reports whether it started the server.
+class _SharedBootstrap extends FakeServerBootstrap
+    implements SharedServerBootstrap {
+  _SharedBootstrap(super.baseUrl, {required this.startedServer});
+
+  @override
+  final bool startedServer;
 }

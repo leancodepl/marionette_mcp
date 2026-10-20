@@ -55,6 +55,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     String? udid,
     NativeServerBootstrap? bootstrap,
     Map<String, dynamic>? capabilities,
+    String? sessionId,
   }) async {
     final ownsBootstrap = bootstrap == null;
     final resolvedBootstrap = bootstrap ?? IosBootstrap(udid: udid);
@@ -63,9 +64,10 @@ final class IosNativeConnector extends WebDriverNativeConnector {
       bootstrap: resolvedBootstrap,
       ownsBootstrap: ownsBootstrap,
       capabilities: capabilities ?? const {'platformName': 'iOS'},
-      create: (client, sessionId) => IosNativeConnector._(
+      sessionId: sessionId,
+      create: (client, id) => IosNativeConnector._(
         client: client,
-        sessionId: sessionId,
+        sessionId: id,
         bootstrap: resolvedBootstrap,
         ownsBootstrap: ownsBootstrap,
         udid: resolvedBootstrap is IosBootstrap
