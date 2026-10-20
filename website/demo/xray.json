@@ -1,0 +1,944 @@
+{
+  "screen": "Custom Widgets (example app, /settings/custom-widgets)",
+  "screenshot": "screen.webp",
+  "logicalWidth": 411.43,
+  "logicalHeight": 914.29,
+  "imageWidth": 900,
+  "imageHeight": 2000,
+  "imageScale": 2.1875,
+  "note": "Bounds are logical pixels; multiply by imageScale for screenshot pixels. The screenshot is Flutter-rendered (take_screenshots), so it has no system status bar.",
+  "compact": {
+    "header": "Found 46 interactive element(s):",
+    "count": 46,
+    "elements": [
+      {
+        "type": "Text",
+        "key": "last_action",
+        "text": "Last action: none",
+        "bounds": {
+          "x": 16,
+          "y": 96,
+          "width": 379,
+          "height": 24
+        },
+        "raw": "Type: Text, Key: \"last_action\", Text: \"Last action: none\", bounds: {\"x\":16,\"y\":96,\"width\":379,\"height\":24}"
+      },
+      {
+        "type": "Text",
+        "text": "Design system",
+        "bounds": {
+          "x": 16,
+          "y": 136,
+          "width": 379,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Design system\", bounds: {\"x\":16,\"y\":136,\"width\":379,\"height\":20}"
+      },
+      {
+        "type": "DsPrimaryButton",
+        "key": "ds_primary_button",
+        "bounds": {
+          "x": 16,
+          "y": 164,
+          "width": 90,
+          "height": 44
+        },
+        "raw": "Type: DsPrimaryButton, Key: \"ds_primary_button\", bounds: {\"x\":16,\"y\":164,\"width\":90,\"height\":44}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 16,
+          "y": 164,
+          "width": 90,
+          "height": 44
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":16,\"y\":164,\"width\":90,\"height\":44}"
+      },
+      {
+        "type": "Text",
+        "text": "Primary",
+        "bounds": {
+          "x": 36,
+          "y": 176,
+          "width": 50,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Primary\", bounds: {\"x\":36,\"y\":176,\"width\":50,\"height\":20}"
+      },
+      {
+        "type": "DsSecondaryButton",
+        "key": "ds_secondary_button",
+        "bounds": {
+          "x": 114,
+          "y": 164,
+          "width": 108,
+          "height": 44
+        },
+        "raw": "Type: DsSecondaryButton, Key: \"ds_secondary_button\", bounds: {\"x\":114,\"y\":164,\"width\":108,\"height\":44}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 114,
+          "y": 164,
+          "width": 108,
+          "height": 44
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":114,\"y\":164,\"width\":108,\"height\":44}"
+      },
+      {
+        "type": "Text",
+        "text": "Secondary",
+        "bounds": {
+          "x": 134,
+          "y": 176,
+          "width": 68,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Secondary\", bounds: {\"x\":134,\"y\":176,\"width\":68,\"height\":20}"
+      },
+      {
+        "type": "DsSelect<String>",
+        "key": "ds_size_select",
+        "text": "Size: Medium",
+        "bounds": {
+          "x": 16,
+          "y": 216,
+          "width": 131,
+          "height": 38
+        },
+        "raw": "Type: DsSelect<String>, Key: \"ds_size_select\", Text: \"Size: Medium\", bounds: {\"x\":16,\"y\":216,\"width\":131,\"height\":38}"
+      },
+      {
+        "type": "DsSelect<int>",
+        "key": "ds_quantity_select",
+        "text": "Quantity: 1",
+        "bounds": {
+          "x": 155,
+          "y": 216,
+          "width": 113,
+          "height": 38
+        },
+        "raw": "Type: DsSelect<int>, Key: \"ds_quantity_select\", Text: \"Quantity: 1\", bounds: {\"x\":155,\"y\":216,\"width\":113,\"height\":38}"
+      },
+      {
+        "type": "DsTile",
+        "bounds": {
+          "x": 16,
+          "y": 254,
+          "width": 379,
+          "height": 48
+        },
+        "raw": "Type: DsTile, bounds: {\"x\":16,\"y\":254,\"width\":379,\"height\":48}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 16,
+          "y": 254,
+          "width": 379,
+          "height": 48
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":16,\"y\":254,\"width\":379,\"height\":48}"
+      },
+      {
+        "type": "Text",
+        "text": "Tappable tile",
+        "bounds": {
+          "x": 16,
+          "y": 268,
+          "width": 355,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Tappable tile\", bounds: {\"x\":16,\"y\":268,\"width\":355,\"height\":20}"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "bounds": {
+          "x": 371,
+          "y": 266,
+          "width": 24,
+          "height": 24
+        },
+        "raw": "Type: RichText, Text: \"\", bounds: {\"x\":371,\"y\":266,\"width\":24,\"height\":24}"
+      },
+      {
+        "type": "Text",
+        "text": "Static tile",
+        "bounds": {
+          "x": 16,
+          "y": 314,
+          "width": 379,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Static tile\", bounds: {\"x\":16,\"y\":314,\"width\":379,\"height\":20}"
+      },
+      {
+        "type": "Text",
+        "text": "Built-in generic widgets",
+        "bounds": {
+          "x": 16,
+          "y": 362,
+          "width": 379,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Built-in generic widgets\", bounds: {\"x\":16,\"y\":362,\"width\":379,\"height\":20}"
+      },
+      {
+        "type": "DropdownButton<String>",
+        "key": "fruit_dropdown",
+        "bounds": {
+          "x": 16,
+          "y": 382,
+          "width": 79,
+          "height": 48
+        },
+        "raw": "Type: DropdownButton<String>, Key: \"fruit_dropdown\", bounds: {\"x\":16,\"y\":382,\"width\":79,\"height\":48}"
+      },
+      {
+        "type": "InkWell",
+        "bounds": {
+          "x": 16,
+          "y": 382,
+          "width": 79,
+          "height": 48
+        },
+        "raw": "Type: InkWell, bounds: {\"x\":16,\"y\":382,\"width\":79,\"height\":48}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 16,
+          "y": 382,
+          "width": 79,
+          "height": 48
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":16,\"y\":382,\"width\":79,\"height\":48}"
+      },
+      {
+        "type": "Text",
+        "text": "Apple",
+        "bounds": {
+          "x": 16,
+          "y": 394,
+          "width": 42,
+          "height": 24
+        },
+        "raw": "Type: Text, Text: \"Apple\", bounds: {\"x\":16,\"y\":394,\"width\":42,\"height\":24}"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "bounds": {
+          "x": 71,
+          "y": 394,
+          "width": 24,
+          "height": 24
+        },
+        "raw": "Type: RichText, Text: \"\", bounds: {\"x\":71,\"y\":394,\"width\":24,\"height\":24}"
+      },
+      {
+        "type": "PopupMenuButton<String>",
+        "key": "actions_menu",
+        "bounds": {
+          "x": 330,
+          "y": 388,
+          "width": 65,
+          "height": 36
+        },
+        "raw": "Type: PopupMenuButton<String>, Key: \"actions_menu\", bounds: {\"x\":330,\"y\":388,\"width\":65,\"height\":36}"
+      },
+      {
+        "type": "InkWell",
+        "bounds": {
+          "x": 330,
+          "y": 388,
+          "width": 65,
+          "height": 36
+        },
+        "raw": "Type: InkWell, bounds: {\"x\":330,\"y\":388,\"width\":65,\"height\":36}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 330,
+          "y": 388,
+          "width": 65,
+          "height": 36
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":330,\"y\":388,\"width\":65,\"height\":36}"
+      },
+      {
+        "type": "Text",
+        "text": "Actions",
+        "bounds": {
+          "x": 338,
+          "y": 396,
+          "width": 49,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Actions\", bounds: {\"x\":338,\"y\":396,\"width\":49,\"height\":20}"
+      },
+      {
+        "type": "Radio<int>",
+        "key": "radio_1",
+        "bounds": {
+          "x": 16,
+          "y": 430,
+          "width": 48,
+          "height": 48
+        },
+        "raw": "Type: Radio<int>, Key: \"radio_1\", bounds: {\"x\":16,\"y\":430,\"width\":48,\"height\":48}"
+      },
+      {
+        "type": "Text",
+        "text": "One",
+        "bounds": {
+          "x": 64,
+          "y": 444,
+          "width": 26,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"One\", bounds: {\"x\":64,\"y\":444,\"width\":26,\"height\":20}"
+      },
+      {
+        "type": "Radio<int>",
+        "key": "radio_2",
+        "bounds": {
+          "x": 90,
+          "y": 430,
+          "width": 48,
+          "height": 48
+        },
+        "raw": "Type: Radio<int>, Key: \"radio_2\", bounds: {\"x\":90,\"y\":430,\"width\":48,\"height\":48}"
+      },
+      {
+        "type": "Text",
+        "text": "Two",
+        "bounds": {
+          "x": 138,
+          "y": 444,
+          "width": 27,
+          "height": 20
+        },
+        "raw": "Type: Text, Text: \"Two\", bounds: {\"x\":138,\"y\":444,\"width\":27,\"height\":20}"
+      },
+      {
+        "type": "RadioListTile<int>",
+        "key": "radio_tile_3",
+        "bounds": {
+          "x": 16,
+          "y": 478,
+          "width": 379,
+          "height": 56
+        },
+        "raw": "Type: RadioListTile<int>, Key: \"radio_tile_3\", bounds: {\"x\":16,\"y\":478,\"width\":379,\"height\":56}"
+      },
+      {
+        "type": "InkWell",
+        "bounds": {
+          "x": 16,
+          "y": 478,
+          "width": 379,
+          "height": 56
+        },
+        "raw": "Type: InkWell, bounds: {\"x\":16,\"y\":478,\"width\":379,\"height\":56}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 16,
+          "y": 478,
+          "width": 379,
+          "height": 56
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":16,\"y\":478,\"width\":379,\"height\":56}"
+      },
+      {
+        "type": "Radio<int>",
+        "bounds": {
+          "x": 32,
+          "y": 486,
+          "width": 40,
+          "height": 40
+        },
+        "raw": "Type: Radio<int>, bounds: {\"x\":32,\"y\":486,\"width\":40,\"height\":40}"
+      },
+      {
+        "type": "Text",
+        "text": "Three",
+        "bounds": {
+          "x": 88,
+          "y": 494,
+          "width": 283,
+          "height": 24
+        },
+        "raw": "Type: Text, Text: \"Three\", bounds: {\"x\":88,\"y\":494,\"width\":283,\"height\":24}"
+      },
+      {
+        "type": "ElevatedButton",
+        "key": "icon_button",
+        "properties": {
+          "enabled": "true"
+        },
+        "bounds": {
+          "x": 16,
+          "y": 534,
+          "width": 123,
+          "height": 48
+        },
+        "raw": "Type: ElevatedButton, Key: \"icon_button\", enabled: \"true\", bounds: {\"x\":16,\"y\":534,\"width\":123,\"height\":48}"
+      },
+      {
+        "type": "BackButton",
+        "bounds": {
+          "x": 4,
+          "y": 28,
+          "width": 48,
+          "height": 48
+        },
+        "raw": "Type: BackButton, bounds: {\"x\":4,\"y\":28,\"width\":48,\"height\":48}"
+      },
+      {
+        "type": "Text",
+        "text": "Custom Widgets",
+        "bounds": {
+          "x": 72,
+          "y": 38,
+          "width": 162,
+          "height": 28
+        },
+        "raw": "Type: Text, Text: \"Custom Widgets\", bounds: {\"x\":72,\"y\":38,\"width\":162,\"height\":28}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 0,
+          "y": 810,
+          "width": 137,
+          "height": 80
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":0,\"y\":810,\"width\":137,\"height\":80}"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "bounds": {
+          "x": 57,
+          "y": 828,
+          "width": 24,
+          "height": 24
+        },
+        "raw": "Type: RichText, Text: \"\", bounds: {\"x\":57,\"y\":828,\"width\":24,\"height\":24}"
+      },
+      {
+        "type": "Text",
+        "text": "Home",
+        "bounds": {
+          "x": 51,
+          "y": 860,
+          "width": 34,
+          "height": 16
+        },
+        "raw": "Type: Text, Text: \"Home\", bounds: {\"x\":51,\"y\":860,\"width\":34,\"height\":16}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 137,
+          "y": 810,
+          "width": 137,
+          "height": 80
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":137,\"y\":810,\"width\":137,\"height\":80}"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "bounds": {
+          "x": 194,
+          "y": 828,
+          "width": 24,
+          "height": 24
+        },
+        "raw": "Type: RichText, Text: \"\", bounds: {\"x\":194,\"y\":828,\"width\":24,\"height\":24}"
+      },
+      {
+        "type": "Text",
+        "text": "Profile",
+        "bounds": {
+          "x": 186,
+          "y": 860,
+          "width": 39,
+          "height": 16
+        },
+        "raw": "Type: Text, Text: \"Profile\", bounds: {\"x\":186,\"y\":860,\"width\":39,\"height\":16}"
+      },
+      {
+        "type": "GestureDetector",
+        "bounds": {
+          "x": 274,
+          "y": 810,
+          "width": 137,
+          "height": 80
+        },
+        "raw": "Type: GestureDetector, bounds: {\"x\":274,\"y\":810,\"width\":137,\"height\":80}"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "bounds": {
+          "x": 331,
+          "y": 828,
+          "width": 24,
+          "height": 24
+        },
+        "raw": "Type: RichText, Text: \"\", bounds: {\"x\":331,\"y\":828,\"width\":24,\"height\":24}"
+      },
+      {
+        "type": "Text",
+        "text": "Settings",
+        "bounds": {
+          "x": 319,
+          "y": 860,
+          "width": 48,
+          "height": 16
+        },
+        "raw": "Type: Text, Text: \"Settings\", bounds: {\"x\":319,\"y\":860,\"width\":48,\"height\":16}"
+      }
+    ]
+  },
+  "none": {
+    "header": "Found 46 interactive element(s):",
+    "count": 46,
+    "elements": [
+      {
+        "type": "Text",
+        "key": "last_action",
+        "text": "Last action: none",
+        "properties": {
+          "data": "Last action: none",
+          "inherit": "false",
+          "family": "Roboto",
+          "size": "16.0",
+          "letterSpacing": "0.15",
+          "baseline": "TextBaseline.alphabetic",
+          "height": "1.5",
+          "leadingDistribution": "TextLeadingDistribution.even"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Key: \"last_action\", Text: \"Last action: none\", data: \"Last action: none\", inherit: \"false\", family: \"Roboto\", size: \"16.0\", letterSpacing: \"0.15\", baseline: \"TextBaseline.alphabetic\", height: \"1.5\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":16.0,\"y\":96.0,\"width\":379.42857142857144,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Design system",
+        "properties": {
+          "data": "Design system",
+          "inherit": "false",
+          "family": "Roboto",
+          "size": "14.0",
+          "letterSpacing": "0.1",
+          "baseline": "TextBaseline.alphabetic",
+          "height": "1.43",
+          "leadingDistribution": "TextLeadingDistribution.even"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Design system\", data: \"Design system\", inherit: \"false\", family: \"Roboto\", size: \"14.0\", letterSpacing: \"0.1\", baseline: \"TextBaseline.alphabetic\", height: \"1.43\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":16.0,\"y\":136.0,\"width\":379.42857142857144,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "DsPrimaryButton",
+        "key": "ds_primary_button",
+        "bounds": null,
+        "raw": "Type: DsPrimaryButton, Key: \"ds_primary_button\", bounds: {\"x\":16.0,\"y\":164.0,\"width\":90.1142578125,\"height\":44.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":164.0,\"width\":90.1142578125,\"height\":44.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Primary",
+        "properties": {
+          "data": "Primary",
+          "inherit": "true"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Primary\", data: \"Primary\", inherit: \"true\", bounds: {\"x\":36.0,\"y\":176.0,\"width\":50.1142578125,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "DsSecondaryButton",
+        "key": "ds_secondary_button",
+        "bounds": null,
+        "raw": "Type: DsSecondaryButton, Key: \"ds_secondary_button\", bounds: {\"x\":114.1142578125,\"y\":164.0,\"width\":108.0322265625,\"height\":44.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":114.1142578125,\"y\":164.0,\"width\":108.0322265625,\"height\":44.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Secondary",
+        "properties": {
+          "data": "Secondary",
+          "inherit": "true"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Secondary\", data: \"Secondary\", inherit: \"true\", bounds: {\"x\":134.1142578125,\"y\":176.0,\"width\":68.0322265625,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "DsSelect<String>",
+        "key": "ds_size_select",
+        "text": "Size: Medium",
+        "bounds": null,
+        "raw": "Type: DsSelect<String>, Key: \"ds_size_select\", Text: \"Size: Medium\", bounds: {\"x\":16.0,\"y\":216.0,\"width\":130.78125,\"height\":38.0}, visible: true"
+      },
+      {
+        "type": "DsSelect<int>",
+        "key": "ds_quantity_select",
+        "text": "Quantity: 1",
+        "bounds": null,
+        "raw": "Type: DsSelect<int>, Key: \"ds_quantity_select\", Text: \"Quantity: 1\", bounds: {\"x\":154.78125,\"y\":216.0,\"width\":113.3662109375,\"height\":38.0}, visible: true"
+      },
+      {
+        "type": "DsTile",
+        "bounds": null,
+        "raw": "Type: DsTile, bounds: {\"x\":16.0,\"y\":254.0,\"width\":379.42857142857144,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":254.0,\"width\":379.42857142857144,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Tappable tile",
+        "properties": {
+          "data": "Tappable tile"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Tappable tile\", data: \"Tappable tile\", bounds: {\"x\":16.0,\"y\":268.0,\"width\":355.42857142857144,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "properties": {
+          "textAlign": "TextAlign.start",
+          "textDirection": "TextDirection.ltr",
+          "softWrap": "true",
+          "overflow": "TextOverflow.visible",
+          "textWidthBasis": "TextWidthBasis.parent"
+        },
+        "bounds": null,
+        "raw": "Type: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":371.42857142857144,\"y\":266.0,\"width\":24.0,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Static tile",
+        "properties": {
+          "data": "Static tile"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Static tile\", data: \"Static tile\", bounds: {\"x\":16.0,\"y\":314.0,\"width\":379.42857142857144,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Built-in generic widgets",
+        "properties": {
+          "data": "Built-in generic widgets",
+          "inherit": "false",
+          "family": "Roboto",
+          "size": "14.0",
+          "letterSpacing": "0.1",
+          "baseline": "TextBaseline.alphabetic",
+          "height": "1.43",
+          "leadingDistribution": "TextLeadingDistribution.even"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Built-in generic widgets\", data: \"Built-in generic widgets\", inherit: \"false\", family: \"Roboto\", size: \"14.0\", letterSpacing: \"0.1\", baseline: \"TextBaseline.alphabetic\", height: \"1.43\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":16.0,\"y\":362.0,\"width\":379.42857142857144,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "DropdownButton<String>",
+        "key": "fruit_dropdown",
+        "bounds": null,
+        "raw": "Type: DropdownButton<String>, Key: \"fruit_dropdown\", bounds: {\"x\":16.0,\"y\":382.0,\"width\":78.6890640258789,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "InkWell",
+        "bounds": null,
+        "raw": "Type: InkWell, bounds: {\"x\":16.0,\"y\":382.0,\"width\":78.6890640258789,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":382.0,\"width\":78.6890640258789,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Apple",
+        "properties": {
+          "data": "Apple"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Apple\", data: \"Apple\", bounds: {\"x\":16.0,\"y\":394.0,\"width\":41.85443115234375,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "properties": {
+          "textAlign": "TextAlign.start",
+          "textDirection": "TextDirection.ltr",
+          "softWrap": "true",
+          "overflow": "TextOverflow.visible",
+          "textWidthBasis": "TextWidthBasis.parent"
+        },
+        "bounds": null,
+        "raw": "Type: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":70.6890640258789,\"y\":394.0,\"width\":24.0,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "PopupMenuButton<String>",
+        "key": "actions_menu",
+        "bounds": null,
+        "raw": "Type: PopupMenuButton<String>, Key: \"actions_menu\", bounds: {\"x\":330.29185267857144,\"y\":388.0,\"width\":65.13671875,\"height\":36.0}, visible: true"
+      },
+      {
+        "type": "InkWell",
+        "bounds": null,
+        "raw": "Type: InkWell, bounds: {\"x\":330.29185267857144,\"y\":388.0,\"width\":65.13671875,\"height\":36.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":330.29185267857144,\"y\":388.0,\"width\":65.13671875,\"height\":36.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Actions",
+        "properties": {
+          "data": "Actions"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Actions\", data: \"Actions\", bounds: {\"x\":338.29185267857144,\"y\":396.0,\"width\":49.13671875,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "Radio<int>",
+        "key": "radio_1",
+        "bounds": null,
+        "raw": "Type: Radio<int>, Key: \"radio_1\", bounds: {\"x\":16.0,\"y\":430.0,\"width\":48.0,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "One",
+        "properties": {
+          "data": "One"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"One\", data: \"One\", bounds: {\"x\":64.0,\"y\":444.0,\"width\":25.537109375,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "Radio<int>",
+        "key": "radio_2",
+        "bounds": null,
+        "raw": "Type: Radio<int>, Key: \"radio_2\", bounds: {\"x\":89.537109375,\"y\":430.0,\"width\":48.0,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Two",
+        "properties": {
+          "data": "Two"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Two\", data: \"Two\", bounds: {\"x\":137.537109375,\"y\":444.0,\"width\":27.21875,\"height\":20.0}, visible: true"
+      },
+      {
+        "type": "RadioListTile<int>",
+        "key": "radio_tile_3",
+        "bounds": null,
+        "raw": "Type: RadioListTile<int>, Key: \"radio_tile_3\", bounds: {\"x\":16.0,\"y\":478.0,\"width\":379.42857142857144,\"height\":56.0}, visible: true"
+      },
+      {
+        "type": "InkWell",
+        "bounds": null,
+        "raw": "Type: InkWell, bounds: {\"x\":16.0,\"y\":478.0,\"width\":379.42857142857144,\"height\":56.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":478.0,\"width\":379.42857142857144,\"height\":56.0}, visible: true"
+      },
+      {
+        "type": "Radio<int>",
+        "bounds": null,
+        "raw": "Type: Radio<int>, bounds: {\"x\":32.0,\"y\":486.0,\"width\":40.0,\"height\":40.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Three",
+        "properties": {
+          "data": "Three"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Three\", data: \"Three\", bounds: {\"x\":88.0,\"y\":494.0,\"width\":283.42857142857144,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "ElevatedButton",
+        "key": "icon_button",
+        "properties": {
+          "enabled": "true"
+        },
+        "bounds": null,
+        "raw": "Type: ElevatedButton, Key: \"icon_button\", enabled: \"true\", bounds: {\"x\":16.0,\"y\":534.0,\"width\":123.26484298706055,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "BackButton",
+        "bounds": null,
+        "raw": "Type: BackButton, bounds: {\"x\":4.0,\"y\":28.0,\"width\":48.0,\"height\":48.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Custom Widgets",
+        "properties": {
+          "data": "Custom Widgets"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Custom Widgets\", data: \"Custom Widgets\", bounds: {\"x\":72.0,\"y\":38.0,\"width\":161.927734375,\"height\":28.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":0.0,\"y\":810.2857142857143,\"width\":137.14285714285714,\"height\":80.0}, visible: true"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "properties": {
+          "textAlign": "TextAlign.start",
+          "textDirection": "TextDirection.ltr",
+          "softWrap": "true",
+          "overflow": "TextOverflow.visible",
+          "textWidthBasis": "TextWidthBasis.parent"
+        },
+        "bounds": null,
+        "raw": "Type: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":56.57142857142857,\"y\":828.2857142857143,\"width\":24.0,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Home",
+        "properties": {
+          "data": "Home",
+          "inherit": "false",
+          "family": "Roboto",
+          "size": "12.0",
+          "letterSpacing": "0.5",
+          "baseline": "TextBaseline.alphabetic",
+          "height": "1.33",
+          "leadingDistribution": "TextLeadingDistribution.even"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Home\", data: \"Home\", inherit: \"false\", family: \"Roboto\", size: \"12.0\", letterSpacing: \"0.5\", baseline: \"TextBaseline.alphabetic\", height: \"1.33\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":51.46986607142857,\"y\":860.2857142857143,\"width\":34.203125,\"height\":16.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":137.14285714285714,\"y\":810.2857142857143,\"width\":137.14285714285714,\"height\":80.0}, visible: true"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "properties": {
+          "textAlign": "TextAlign.start",
+          "textDirection": "TextDirection.ltr",
+          "softWrap": "true",
+          "overflow": "TextOverflow.visible",
+          "textWidthBasis": "TextWidthBasis.parent"
+        },
+        "bounds": null,
+        "raw": "Type: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":193.71428571428572,\"y\":828.2857142857143,\"width\":24.0,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Profile",
+        "properties": {
+          "data": "Profile",
+          "inherit": "false",
+          "family": "Roboto",
+          "size": "12.0",
+          "letterSpacing": "0.5",
+          "baseline": "TextBaseline.alphabetic",
+          "height": "1.33",
+          "leadingDistribution": "TextLeadingDistribution.even"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Profile\", data: \"Profile\", inherit: \"false\", family: \"Roboto\", size: \"12.0\", letterSpacing: \"0.5\", baseline: \"TextBaseline.alphabetic\", height: \"1.33\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":186.29498182024275,\"y\":860.2857142857143,\"width\":38.83860778808594,\"height\":16.0}, visible: true"
+      },
+      {
+        "type": "GestureDetector",
+        "properties": {
+          "startBehavior": "DragStartBehavior.start"
+        },
+        "bounds": null,
+        "raw": "Type: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":274.2857142857143,\"y\":810.2857142857143,\"width\":137.14285714285714,\"height\":80.0}, visible: true"
+      },
+      {
+        "type": "RichText",
+        "text": "",
+        "properties": {
+          "textAlign": "TextAlign.start",
+          "textDirection": "TextDirection.ltr",
+          "softWrap": "true",
+          "overflow": "TextOverflow.visible",
+          "textWidthBasis": "TextWidthBasis.parent"
+        },
+        "bounds": null,
+        "raw": "Type: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":330.85714285714283,\"y\":828.2857142857143,\"width\":24.0,\"height\":24.0}, visible: true"
+      },
+      {
+        "type": "Text",
+        "text": "Settings",
+        "properties": {
+          "data": "Settings",
+          "inherit": "false",
+          "family": "Roboto",
+          "size": "12.0",
+          "letterSpacing": "0.5",
+          "baseline": "TextBaseline.alphabetic",
+          "height": "1.33",
+          "leadingDistribution": "TextLeadingDistribution.even"
+        },
+        "bounds": null,
+        "raw": "Type: Text, Text: \"Settings\", data: \"Settings\", inherit: \"false\", family: \"Roboto\", size: \"12.0\", letterSpacing: \"0.5\", baseline: \"TextBaseline.alphabetic\", height: \"1.33\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":318.65597098214283,\"y\":860.2857142857143,\"width\":48.40234375,\"height\":16.0}, visible: true"
+      }
+    ]
+  },
+  "compactRaw": "Found 46 interactive element(s):\n\nType: Text, Key: \"last_action\", Text: \"Last action: none\", bounds: {\"x\":16,\"y\":96,\"width\":379,\"height\":24}\nType: Text, Text: \"Design system\", bounds: {\"x\":16,\"y\":136,\"width\":379,\"height\":20}\nType: DsPrimaryButton, Key: \"ds_primary_button\", bounds: {\"x\":16,\"y\":164,\"width\":90,\"height\":44}\nType: GestureDetector, bounds: {\"x\":16,\"y\":164,\"width\":90,\"height\":44}\nType: Text, Text: \"Primary\", bounds: {\"x\":36,\"y\":176,\"width\":50,\"height\":20}\nType: DsSecondaryButton, Key: \"ds_secondary_button\", bounds: {\"x\":114,\"y\":164,\"width\":108,\"height\":44}\nType: GestureDetector, bounds: {\"x\":114,\"y\":164,\"width\":108,\"height\":44}\nType: Text, Text: \"Secondary\", bounds: {\"x\":134,\"y\":176,\"width\":68,\"height\":20}\nType: DsSelect<String>, Key: \"ds_size_select\", Text: \"Size: Medium\", bounds: {\"x\":16,\"y\":216,\"width\":131,\"height\":38}\nType: DsSelect<int>, Key: \"ds_quantity_select\", Text: \"Quantity: 1\", bounds: {\"x\":155,\"y\":216,\"width\":113,\"height\":38}\nType: DsTile, bounds: {\"x\":16,\"y\":254,\"width\":379,\"height\":48}\nType: GestureDetector, bounds: {\"x\":16,\"y\":254,\"width\":379,\"height\":48}\nType: Text, Text: \"Tappable tile\", bounds: {\"x\":16,\"y\":268,\"width\":355,\"height\":20}\nType: RichText, Text: \"\", bounds: {\"x\":371,\"y\":266,\"width\":24,\"height\":24}\nType: Text, Text: \"Static tile\", bounds: {\"x\":16,\"y\":314,\"width\":379,\"height\":20}\nType: Text, Text: \"Built-in generic widgets\", bounds: {\"x\":16,\"y\":362,\"width\":379,\"height\":20}\nType: DropdownButton<String>, Key: \"fruit_dropdown\", bounds: {\"x\":16,\"y\":382,\"width\":79,\"height\":48}\nType: InkWell, bounds: {\"x\":16,\"y\":382,\"width\":79,\"height\":48}\nType: GestureDetector, bounds: {\"x\":16,\"y\":382,\"width\":79,\"height\":48}\nType: Text, Text: \"Apple\", bounds: {\"x\":16,\"y\":394,\"width\":42,\"height\":24}\nType: RichText, Text: \"\", bounds: {\"x\":71,\"y\":394,\"width\":24,\"height\":24}\nType: PopupMenuButton<String>, Key: \"actions_menu\", bounds: {\"x\":330,\"y\":388,\"width\":65,\"height\":36}\nType: InkWell, bounds: {\"x\":330,\"y\":388,\"width\":65,\"height\":36}\nType: GestureDetector, bounds: {\"x\":330,\"y\":388,\"width\":65,\"height\":36}\nType: Text, Text: \"Actions\", bounds: {\"x\":338,\"y\":396,\"width\":49,\"height\":20}\nType: Radio<int>, Key: \"radio_1\", bounds: {\"x\":16,\"y\":430,\"width\":48,\"height\":48}\nType: Text, Text: \"One\", bounds: {\"x\":64,\"y\":444,\"width\":26,\"height\":20}\nType: Radio<int>, Key: \"radio_2\", bounds: {\"x\":90,\"y\":430,\"width\":48,\"height\":48}\nType: Text, Text: \"Two\", bounds: {\"x\":138,\"y\":444,\"width\":27,\"height\":20}\nType: RadioListTile<int>, Key: \"radio_tile_3\", bounds: {\"x\":16,\"y\":478,\"width\":379,\"height\":56}\nType: InkWell, bounds: {\"x\":16,\"y\":478,\"width\":379,\"height\":56}\nType: GestureDetector, bounds: {\"x\":16,\"y\":478,\"width\":379,\"height\":56}\nType: Radio<int>, bounds: {\"x\":32,\"y\":486,\"width\":40,\"height\":40}\nType: Text, Text: \"Three\", bounds: {\"x\":88,\"y\":494,\"width\":283,\"height\":24}\nType: ElevatedButton, Key: \"icon_button\", enabled: \"true\", bounds: {\"x\":16,\"y\":534,\"width\":123,\"height\":48}\nType: BackButton, bounds: {\"x\":4,\"y\":28,\"width\":48,\"height\":48}\nType: Text, Text: \"Custom Widgets\", bounds: {\"x\":72,\"y\":38,\"width\":162,\"height\":28}\nType: GestureDetector, bounds: {\"x\":0,\"y\":810,\"width\":137,\"height\":80}\nType: RichText, Text: \"\", bounds: {\"x\":57,\"y\":828,\"width\":24,\"height\":24}\nType: Text, Text: \"Home\", bounds: {\"x\":51,\"y\":860,\"width\":34,\"height\":16}\nType: GestureDetector, bounds: {\"x\":137,\"y\":810,\"width\":137,\"height\":80}\nType: RichText, Text: \"\", bounds: {\"x\":194,\"y\":828,\"width\":24,\"height\":24}\nType: Text, Text: \"Profile\", bounds: {\"x\":186,\"y\":860,\"width\":39,\"height\":16}\nType: GestureDetector, bounds: {\"x\":274,\"y\":810,\"width\":137,\"height\":80}\nType: RichText, Text: \"\", bounds: {\"x\":331,\"y\":828,\"width\":24,\"height\":24}\nType: Text, Text: \"Settings\", bounds: {\"x\":319,\"y\":860,\"width\":48,\"height\":16}\n",
+  "noneRaw": "Found 46 interactive element(s):\n\nType: Text, Key: \"last_action\", Text: \"Last action: none\", data: \"Last action: none\", inherit: \"false\", family: \"Roboto\", size: \"16.0\", letterSpacing: \"0.15\", baseline: \"TextBaseline.alphabetic\", height: \"1.5\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":16.0,\"y\":96.0,\"width\":379.42857142857144,\"height\":24.0}, visible: true\nType: Text, Text: \"Design system\", data: \"Design system\", inherit: \"false\", family: \"Roboto\", size: \"14.0\", letterSpacing: \"0.1\", baseline: \"TextBaseline.alphabetic\", height: \"1.43\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":16.0,\"y\":136.0,\"width\":379.42857142857144,\"height\":20.0}, visible: true\nType: DsPrimaryButton, Key: \"ds_primary_button\", bounds: {\"x\":16.0,\"y\":164.0,\"width\":90.1142578125,\"height\":44.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":164.0,\"width\":90.1142578125,\"height\":44.0}, visible: true\nType: Text, Text: \"Primary\", data: \"Primary\", inherit: \"true\", bounds: {\"x\":36.0,\"y\":176.0,\"width\":50.1142578125,\"height\":20.0}, visible: true\nType: DsSecondaryButton, Key: \"ds_secondary_button\", bounds: {\"x\":114.1142578125,\"y\":164.0,\"width\":108.0322265625,\"height\":44.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":114.1142578125,\"y\":164.0,\"width\":108.0322265625,\"height\":44.0}, visible: true\nType: Text, Text: \"Secondary\", data: \"Secondary\", inherit: \"true\", bounds: {\"x\":134.1142578125,\"y\":176.0,\"width\":68.0322265625,\"height\":20.0}, visible: true\nType: DsSelect<String>, Key: \"ds_size_select\", Text: \"Size: Medium\", bounds: {\"x\":16.0,\"y\":216.0,\"width\":130.78125,\"height\":38.0}, visible: true\nType: DsSelect<int>, Key: \"ds_quantity_select\", Text: \"Quantity: 1\", bounds: {\"x\":154.78125,\"y\":216.0,\"width\":113.3662109375,\"height\":38.0}, visible: true\nType: DsTile, bounds: {\"x\":16.0,\"y\":254.0,\"width\":379.42857142857144,\"height\":48.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":254.0,\"width\":379.42857142857144,\"height\":48.0}, visible: true\nType: Text, Text: \"Tappable tile\", data: \"Tappable tile\", bounds: {\"x\":16.0,\"y\":268.0,\"width\":355.42857142857144,\"height\":20.0}, visible: true\nType: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":371.42857142857144,\"y\":266.0,\"width\":24.0,\"height\":24.0}, visible: true\nType: Text, Text: \"Static tile\", data: \"Static tile\", bounds: {\"x\":16.0,\"y\":314.0,\"width\":379.42857142857144,\"height\":20.0}, visible: true\nType: Text, Text: \"Built-in generic widgets\", data: \"Built-in generic widgets\", inherit: \"false\", family: \"Roboto\", size: \"14.0\", letterSpacing: \"0.1\", baseline: \"TextBaseline.alphabetic\", height: \"1.43\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":16.0,\"y\":362.0,\"width\":379.42857142857144,\"height\":20.0}, visible: true\nType: DropdownButton<String>, Key: \"fruit_dropdown\", bounds: {\"x\":16.0,\"y\":382.0,\"width\":78.6890640258789,\"height\":48.0}, visible: true\nType: InkWell, bounds: {\"x\":16.0,\"y\":382.0,\"width\":78.6890640258789,\"height\":48.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":382.0,\"width\":78.6890640258789,\"height\":48.0}, visible: true\nType: Text, Text: \"Apple\", data: \"Apple\", bounds: {\"x\":16.0,\"y\":394.0,\"width\":41.85443115234375,\"height\":24.0}, visible: true\nType: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":70.6890640258789,\"y\":394.0,\"width\":24.0,\"height\":24.0}, visible: true\nType: PopupMenuButton<String>, Key: \"actions_menu\", bounds: {\"x\":330.29185267857144,\"y\":388.0,\"width\":65.13671875,\"height\":36.0}, visible: true\nType: InkWell, bounds: {\"x\":330.29185267857144,\"y\":388.0,\"width\":65.13671875,\"height\":36.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":330.29185267857144,\"y\":388.0,\"width\":65.13671875,\"height\":36.0}, visible: true\nType: Text, Text: \"Actions\", data: \"Actions\", bounds: {\"x\":338.29185267857144,\"y\":396.0,\"width\":49.13671875,\"height\":20.0}, visible: true\nType: Radio<int>, Key: \"radio_1\", bounds: {\"x\":16.0,\"y\":430.0,\"width\":48.0,\"height\":48.0}, visible: true\nType: Text, Text: \"One\", data: \"One\", bounds: {\"x\":64.0,\"y\":444.0,\"width\":25.537109375,\"height\":20.0}, visible: true\nType: Radio<int>, Key: \"radio_2\", bounds: {\"x\":89.537109375,\"y\":430.0,\"width\":48.0,\"height\":48.0}, visible: true\nType: Text, Text: \"Two\", data: \"Two\", bounds: {\"x\":137.537109375,\"y\":444.0,\"width\":27.21875,\"height\":20.0}, visible: true\nType: RadioListTile<int>, Key: \"radio_tile_3\", bounds: {\"x\":16.0,\"y\":478.0,\"width\":379.42857142857144,\"height\":56.0}, visible: true\nType: InkWell, bounds: {\"x\":16.0,\"y\":478.0,\"width\":379.42857142857144,\"height\":56.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":16.0,\"y\":478.0,\"width\":379.42857142857144,\"height\":56.0}, visible: true\nType: Radio<int>, bounds: {\"x\":32.0,\"y\":486.0,\"width\":40.0,\"height\":40.0}, visible: true\nType: Text, Text: \"Three\", data: \"Three\", bounds: {\"x\":88.0,\"y\":494.0,\"width\":283.42857142857144,\"height\":24.0}, visible: true\nType: ElevatedButton, Key: \"icon_button\", enabled: \"true\", bounds: {\"x\":16.0,\"y\":534.0,\"width\":123.26484298706055,\"height\":48.0}, visible: true\nType: BackButton, bounds: {\"x\":4.0,\"y\":28.0,\"width\":48.0,\"height\":48.0}, visible: true\nType: Text, Text: \"Custom Widgets\", data: \"Custom Widgets\", bounds: {\"x\":72.0,\"y\":38.0,\"width\":161.927734375,\"height\":28.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":0.0,\"y\":810.2857142857143,\"width\":137.14285714285714,\"height\":80.0}, visible: true\nType: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":56.57142857142857,\"y\":828.2857142857143,\"width\":24.0,\"height\":24.0}, visible: true\nType: Text, Text: \"Home\", data: \"Home\", inherit: \"false\", family: \"Roboto\", size: \"12.0\", letterSpacing: \"0.5\", baseline: \"TextBaseline.alphabetic\", height: \"1.33\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":51.46986607142857,\"y\":860.2857142857143,\"width\":34.203125,\"height\":16.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":137.14285714285714,\"y\":810.2857142857143,\"width\":137.14285714285714,\"height\":80.0}, visible: true\nType: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":193.71428571428572,\"y\":828.2857142857143,\"width\":24.0,\"height\":24.0}, visible: true\nType: Text, Text: \"Profile\", data: \"Profile\", inherit: \"false\", family: \"Roboto\", size: \"12.0\", letterSpacing: \"0.5\", baseline: \"TextBaseline.alphabetic\", height: \"1.33\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":186.29498182024275,\"y\":860.2857142857143,\"width\":38.83860778808594,\"height\":16.0}, visible: true\nType: GestureDetector, startBehavior: \"DragStartBehavior.start\", bounds: {\"x\":274.2857142857143,\"y\":810.2857142857143,\"width\":137.14285714285714,\"height\":80.0}, visible: true\nType: RichText, Text: \"\", textAlign: \"TextAlign.start\", textDirection: \"TextDirection.ltr\", softWrap: \"true\", overflow: \"TextOverflow.visible\", textWidthBasis: \"TextWidthBasis.parent\", bounds: {\"x\":330.85714285714283,\"y\":828.2857142857143,\"width\":24.0,\"height\":24.0}, visible: true\nType: Text, Text: \"Settings\", data: \"Settings\", inherit: \"false\", family: \"Roboto\", size: \"12.0\", letterSpacing: \"0.5\", baseline: \"TextBaseline.alphabetic\", height: \"1.33\", leadingDistribution: \"TextLeadingDistribution.even\", bounds: {\"x\":318.65597098214283,\"y\":860.2857142857143,\"width\":48.40234375,\"height\":16.0}, visible: true\n",
+  "compactChars": 3751,
+  "noneChars": 8113
+}

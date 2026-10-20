@@ -1,0 +1,38 @@
+name: marionette_website
+description: The Marionette landing page and docs, a statically generated Jaspr site.
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  jaspr: ^0.23.4
+  jaspr_class_scope: ^0.1.1
+  jaspr_router: ^0.9.0
+  syntax_highlight_lite: ^0.0.1
+  universal_web: ^1.1.0
+
+dev_dependencies:
+  # The analyzer override below hides analyzer requirements from pub, so
+  # every build-time package that compiles against analyzer is capped at its
+  # last release for analyzer 12; newer ones fail to compile. pubspec.lock is
+  # committed for the same reason. Lift all of it with the next jaspr release.
+  build_runner: '>=2.10.0 <2.15.2'
+  build_web_compilers: '>=4.8.5 <4.8.6'
+  dart_style: '>=3.1.8 <3.1.9'
+  image: ^4.9.2
+  jaspr_builder: ^0.23.4
+  jaspr_class_scope_builder: ^0.1.0
+  leancode_lint: ^27.0.0
+  path: ^1.9.0
+  puppeteer: ^3.26.0
+  test: '>=1.31.1 <1.31.2'
+
+dependency_overrides:
+  # jaspr_builder 0.23 needs analyzer 12 and does not compile against newer
+  # ones; leancode_lint wants 13+, but only its analysis_options.yaml is
+  # consumed here (its plugin is resolved separately by the analysis server).
+  analyzer: ^12.1.0
+
+jaspr:
+  mode: static

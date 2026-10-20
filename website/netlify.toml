@@ -1,0 +1,8 @@
+# Netlify builds this site from the marionette_mcp repository through its
+# GitHub App. The project's base directory is `website`, set in the Netlify UI,
+# so every path here is relative to it.
+
+[build]
+  command = "bash tool/netlify_build.sh"
+  publish = "build/jaspr"
+  ignore = "bash ./tool/netlify_ignore.sh"
