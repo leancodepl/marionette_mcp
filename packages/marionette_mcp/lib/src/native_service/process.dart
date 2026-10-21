@@ -57,14 +57,26 @@ void checkProcessResult(
   );
 }
 
-/// Whether local [port] can be bound on the loopback interface — free for a
-/// server to listen on.
+/// Whether local [port] is free for a server on the loopback interface: it
+/// can be bound, and nothing answers a connection to it. Binding alone is not
+/// enough — on macOS 127.0.0.1 can be bound while a dual-stack listener
+/// (IPv6 `*`, e.g. `python3 -m http.server`) takes its connections.
 Future<bool> canBindLoopbackPort(int port) async {
   try {
     final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
     await socket.close();
-    return true;
   } on SocketException {
     return false;
+  }
+  try {
+    final client = await Socket.connect(
+      InternetAddress.loopbackIPv4,
+      port,
+      timeout: const Duration(milliseconds: 500),
+    );
+    client.destroy();
+    return false;
+  } on SocketException {
+    return true;
   }
 }

@@ -56,7 +56,7 @@ class AndroidBootstrap implements SharedServerBootstrap {
         _cacheDir = cacheDir ?? _defaultCacheDir(),
         _explicitLocalPort = localPort,
         _environment = environment ?? Platform.environment,
-        _isPortFree = isPortFree ?? _canBind,
+        _isPortFree = isPortFree ?? canBindLoopbackPort,
         _apkSha256 = apkSha256 ?? pinnedApkSha256,
         _startDetached = detachedProcessStarter ?? _startDetachedProcess;
 
@@ -480,17 +480,6 @@ class AndroidBootstrap implements SharedServerBootstrap {
 
   static Future<String> _sha256Of(File file) async =>
       sha256.convert(await file.readAsBytes()).toString();
-
-  static Future<bool> _canBind(int port) async {
-    try {
-      final socket =
-          await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
-      await socket.close();
-      return true;
-    } on SocketException {
-      return false;
-    }
-  }
 
   /// Directory the UIAutomator2 APKs are downloaded to when no cache
   /// directory is given.

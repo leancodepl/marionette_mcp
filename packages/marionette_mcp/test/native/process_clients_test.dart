@@ -8,6 +8,30 @@ import 'package:test/test.dart';
 import 'support/fake_process_runner.dart';
 
 void main() {
+  group('canBindLoopbackPort', () {
+    test('a port nobody uses is free', () async {
+      final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = socket.port;
+      await socket.close();
+
+      expect(await canBindLoopbackPort(port), isTrue);
+    });
+
+    test('a port a dual-stack server listens on is taken', () async {
+      // Seen on macOS: 127.0.0.1 could be bound while `python3 -m
+      // http.server 8100` (IPv6 *) listened, so 8100 was reported free.
+      final server = await ServerSocket.bind(
+        InternetAddress.anyIPv6,
+        0,
+        v6Only: false,
+      );
+      addTearDown(server.close);
+      server.listen((client) => client.destroy());
+
+      expect(await canBindLoopbackPort(server.port), isFalse);
+    });
+  });
+
   group('processMessage', () {
     test('prefers stderr, then stdout, then exit code', () {
       expect(processMessage(failed(stderr: ' boom ', stdout: 'out')), 'boom');

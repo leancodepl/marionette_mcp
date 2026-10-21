@@ -43,7 +43,7 @@ class NativeDoctor {
         _uia2CacheDir = uia2CacheDir ?? AndroidBootstrap.defaultCacheDir,
         _wdaCacheDir = wdaCacheDir ?? defaultWdaCacheDir,
         _isServerRunning = isServerRunning ?? _serverAnswers,
-        _isPortFree = isPortFree ?? _canBind;
+        _isPortFree = isPortFree ?? canBindLoopbackPort;
 
   final NativeSessionRegistry _registry;
   final ProcessRunner _run;
@@ -348,17 +348,6 @@ class NativeDoctor {
                     'native-disconnect to forget it.',
               ),
     ];
-  }
-
-  static Future<bool> _canBind(int port) async {
-    try {
-      final socket =
-          await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
-      await socket.close();
-      return true;
-    } on SocketException {
-      return false;
-    }
   }
 
   static Future<bool> _serverAnswers(String baseUrl) async {

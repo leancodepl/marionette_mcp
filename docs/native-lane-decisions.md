@@ -507,6 +507,10 @@ The iOS bootstrap has the same fast path as Android — a healthy WebDriverAgent
 - **Two clients on one Android device:** UIAutomator2 has a single session, so they take it from each other. A CLI command opens a new session ([D4](#d4)); the MCP server's recovery first failed here — it restarted its server and the old instrumentation's stop killed the new one — and since unit 10 opens a new session on the same server instead ([D3](#d3), follow-up). Both now keep working, but an action of one client can be interrupted when the other takes the session at that moment, so one client per Android device remains the recommendation; `native-connect` warns when it reuses another process's server.
 - Unit tests: a session on a shared server is not deleted on dispose, one on an own server is; `native-disconnect` of a reused server sends no `DELETE`.
 
+### Follow-up (acceptance tests, 2026-10-21): a port taken by a dual-stack listener
+
+Whether a local port is free was checked by binding it on 127.0.0.1. On macOS that bind succeeds while a dual-stack listener — IPv6 `*`, as `python3 -m http.server 8100` opens — owns the port and takes the connections to 127.0.0.1. `marionette doctor` then reported nothing with port 8100 taken, and an iOS connect would have started WebDriverAgent and waited for it until the timeout instead of failing at once with `portConflict`; the Android port choice had the same blind spot. The check (`canBindLoopbackPort`, now shared by the iOS and Android bootstraps and the doctor) also tries to connect to 127.0.0.1 and counts the port as free only when nothing answers. Unit test: a port a dual-stack server listens on is taken (on macOS the old check said free); a port nobody uses is free. Live on macOS with `python3 -m http.server 8100`: the doctor reports the port with the `lsof` fix (exit 1), MCP `native_connect` on iOS fails at once with `portConflict`; without it, both platforms connect as before.
+
 ---
 
 <a id="d11"></a>
