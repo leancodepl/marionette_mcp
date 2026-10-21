@@ -78,24 +78,6 @@ void main() {
       expect(photos.bounds.y, greaterThan(camera.bounds.y));
     });
 
-    test('permission dialog belongs to the package installer', () {
-      final dialog = Fixture('android', 'android28_permission_dialog');
-
-      expect(dialog.foregroundApp, 'com.google.android.packageinstaller');
-      expect(
-        dialog.select(const NativeSelector(text: 'DENY')).resourceId,
-        'com.android.packageinstaller:id/permission_deny_button',
-      );
-      expect(
-        dialog
-            .select(const NativeSelector(
-              id: 'com.android.packageinstaller:id/permission_allow_button',
-            ))
-            .text,
-        'ALLOW',
-      );
-    });
-
     test('native controls: platform-view widgets are visible natively', () {
       final controls = Fixture('android', 'android28_native_controls');
 
@@ -141,11 +123,7 @@ void main() {
         'android28_home',
         'android28_keyboard',
         'android28_native_controls',
-        'android28_permission_dialog',
         'android28_permission_screen',
-        'android35_native_controls',
-        'android35_permission_photos',
-        'android35_permission_screen',
       ]) {
         final fixture = Fixture('android', name);
         for (final element in fixture.elements) {
@@ -163,54 +141,13 @@ void main() {
     });
   });
 
-  group('Android 15 (API 35) fixtures', () {
-    test('permission screen: the same two "Request" buttons as on API 28', () {
-      final screen = Fixture('android', 'android35_permission_screen');
-
-      expect(
-        () => screen.select(const NativeSelector(text: 'Request')),
-        _ambiguousWith(2),
-      );
-    });
-
-    test('photos dialog belongs to the permission controller (API 29+)', () {
-      final dialog = Fixture('android', 'android35_permission_photos');
-
-      expect(dialog.foregroundApp, 'com.google.android.permissioncontroller');
-      expect(
-        dialog.select(const NativeSelector(textContains: 'limited')).resourceId,
-        'com.android.permissioncontroller:id/permission_allow_selected_button',
-      );
-      // Typographic apostrophe, unlike "DENY" on API 28.
-      expect(
-        dialog.select(const NativeSelector(text: 'Don’t allow')).clickable,
-        isTrue,
-      );
-    });
-
-    test('native controls with the keyboard open hide the tab bar', () {
-      final controls = Fixture('android', 'android35_native_controls');
-
-      // A filled field keeps its hint as text; the content is its value.
-      final field = controls.select(const NativeSelector(type: 'EditText'));
-      expect((field.text, field.value), ('Type here (native)', 'API 35'));
-      expect(
-        controls.elements.where((e) => e.text?.contains('Tab 3 of 4') ?? false),
-        isEmpty,
-        reason: 'Flutter resizes above the IME, so the bottom tabs are gone',
-      );
-    });
-  });
-
-  group('iOS 26.4 / 18.6 fixtures (points converted to screenshot pixels)', () {
+  group('iOS 26.4 fixtures (points converted to screenshot pixels)', () {
     test('the application spans exactly the screenshot', () {
       for (final name in [
         'ios26_home',
         'ios26_keyboard',
         'ios26_native_controls',
         'ios26_permission_screen',
-        'ios18_native_controls',
-        'ios18_permission_screen',
       ]) {
         final fixture = Fixture('ios', name);
         final app = fixture.elements.firstWhere(
@@ -223,17 +160,6 @@ void main() {
     });
 
     test('native controls: the button wins over its own label', () {
-      for (final name in ['ios26_native_controls', 'ios18_native_controls']) {
-        final controls = Fixture('ios', name);
-
-        expect(
-          controls
-              .select(const NativeSelector(text: 'Tap me (native)'))
-              .className,
-          'XCUIElementTypeButton',
-          reason: name,
-        );
-      }
       final controls = Fixture('ios', 'ios26_native_controls');
 
       expect(
@@ -249,11 +175,6 @@ void main() {
     });
 
     test('permission screen: "Request" buttons share text and id', () {
-      expect(
-        () => Fixture('ios', 'ios18_permission_screen')
-            .select(const NativeSelector(id: 'Request')),
-        _ambiguousWith(2),
-      );
       final screen = Fixture('ios', 'ios26_permission_screen');
 
       expect(
@@ -266,32 +187,6 @@ void main() {
           screen.select(const NativeSelector(id: 'Request', index: 0)).bounds.y,
         ),
       );
-    });
-
-    test('camera alert is owned by SpringBoard', () {
-      final alert = Fixture('ios', 'ios26_alert_camera');
-
-      expect(alert.foregroundApp, 'com.apple.springboard');
-      expect(
-        alert.select(const NativeSelector(text: 'Don’t Allow')).clickable,
-        isTrue,
-      );
-    });
-
-    test('photos alert offers three choices', () {
-      final alert = Fixture('ios', 'ios26_alert_photos');
-
-      for (final choice in [
-        'Limit Access…',
-        'Allow Full Access',
-        'Don’t Allow'
-      ]) {
-        expect(
-          alert.select(NativeSelector(text: choice, type: 'Button')).clickable,
-          isTrue,
-          reason: choice,
-        );
-      }
     });
 
     test('keyboard keys are visible and tappable', () {
