@@ -1,0 +1,6 @@
+.dart_tool/
+build/
+# The root .gitignore ignores pubspec.lock for the package; the site is an
+# application and pins its build toolchain with it.
+!pubspec.lock
+.netlify/

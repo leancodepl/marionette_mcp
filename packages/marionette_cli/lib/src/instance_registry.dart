@@ -32,7 +32,10 @@ class InstanceInfo {
 
 /// File-based registry for named Flutter app instances.
 ///
-/// Stores instance metadata in `~/.marionette/instances/<name>.json`.
+/// Stores instance metadata in `~/.marionette/instances/<name>.json`, where
+/// `<name>` is [InstanceRegistry._encodeFileNameComponent]'s portable
+/// encoding of the instance name (identical to the name itself for names
+/// made up of letters, digits, `_`, `-`, and `.`).
 class InstanceRegistry {
   InstanceRegistry({String? baseDir})
       : _baseDir = baseDir ??
@@ -46,19 +49,97 @@ class InstanceRegistry {
 
   final String _baseDir;
 
-  static final _namePattern = RegExp(r'^[a-zA-Z0-9_-]+$');
+  /// Characters that would let [name] escape [_baseDir] once it becomes part
+  /// of a file path (`/`, `\`), or C0/DEL control characters. Control
+  /// characters are rejected outright (rather than just NUL) because
+  /// instance names are later printed verbatim by `register`, `list`,
+  /// `doctor`, and `unregister`; allowing them would let a registered name
+  /// forge output lines or inject terminal escape sequences. Everything
+  /// else — including device identifiers like `192.168.1.1:5555` — is a
+  /// valid instance name.
+  static final _unsafeCharsPattern = RegExp(r'[/\\\x00-\x1f\x7f]');
+
+  /// Characters that are safe to use verbatim in a filename on every
+  /// platform, including Windows (which additionally forbids
+  /// `< > : " | ? *`). Names made up only of these characters — the old,
+  /// stricter [validateName] pattern plus `.` — encode to themselves, so
+  /// existing on-disk `.json` files are unaffected.
+  static final _fileNameSafeCharsPattern = RegExp(r'[a-zA-Z0-9_.-]');
+
+  static const _windowsReservedBaseNames = {
+    'CON', 'PRN', 'AUX', 'NUL', //
+    'COM0', 'COM1', 'COM2', 'COM3', 'COM4', //
+    'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+    'LPT0', 'LPT1', 'LPT2', 'LPT3', 'LPT4', //
+    'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+  };
+
+  /// Most filesystems (ext4, APFS, NTFS) cap a single path component at 255
+  /// bytes. [_encodeFileNameComponent] percent-encodes every byte outside
+  /// [_fileNameSafeCharsPattern], so a name can end up far longer once
+  /// encoded than it was as typed (one 4-byte UTF-8 character becomes
+  /// `%XX%XX%XX%XX`, 12 bytes) — checking only the raw [name] length would
+  /// still let a short, exotic name blow past the limit and crash
+  /// `register` with an uncaught `FileSystemException`.
+  static const _maxFileNameLength = 255;
 
   /// Validates that [name] is a safe instance name.
   static void validateName(String name) {
-    if (!_namePattern.hasMatch(name)) {
+    if (name.isEmpty || _unsafeCharsPattern.hasMatch(name)) {
       throw FormatException(
         'Invalid instance name "$name". '
-        'Names must match [a-zA-Z0-9_-]+.',
+        'Names must not be empty and must not contain "/", "\\", or control '
+        'characters.',
+      );
+    }
+
+    final fileName = '${_encodeFileNameComponent(name)}.json';
+    if (fileName.length > _maxFileNameLength) {
+      throw FormatException(
+        'Invalid instance name "$name". '
+        'Its encoded file name is ${fileName.length} characters, exceeding '
+        'the $_maxFileNameLength character limit most filesystems enforce '
+        'for a single file name.',
       );
     }
   }
 
-  String _filePath(String name) => p.join(_baseDir, '$name.json');
+  /// Encodes [name] into a filename component that is safe on every
+  /// platform. Any character outside of [_fileNameSafeCharsPattern] is
+  /// percent-encoded, and a leading character is percent-encoded too if the
+  /// name would otherwise collide with a Windows-reserved device name (e.g.
+  /// `NUL`).
+  static String _encodeFileNameComponent(String name) {
+    final buffer = StringBuffer();
+    for (final rune in name.runes) {
+      final char = String.fromCharCode(rune);
+      if (_fileNameSafeCharsPattern.hasMatch(char)) {
+        buffer.write(char);
+      } else {
+        for (final byte in utf8.encode(char)) {
+          buffer.write(
+              '%${byte.toRadixString(16).padLeft(2, '0').toUpperCase()}');
+        }
+      }
+    }
+
+    var encoded = buffer.toString();
+
+    final base = encoded.split('.').first.toUpperCase();
+    if (_windowsReservedBaseNames.contains(base)) {
+      encoded = _percentEncodeCharAt(encoded, 0);
+    }
+
+    return encoded;
+  }
+
+  static String _percentEncodeCharAt(String s, int index) {
+    final code = s.codeUnitAt(index).toRadixString(16).padLeft(2, '0');
+    return '${s.substring(0, index)}%${code.toUpperCase()}${s.substring(index + 1)}';
+  }
+
+  String _filePath(String name) =>
+      p.join(_baseDir, '${_encodeFileNameComponent(name)}.json');
 
   /// Registers an instance. Overwrites if already exists.
   ///

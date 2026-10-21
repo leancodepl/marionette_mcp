@@ -2,7 +2,8 @@ import 'dart:convert';
 
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
-/// Supports matching by key, identifier, text, type, and coordinates.
+/// Supports matching by key, identifier, text, type, and coordinates, plus the
+/// optional `ancestor_keys` scope.
 Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   final matcher = <String, dynamic>{};
   if (args['focused_element'] == true) {
@@ -31,7 +32,22 @@ Map<String, dynamic> buildMatcher(Map<String, dynamic> args) {
   if (args.containsKey('y')) {
     matcher['y'] = args['y'];
   }
+  // The VM service only carries string values, so the scope chain travels
+  // JSON-encoded rather than as a list (whose toString() is un-parseable) or
+  // a delimited string (whose delimiter could appear inside a key).
+  if (args['ancestor_keys'] case final List<dynamic> ancestorKeys
+      when ancestorKeys.isNotEmpty) {
+    matcher['ancestor_keys'] = jsonEncode(ancestorKeys);
+  }
   return matcher;
+}
+
+/// Whether [matcher] identifies an element to act on.
+///
+/// `ancestor_keys` only narrows where the search happens, so a matcher
+/// carrying nothing but a scope still selects nothing.
+bool hasSelector(Map<String, dynamic> matcher) {
+  return matcher.keys.any((field) => field != 'ancestor_keys');
 }
 
 /// Formats an element map for human-readable display.

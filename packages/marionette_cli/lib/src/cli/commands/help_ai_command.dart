@@ -39,8 +39,11 @@ URI connections for fully stateless operation.
 1. Start your Flutter app in debug mode and note the VM service URI.
 2. Interact directly: `marionette --uri <ws-uri> <command> [args]`
 
-No registration, no cleanup, no files on disk. Each command opens a fresh
-WebSocket connection, executes, and disconnects.
+No registration, no cleanup. Each command opens a fresh WebSocket connection,
+executes, and disconnects. If the app enables session reports
+(MarionetteConfiguration(enableSessionReports: true)), every invocation also
+gets its own fresh session directory, appending one line to its steps.md (see
+--session below).
 
 ## Global Options
 
@@ -51,6 +54,14 @@ WebSocket connection, executes, and disconnects.
       --native-session <name>
                            Native session for native-* commands
                            (default: "default")
+      --session <title>    Session title for this command's directory
+                           (.marionette/sessions/<title>-<timestamp>/).
+                           Keep it under ~60 characters — longer is
+                           truncated. Every invocation gets its own fresh
+                           directory.
+      --session-dir <path> Base directory .marionette/sessions/ is created
+                           under (default: current directory, or
+                           $MARIONETTE_SESSION_DIR if set)
 
 ## Commands
 
@@ -59,7 +70,7 @@ WebSocket connection, executes, and disconnects.
 Register a Flutter app instance.
 
   Arguments:
-    name   Alphanumeric identifier [a-zA-Z0-9_-]+
+    name   Any identifier without "/", "\", or control characters (e.g. my-app, 192.168.1.1:5555)
     uri    VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws)
 
   Example:
@@ -118,8 +129,25 @@ List interactive UI elements in the app's widget tree.
 
   Requires: -i <instance> or --uri <ws-uri>
 
+  Options:
+    --ancestor-keys <str>  List only the elements inside the subtree of the
+                           element with this key (grid cells, repeated
+                           cards). Repeat it, outermost first, to go deeper
+    --compaction=compact   Reduce the payload further: drop rendering details
+                           (textAlign, softWrap, overflow, ...) and text font
+                           metrics, drop a Text element's duplicated data
+                           field, round bounds to whole logical pixels, and
+                           report visible only when an element is not visible.
+                           This is the default for most apps.
+    --compaction=none      Force the full payload.
+
+  Omit --compaction to use the app's MarionetteConfiguration.compaction
+  default.
+
   Examples:
     marionette -i my-app get-interactive-elements
+    marionette -i my-app get-interactive-elements --ancestor-keys grid.cell_2
+    marionette -i my-app get-interactive-elements --compaction=none
     marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 
   Output (stdout), one line per element:
@@ -131,7 +159,9 @@ List interactive UI elements in the app's widget tree.
 
   Each element may have: type, key, text, identifier, and additional
   properties. Use the key, identifier, or text values as matchers for tap,
-  enter-text, scroll-to.
+  enter-text, scroll-to. On a screen that repeats the same subtree, pass
+  --ancestor-keys <wrapper key> to list just that subtree, then reuse the same
+  keys as --ancestor-keys on tap/enter-text to act inside it.
 
 ---
 
@@ -148,6 +178,9 @@ Tap an element. Provide exactly one matching strategy.
     --type <string>       Match by widget type name (e.g., ElevatedButton)
     --x <number>          X screen coordinate (use with --y)
     --y <number>          Y screen coordinate (use with --x)
+    --ancestor-keys <str> Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
 
   Examples:
     marionette -i my-app tap --key submit_button
@@ -155,6 +188,9 @@ Tap an element. Provide exactly one matching strategy.
     marionette -i my-app tap --text "Submit"
     marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
     marionette -i my-app tap --x 100 --y 200
+    marionette -i my-app tap --key cell.joinButton --ancestor-keys grid.cell_2
+    marionette -i my-app tap --key cell.joinButton \
+      --ancestor-keys session_2 --ancestor-keys grid.cell_3
 
   Output (stdout):
     Tapped element matching {key: submit_button}
@@ -176,6 +212,9 @@ strategy.
     --type <string>       Match by widget type name (e.g., ElevatedButton)
     --x <number>          X screen coordinate (use with --y)
     --y <number>          Y screen coordinate (use with --x)
+    --ancestor-keys <str> Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
 
   Examples:
     marionette -i my-app secondary-tap --key file_item
@@ -199,6 +238,9 @@ Enter text into a text field.
     --identifier <string> Match text field by Semantics identifier
     --text <string>       Match text field by visible text
     --focused             Target the currently focused text field
+    --ancestor-keys <str> Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
     --input <string>      Text to enter (mandatory)
 
   Example:
@@ -279,6 +321,9 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
     --identifier <string> Match by Semantics identifier (stable alternative)
     --text <string>       Match by visible text content
     --type <string>       Match by widget type name (e.g., PageView)
+    --ancestor-keys <str> Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
     --direction <dir>     left, right, up, or down (required for this mode)
     --distance <number>   Swipe distance in pixels (default: 200)
     --start-x <number>    Optional finger start X (requires --start-y)
@@ -312,6 +357,9 @@ Scroll until an element becomes visible.
     --key <string>        Match by ValueKey<String>
     --identifier <string> Match by Semantics identifier
     --text <string>       Match by visible text content
+    --ancestor-keys <str> Limit the search to the subtree of the element with
+                          this key (repeated cards, grid cells, embedded apps).
+                          Repeat it, outermost first, to go deeper
 
   Example:
     marionette -i my-app scroll-to --text "Bottom Item"
@@ -405,6 +453,45 @@ Retrieve collected application logs.
 
   Output if empty (stdout):
     No logs collected.
+
+---
+
+### set-device-config
+
+Override the device configuration the running app sees — text scale, bold text,
+light/dark appearance — without touching real device settings. Use it to sweep
+a screen under accessibility or appearance conditions.
+
+Requires the app to wrap its root widget in MarionetteDeviceConfig:
+
+    runApp(const MarionetteDeviceConfig(child: MyApp()));
+
+  Requires: -i <instance> or --uri <ws-uri>
+  At least one of: --text-scale, --bold-text, --platform-brightness, --reset
+
+  Options:
+    --text-scale <n>              Linear text scale, > 0 (1.0 default, 2.0 very
+                                  large; real devices top out around 3.0)
+    --bold-text <true|false>      System bold-text setting
+    --platform-brightness <light|dark>
+                                  System light/dark appearance
+    --reset                       Clear every override; applied before the
+                                  other options in the same call
+
+  Examples:
+    marionette -i my-app set-device-config --text-scale 2.0
+    marionette -i my-app set-device-config --platform-brightness dark
+    marionette -i my-app set-device-config --reset --text-scale 1.5
+    marionette -i my-app set-device-config --reset
+
+  Output (stdout, exit 0):
+    Device config updated
+
+  Output if the app did not opt in (stderr, exit 1):
+    Error: Device config overrides are not available in this app. ...
+
+  Omitted options keep their current override. Reverting a single field means
+  --reset plus the fields worth keeping.
 
 ---
 
@@ -627,8 +714,12 @@ If a command fails with a connection error, the app may have stopped.
 - Prefer --key over --text for matching elements (keys are stable, text may change)
 - --identifier (Semantics identifier) is an equally stable alternative to --key
   when a widget has no ValueKey but does set an accessibility identifier
-- Run `get-interactive-elements` first to discover what's on screen before interacting
-- Instance names are alphanumeric with hyphens/underscores: [a-zA-Z0-9_-]+
+- --ancestor-keys scopes a match to one subtree when the same key repeats across
+  identical subtrees; repeat it (outermost first) when the wrapper key itself
+  repeats. Every key must exist or the command fails
+- Run `get-interactive-elements` first to discover what's on screen before interacting;
+  add --ancestor-keys to list just one subtree on busy screens
+- Instance names allow any characters except "/", "\", or control characters (e.g. device IDs like 192.168.1.1:5555)
 - Flutter commands are stateless — each opens a fresh connection, so no session management needed
 - native-* commands share a session started by native-connect; run native-disconnect at the end
 ''';

@@ -82,6 +82,7 @@ class KeyboardSimulator {
       _dispatch(_upEvent(modifier));
     }
 
+    _performTextInputActionForEnter(keyDef, modifiers);
     WidgetsBinding.instance.scheduleFrame();
   }
 
@@ -108,6 +109,38 @@ class KeyboardSimulator {
     ServicesBinding.instance.keyEventManager.keyMessageHandler
         // ignore: deprecated_member_use
         ?.call(KeyMessage(<KeyEvent>[event], null));
+  }
+
+  void _performTextInputActionForEnter(_KeyDef keyDef, Set<String> modifiers) {
+    if (keyDef.logical != LogicalKeyboardKey.enter || modifiers.isNotEmpty) {
+      return;
+    }
+
+    final focusNode = FocusManager.instance.primaryFocus;
+    final context = focusNode?.context;
+    if (context == null) {
+      return;
+    }
+
+    EditableTextState? editableTextState;
+    context.visitAncestorElements((element) {
+      if (element is StatefulElement && element.state is EditableTextState) {
+        editableTextState = element.state as EditableTextState;
+        return false;
+      }
+      return true;
+    });
+
+    if (editableTextState == null) {
+      return;
+    }
+
+    final widget = editableTextState!.widget;
+    final action = widget.textInputAction ??
+        (widget.keyboardType == TextInputType.multiline
+            ? TextInputAction.newline
+            : TextInputAction.done);
+    editableTextState!.performAction(action);
   }
 
   _KeyDef? _resolveKey(String name) {

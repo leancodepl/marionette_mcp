@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
@@ -10,7 +11,8 @@ class ScrollToCommand extends InstanceCommand {
     argParser
       ..addOption('key', help: 'Element key (ValueKey<String>).')
       ..addOption('identifier', help: 'Semantics identifier of the element.')
-      ..addOption('text', help: 'Visible text of the element to scroll to.');
+      ..addOption('text', help: 'Visible text of the element to scroll to.')
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp);
   }
 
   final InstanceRegistry _registry;
@@ -31,9 +33,10 @@ class ScrollToCommand extends InstanceCommand {
       key: argResults?['key'] as String?,
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
+      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
     );
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, or --text.',
       );

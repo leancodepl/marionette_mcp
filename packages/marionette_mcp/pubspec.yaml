@@ -1,6 +1,6 @@
 name: marionette_mcp
 description: MCP server that lets AI agents (Claude, Copilot, Cursor) inspect and interact with running Flutter apps — tap, scroll, type, and screenshot.
-version: 0.6.0
+version: 0.7.0
 repository: https://github.com/leancodepl/marionette_mcp
 issue_tracker: https://github.com/leancodepl/marionette_mcp/issues
 topics:
@@ -22,6 +22,8 @@ dependencies:
   crypto: ^3.0.0
   logging: ^1.3.0
   mcp_dart: ^2.1.0
+  path: ^1.9.0
+  stack_trace: ^1.12.0
   vm_service: ">=14.0.0"
 
 dev_dependencies:

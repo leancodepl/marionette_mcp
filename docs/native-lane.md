@@ -11,13 +11,66 @@ Prefer the Flutter lane for in-app widgets; switch to the native lane when the t
 
 ### Android
 
-- `adb` on `PATH` (Android SDK platform-tools) and an emulator or a phone with USB debugging.
-- Nothing else: on the first `native_connect` Marionette downloads the pinned UIAutomator2 APKs (checked against their SHA-256), installs them only when they changed, and forwards a free local port (`MARIONETTE_UIA2_PORT` to fix one).
+`native_connect` with `platform: android` uses **UIAutomator2** over adb. Marionette does **not** install adb for you — it must already be on your `PATH` (Android SDK Platform Tools; usually present if you run Flutter on Android):
+
+```bash
+which adb          # should print a path
+adb devices        # device/emulator must show state "device"
+```
+
+You also need a connected Android device or emulator. Optionally pass `serial` to `native_connect` when multiple devices are attached.
+
+On first connect, Marionette **downloads and caches** the UIAutomator2 server APKs (Appium v10.3.2). To use local APKs instead:
+
+```bash
+export MARIONETTE_UIA2_SERVER_APK=/path/to/appium-uiautomator2-server.apk
+export MARIONETTE_UIA2_TEST_APK=/path/to/appium-uiautomator2-server-debug-androidTest.apk
+```
+
+Downloaded APKs are verified against pinned SHA-256 checksums, and an APK is only installed when the copy on the device differs, so reconnecting is fast.
+
+Marionette forwards a local port to UIAutomator2: by default the first free port from 8200 (an existing forward for the same device is reused). To pin it:
+
+```bash
+export MARIONETTE_UIA2_PORT=8200
+```
+
+If the device-side server dies during a session, call `native_connect` again.
 
 ### iOS (Simulator)
 
-- macOS with Xcode and a booted simulator. Real iPhones are not supported yet.
-- A one-time WebDriverAgent build — see the [README](../README.md#native-lane-requirements-ios); Marionette finds it in `~/.cache/marionette_mcp/wda/` or through `MARIONETTE_WDA_XCTESTRUN`. A WebDriverAgent already running for the simulator is reused.
+`native_connect` with `platform: ios` uses **WebDriverAgent (WDA)** on an **iOS Simulator** (real devices are not supported yet). Unlike Android, Marionette does **not** download or build WDA for you — you need a **one-time build**, then Marionette can launch and reuse it.
+
+**Host & tools**
+
+- **macOS only** — WDA bootstrap uses `xcrun simctl` and `xcodebuild` (from Xcode).
+- A **booted iOS Simulator** (`open -a Simulator`, or `xcrun simctl boot "iPhone 16"`). Optionally pass `udid` to `native_connect` when several simulators are booted.
+
+**One-time WebDriverAgent build**
+
+```bash
+git clone https://github.com/appium/WebDriverAgent.git
+cd WebDriverAgent
+xcodebuild build-for-testing \
+  -project WebDriverAgent.xcodeproj \
+  -scheme WebDriverAgentRunner \
+  -destination 'platform=iOS Simulator,id=<UDID>'
+```
+
+Get `<UDID>` from `xcrun simctl list devices`. Build for the simulator runtime you plan to use — rebuild if you switch to an incompatible OS/arch.
+
+**Point Marionette at the build** (pick one):
+
+```bash
+# Preferred: .xctestrun from DerivedData/Build/Products
+export MARIONETTE_WDA_XCTESTRUN=/path/to/WebDriverAgentRunner_*.xctestrun
+
+# Or the runner .app / Products directory
+export MARIONETTE_WDA_BUNDLE=/path/to/WebDriverAgentRunner-Runner.app
+export MARIONETTE_WDA_PATH=/path/to/DerivedData/Build/Products
+```
+
+Or copy the build output into `~/.cache/marionette_mcp/wda/` — Marionette scans that directory automatically (no env vars needed once artifacts are there). On connect it runs `xcodebuild test-without-building` against the `.xctestrun`, or falls back to `simctl install` + `simctl launch` for a `.app` bundle.
 
 ### MCP and CLI
 
@@ -25,6 +78,34 @@ Prefer the Flutter lane for in-app widgets; switch to the native lane when the t
 - **CLI:** `marionette native-connect --platform android|ios` starts the device-side server **detached** from the CLI, so every later `marionette native-*` command attaches to it and reuses the WebDriver session; `native-disconnect` stops it. `--native-session <name>` drives several devices at once ([CLI guide](./cli.md#native-lane-system-ui)).
 
 Use one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other: the CLI opens a new session for its next command, the MCP server needs `native_connect` again.
+
+### Screenshots
+
+`native_take_screenshot` returns an inline PNG image by default — **no files are written to disk** unless you opt in.
+
+To also save PNG files locally, set `MARIONETTE_SCREENSHOTS_DIR` to an existing or creatable directory path. Files are named with a UTC timestamp and a `native` suffix (e.g. `2026-08-06T09-35-17.281020Z_native.png`). Flutter's `take_screenshots` stores screenshots in the session directory instead (session reports).
+
+```bash
+export MARIONETTE_SCREENSHOTS_DIR="$HOME/marionette-screenshots"
+```
+
+When running the MCP server from an AI tool, set the variable in that tool's MCP config. For Cursor (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "marionette": {
+      "command": "marionette_mcp",
+      "args": [],
+      "env": {
+        "MARIONETTE_SCREENSHOTS_DIR": "/path/to/screenshots"
+      }
+    }
+  }
+}
+```
+
+Restart the MCP server after changing the variable so it picks up the new value.
 
 ## Working with it
 

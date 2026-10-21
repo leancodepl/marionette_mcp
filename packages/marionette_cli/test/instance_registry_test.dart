@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
@@ -39,7 +40,17 @@ void main() {
 
   group('InstanceRegistry.validateName', () {
     test('accepts valid names', () {
-      for (final name in ['my-app', 'app_1', 'ABC123', 'a', 'test-app-2']) {
+      for (final name in [
+        'my-app',
+        'app_1',
+        'ABC123',
+        'a',
+        'test-app-2',
+        'my app',
+        'app@1',
+        '192.168.240.112:5555',
+        'my.device.local',
+      ]) {
         expect(
           () => InstanceRegistry.validateName(name),
           returnsNormally,
@@ -49,13 +60,93 @@ void main() {
     });
 
     test('rejects invalid names', () {
-      for (final name in ['my app', 'app/bad', '', 'app@1', '../../etc']) {
+      for (final name in [
+        '',
+        'app/bad',
+        '../../etc',
+        'a\\b',
+        'app\u0000name',
+        'app\nname',
+        'app\rname',
+        'app\tname',
+        'app\u001Bname', // ESC
+        'app\u007Fname', // DEL
+      ]) {
         expect(
           () => InstanceRegistry.validateName(name),
           throwsA(isA<FormatException>()),
           reason: 'Expected "$name" to be invalid',
         );
       }
+    });
+
+    test('accepts a name whose encoded file name is exactly at the limit',
+        () {
+      final name = 'a' * 250; // + '.json' (5 chars) = 255
+      expect(() => InstanceRegistry.validateName(name), returnsNormally);
+    });
+
+    test('rejects a name whose raw length alone exceeds the limit', () {
+      final name = 'a' * 251; // + '.json' (5 chars) = 256
+      expect(
+        () => InstanceRegistry.validateName(name),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test(
+        'rejects a short name that percent-encoding inflates past the limit',
+        () {
+      // Each '😀' is a 4-byte UTF-8 character encoding to 12 chars
+      // (`%XX%XX%XX%XX`); 22 of them alone exceed 255 chars once encoded,
+      // even though the raw name is only 44 UTF-16 code units long.
+      final name = '😀' * 22;
+      expect(
+        () => InstanceRegistry.validateName(name),
+        throwsA(isA<FormatException>()),
+      );
+    });
+  });
+
+  group('InstanceRegistry file name encoding', () {
+    List<String> fileNames() =>
+        tempDir.listSync().map((f) => p.basename(f.path)).toList();
+
+    test('names matching the old strict pattern use a plain file name',
+        () async {
+      await registry.register('my-app_1', 'ws://127.0.0.1:8181/ws');
+      expect(fileNames(), equals(['my-app_1.json']));
+    });
+
+    test('names with Windows-unsafe characters round-trip', () async {
+      for (final name in [
+        '192.168.240.112:5555',
+        'a*b?c"d<e>f|g',
+        'weird name',
+      ]) {
+        await registry.register(name, 'ws://127.0.0.1:8181/ws');
+        expect(registry.get(name)?.name, equals(name));
+      }
+    });
+
+    test('does not create a file matching a Windows-reserved device name',
+        () async {
+      for (final name in ['NUL', 'COM0', 'LPT0', 'COM1', 'LPT9']) {
+        await registry.register(name, 'ws://127.0.0.1:8181/ws');
+
+        expect(fileNames(), isNot(contains('$name.json')));
+        expect(registry.get(name)?.name, equals(name));
+      }
+    });
+
+    test('a name ending in a dot round-trips via the .json suffix', () async {
+      // The on-disk file is "trailing..json" — a harmless double dot, since
+      // the appended ".json" suffix means the actual file name never ends
+      // in a dot regardless of what the encoded name looks like.
+      await registry.register('trailing.', 'ws://127.0.0.1:8181/ws');
+
+      expect(fileNames(), equals(['trailing..json']));
+      expect(registry.get('trailing.')?.name, equals('trailing.'));
     });
   });
 

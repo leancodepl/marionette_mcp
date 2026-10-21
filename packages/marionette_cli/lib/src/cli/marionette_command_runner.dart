@@ -25,6 +25,7 @@ import 'package:marionette_cli/src/cli/commands/press_key_command.dart';
 import 'package:marionette_cli/src/cli/commands/register_command.dart';
 import 'package:marionette_cli/src/cli/commands/scroll_to_command.dart';
 import 'package:marionette_cli/src/cli/commands/secondary_tap_command.dart';
+import 'package:marionette_cli/src/cli/commands/set_device_config_command.dart';
 import 'package:marionette_cli/src/cli/commands/swipe_command.dart';
 import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
@@ -62,6 +63,20 @@ class MarionetteCommandRunner extends CommandRunner<int> {
         'native-session',
         help: 'Name of the native session for native-* commands.',
         defaultsTo: 'default',
+      )
+      ..addOption(
+        'session',
+        help: 'Title for the session directory this command\'s step is '
+            'logged into (see .marionette/sessions/). Keep it under ~60 '
+            'characters — longer is truncated. Every invocation gets its '
+            'own fresh session directory, titled from this if given. Falls '
+            'back to an untitled directory when omitted.',
+      )
+      ..addOption(
+        'session-dir',
+        help: 'Base directory .marionette/sessions/ is created under. '
+            'Overrides the MARIONETTE_SESSION_DIR environment variable and '
+            'defaults to the current directory when neither is set.',
       );
 
     addCommand(RegisterCommand(_registry));
@@ -81,6 +96,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(ScreenshotCommand(_registry));
     addCommand(RecordVideoCommand(_registry));
     addCommand(LogsCommand(_registry));
+    addCommand(SetDeviceConfigCommand(_registry));
     addCommand(HotReloadCommand(_registry));
     addCommand(HotRestartCommand(_registry));
     addCommand(DoctorCommand(_registry));

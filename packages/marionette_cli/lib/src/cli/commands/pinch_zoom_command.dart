@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
@@ -14,6 +15,7 @@ class PinchZoomCommand extends InstanceCommand {
       ..addOption('type', help: 'Widget type name (e.g., InteractiveViewer).')
       ..addOption('x', help: 'X coordinate for pinch center.')
       ..addOption('y', help: 'Y coordinate for pinch center.')
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp)
       ..addOption(
         'scale',
         help: 'Zoom scale factor. >1.0 zooms in, <1.0 zooms out.',
@@ -48,6 +50,7 @@ class PinchZoomCommand extends InstanceCommand {
       type: argResults?['type'] as String?,
       x: _parseNum(argResults?['x'] as String?),
       y: _parseNum(argResults?['y'] as String?),
+      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
     );
 
     final xStr = argResults?['x'] as String?;
@@ -56,7 +59,7 @@ class PinchZoomCommand extends InstanceCommand {
       usageException('--x and --y must be provided together.');
     }
 
-    if (matcher.isEmpty) {
+    if (!hasSelector(matcher)) {
       usageException(
         'At least one matcher required: --key, --identifier, --text, --type, '
         'or --x/--y.',

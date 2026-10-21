@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
 import 'package:vm_service/vm_service.dart';
@@ -22,6 +23,20 @@ class VmServiceExtensionException implements Exception {
     this.stackTrace,
   });
 
+  /// Creates an exception that preserves the application-side VM extension
+  /// details when they are available.
+  factory VmServiceExtensionException.fromRpcError(
+    String extensionName,
+    RPCError rpcError,
+  ) {
+    final details = rpcError.data?['details'];
+    return VmServiceExtensionException(
+      'Extension $extensionName failed',
+      errorCode: rpcError.code,
+      error: details?.toString() ?? rpcError.message,
+    );
+  }
+
   final String message;
   final int? errorCode;
   final String? error;
@@ -40,6 +55,23 @@ class VmServiceExtensionException implements Exception {
   }
 }
 
+/// Builds the wire args for `marionette.interactiveElements`.
+///
+/// The VM service delivers extension params to the app as a
+/// `Map<String, String>`, so [compaction] travels as the name of the
+/// `CompactionMode` value rather than as a Dart value the transport would have
+/// to coerce — same as the screencast params. An omitted key is what tells the
+/// app to use its configured default, so null sends nothing. [ancestorKeys]
+/// is JSON-encoded, like on the matcher tools, and omitted when empty.
+Map<String, dynamic> interactiveElementsArgs(
+  String? compaction, {
+  List<String> ancestorKeys = const [],
+}) =>
+    {
+      if (ancestorKeys.isNotEmpty) 'ancestor_keys': jsonEncode(ancestorKeys),
+      if (compaction != null) 'compaction': compaction,
+    };
+
 /// Modifier keys accepted by [VmServiceConnector.pressKey].
 ///
 /// Must stay in sync with the modifiers the `marionette_flutter`
@@ -47,6 +79,45 @@ class VmServiceExtensionException implements Exception {
 /// (which can't import the Flutter package) reject bad input before it reaches
 /// the device.
 const supportedKeyModifiers = {'control', 'shift', 'alt', 'meta'};
+
+/// Values accepted for `platformBrightness` by
+/// [VmServiceConnector.setDeviceConfig].
+///
+/// Mirrors Flutter's `Brightness` enum, which the CLI and MCP server can't
+/// import, so bad input is rejected before it reaches the device.
+const supportedBrightnessValues = {'light', 'dark'};
+
+/// Values accepted for `compaction` by
+/// [VmServiceConnector.getInteractiveElements].
+///
+/// Mirrors the names of the `marionette_flutter` `CompactionMode` enum, which
+/// the CLI and MCP server can't import, so bad input is rejected before it
+/// reaches the device.
+const supportedCompactionModes = {'none', 'compact'};
+
+/// Validates [brightness] against [supportedBrightnessValues].
+///
+/// Returns a human-readable error message, or `null` when [brightness] is
+/// null or supported.
+String? invalidBrightnessError(String? brightness) {
+  if (brightness == null || supportedBrightnessValues.contains(brightness)) {
+    return null;
+  }
+  return 'Unsupported brightness: $brightness. '
+      'Supported values: ${supportedBrightnessValues.join(', ')}.';
+}
+
+/// Validates [compaction] against [supportedCompactionModes].
+///
+/// Returns a human-readable error message, or `null` when [compaction] is
+/// null or supported.
+String? invalidCompactionError(String? compaction) {
+  if (compaction == null || supportedCompactionModes.contains(compaction)) {
+    return null;
+  }
+  return 'Unsupported compaction: $compaction. '
+      'Supported values: ${supportedCompactionModes.join(', ')}.';
+}
 
 /// Validates a comma-separated [modifiers] string against
 /// [supportedKeyModifiers] (case-insensitive).
@@ -116,7 +187,13 @@ class VmServiceConnector {
             _logger.info('Service event: $e');
         }
       });
-      await _service!.streamListen(EventStreams.kService);
+      try {
+        await _service!
+            .streamListen(EventStreams.kService)
+            .timeout(const Duration(milliseconds: 500));
+      } catch (e) {
+        _logger.info('streamListen(EventStreams.kService) skipped: $e');
+      }
 
       _isolateId = await _findIsolateWithMarionetteExtensions();
       _logger.info('Connected to isolate: $_isolateId');
@@ -209,13 +286,9 @@ class VmServiceConnector {
       _logger.finest('Extension response: $responseJson');
 
       return responseJson;
-    } on RPCError catch (e) {
-      _logger.severe('Error calling extension $extensionName', e);
-      throw VmServiceExtensionException(
-        'Extension $extensionName failed',
-        errorCode: e.code,
-        error: e.message,
-      );
+    } on RPCError catch (e, stackTrace) {
+      _logger.severe('Error calling extension $extensionName', e, stackTrace);
+      throw VmServiceExtensionException.fromRpcError(extensionName, e);
     } catch (err) {
       _logger.severe('Error calling extension $extensionName', err);
       rethrow;
@@ -228,6 +301,15 @@ class VmServiceConnector {
   Future<String> getVersion() async {
     final response = await _callExtension('marionette.getVersion', {});
     return response['version'] as String;
+  }
+
+  /// Whether the app opted into session reports via
+  /// `MarionetteConfiguration.enableSessionReports`.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<bool> getSessionReportsEnabled() async {
+    final response = await _callExtension('marionette.getConfiguration', {});
+    return response['enableSessionReports'] == true;
   }
 
   /// Calls a custom VM service extension registered by the Flutter app.
@@ -275,9 +357,23 @@ class VmServiceConnector {
 
   /// Gets the list of interactive elements in the widget tree.
   ///
+  /// When [ancestorKeys] is given, only the subtree it names is listed. The
+  /// keys nest, outermost first, and the call fails if any of them matches no
+  /// element.
+  ///
+  /// [compaction] must be one of [supportedCompactionModes]. It overrides the
+  /// app's `MarionetteConfiguration.compaction` default in both directions;
+  /// pass null to use it (see `get_interactive_elements`).
+  ///
   /// Throws [NotConnectedException] if not connected.
-  Future<Map<String, dynamic>> getInteractiveElements() {
-    return _callExtension('marionette.interactiveElements', {});
+  Future<Map<String, dynamic>> getInteractiveElements({
+    List<String> ancestorKeys = const [],
+    String? compaction,
+  }) {
+    return _callExtension(
+      'marionette.interactiveElements',
+      interactiveElementsArgs(compaction, ancestorKeys: ancestorKeys),
+    );
   }
 
   /// Taps an element matching the given criteria.
@@ -431,6 +527,33 @@ class VmServiceConnector {
   /// Throws [NotConnectedException] if not connected.
   Future<Map<String, dynamic>> scrollToElement(Map<String, dynamic> matcher) {
     return _callExtension('marionette.scrollTo', matcher);
+  }
+
+  /// Overrides the device configuration the app sees through `MediaQuery`.
+  ///
+  /// Omitted fields keep whatever was set before. [reset] clears every
+  /// override first, so passing it alone reverts to the platform defaults and
+  /// passing it alongside values leaves exactly those values set.
+  ///
+  /// [platformBrightness] must be one of [supportedBrightnessValues].
+  ///
+  /// Requires the app to have mounted a `MarionetteDeviceConfig` widget;
+  /// without one the extension answers with setup instructions instead of
+  /// applying anything.
+  ///
+  /// Throws [NotConnectedException] if not connected.
+  Future<Map<String, dynamic>> setDeviceConfig({
+    double? textScale,
+    bool? boldText,
+    String? platformBrightness,
+    bool reset = false,
+  }) {
+    return _callExtension('marionette.setDeviceConfig', {
+      if (textScale != null) 'textScale': textScale,
+      if (boldText != null) 'boldText': boldText,
+      if (platformBrightness != null) 'platformBrightness': platformBrightness,
+      if (reset) 'reset': true,
+    });
   }
 
   /// Gets the collected application logs.

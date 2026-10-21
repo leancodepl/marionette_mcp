@@ -1,9 +1,12 @@
+import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/log_store.dart';
+import 'package:marionette_flutter/src/services/widget_finder.dart';
+import 'package:marionette_flutter/src/services/widget_matcher.dart';
 import 'package:marionette_flutter/src/version.g.dart' as v;
 
 /// Help text returned by `marionette.getLogs` when no log collector has been
@@ -40,9 +43,15 @@ See https://pub.dev/packages/marionette_flutter for more details.''';
 /// [logStoreProvider] is read at call time (not capture time) because the
 /// log store can be created lazily when the binding is configured with a
 /// log collector.
+///
+/// [widgetFinder] resolves the optional `ancestor_keys` scope of
+/// `marionette.interactiveElements`, which limits discovery to one subtree.
 void registerInfoExtensions({
   required ElementTreeFinder elementTreeFinder,
+  required WidgetFinder widgetFinder,
+  required MarionetteConfiguration configuration,
   required LogStore? Function() logStoreProvider,
+  required bool enableSessionReports,
 }) {
   registerInternalMarionetteExtension(
     name: 'marionette.getVersion',
@@ -52,9 +61,29 @@ void registerInfoExtensions({
   );
 
   registerInternalMarionetteExtension(
+    name: 'marionette.getConfiguration',
+    callback: (params) async {
+      return MarionetteExtensionResult.success({
+        'enableSessionReports': enableSessionReports,
+      });
+    },
+  );
+
+  registerInternalMarionetteExtension(
     name: 'marionette.interactiveElements',
     callback: (params) async {
-      final elements = elementTreeFinder.findInteractiveElements();
+      final compaction = parseCompactionParam(params);
+      if (compaction.error case final error?) {
+        return error;
+      }
+
+      final elements = findScopedInteractiveElements(
+        params,
+        elementTreeFinder: elementTreeFinder,
+        widgetFinder: widgetFinder,
+        configuration: configuration,
+        compaction: compaction.value,
+      );
       return MarionetteExtensionResult.success({
         'elements': elements,
         // Not `resumed` while system UI or another screen covers the app,
@@ -95,4 +124,56 @@ void registerInfoExtensions({
       });
     },
   );
+}
+
+/// Lists the interactive elements of `marionette.interactiveElements`: inside
+/// the `ancestor_keys` scope in [params] when there is one, the whole tree
+/// otherwise.
+///
+/// A scope alone is the whole request here, unlike on the matcher tools. It
+/// is resolved by [WidgetFinder.resolveScopeRoot], so a key with no element
+/// fails the same way, naming the link that broke, instead of listing the
+/// whole tree. The scope element itself is listed too: a scope key sitting on
+/// an interactive widget would otherwise list nothing.
+@visibleForTesting
+List<Map<String, dynamic>> findScopedInteractiveElements(
+  Map<String, String> params, {
+  required ElementTreeFinder elementTreeFinder,
+  required WidgetFinder widgetFinder,
+  required MarionetteConfiguration configuration,
+  CompactionMode? compaction,
+}) {
+  return elementTreeFinder.findInteractiveElements(
+    startElement: widgetFinder.resolveScopeRoot(
+      WidgetMatcher.ancestorsFromJson(params),
+      configuration,
+    ),
+    compaction: compaction,
+  );
+}
+
+/// Reads the optional `compaction` param of `marionette.interactiveElements`.
+///
+/// VM service params always arrive as strings, so the caller sends the enum
+/// name rather than a Dart value. An absent key means "use the app's
+/// `MarionetteConfiguration.compaction` default", so it maps to null.
+@visibleForTesting
+({CompactionMode? value, MarionetteExtensionResult? error})
+    parseCompactionParam(
+  Map<String, String> params,
+) {
+  final raw = params['compaction'];
+  if (raw == null) {
+    return (value: null, error: null);
+  }
+  return switch (raw) {
+    'none' => (value: CompactionMode.none, error: null),
+    'compact' => (value: CompactionMode.compact, error: null),
+    _ => (
+        value: null,
+        error: MarionetteExtensionResult.invalidParams(
+          'Parameter "compaction" must be "none" or "compact", got "$raw"',
+        ),
+      ),
+  };
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
@@ -12,6 +13,7 @@ class SwipeCommand extends InstanceCommand {
       ..addOption('identifier', help: 'Semantics identifier of the element.')
       ..addOption('text', help: 'Visible text content of the element.')
       ..addOption('type', help: 'Widget type name (e.g., PageView).')
+      ..addMultiOption('ancestor-keys', help: ancestorKeysHelp)
       ..addOption(
         'direction',
         help: 'Swipe direction for element-based mode: left, right, up, down.',
@@ -82,8 +84,9 @@ class SwipeCommand extends InstanceCommand {
         identifier: argResults?['identifier'] as String?,
         text: argResults?['text'] as String?,
         type: argResults?['type'] as String?,
+        ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
       );
-      if (matcher.isEmpty) {
+      if (!hasSelector(matcher)) {
         usageException(
           'Element-based swipe requires a matcher: --key, --identifier, '
           '--text, or --type. Alternatively provide '

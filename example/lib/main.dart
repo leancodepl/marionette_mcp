@@ -4,12 +4,31 @@ import 'package:logging/logging.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:marionette_logging/marionette_logging.dart';
 
+import 'custom_widgets.dart';
 import 'router.dart';
 
 void main() {
-  if (kDebugMode) {
+  if (!kReleaseMode) {
     MarionetteBinding.ensureInitialized(
-      MarionetteConfiguration(logCollector: LoggingLogCollector()),
+      MarionetteConfiguration(
+        logCollector: LoggingLogCollector(),
+        enableSessionReports: true,
+        // Teach Marionette about the custom widgets in custom_widgets.dart.
+        // An `is` check matches every DsButton subclass and every
+        // DsSelect<T>, and the widget's fields allow per-instance decisions.
+        isInteractiveElement: (element) => switch (element.widget) {
+          DsButton() || DsSelect() => true,
+          DsTile(:final onTap) => onTap != null,
+          _ => false,
+        },
+        // DsSelect reports its label through extractText, so its internals
+        // would only duplicate it.
+        shouldStopTraversalAtElement: (element) => element.widget is DsSelect,
+        extractText: (element) => switch (element.widget) {
+          DsSelect(:final selectedLabel) => selectedLabel,
+          _ => null,
+        },
+      ),
     );
     _registerNavigationExtensions();
   }
@@ -20,7 +39,14 @@ void main() {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
 
-  runApp(const ExampleApp());
+  // Opting in to the set_device_config tool. kReleaseMode is a compile-time
+  // constant, so the wrapper is compiled out of a release build entirely
+  // rather than left in the tree to no-op.
+  if (!kReleaseMode) {
+    runApp(const MarionetteDeviceConfig(child: ExampleApp()));
+  } else {
+    runApp(const ExampleApp());
+  }
 }
 
 void _registerNavigationExtensions() {
@@ -94,6 +120,15 @@ class ExampleApp extends StatelessWidget {
       title: 'Marionette Example',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      // A dark theme so set_device_config's platform_brightness override has
+      // something to switch to.
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
         useMaterial3: true,
       ),
       routerConfig: router,

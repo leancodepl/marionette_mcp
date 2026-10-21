@@ -1,14 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:marionette_flutter/src/binding/extensions/device_config_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/gesture_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/info_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/keyboard_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/media_extensions.dart';
+import 'package:marionette_flutter/src/binding/extensions/navigation_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/text_extensions.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
-import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
-import 'package:marionette_flutter/src/binding/register_extension_internal.dart';
 import 'package:marionette_flutter/src/services/create_screencast_server.dart';
+import 'package:marionette_flutter/src/services/device_config_service.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
 import 'package:marionette_flutter/src/services/gesture_dispatcher.dart';
 import 'package:marionette_flutter/src/services/keyboard_simulator.dart';
@@ -92,12 +93,21 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   static MarionetteBinding get instance => BindingBase.checkInstance(_instance);
   static MarionetteBinding? _instance;
 
+  /// The device config service, or `null` when the binding was never
+  /// installed — a release build, or an app that doesn't use Marionette.
+  ///
+  /// Unlike [instance] this never throws, so `MarionetteDeviceConfig` can
+  /// degrade to a pass-through instead of taking the app down with it.
+  static DeviceConfigService? get maybeDeviceConfigService =>
+      _instance?._deviceConfigService;
+
   MarionetteBinding._(this.configuration);
 
   /// Configuration for the Marionette extensions.
   final MarionetteConfiguration configuration;
 
   // Service instances
+  late final DeviceConfigService _deviceConfigService;
   late final ElementTreeFinder _elementTreeFinder;
   late final GestureDispatcher _gestureDispatcher;
   late final KeyboardSimulator _keyboardSimulator;
@@ -113,6 +123,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     super.initInstances();
     _instance = this;
 
+    _deviceConfigService = DeviceConfigService();
     _widgetFinder = WidgetFinder();
     _elementTreeFinder = ElementTreeFinder(configuration);
     _gestureDispatcher = GestureDispatcher();
@@ -143,7 +154,11 @@ class MarionetteBinding extends WidgetsFlutterBinding {
 
     registerInfoExtensions(
       elementTreeFinder: _elementTreeFinder,
+      widgetFinder: _widgetFinder,
+      configuration: configuration,
       logStoreProvider: () => _logStore,
+      // TODO(KrzysztofMamak): Consider flag
+      enableSessionReports: configuration.enableSessionReports,
     );
     registerGestureExtensions(
       gestureDispatcher: _gestureDispatcher,
@@ -162,23 +177,12 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       screenshotService: _screenshotService,
       screencastServer: _screencastServer,
     );
-
-    // pressBackButton stays inline because it calls handlePopRoute(), which
-    // is an instance method on the binding itself.
-    registerInternalMarionetteExtension(
-      name: 'marionette.pressBackButton',
-      callback: (params) async {
-        // This acts like a normal, non-predictive back.
-        // For details, see https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
-        final didPop = await handlePopRoute();
-        return MarionetteExtensionResult.success({
-          'didPop': didPop,
-          'message': didPop
-              ? 'Back button pressed, route was popped'
-              : 'Back button pressed, no route to pop (app may exit)',
-        });
-      },
+    registerDeviceConfigExtensions(
+      deviceConfigService: _deviceConfigService,
     );
+    // This acts like a normal, non-predictive back. For details, see
+    // https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
+    registerNavigationExtensions(handlePopRoute: handlePopRoute);
   }
 
   @override

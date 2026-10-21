@@ -18,6 +18,16 @@ A multi-page Flutter app demonstrating **`call_custom_extension`** with Marionet
 | `/testing/native-screen` | Native screen | A native screen with a text field; its value returns to Flutter |
 | `/testing/notifications` | Notifications | Local notification after 3 s, opening the app from it, Android toast |
 | `/settings` | Settings | Gesture and UI demos |
+| `/settings/custom-widgets` | Custom Widgets | Custom design-system widgets recognized via `MarionetteConfiguration` |
+
+## Custom Widgets
+
+`lib/custom_widgets.dart` is a tiny stand-in for an app's design system. `main.dart` teaches Marionette about it:
+
+- `isInteractiveElement` matches every `DsButton` subclass and every `DsSelect<T>` with an `is` check, and marks a `DsTile` interactive only when it has an `onTap`.
+- `shouldStopTraversalAtElement` skips the internals of `DsSelect`, whose label comes from `extractText`.
+
+The same page shows built-in generic widgets (`DropdownButton<String>`, `Radio<int>`, `RadioListTile<int>`, `PopupMenuButton<String>`) that Marionette recognizes without any configuration.
 
 ## Custom VM Service Extensions
 
