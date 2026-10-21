@@ -838,6 +838,10 @@ WebDriverAgent lists a WebView's whole page with real coordinates, and only elem
 
 In the test with an agent that knew nothing of the code (Claude Code given only the MCP tools), the agent waited for the Android file picker with `native_wait_for textContains="documentsui"` — the picker's package name. It matched a label of the app itself ("SAF DocumentsUI / …"), so the wait returned at once, before the picker was there; the agent recovered only because it read the tree next. The description of `native_wait_for`, the server instructions and `help-ai` now say to wait for an element expected on the new screen, and that a package name is not element text — `foregroundApp` of `native_get_elements` tells which app is in front. A `foregroundApp` option for `native_wait_for` was considered and not added: the other nine agent runs waited correctly with selectors. Text only; no unit test (descriptions and instructions are not tested).
 
+### Follow-up (acceptance tests, 2026-10-21): a failed read while the app starts
+
+In an E2E run on iOS 26.4, `native_permissions reset` terminated the app, `native_app activate` started it again, and the next `native_wait_for "Tab 1 of 4"` failed in the same second — the app process started a second later. A failed tree read ended the wait at once, although the element appeared moments later; the server log said only "Failed to native wait for", so the error itself was lost. `native_wait_for` now retries a failed read — up to three in a row, each after `intervalMs`, within `timeoutMs` — and fails with the last error only when the failure lasts; "not connected" and a session that recovery could not restore still fail at once. Separately, the server log line of a failed tool now ends with the error (the log handler printed only the message, for every tool). Unit tests: one failed read then the element → success; a lasting failure ends the wait well before `timeoutMs`; a lost session ends it without a read; a log line includes the error. The failure itself did not happen again in three manual tries and two E2E runs; the E2E scenarios pass on both platforms after the change.
+
 ---
 
 <a id="d17"></a>

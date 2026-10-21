@@ -13,6 +13,10 @@ import 'package:mcp_dart/mcp_dart.dart';
 
 const _defaultWaitTimeoutMs = 10000;
 const _maxWaitTimeoutMs = 60000;
+
+/// Consecutive failed tree reads `native_wait_for` retries before failing.
+const _maxFailedWaitReads = 3;
+
 const _defaultWaitIntervalMs = 500;
 const _minWaitIntervalMs = 50;
 
@@ -217,6 +221,7 @@ Future<CallToolResult> handleNativeWaitFor(
 
     final stopwatch = Stopwatch()..start();
     var reads = 0;
+    var failedReads = 0;
     while (true) {
       // One read can be slow (a server waiting for an animating UI to go
       // idle); never let it stretch the wait past timeoutMs.
@@ -235,8 +240,28 @@ Future<CallToolResult> handleNativeWaitFor(
           hint: 'The screen may be animating continuously (video, map); '
               'raise timeoutMs or check with native_take_screenshot.',
         );
+      } on NativeNotConnectedException {
+        rethrow;
+      } on NativeSessionLostException {
+        // Recovery could not restore the session; retrying will not help.
+        rethrow;
+      } catch (error) {
+        // A read can fail while the app is starting (seen on iOS right
+        // after native_app activate of a terminated app): try again, but
+        // let a lasting failure through instead of waiting out timeoutMs.
+        failedReads++;
+        final remaining = timeoutMs - stopwatch.elapsedMilliseconds;
+        if (failedReads > _maxFailedWaitReads || remaining <= 0) rethrow;
+        logger.info('Reading the native UI tree failed ($error); retrying');
+        await Future<void>.delayed(
+          Duration(
+            milliseconds: remaining < intervalMs ? remaining : intervalMs,
+          ),
+        );
+        continue;
       }
       reads++;
+      failedReads = 0;
       final match =
           elements.where((e) => e.isListed && selector.matches(e)).firstOrNull;
       final done = switch (state) {

@@ -930,6 +930,54 @@ void main() {
       );
     });
 
+    test('keeps waiting through a failed read of an app that is starting',
+        () async {
+      // Seen on iOS: right after native_app activate of a terminated app,
+      // the first read failed and ended the wait at once.
+      final connector = FakeNativeConnector()
+        ..errorsOnce.add(
+          const WebDriverException('Application is not running'),
+        )
+        ..onGetElements = (_) => [nativeElement(text: 'Home')];
+
+      final result = await handleNativeWaitFor(_contextWith(connector), {
+        'text': 'Home',
+        'intervalMs': 50,
+      });
+
+      expect(result, _isToolSuccess(contains('"state":"visible"')));
+    });
+
+    test('a read failure that lasts ends the wait after a few retries',
+        () async {
+      final connector = FakeNativeConnector()
+        ..error = const WebDriverException('server error');
+      final stopwatch = Stopwatch()..start();
+
+      final result = await handleNativeWaitFor(_contextWith(connector), {
+        'text': 'Home',
+        'intervalMs': 50,
+        'timeoutMs': 10000,
+      });
+
+      expect(result, _isToolError(contains('server error')));
+      expect(stopwatch.elapsedMilliseconds, lessThan(2000),
+          reason: 'not the whole timeoutMs');
+    });
+
+    test('a lost session ends the wait at once', () async {
+      final connector = FakeNativeConnector()
+        ..error = const NativeSessionLostException('gone');
+
+      final result = await handleNativeWaitFor(_contextWith(connector), {
+        'text': 'Home',
+        'intervalMs': 50,
+      });
+
+      expect(result, _isToolError(contains('gone')));
+      expect(connector.getElementsCalls, 0);
+    });
+
     test('returns the element once it appears', () async {
       final connector = FakeNativeConnector()
         ..onGetElements =

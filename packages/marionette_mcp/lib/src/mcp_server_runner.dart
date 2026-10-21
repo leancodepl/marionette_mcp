@@ -94,17 +94,26 @@ void setupLogging(String logLevelName, String? logFile) {
     final file = File(logFile)..createSync(recursive: true);
     logging.Logger.root.onRecord.listen((record) {
       file.writeAsStringSync(
-        '[${record.level.name}][${record.loggerName}][${_formatTime(record.time)}] ${record.message}\n',
+        '${formatLogRecord(record)}\n',
         mode: FileMode.append,
       );
     });
   } else {
     logging.Logger.root.onRecord.listen((record) {
       stderr.writeln(
-        '[${record.level.name}][${record.loggerName}][${_formatTime(record.time)}] ${record.message}',
+        formatLogRecord(record),
       );
     });
   }
+}
+
+/// One log line; the error of a record (e.g. a failed tool call) is
+/// appended so the log says why it failed. Public for tests.
+String formatLogRecord(logging.LogRecord record) {
+  final error = record.error;
+  return '[${record.level.name}][${record.loggerName}]'
+      '[${_formatTime(record.time)}] ${record.message}'
+      '${error == null ? '' : ': $error'}';
 }
 
 String _formatTime(DateTime time) {
