@@ -26,15 +26,6 @@ const _noSuchElement = FakeResponse.error(
   return (x: move['x'] as int, y: move['y'] as int);
 }
 
-/// Pointer action lists of a W3C actions request, one per finger.
-List<List<Map<String, dynamic>>> _fingers(RecordedRequest request) => [
-      for (final source in request.body!['actions'] as List)
-        [
-          for (final action in (source as Map)['actions'] as List)
-            action as Map<String, dynamic>,
-        ],
-    ];
-
 /// `dumpsys window windows` excerpt for Gboard's floating toolbar on API 35.
 const _floatingImeDumpsys = '''
   Window #7 Window{ad0968f u0 InputMethod}:
@@ -125,25 +116,6 @@ void main() {
       await connector.dispose();
 
       expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
-    });
-
-    test('reopenSession: a new session on the same server takes it over (D3)',
-        () async {
-      final owned = _SharedBootstrap(server.baseUrl, startedServer: true);
-      final first = await AndroidNativeConnector.connect(
-        bootstrap: owned,
-        adb: AdbClient(serial: 'emulator-5554', processRunner: runner.call),
-        ownsBootstrap: true,
-      );
-
-      final second = await first.reopenSession();
-      await first.dispose();
-
-      expect(second, isNotNull);
-      expect(server.requestsTo('POST', '/session'), hasLength(2));
-      expect(owned.disposeCalls, 0, reason: 'the server moved to the new one');
-      await second!.dispose();
-      expect(owned.disposeCalls, 1);
     });
 
     group('reusing a session (D4)', () {
@@ -546,112 +518,6 @@ void main() {
       });
     });
 
-    group('gestures (N-06)', () {
-      setUp(() => server.onValue('POST', '/session/sess-1/actions', null));
-
-      test('longPress holds the finger down for the duration', () async {
-        final connector = await connect();
-        addTearDown(connector.dispose);
-
-        await connector.longPress(100, 200, durationMs: 800);
-
-        final [finger] = _fingers(
-          server.requestsTo('POST', '/session/sess-1/actions').single,
-        );
-        expect(finger.map((a) => a['type']), [
-          'pointerMove',
-          'pointerDown',
-          'pause',
-          'pointerUp',
-        ]);
-        expect((finger[0]['x'], finger[0]['y']), (100, 200));
-        expect(finger[2]['duration'], 800);
-      });
-
-      test('doubleTap sends both taps in one request', () async {
-        final connector = await connect();
-        addTearDown(connector.dispose);
-
-        await connector.doubleTap(10, 20, delayMs: 120);
-
-        final [finger] = _fingers(
-          server.requestsTo('POST', '/session/sess-1/actions').single,
-        );
-        expect(finger.where((a) => a['type'] == 'pointerDown'), hasLength(2));
-        expect(finger[4], {'type': 'pause', 'duration': 120});
-      });
-
-      test('pinch moves two fingers apart horizontally', () async {
-        final connector = await connect();
-        addTearDown(connector.dispose);
-
-        await connector.pinch(
-          centerX: 500,
-          centerY: 1000,
-          startSpan: 200,
-          endSpan: 600,
-        );
-
-        final [left, right] = _fingers(
-          server.requestsTo('POST', '/session/sess-1/actions').single,
-        );
-        expect((left[0]['x'], right[0]['x']), (400, 600));
-        expect((left[2]['x'], right[2]['x']), (200, 800));
-        expect(left[2]['y'], 1000);
-      });
-    });
-
-    test('takeElementScreenshot finds the element by class and bounds',
-        () async {
-      server
-        ..onValue('POST', '/session/sess-1/element', {w3cElementKey: 'e-1'})
-        ..onValue('GET', '/session/sess-1/element/e-1/screenshot', 'png');
-      final connector = await connect();
-      addTearDown(connector.dispose);
-
-      final png = await connector.takeElementScreenshot(
-        nativeElement(x: 10, y: 20, width: 100, height: 50),
-      );
-
-      expect(png, 'png');
-      expect(
-        server
-            .requestsTo('POST', '/session/sess-1/element')
-            .single
-            .body!['value'],
-        "//*[@class='android.widget.Button' and "
-        '@bounds="[10,20][110,70]"]',
-      );
-    });
-
-    test('takeElementScreenshot reports an element that is gone', () async {
-      server.on('POST', '/session/sess-1/element', (_) => _noSuchElement);
-      final connector = await connect();
-      addTearDown(connector.dispose);
-
-      await expectLater(
-        connector.takeElementScreenshot(nativeElement(id: 'logo')),
-        throwsA(isA<NativeElementNotFoundException>()),
-      );
-      // Geometry first, then the resource id.
-      expect(
-          server.requestsTo('POST', '/session/sess-1/element'), hasLength(2));
-    });
-
-    test('isServerResponding reflects /status', () async {
-      final connector = await connect();
-      addTearDown(connector.dispose);
-
-      expect(await connector.isServerResponding(), isTrue);
-
-      server.on(
-        'GET',
-        '/status',
-        (_) => const FakeResponse.raw('', status: HttpStatus.badGateway),
-      );
-      expect(await connector.isServerResponding(), isFalse);
-    });
-
     test('failed session creation does not dispose an injected bootstrap',
         () async {
       server.on(
@@ -763,79 +629,6 @@ void main() {
           as Map)['actions'] as List;
       expect((swipe.first as Map)['y'], 500);
       expect((swipe[2] as Map)['y'], 100);
-    });
-
-    test('gestures convert screenshot pixels to points', () async {
-      server.onValue('POST', '/session/sess-1/actions', null);
-      final connector = await connect();
-      addTearDown(connector.dispose);
-
-      await connector.longPress(300, 600);
-      await connector.pinch(
-        centerX: 600,
-        centerY: 1200,
-        startSpan: 600,
-        endSpan: 300,
-      );
-
-      final [press, pinch] =
-          server.requestsTo('POST', '/session/sess-1/actions');
-      final [finger] = _fingers(press);
-      expect((finger[0]['x'], finger[0]['y']), (100, 200));
-      final [left, right] = _fingers(pinch);
-      expect((left[0]['x'], right[0]['x']), (100, 300));
-      expect((left[2]['x'], right[2]['x']), (150, 250));
-      expect(left[0]['y'], 400);
-    });
-
-    test('takeElementScreenshot finds the element by geometry in points',
-        () async {
-      server
-        ..onValue('POST', '/session/sess-1/element', {w3cElementKey: 'e-1'})
-        ..onValue('GET', '/session/sess-1/element/e-1/screenshot', 'png');
-      final connector = await connect();
-      addTearDown(connector.dispose);
-
-      await connector.takeElementScreenshot(
-        nativeElement(
-          type: 'XCUIElementTypeImage',
-          x: 30,
-          y: 60,
-          width: 300,
-          height: 150,
-        ),
-      );
-
-      expect(
-        server
-            .requestsTo('POST', '/session/sess-1/element')
-            .single
-            .body!['value'],
-        '//XCUIElementTypeImage[@x=10 and @y=20 and @width=100 and '
-        '@height=50]',
-      );
-    });
-
-    test('a refused rotation becomes a typed error with a hint', () async {
-      server.on(
-        'POST',
-        '/session/sess-1/orientation',
-        (_) => const FakeResponse.error(
-          'unknown error',
-          'Unable To Rotate Device',
-          status: HttpStatus.internalServerError,
-        ),
-      );
-      final connector = await connect();
-      addTearDown(connector.dispose);
-
-      await expectLater(
-        connector.setOrientation(NativeOrientation.landscape),
-        throwsA(
-          isA<NativeOperationFailedException>()
-              .having((e) => e.hint, 'hint', contains('native_notifications')),
-        ),
-      );
     });
 
     test('getScreen reports the screen in screenshot pixels', () async {

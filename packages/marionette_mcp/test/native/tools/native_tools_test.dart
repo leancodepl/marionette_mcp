@@ -97,9 +97,6 @@ void main() {
       'native_get_elements': handleNativeGetElements,
       'native_take_screenshot': handleNativeTakeScreenshot,
       'native_wait_for': (c) => handleNativeWaitFor(c, {'text': 'OK'}),
-      'native_long_press': (c) => handleNativeLongPress(c, {'text': 'OK'}),
-      'native_double_tap': (c) => handleNativeDoubleTap(c, {'x': 1, 'y': 1}),
-      'native_pinch': (c) => handleNativePinch(c, {'scale': 2}),
       'native_swipe': (c) => handleNativeSwipe(
             c,
             {'startX': 1, 'startY': 1, 'endX': 2, 'endY': 2},
@@ -273,20 +270,12 @@ void main() {
       ]);
       final context = _contextWith(connector);
 
-      for (final handle in [
-        handleNativeTap,
-        handleNativeLongPress,
-        handleNativeDoubleTap,
-      ]) {
-        expect(
-          await handle(context, {'text': 'Pick file'}),
-          _isToolError(allOf(contains('is disabled'), contains('Hint:'))),
-        );
-      }
+      expect(
+        await handleNativeTap(context, {'text': 'Pick file'}),
+        _isToolError(allOf(contains('is disabled'), contains('Hint:'))),
+      );
       expect(connector.tappedElements, isEmpty);
       expect(connector.taps, isEmpty);
-      expect(connector.longPresses, isEmpty);
-      expect(connector.doubleTaps, isEmpty);
     });
 
     test('taps coordinates', () async {
@@ -965,19 +954,6 @@ void main() {
           reason: 'not the whole timeoutMs');
     });
 
-    test('a lost session ends the wait at once', () async {
-      final connector = FakeNativeConnector()
-        ..error = const NativeSessionLostException('gone');
-
-      final result = await handleNativeWaitFor(_contextWith(connector), {
-        'text': 'Home',
-        'intervalMs': 50,
-      });
-
-      expect(result, _isToolError(contains('gone')));
-      expect(connector.getElementsCalls, 0);
-    });
-
     test('returns the element once it appears', () async {
       final connector = FakeNativeConnector()
         ..onGetElements =
@@ -1084,104 +1060,6 @@ void main() {
     });
   });
 
-  group('native_long_press and native_double_tap', () {
-    test('press the center of the selected element', () async {
-      final connector = FakeNativeConnector.single([
-        nativeElement(text: 'Long press here', x: 100, y: 200),
-      ]);
-      final context = _contextWith(connector);
-
-      expect(
-        await handleNativeLongPress(context, {
-          'textContains': 'long press',
-          'durationMs': 1000,
-        }),
-        _isToolSuccess(contains('long-pressed')),
-      );
-      expect(
-        await handleNativeDoubleTap(context, {'text': 'Long press here'}),
-        _isToolSuccess(contains('double-tapped')),
-      );
-
-      expect(connector.longPresses.single, (x: 150, y: 225, durationMs: 1000));
-      expect(connector.doubleTaps.single, (x: 150, y: 225, delayMs: 100));
-    });
-
-    test('accept coordinates and validate arguments', () async {
-      final connector = FakeNativeConnector();
-      final context = _contextWith(connector);
-
-      await handleNativeLongPress(context, {'x': 5, 'y': 6});
-      expect(connector.longPresses.single, (x: 5, y: 6, durationMs: 600));
-
-      expect(
-        await handleNativeLongPress(context, {'text': 'A', 'x': 1, 'y': 1}),
-        _isToolError(contains('not both')),
-      );
-      expect(
-        await handleNativeLongPress(context, {}),
-        _isToolError(contains('requires either')),
-      );
-      expect(
-        await handleNativeLongPress(context, {'x': 1, 'y': 1, 'durationMs': 5}),
-        _isToolError(contains('durationMs')),
-      );
-      expect(
-        await handleNativeDoubleTap(context, {'x': 1}),
-        _isToolError(contains('both x and y')),
-      );
-    });
-  });
-
-  group('native_pinch', () {
-    test('zooms in around the element with fingers inside it', () async {
-      final connector = FakeNativeConnector.single([
-        nativeElement(text: 'Pinch here', x: 100, y: 500, width: 800),
-      ]);
-
-      final result = await handleNativePinch(
-        _contextWith(connector),
-        {'text': 'Pinch here', 'scale': 2},
-      );
-
-      expect(result, _isToolSuccess(contains('scale 2')));
-      final pinch = connector.pinches.single;
-      expect((pinch.centerX, pinch.centerY), (500, 525));
-      expect(pinch.startSpan, lessThanOrEqualTo(640));
-      expect(pinch.endSpan, pinch.startSpan * 2);
-      expect(pinch.endSpan, lessThanOrEqualTo(800));
-    });
-
-    test('defaults to the screen center and zooms out', () async {
-      final connector = FakeNativeConnector();
-
-      await handleNativePinch(_contextWith(connector), {'scale': 0.5});
-
-      final pinch = connector.pinches.single;
-      expect((pinch.centerX, pinch.centerY), (500, 1000));
-      expect((pinch.startSpan, pinch.endSpan), (800, 400));
-    });
-
-    test('validates scale and refuses pinches without room', () async {
-      final connector = FakeNativeConnector.single([
-        nativeElement(text: 'Tiny', width: 40),
-      ]);
-      final context = _contextWith(connector);
-
-      for (final scale in [null, 1, 0.01, 11]) {
-        expect(
-          await handleNativePinch(context, {'scale': scale}),
-          _isToolError(contains('scale between 0.1 and 10')),
-        );
-      }
-      expect(
-        await handleNativePinch(context, {'text': 'Tiny', 'scale': 0.5}),
-        _isToolError(contains('Not enough room')),
-      );
-      expect(connector.pinches, isEmpty);
-    });
-  });
-
   group('native_swipe', () {
     test('swipes between the given points', () async {
       final connector = FakeNativeConnector();
@@ -1208,34 +1086,6 @@ void main() {
         ),
         _isToolError(contains('requires startX, startY, endX and endY')),
       );
-    });
-  });
-
-  group('native_take_screenshot of an element', () {
-    test('captures the selected element', () async {
-      final connector = FakeNativeConnector.single([
-        nativeElement(text: 'Logo', id: 'logo'),
-      ]);
-
-      final result = await handleNativeTakeScreenshot(_contextWith(connector), {
-        'id': 'logo',
-      });
-
-      expect(result.isError, isFalse);
-      expect(connector.elementScreenshots.single.resourceId, 'logo');
-      expect(
-        result.content.whereType<ImageContent>().single.data,
-        'fake-element-png-base64',
-      );
-    });
-
-    test('reports a missing element', () async {
-      final result = await handleNativeTakeScreenshot(
-        _contextWith(FakeNativeConnector()),
-        {'id': 'logo'},
-      );
-
-      expect(result, _isToolError(contains('No native element')));
     });
   });
 }

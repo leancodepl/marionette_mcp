@@ -101,7 +101,7 @@ Marionette forwards a local port to UIAutomator2: by default the first free port
 export MARIONETTE_UIA2_PORT=8200
 ```
 
-If the device-side server (UIAutomator2 or WebDriverAgent) dies during a session, the next native call re-establishes it automatically. See the [Native lane guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/native-lane.md) and the [design decisions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/native-lane-decisions.md) for details.
+If the device-side server (UIAutomator2 or WebDriverAgent) dies during a session, call `native_connect` again. See the [Native lane guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/native-lane.md) and the [design decisions](https://github.com/leancodepl/marionette_mcp/blob/main/docs/native-lane-decisions.md) for details.
 
 ### Native lane requirements (iOS)
 

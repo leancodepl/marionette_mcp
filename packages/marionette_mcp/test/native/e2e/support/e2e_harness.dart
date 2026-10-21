@@ -63,6 +63,55 @@ class E2eConfig {
         if (serial != null) 'serial': serial,
         if (udid != null) 'udid': udid,
       };
+
+  /// Starts the app, or brings its running instance to the front.
+  Future<void> launchApp() => isAndroid
+      ? _adb([
+          'shell', 'monkey', '-p', appId, '-c', //
+          'android.intent.category.LAUNCHER', '1',
+        ])
+      : _simctl(['launch', _simulator, appId]);
+
+  /// Opens deep link [url] in the app.
+  Future<void> openUrl(String url) => isAndroid
+      ? _adb([
+          'shell', 'am', 'start', '-a', 'android.intent.action.VIEW', //
+          '-d', "'$url'", appId,
+        ])
+      : _simctl(['openurl', _simulator, url]);
+
+  /// Makes the app ask for the camera again. May terminate it.
+  Future<void> resetCameraPermission() async {
+    if (isIos)
+      return _simctl(['privacy', _simulator, 'reset', 'camera', appId]);
+    const camera = 'android.permission.CAMERA';
+    await _adb(['shell', 'pm', 'revoke', appId, camera]);
+    // Clears "don't ask again"; best-effort, older API levels lack it.
+    await Process.run('adb', [
+      if (serial != null) ...['-s', serial!],
+      'shell', 'pm', 'clear-permission-flags', appId, camera, //
+      'user-set', 'user-fixed',
+    ]);
+  }
+
+  String get _simulator => udid ?? 'booted';
+
+  Future<void> _adb(List<String> arguments) => _run('adb', [
+        if (serial != null) ...['-s', serial!],
+        ...arguments
+      ]);
+
+  Future<void> _simctl(List<String> arguments) =>
+      _run('xcrun', ['simctl', ...arguments]);
+
+  static Future<void> _run(String executable, List<String> arguments) async {
+    final result = await Process.run(executable, arguments);
+    expect(
+      result.exitCode,
+      0,
+      reason: '$executable ${arguments.join(' ')}: ${result.stderr}',
+    );
+  }
 }
 
 /// Result of one MCP tool call.

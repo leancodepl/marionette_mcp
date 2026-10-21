@@ -132,7 +132,7 @@ void main() {
         () => keyboard.select(const NativeSelector(type: 'EditText')),
         _ambiguousWith(3),
       );
-      // Gboard does not publish its keys to accessibility (§8).
+      // Gboard does not publish its keys to accessibility.
       expect(keyboard.xml, isNot(contains('inputmethod')));
     });
 
@@ -295,7 +295,7 @@ void main() {
       }
     });
 
-    test('keyboard keys are visible and tappable (§8)', () {
+    test('keyboard keys are visible and tappable', () {
       final keyboard = Fixture('ios', 'ios26_keyboard');
 
       final key = keyboard.select(const NativeSelector(text: 'Q', type: 'Key'));
@@ -308,7 +308,7 @@ void main() {
     });
   });
 
-  group('element state on captured trees (N-01)', () {
+  group('element state on captured trees', () {
     test('Android 9: the focused field, the selected tab, a scroll view', () {
       final keyboard = Fixture('android', 'android28_keyboard');
       final fields = keyboard.elements

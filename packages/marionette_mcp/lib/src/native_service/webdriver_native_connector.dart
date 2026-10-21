@@ -32,9 +32,8 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
 
   final NativeServerBootstrap _bootstrap;
 
-  /// Whether [dispose] disposes the bootstrap; handed to the connector
-  /// [reopenSession] returns.
-  bool _ownsBootstrap;
+  /// Whether [dispose] disposes the bootstrap.
+  final bool _ownsBootstrap;
   bool _disposed = false;
 
   /// Whether [dispose] deletes the session. A subclass turns it off when
@@ -70,21 +69,6 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
       if (ownsBootstrap) await bootstrap.dispose();
       rethrow;
     }
-  }
-
-  /// A connector of the same platform for a new session on [bootstrap]'s
-  /// server, owning it when [ownsBootstrap].
-  Future<WebDriverNativeConnector> openOnSameServer(
-    NativeServerBootstrap bootstrap, {
-    required bool ownsBootstrap,
-  });
-
-  @override
-  Future<NativeConnector?> reopenSession() async {
-    final fresh =
-        await openOnSameServer(_bootstrap, ownsBootstrap: _ownsBootstrap);
-    _ownsBootstrap = false;
-    return fresh;
   }
 
   /// Whether the server still has session [sessionId] — read through a
@@ -156,120 +140,8 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     );
   }
 
-  /// How long a finger stays down for a single tap of [doubleTap].
-  static const _tapPressMs = 50;
-
-  @override
-  Future<void> longPress(int x, int y, {int durationMs = 600}) {
-    final sx = toServerUnits(x);
-    final sy = toServerUnits(y);
-    return client.touchActions(sessionId, [
-      [
-        TouchStep.move(sx, sy),
-        TouchStep.down(),
-        TouchStep.pause(durationMs),
-        TouchStep.up(),
-      ],
-    ]);
-  }
-
-  @override
-  Future<void> doubleTap(int x, int y, {int delayMs = 100}) {
-    final sx = toServerUnits(x);
-    final sy = toServerUnits(y);
-    // One action sequence keeps the gap exact; two separate taps would add
-    // a round trip (tens of ms on WDA) and could exceed the double-tap
-    // timeout.
-    return client.touchActions(sessionId, [
-      [
-        TouchStep.move(sx, sy),
-        TouchStep.down(),
-        TouchStep.pause(_tapPressMs),
-        TouchStep.up(),
-        TouchStep.pause(delayMs),
-        TouchStep.down(),
-        TouchStep.pause(_tapPressMs),
-        TouchStep.up(),
-      ],
-    ]);
-  }
-
-  @override
-  Future<void> pinch({
-    required int centerX,
-    required int centerY,
-    required int startSpan,
-    required int endSpan,
-    int durationMs = 500,
-  }) {
-    final cx = toServerUnits(centerX);
-    final cy = toServerUnits(centerY);
-    final startHalf = toServerUnits(startSpan) ~/ 2;
-    final endHalf = toServerUnits(endSpan) ~/ 2;
-    List<Map<String, dynamic>> finger(int direction) => [
-          TouchStep.move(cx + direction * startHalf, cy),
-          TouchStep.down(),
-          TouchStep.move(
-            cx + direction * endHalf,
-            cy,
-            durationMs: durationMs,
-          ),
-          TouchStep.up(),
-        ];
-    return client.touchActions(sessionId, [finger(-1), finger(1)]);
-  }
-
   @override
   Future<String> takeScreenshot() => client.takeScreenshot(sessionId);
-
-  @override
-  Future<NativeOrientation> getOrientation() async {
-    final raw = await client.getOrientation(sessionId);
-    return NativeOrientation.tryParse(raw) ??
-        (throw WebDriverException('Unknown orientation "$raw"'));
-  }
-
-  @override
-  Future<void> setOrientation(NativeOrientation orientation) async {
-    try {
-      await client.setOrientation(sessionId, orientation.wireName);
-    } on WebDriverException catch (error) {
-      // WDA: "Unable To Rotate Device" while e.g. Notification Center or
-      // the lock screen is in front; both servers also refuse when the app
-      // supports only one orientation.
-      if (error.httpStatus != 500 && error.error != 'unknown error') rethrow;
-      throw NativeOperationFailedException(
-        'The screen cannot be rotated to ${orientation.name} now: '
-        '${error.message}',
-        hint: 'Close system surfaces in front (native_notifications '
-            'action=close) and check that the app supports this '
-            'orientation.',
-      );
-    }
-  }
-
-  /// Finds the server-side id of [element] (an element from the current UI
-  /// tree) by its exact geometry, or null when it is no longer on screen
-  /// (docs/native-lane-decisions.md#d6).
-  Future<String?> locateElement(NativeElement element);
-
-  @override
-  Future<String> takeElementScreenshot(NativeElement element) async {
-    final elementId = await locateElement(element);
-    if (elementId == null) {
-      throw NativeElementNotFoundException(
-        _describeForLookup(element),
-        hint: 'The screen changed; call native_get_elements and retry.',
-      );
-    }
-    return client.elementScreenshot(sessionId, elementId);
-  }
-
-  static String _describeForLookup(NativeElement element) => [
-        element.className,
-        if (element.text != null) 'text="${element.text}"',
-        if (element.resourceId != null) 'id="${element.resourceId}"',
-      ].join(' ');
 
   /// Name of the element attribute holding its class (`className` on
   /// UIAutomator2, `type` on WebDriverAgent).
@@ -335,15 +207,6 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   /// Whether [error] means "no matching element" on either server.
   static bool isNoSuchElement(WebDriverException error) =>
       error.error == 'no such element' || error.httpStatus == 404;
-
-  /// How long [isServerResponding] waits before treating the server as
-  /// gone. Generous, because WebDriverAgent can be slow while busy and a
-  /// false negative costs a full reconnect.
-  static const serverResponseTimeout = Duration(seconds: 5);
-
-  @override
-  Future<bool> isServerResponding() =>
-      client.status().timeout(serverResponseTimeout, onTimeout: () => false);
 
   /// Closes the client but keeps the session and the server, for a later
   /// process to reuse them through `openSession(sessionId: …)` — the CLI

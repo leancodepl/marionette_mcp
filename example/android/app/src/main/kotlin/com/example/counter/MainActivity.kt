@@ -8,8 +8,8 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-// FlutterFragmentActivity (not FlutterActivity) because local_auth needs a
-// FragmentActivity for the biometric prompt.
+// FlutterFragmentActivity (not FlutterActivity): a ComponentActivity, which
+// registerForActivityResult needs for the native screen.
 class MainActivity : FlutterFragmentActivity() {
     private var pendingNativeScreen: MethodChannel.Result? = null
 
@@ -31,7 +31,7 @@ class MainActivity : FlutterFragmentActivity() {
                 NativeControlsViewFactory(messenger),
             )
 
-        // Native UI that the native lane must handle on its own (§9, §10, §11).
+        // Native UI that the native lane must handle on its own.
         MethodChannel(messenger, "marionette-demo/native").setMethodCallHandler { call, result ->
             when (call.method) {
                 "showAlert" -> showAlert(

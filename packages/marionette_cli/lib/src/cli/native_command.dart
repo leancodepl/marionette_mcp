@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
@@ -42,22 +41,15 @@ abstract class NativeCommand extends Command<int> {
   /// malformed values.
   Map<String, dynamic> toolArguments();
 
-  /// Flutter view metrics for commands that bridge to the Flutter lane.
-  Future<Map<String, dynamic>> Function()? get flutterViewMetrics => null;
-
   /// Saves an image returned by the tool. Commands without image output
   /// report that it was dropped.
   Future<void> saveImage(ImageContent image) async {
     stderr.writeln('(image output not saved)');
   }
 
-  /// Releases anything [flutterViewMetrics] opened.
-  Future<void> cleanup() async {}
-
   @override
   Future<int> run() async {
     final args = toolArguments();
-    final viewMetrics = flutterViewMetrics;
     final name = nativeSessionName(globalResults);
     final info = nativeRegistry.get(name);
     if (info == null) {
@@ -91,20 +83,16 @@ abstract class NativeCommand extends Command<int> {
       return 1;
     }
 
-    final context = NativeServiceContext(flutterViewMetrics: viewMetrics)
+    final context = NativeServiceContext()
       ..connector = connector
-      ..platform = platform
-      ..defaultAppId = info.defaultAppId;
+      ..platform = platform;
     try {
       final result = await execute(context, args);
       return await _print(result);
     } finally {
-      info
-        ..sessionId = connector.sessionId
-        ..defaultAppId = context.defaultAppId ?? info.defaultAppId;
+      info.sessionId = connector.sessionId;
       nativeRegistry.save(info);
       connector.release();
-      await cleanup();
     }
   }
 
@@ -213,19 +201,6 @@ abstract class NativeCommand extends Command<int> {
     final results = _results;
     if (results == null || !results.wasParsed(name)) return null;
     return results[name] as bool;
-  }
-
-  /// JSON object value of option [name], or null when not given.
-  Map<String, dynamic>? jsonObject(String name) {
-    final value = string(name);
-    if (value == null) return null;
-    try {
-      final decoded = jsonDecode(value);
-      if (decoded is Map<String, dynamic>) return decoded;
-    } on FormatException {
-      // Reported below.
-    }
-    usageException('--$name must be a JSON object, got "$value".');
   }
 
   /// [args] without the entries that were not given.

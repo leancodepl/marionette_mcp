@@ -6,11 +6,14 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-/// The plan's CLI acceptance (D-01): the §3 permission scenario driven only
-/// by `marionette native-*` commands against the example app on an emulator
-/// or simulator. Run with `dart test -P device`; set
+/// The permission scenario driven by `marionette native-*` commands (device
+/// setup with adb / simctl) against the example app on an emulator or
+/// simulator. Run with `dart test -P device`; set
 /// `MARIONETTE_E2E_PLATFORM=ios` (and `MARIONETTE_E2E_UDID` /
 /// `MARIONETTE_E2E_SERIAL` when several devices are connected).
+const _app = 'com.example.counter';
+const _link = 'marionette-example://app/testing/permission-dialogs';
+
 void main() {
   final env = Platform.environment;
   final platform = env['MARIONETTE_E2E_PLATFORM'] ?? 'android';
@@ -45,7 +48,7 @@ void main() {
     await Process.run(marionette, [...session, 'native-disconnect']);
   });
 
-  test('§3 permission dialog only from the CLI', () async {
+  test('permission dialog only from the CLI', () async {
     await run([
       'native-connect',
       '--platform',
@@ -55,31 +58,64 @@ void main() {
     ]);
     expect(await run(['native-sessions']), contains('e2e\t$platform'));
 
-    await run([
-      'native-permissions',
-      '--action', 'reset', //
-      '--permission', 'camera',
-      '--app-id', 'com.example.counter',
-    ]);
-    await run(['native-app', '--action', 'activate']);
-    // A deep link sent while the app starts is lost on Android (D11).
-    await run(['native-wait-for', '--text-contains', 'Tab 1 of 4']);
-    await run([
-      'native-open-url',
-      '--url',
-      'marionette-example://app/testing/device',
-    ]);
-    await run(['native-wait-for', '--text', 'Request camera']);
-    await run(
-        ['native-scroll', '--direction', 'up', '--text', 'Request camera']);
-    await run(['native-tap', '--text', 'Request camera']);
+    // Device setup outside Marionette: reset the camera permission, start
+    // the app and open the screen by deep link.
+    final adb = [
+      'adb',
+      if (serial != null) ...['-s', serial]
+    ];
+    final simulator = udid ?? 'booted';
+    for (final command in platform == 'android'
+        ? [
+            [
+              ...adb,
+              'shell',
+              'pm',
+              'revoke',
+              _app,
+              'android.permission.CAMERA'
+            ],
+            [
+              ...adb, 'shell', 'monkey', '-p', _app, '-c', //
+              'android.intent.category.LAUNCHER', '1',
+            ],
+          ]
+        : [
+            ['xcrun', 'simctl', 'privacy', simulator, 'reset', 'camera', _app],
+            ['xcrun', 'simctl', 'launch', simulator, _app],
+          ]) {
+      final result = await Process.run(command.first, command.skip(1).toList());
+      expect(result.exitCode, 0, reason: '$command: ${result.stderr}');
+    }
+    // A deep link sent while the app starts is lost on Android: send it
+    // again until the screen shows.
+    for (var attempt = 1;; attempt++) {
+      final link = await Process.run(
+        platform == 'android' ? adb.first : 'xcrun',
+        platform == 'android'
+            ? [
+                ...adb.skip(1), 'shell', 'am', 'start', '-a', //
+                'android.intent.action.VIEW', '-d', "'$_link'", _app,
+              ]
+            : ['simctl', 'openurl', simulator, _link],
+      );
+      expect(link.exitCode, 0, reason: '${link.stderr}');
+      final shown = await Process.run(marionette, [
+        ...session, 'native-wait-for', '--text-contains', 'Camera access', //
+        '--timeout-ms', '8000',
+      ]);
+      if (shown.exitCode == 0) break;
+      expect(attempt, lessThan(3), reason: '${shown.stderr}');
+    }
+    await run(['native-tap', '--text', 'Request', '--index', '0']);
 
     final allow = platform == 'android'
         ? ['--text-contains', 'While using', '--type', 'android.widget.Button']
         : ['--text', 'Allow', '--type', 'XCUIElementTypeButton'];
     await run(['native-wait-for', ...allow, '--timeout-ms', '10000']);
     await run(['native-tap', ...allow]);
-    await run(['native-wait-for', '--text-contains', 'camera: granted']);
+    await run(
+        ['native-wait-for', '--text-contains', 'Camera access · granted']);
 
     // A missing element fails with the shared message and exit code 1.
     final missing = await run(

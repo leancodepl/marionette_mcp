@@ -152,7 +152,6 @@ Future<CallToolResult> handleNativeGetElements(
           filter.matches(element),
     );
     final foreground = await foregroundApp;
-    context.observeForegroundApp(foreground);
     final payload = <String, dynamic>{
       'elements': elements.map((e) => e.toJson()).toList(),
       if (foregroundApp != null) 'foregroundApp': foreground,
@@ -242,12 +241,9 @@ Future<CallToolResult> handleNativeWaitFor(
         );
       } on NativeNotConnectedException {
         rethrow;
-      } on NativeSessionLostException {
-        // Recovery could not restore the session; retrying will not help.
-        rethrow;
       } catch (error) {
         // A read can fail while the app is starting (seen on iOS right
-        // after native_app activate of a terminated app): try again, but
+        // after a terminated app was activated): try again, but
         // let a lasting failure through instead of waiting out timeoutMs.
         failedReads++;
         final remaining = timeoutMs - stopwatch.elapsedMilliseconds;
@@ -269,11 +265,6 @@ Future<CallToolResult> handleNativeWaitFor(
         NativeWaitState.gone => match == null,
       };
       if (done) {
-        // The app under test is often first seen here (docs/
-        // native-lane-decisions.md#d7); free once it is known.
-        if (state == NativeWaitState.visible) {
-          await context.observeForegroundAppIfUnknown();
-        }
         return _waitResult(selector, state, stopwatch.elapsedMilliseconds,
             match: match);
       }

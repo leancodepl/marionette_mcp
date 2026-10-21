@@ -13,8 +13,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 const _defaultSwipeDistance = 400;
 const _defaultMaxSwipes = 10;
 const _maxMaxSwipes = 50;
-const _defaultLongPressMs = 600;
-const _defaultDoubleTapDelayMs = 100;
 const _defaultSwipeDurationMs = 300;
 const _maxGestureDurationMs = 10000;
 
@@ -34,10 +32,6 @@ const _searchSwipeShare = 0.6;
 /// past the target, even with a 200 ms rest.
 const _searchSwipeDurationMs = 1000;
 const _searchHoldMs = 300;
-
-/// Smallest distance between the two fingers of a pinch, in screenshot
-/// pixels; closer fingers merge into one touch on some devices.
-const _minPinchSpan = 60;
 
 /// Finger-swipe direction for [native_scroll] (screen coordinates).
 enum SwipeDirection {
@@ -143,83 +137,6 @@ void registerNativeGestureTools(
       callback: (args, extra) => handleNativeTap(context, args),
     )
     ..registerTool(
-      'native_long_press',
-      description:
-          'Long-presses a native element (selector: text, textContains, id, '
-          'type, optional index) or x+y in screenshot pixels, holding for '
-          'durationMs (default $_defaultLongPressMs). Opens context menus, '
-          'starts drag/reorder, or shows tooltips. '
-          '$nativeSelectorRules '
-          '$nativeRoutingPreferFlutter '
-          'Requires native_connect.',
-      annotations: const ToolAnnotations(title: 'Native Long Press'),
-      inputSchema: ToolInputSchema(
-        properties: {
-          ...nativeSelectorProperties(),
-          ..._pointProperties('to press'),
-          'durationMs': JsonSchema.integer(
-            description: 'How long to hold, in milliseconds (default '
-                '$_defaultLongPressMs).',
-          ),
-        },
-      ),
-      callback: (args, extra) => handleNativeLongPress(context, args),
-    )
-    ..registerTool(
-      'native_double_tap',
-      description:
-          'Double-taps a native element (selector: text, textContains, id, '
-          'type, optional index) or x+y in screenshot pixels, with delayMs '
-          '(default $_defaultDoubleTapDelayMs) between the taps. Zooms maps, '
-          'images and web pages. '
-          '$nativeSelectorRules '
-          '$nativeRoutingPreferFlutter '
-          'Requires native_connect.',
-      annotations: const ToolAnnotations(title: 'Native Double Tap'),
-      inputSchema: ToolInputSchema(
-        properties: {
-          ...nativeSelectorProperties(),
-          ..._pointProperties('to tap'),
-          'delayMs': JsonSchema.integer(
-            description: 'Pause between the two taps in milliseconds '
-                '(default $_defaultDoubleTapDelayMs; keep it under ~250).',
-          ),
-        },
-      ),
-      callback: (args, extra) => handleNativeDoubleTap(context, args),
-    )
-    ..registerTool(
-      'native_pinch',
-      description: 'Two-finger pinch on a native element (selector: text, '
-          'textContains, id, type, optional index) or around x+y in '
-          'screenshot pixels (default: screen center). scale > 1 spreads the '
-          'fingers (zoom in), scale < 1 pinches them together (zoom out); '
-          'the fingers start inside the element and move horizontally. The '
-          'scale an app sees is approximate: it starts measuring after the '
-          'fingers have moved a little. '
-          '$nativeSelectorRules '
-          '$nativeRoutingPreferFlutter '
-          'Requires native_connect.',
-      annotations: const ToolAnnotations(title: 'Native Pinch'),
-      inputSchema: ToolInputSchema(
-        properties: {
-          'scale': JsonSchema.number(
-            description: 'End distance between the fingers divided by the '
-                'start distance, e.g. 2 (zoom in) or 0.5 (zoom out). Between '
-                '0.1 and 10.',
-          ),
-          ...nativeSelectorProperties(),
-          ..._pointProperties('of the pinch center'),
-          'durationMs': JsonSchema.integer(
-            description: 'Duration of the finger movement in milliseconds '
-                '(default 500).',
-          ),
-        },
-        required: ['scale'],
-      ),
-      callback: (args, extra) => handleNativePinch(context, args),
-    )
-    ..registerTool(
       'native_swipe',
       description: 'Swipes one finger from (startX, startY) to (endX, endY) in '
           'screenshot pixels over durationMs (default '
@@ -309,12 +226,11 @@ final class _PointTarget {
   final ({int x, int y})? point;
 
   /// Parses a selector or x+y from [args]. Returns an error message for
-  /// invalid combinations; with [optional], neither is accepted too.
+  /// invalid combinations.
   static ({_PointTarget? target, String? error}) parse(
     Map<String, dynamic> args,
-    String tool, {
-    bool optional = false,
-  }) {
+    String tool,
+  ) {
     final selector = nativeSelectorFromArgs(args);
     final coordinates = argPairPresence(args, 'x', 'y');
     final hasCoords = coordinates != ArgPairPresence.none;
@@ -324,7 +240,7 @@ final class _PointTarget {
     if (hasSelector && hasCoords) {
       error = '$tool takes either a selector (text, textContains, id, type) '
           'or x and y — not both.';
-    } else if (!hasSelector && !hasCoords && !optional) {
+    } else if (!hasSelector && !hasCoords) {
       error = '$tool requires either a selector (text, textContains, id, '
           'type) or both x and y.';
     } else if (coordinates == ArgPairPresence.partial) {
@@ -339,8 +255,6 @@ final class _PointTarget {
     return (target: _PointTarget._(selector, point), error: null);
   }
 
-  bool get isEmpty => point == null && selector.isEmpty;
-
   /// The selected element, or null for coordinates / an empty target. A
   /// disabled element fails: a gesture on it would do nothing, or land on a
   /// sheet covering it.
@@ -351,26 +265,18 @@ final class _PointTarget {
               selectElement(await connector.getNativeElements(), selector),
               selector,
             );
-
-  String describe() {
-    final p = point;
-    if (p != null) return 'at (${p.x}, ${p.y})';
-    return 'on native element ${selector.describe()}';
-  }
 }
 
 /// Reads an optional positive duration argument, or returns an error.
 ({int? value, String? error}) _durationArg(
   Map<String, dynamic> args,
-  String key, {
-  int min = 1,
-}) {
+  String key,
+) {
   final value = intArg(args, key);
-  if (value != null && (value < min || value > _maxGestureDurationMs)) {
+  if (value != null && (value < 1 || value > _maxGestureDurationMs)) {
     return (
       value: null,
-      error: 'Parameter "$key" must be between $min and '
-          '$_maxGestureDurationMs.',
+      error: 'Parameter "$key" must be between 1 and $_maxGestureDurationMs.',
     );
   }
   return (value: value, error: null);
@@ -410,140 +316,6 @@ Future<CallToolResult> handleNativeTap(
       ],
     );
   });
-}
-
-/// Handles `native_long_press`.
-Future<CallToolResult> handleNativeLongPress(
-  NativeServiceContext context,
-  Map<String, dynamic> args,
-) async {
-  final logger = context.logger;
-  final parsed = _PointTarget.parse(args, 'native_long_press');
-  final target = parsed.target;
-  if (target == null) return invalidArguments(parsed.error!);
-  final duration = _durationArg(args, 'durationMs', min: 100);
-  if (duration.error != null) return invalidArguments(duration.error!);
-  final durationMs = duration.value ?? _defaultLongPressMs;
-
-  logger.info('Native long press ${target.describe()} for ${durationMs}ms');
-  return runTool(logger, 'native long press', () async {
-    final connector = context.requireConnector();
-    final point = target.point ?? (await target.element(connector))!.center;
-    await connector.longPress(point.x, point.y, durationMs: durationMs);
-    return CallToolResult(
-      content: [
-        TextContent(
-          text: 'Successfully long-pressed ${target.describe()} '
-              '(${durationMs}ms)',
-        ),
-      ],
-    );
-  });
-}
-
-/// Handles `native_double_tap`.
-Future<CallToolResult> handleNativeDoubleTap(
-  NativeServiceContext context,
-  Map<String, dynamic> args,
-) async {
-  final logger = context.logger;
-  final parsed = _PointTarget.parse(args, 'native_double_tap');
-  final target = parsed.target;
-  if (target == null) return invalidArguments(parsed.error!);
-  final delay = _durationArg(args, 'delayMs', min: 0);
-  if (delay.error != null) return invalidArguments(delay.error!);
-  final delayMs = delay.value ?? _defaultDoubleTapDelayMs;
-
-  logger.info('Native double tap ${target.describe()} (delay ${delayMs}ms)');
-  return runTool(logger, 'native double tap', () async {
-    final connector = context.requireConnector();
-    final point = target.point ?? (await target.element(connector))!.center;
-    await connector.doubleTap(point.x, point.y, delayMs: delayMs);
-    return CallToolResult(
-      content: [
-        TextContent(text: 'Successfully double-tapped ${target.describe()}'),
-      ],
-    );
-  });
-}
-
-/// Handles `native_pinch`.
-Future<CallToolResult> handleNativePinch(
-  NativeServiceContext context,
-  Map<String, dynamic> args,
-) async {
-  final logger = context.logger;
-  final scale = (args['scale'] as num?)?.toDouble();
-  if (scale == null || scale < 0.1 || scale > 10 || scale == 1) {
-    return invalidArguments(
-      'native_pinch requires scale between 0.1 and 10, other than 1 '
-      '(> 1 zooms in, < 1 zooms out).',
-    );
-  }
-  final parsed = _PointTarget.parse(args, 'native_pinch', optional: true);
-  final target = parsed.target;
-  if (target == null) return invalidArguments(parsed.error!);
-  final duration = _durationArg(args, 'durationMs', min: 100);
-  if (duration.error != null) return invalidArguments(duration.error!);
-
-  final where = target.isEmpty ? 'at the screen center' : target.describe();
-  logger.info('Native pinch $where (scale $scale)');
-  return runTool(logger, 'native pinch', () async {
-    final connector = context.requireConnector();
-    final screen = await connector.getScreen();
-    final element = await target.element(connector);
-    final center = target.point ??
-        element?.center ??
-        (x: screen.width ~/ 2, y: screen.height ~/ 2);
-    final spans = pinchSpans(
-      scale: scale,
-      centerX: center.x,
-      screenWidth: screen.width,
-      elementWidth: element?.bounds.width,
-    );
-    if (spans == null) {
-      throw NativeOperationFailedException(
-        'Not enough room for a pinch with scale $scale $where.',
-        hint: 'Use a scale closer to 1, or pinch a larger element / '
-            'closer to the screen center.',
-      );
-    }
-    await connector.pinch(
-      centerX: center.x,
-      centerY: center.y,
-      startSpan: spans.startSpan,
-      endSpan: spans.endSpan,
-      durationMs: duration.value ?? 500,
-    );
-    return CallToolResult(
-      content: [
-        TextContent(
-          text: 'Successfully pinched $where (scale $scale, fingers '
-              '${spans.startSpan}px → ${spans.endSpan}px apart)',
-        ),
-      ],
-    );
-  });
-}
-
-/// Finger distances for a horizontal pinch of [scale] around [centerX].
-///
-/// Both fingers must stay on screen; they must also start inside the
-/// element ([elementWidth]), because apps only receive touches that begin
-/// on them. Uses 80% of the available room. Returns null when the closer
-/// span would be under [_minPinchSpan].
-({int startSpan, int endSpan})? pinchSpans({
-  required double scale,
-  required int centerX,
-  required int screenWidth,
-  int? elementWidth,
-}) {
-  final screenRoom = 2 * min(centerX, screenWidth - centerX) * 0.8;
-  final startRoom = min(screenRoom, (elementWidth ?? screenWidth) * 0.8);
-  final startSpan = scale > 1 ? min(startRoom, screenRoom / scale) : startRoom;
-  final endSpan = startSpan * scale;
-  if (min(startSpan, endSpan) < _minPinchSpan) return null;
-  return (startSpan: startSpan.round(), endSpan: endSpan.round());
 }
 
 /// Handles `native_swipe`.

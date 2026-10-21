@@ -1,4 +1,4 @@
-# Tests tagged `device` drive a real emulator / simulator (T-04). They are
+# Tests tagged `device` drive a real emulator / simulator. They are
 # left out of a plain `dart test`; run them with `dart test -P device`.
 tags:
   device:

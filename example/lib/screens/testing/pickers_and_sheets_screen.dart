@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// §4 Pickers and sheets — OS-owned file/photo/camera/share UI.
+/// Pickers and sheets — OS-owned file/photo/camera/share UI.
 class PickersAndSheetsScreen extends StatefulWidget {
   const PickersAndSheetsScreen({super.key});
 

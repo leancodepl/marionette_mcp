@@ -32,8 +32,7 @@ void main() {
       );
 
   test('JSON roundtrip preserves all fields', () {
-    final info = session('default', sessionId: 'sess-1')
-      ..defaultAppId = 'com.example.counter';
+    final info = session('default', sessionId: 'sess-1');
 
     final restored = NativeSessionInfo.fromJson(info.toJson());
 

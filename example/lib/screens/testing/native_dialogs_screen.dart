@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'native_demo_channel.dart';
 
-/// §11 Native dialogs from plugins and platform code: an AlertDialog /
+/// Native dialogs from plugins and platform code: an AlertDialog /
 /// UIAlertController shown over MethodChannel, and the iOS App Tracking
 /// Transparency prompt. Neither is in the Flutter tree.
 class NativeDialogsScreen extends StatefulWidget {

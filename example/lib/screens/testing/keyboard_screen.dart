@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// §8 Keyboard / IME — native keyboard occludes layout; test via native lane.
+/// Keyboard / IME — native keyboard occludes layout; test via native lane.
 class KeyboardScreen extends StatefulWidget {
   const KeyboardScreen({super.key});
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-/// §3 Permission dialogs — OS-owned alerts (permissioncontroller / SpringBoard).
+/// Permission dialogs — OS-owned alerts (permissioncontroller / SpringBoard).
 class PermissionDialogsScreen extends StatefulWidget {
   const PermissionDialogsScreen({super.key});
 
@@ -70,10 +70,8 @@ class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
             padding: const EdgeInsets.all(16),
             child: Text(
               'Trigger system permission dialogs via permission_handler. '
-              'Reset between runs with native_permissions action=reset '
-              '(e.g. permission=camera), or skip a dialog with action=grant. '
-              'Revoking (Android) and most changes on iOS close the app — '
-              'bring it back with native_app action=activate.',
+              'Reset between runs with adb shell pm revoke (Android) or '
+              'xcrun simctl privacy … reset (iOS); this may close the app.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),

@@ -12,25 +12,6 @@ import 'package:marionette_mcp/src/native_service/native_key.dart';
 export 'package:marionette_mcp/src/native_service/native_device.dart';
 export 'package:marionette_mcp/src/native_service/native_key.dart';
 
-/// Screen orientation, as named by W3C WebDriver.
-enum NativeOrientation {
-  portrait('PORTRAIT'),
-  landscape('LANDSCAPE');
-
-  const NativeOrientation(this.wireName);
-
-  /// Value of the WebDriver `orientation` endpoint.
-  final String wireName;
-
-  static NativeOrientation? tryParse(Object? raw) {
-    final normalized = raw is String ? raw.toLowerCase().trim() : null;
-    for (final value in values) {
-      if (value.name == normalized) return value;
-    }
-    return null;
-  }
-}
-
 /// Rectangle in **screenshot pixels**: the pixel grid of the image returned
 /// by `native_take_screenshot`, on every platform.
 ///
@@ -298,26 +279,6 @@ abstract class NativeConnector {
     int holdMs = 0,
   });
 
-  /// Presses at ([x], [y]) in screenshot pixels and holds for [durationMs].
-  Future<void> longPress(int x, int y, {int durationMs = 600});
-
-  /// Taps twice at ([x], [y]) with [delayMs] between the taps.
-  Future<void> doubleTap(int x, int y, {int delayMs = 100});
-
-  /// Two-finger pinch centered on ([centerX], [centerY]): the fingers start
-  /// [startSpan] screenshot pixels apart (horizontally) and move to
-  /// [endSpan] apart over [durationMs]. `endSpan > startSpan` zooms in.
-  Future<void> pinch({
-    required int centerX,
-    required int centerY,
-    required int startSpan,
-    required int endSpan,
-    int durationMs = 500,
-  });
-
-  /// Captures a PNG of just [element] (base64), in screenshot pixels.
-  Future<String> takeElementScreenshot(NativeElement element);
-
   /// Captures a PNG of the full device screen (system dialogs included)
   /// and returns it as a base64-encoded string.
   ///
@@ -329,31 +290,9 @@ abstract class NativeConnector {
   /// Current screen size in screenshot pixels and the server-unit scale.
   Future<NativeScreen> getScreen();
 
-  /// Current screen orientation.
-  Future<NativeOrientation> getOrientation();
-
-  /// Rotates the screen to [orientation]; [getScreen] and element bounds
-  /// follow the new orientation.
-  Future<void> setOrientation(NativeOrientation orientation);
-
-  /// Operations on the device that do not use the UI session (permissions,
-  /// app lifecycle, URLs …); see docs/native-lane-decisions.md#d12.
+  /// Operations on the device that do not use the UI session (the
+  /// notification shade); see docs/native-lane-decisions.md#d12.
   NativeDevice get device;
-
-  /// Whether the device-side server answers a health check right now.
-  ///
-  /// Never throws; a slow or dead server reports false. Used before actions
-  /// to tell "the server was already gone" (safe to reconnect and act) from
-  /// "the connection broke while acting" (see
-  /// docs/native-lane-decisions.md#d3).
-  Future<bool> isServerResponding();
-
-  /// Opens a new WebDriver session on the same, still running server and
-  /// returns a connector for it, which takes over the server; this one keeps
-  /// only its (lost) session. For a session taken over by another client
-  /// while the server is healthy (docs/native-lane-decisions.md#d3). Null
-  /// when the connector cannot do that.
-  Future<NativeConnector?> reopenSession();
 
   /// Ends the session and tears down any resources the connector started.
   Future<void> dispose();

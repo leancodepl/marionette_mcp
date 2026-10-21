@@ -3,7 +3,7 @@ import 'package:video_player/video_player.dart';
 
 const _sampleVideoUrl = 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
 
-/// §1b GPU-backed platform view — [VideoPlayer] (ExoPlayer / AVPlayerLayer).
+/// GPU-backed platform view — [VideoPlayer] (ExoPlayer / AVPlayerLayer).
 class VideoPlayerPlatformViewScreen extends StatefulWidget {
   const VideoPlayerPlatformViewScreen({super.key});
 

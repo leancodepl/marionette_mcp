@@ -35,7 +35,7 @@ Future<void> _initialize() => _initialized ??= () async {
       }
     }();
 
-/// §9 Notifications and toasts: a local notification posted after a delay
+/// Notifications and toasts: a local notification posted after a delay
 /// (so the app can be sent to the background first), opening the app from
 /// it, and an Android Toast.
 class NotificationsScreen extends StatefulWidget {
@@ -129,7 +129,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         children: [
           Text(
             'Post a notification in 3 s (send the app to the background '
-            'with native_app action=background to see a banner), read it '
+            'with native_press_key key=home to see a banner), read it '
             'with native_notifications action=open and tap it to come back.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),

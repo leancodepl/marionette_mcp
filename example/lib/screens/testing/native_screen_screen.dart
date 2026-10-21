@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'native_demo_channel.dart';
 
-/// §10 A full native screen (Activity / UIViewController) opened from
+/// A full native screen (Activity / UIViewController) opened from
 /// Flutter; it returns the text typed into its native field.
 class NativeScreenScreen extends StatefulWidget {
   const NativeScreenScreen({super.key});

@@ -370,7 +370,7 @@ void _unitTests() {
     });
   });
 
-  group('element state (N-01)', () {
+  group('element state', () {
     test('Android: field content, focus, checked, selected, scrollable', () {
       final elements = parseAndroidUiDump('''
 <hierarchy>

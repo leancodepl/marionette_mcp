@@ -93,13 +93,6 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   }
 
   @override
-  Future<WebDriverNativeConnector> openOnSameServer(
-    NativeServerBootstrap bootstrap, {
-    required bool ownsBootstrap,
-  }) =>
-      connect(bootstrap: bootstrap, adb: _adb, ownsBootstrap: ownsBootstrap);
-
-  @override
   List<NativeElement> parseSource(String xml) => parseAndroidUiDump(xml);
 
   /// How long a tree read keeps retrying while a toast is on screen; a long
@@ -279,17 +272,6 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     );
   }
 
-  /// Locates [element] by its class and exact bounds (unique even when ids
-  /// or texts repeat), then by resource id.
-  @override
-  Future<String?> locateElement(NativeElement element) async {
-    final elementId = await _tryFind('xpath', androidGeometryXPath(element));
-    if (elementId != null) return elementId;
-    final resourceId = element.resourceId;
-    if (resourceId == null) return null;
-    return _tryFind('id', resourceId);
-  }
-
   Future<String?> _tryFind(String using, String value) async {
     try {
       return await client.findElement(sessionId, using, value);
@@ -300,12 +282,4 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       rethrow;
     }
   }
-}
-
-/// XPath selecting the UIAutomator2 node of [element]'s class at exactly its
-/// bounds (`[x1,y1][x2,y2]`, pixels — the same units as the element).
-String androidGeometryXPath(NativeElement element) {
-  final b = element.bounds;
-  return '//*[@class=${xpathLiteral(element.className)} and '
-      '@bounds="[${b.x},${b.y}][${b.x + b.width},${b.y + b.height}]"]';
 }

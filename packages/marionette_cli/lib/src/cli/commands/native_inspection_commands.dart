@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:marionette_cli/src/cli/native_command.dart';
 import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
-import 'package:marionette_mcp/src/native_service/tools/device_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -94,7 +93,6 @@ class NativeWaitForCommand extends NativeCommand {
 
 class NativeTakeScreenshotCommand extends NativeCommand {
   NativeTakeScreenshotCommand(this.nativeRegistry) {
-    addSelectorOptions();
     argParser.addOption(
       'output',
       abbr: 'o',
@@ -111,42 +109,7 @@ class NativeTakeScreenshotCommand extends NativeCommand {
 
   @override
   String get description =>
-      'Save a screenshot of the whole device screen (system UI included), or '
-      'of one element chosen by a selector.';
-
-  @override
-  Map<String, dynamic> toolArguments() => NativeCommand.compact(selectorArgs());
-
-  @override
-  Future<CallToolResult> execute(
-    NativeServiceContext context,
-    Map<String, dynamic> args,
-  ) =>
-      handleNativeTakeScreenshot(context, args);
-
-  @override
-  Future<void> saveImage(ImageContent image) async {
-    final path = argResults!['output'] as String;
-    File(path)
-      ..createSync(recursive: true)
-      ..writeAsBytesSync(base64Decode(image.data));
-    stdout.writeln('Saved screenshot: $path');
-  }
-}
-
-class NativeDeviceInfoCommand extends NativeCommand {
-  NativeDeviceInfoCommand(this.nativeRegistry);
-
-  @override
-  final NativeSessionRegistry nativeRegistry;
-
-  @override
-  String get name => 'native-device-info';
-
-  @override
-  String get description =>
-      'Print platform, OS version, model, screen, orientation, foreground app '
-      'and the default app id as JSON.';
+      'Save a screenshot of the whole device screen (system UI included).';
 
   @override
   Map<String, dynamic> toolArguments() => const {};
@@ -156,5 +119,14 @@ class NativeDeviceInfoCommand extends NativeCommand {
     NativeServiceContext context,
     Map<String, dynamic> args,
   ) =>
-      handleNativeDeviceInfo(context);
+      handleNativeTakeScreenshot(context);
+
+  @override
+  Future<void> saveImage(ImageContent image) async {
+    final path = argResults!['output'] as String;
+    File(path)
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(base64Decode(image.data));
+    stdout.writeln('Saved screenshot: $path');
+  }
 }

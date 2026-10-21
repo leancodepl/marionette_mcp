@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
@@ -68,15 +66,6 @@ void registerInfoExtensions({
   );
 
   registerInternalMarionetteExtension(
-    name: 'marionette.getViewMetrics',
-    callback: (params) async {
-      final dispatcher = WidgetsBinding.instance.platformDispatcher;
-      final view = dispatcher.implicitView ?? dispatcher.views.first;
-      return MarionetteExtensionResult.success(viewMetricsOf(view));
-    },
-  );
-
-  registerInternalMarionetteExtension(
     name: 'marionette.getLogs',
     callback: (params) async {
       final logStore = logStoreProvider();
@@ -107,29 +96,4 @@ void registerInfoExtensions({
       });
     },
   );
-}
-
-/// Size and scale of [view], so coordinates from `marionette.interactiveElements`
-/// (logical pixels of the view) can be converted to the device screen by the
-/// native lane (docs/native-lane-decisions.md#d13 in marionette_mcp).
-///
-/// Sizes and padding are physical pixels; `logicalWidth` / `logicalHeight`
-/// are the view size in the units of element bounds.
-Map<String, Object> viewMetricsOf(ui.FlutterView view) {
-  final size = view.physicalSize;
-  final ratio = view.devicePixelRatio;
-  final padding = view.padding;
-  return {
-    'devicePixelRatio': ratio,
-    'physicalWidth': size.width,
-    'physicalHeight': size.height,
-    'logicalWidth': size.width / ratio,
-    'logicalHeight': size.height / ratio,
-    'padding': {
-      'top': padding.top,
-      'right': padding.right,
-      'bottom': padding.bottom,
-      'left': padding.left,
-    },
-  };
 }

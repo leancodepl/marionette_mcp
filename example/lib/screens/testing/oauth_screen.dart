@@ -21,7 +21,7 @@ const _loginPage = '''
 </body></html>
 ''';
 
-/// §7 OAuth in the system browser (Custom Tabs / ASWebAuthenticationSession).
+/// OAuth in the system browser (Custom Tabs / ASWebAuthenticationSession).
 /// The login page is served by the app itself on 127.0.0.1, so no network
 /// or external server is needed; signing in redirects to
 /// marionette-auth://callback, which returns to the app.

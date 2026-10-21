@@ -84,12 +84,6 @@ final class NativeUnsupportedException extends NativeLaneException {
   const NativeUnsupportedException(super.message, {super.hint});
 }
 
-/// The device-side automation server or its session went away and could not
-/// be transparently re-established. See docs/native-lane-decisions.md#d3.
-final class NativeSessionLostException extends NativeLaneException {
-  const NativeSessionLostException(super.message, {super.hint});
-}
-
 /// Preparing the device-side automation server failed.
 sealed class NativeBootstrapException extends NativeLaneException {
   const NativeBootstrapException(super.message, {super.hint});

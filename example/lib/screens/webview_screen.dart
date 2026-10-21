@@ -7,7 +7,7 @@ const _formAsset = 'assets/webview_form.html';
 /// Page shown in the WebView.
 enum _Page { form, website }
 
-/// §2 WebView. The default page is a local form (no network needed) with
+/// WebView. The default page is a local form (no network needed) with
 /// fields, a checkbox, a select, a button and a link, so the native lane's
 /// view of web content can be checked; the marionette_mcp website is the
 /// alternative.

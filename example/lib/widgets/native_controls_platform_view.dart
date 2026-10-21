@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 /// View type registered in Android [MainActivity] and iOS [AppDelegate].
 const kNativeControlsPlatformViewType = 'marionette-demo-native-controls';
 
-/// Embedded native label, text field, and button (§1a plain platform view).
+/// Embedded native label, text field, and button (plain platform view).
 class NativeControlsPlatformView extends StatelessWidget {
   const NativeControlsPlatformView({super.key});
 

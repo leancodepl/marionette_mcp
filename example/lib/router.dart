@@ -11,9 +11,6 @@ import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/testing/camera_platform_view_screen.dart';
-import 'screens/testing/auth_screen.dart';
-import 'screens/testing/device_screen.dart';
-import 'screens/testing/gestures_screen.dart';
 import 'screens/testing/native_dialogs_screen.dart';
 import 'screens/testing/native_screen_screen.dart';
 import 'screens/testing/notifications_screen.dart';
@@ -42,12 +39,9 @@ const availablePages = <String, String>{
   'permission_dialogs': '/testing/permission-dialogs',
   'pickers_and_sheets': '/testing/pickers-and-sheets',
   'keyboard': '/testing/keyboard',
-  'gestures': '/testing/gestures',
-  'device': '/testing/device',
   'native_dialogs': '/testing/native-dialogs',
   'native_screen': '/testing/native-screen',
   'notifications': '/testing/notifications',
-  'auth': '/testing/auth',
   'oauth': '/testing/oauth',
   'settings': '/settings',
   'items': '/settings/items',
@@ -115,14 +109,6 @@ final router = GoRouter(
               builder: (context, state) => const KeyboardScreen(),
             ),
             GoRoute(
-              path: 'gestures',
-              builder: (context, state) => const GesturesScreen(),
-            ),
-            GoRoute(
-              path: 'device',
-              builder: (context, state) => const DeviceScreen(),
-            ),
-            GoRoute(
               path: 'native-dialogs',
               builder: (context, state) => const NativeDialogsScreen(),
             ),
@@ -133,10 +119,6 @@ final router = GoRouter(
             GoRoute(
               path: 'notifications',
               builder: (context, state) => const NotificationsScreen(),
-            ),
-            GoRoute(
-              path: 'auth',
-              builder: (context, state) => const AuthScreen(),
             ),
             GoRoute(
               path: 'oauth',

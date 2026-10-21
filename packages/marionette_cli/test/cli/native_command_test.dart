@@ -75,26 +75,20 @@ void main() {
     expect((await run(['native-tap', '--index', 'two'])).code, 64);
     expect((await run(['native-press-key', '--key', 'f13'])).code, 64);
     expect(
-        (await run([
-          'native-notifications',
-          '--action',
-          'push',
-          '--payload',
-          '[1]'
-        ]))
-            .code,
-        64);
+      (await run(['native-notifications', '--action', 'push'])).code,
+      64,
+    );
   });
 
   test('a missing required option is a usage error, not a crash', () async {
     saveSession();
 
     for (final args in [
-      ['native-open-url', 'app://positional'],
+      ['native-enter-text', 'positional'],
       ['native-press-key'],
-      ['native-app'],
-      ['native-permissions', '--action', 'grant'],
-      ['native-set-location', '--latitude', '1'],
+      ['native-notifications'],
+      ['native-scroll', '--text', 'Row'],
+      ['native-swipe', '--start-x', '1'],
     ]) {
       final result = await run(args);
 
@@ -102,17 +96,6 @@ void main() {
       expect(result.err, contains('Missing required option --'),
           reason: '$args');
     }
-  });
-
-  test('native-map-flutter-rect without the Flutter app is a usage error',
-      () async {
-    saveSession();
-
-    final result =
-        await run(['native-map-flutter-rect', '--x', '0', '--y', '0']);
-
-    expect(result.code, 64);
-    expect(result.err, contains('-i <instance> or --uri'));
   });
 
   test('reuses the saved WebDriver session and keeps it', () async {

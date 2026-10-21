@@ -273,15 +273,6 @@ class VmServiceConnector {
     return _callExtension('marionette.listExtensions', {});
   }
 
-  /// Gets the size and pixel ratio of the Flutter view
-  /// (`marionette.getViewMetrics`); used to map Flutter coordinates to the
-  /// device screen.
-  ///
-  /// Throws [NotConnectedException] if not connected.
-  Future<Map<String, dynamic>> getViewMetrics() {
-    return _callExtension('marionette.getViewMetrics', {});
-  }
-
   /// Gets the list of interactive elements in the widget tree.
   ///
   /// Throws [NotConnectedException] if not connected.

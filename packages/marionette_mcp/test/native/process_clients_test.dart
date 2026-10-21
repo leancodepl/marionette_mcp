@@ -314,6 +314,18 @@ void main() {
         throwsA(isA<ProcessCommandException>()),
       );
     });
+
+    test('isAppRunning reads launchctl inside the simulator', () async {
+      final runner = FakeProcessRunner()
+        ..on('xcrun', ['simctl', 'spawn'],
+            result: ok('PID\tStatus\tLabel\n'
+                '55167\t0\tUIKitApplication:com.app[e8fc][rb-legacy]\n'
+                '-\t0\tUIKitApplication:com.other[1]\n'));
+      final simctl = SimctlClient(processRunner: runner.call);
+
+      expect(await simctl.isAppRunning('UDID', 'com.app'), isTrue);
+      expect(await simctl.isAppRunning('UDID', 'com.other'), isFalse);
+    });
   });
 
   group('parseCurrentUserLocked', () {

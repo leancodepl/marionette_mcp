@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Stable resource ids for the native form screen (§10), so the native
+<!-- Stable resource ids for the native form screen, so the native
      lane can address them as com.example.counter:id/native_form_*. -->
 <resources>
     <item name="native_form_title" type="id" />

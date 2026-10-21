@@ -29,7 +29,7 @@ import UserNotifications
       withId: "marionette-demo-native-controls"
     )
 
-    // Native UI that the native lane must handle on its own (§10, §11).
+    // Native UI that the native lane must handle on its own.
     let channel = FlutterMethodChannel(
       name: "marionette-demo/native",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
@@ -72,7 +72,7 @@ import UserNotifications
   }
 }
 
-/// §10: a full native screen outside Flutter. Returns the typed text to the
+/// A full native screen outside Flutter. Returns the typed text to the
 /// Flutter screen that opened it.
 final class NativeFormViewController: UIViewController {
   private let onDone: (String) -> Void

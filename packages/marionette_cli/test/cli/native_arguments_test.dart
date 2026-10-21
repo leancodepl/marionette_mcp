@@ -1,6 +1,6 @@
-import 'package:marionette_cli/src/cli/commands/native_device_commands.dart';
 import 'package:marionette_cli/src/cli/commands/native_gesture_commands.dart';
 import 'package:marionette_cli/src/cli/commands/native_inspection_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_notification_commands.dart';
 import 'package:marionette_cli/src/cli/commands/native_text_commands.dart';
 import 'package:marionette_cli/src/cli/native_command.dart';
 import 'package:marionette_cli/src/native_session_registry.dart';
@@ -22,33 +22,8 @@ const _toolProperties = <String, Set<String>>{
     'timeoutMs',
     'intervalMs',
   },
-  'native_take_screenshot': {'text', 'textContains', 'id', 'type', 'index'},
-  'native_device_info': {},
+  'native_take_screenshot': {},
   'native_tap': {'text', 'textContains', 'id', 'type', 'index', 'x', 'y'},
-  'native_double_tap': {
-    'text',
-    'textContains',
-    'id',
-    'type',
-    'index',
-    'x',
-    'y',
-    'delayMs',
-  },
-  'native_long_press': {
-    'text',
-    'textContains',
-    'id',
-    'type',
-    'index',
-    'x',
-    'y',
-    'durationMs',
-  },
-  'native_pinch': {
-    'scale', 'text', 'textContains', 'id', 'type', 'index', 'x', 'y', //
-    'durationMs',
-  },
   'native_swipe': {'startX', 'startY', 'endX', 'endY', 'durationMs'},
   'native_scroll': {
     'direction', 'text', 'textContains', 'id', 'type', 'within', //
@@ -65,13 +40,7 @@ const _toolProperties = <String, Set<String>>{
   },
   'native_press_key': {'key'},
   'native_hide_keyboard': {},
-  'native_permissions': {'action', 'permission', 'appId'},
-  'native_open_url': {'url'},
-  'native_app': {'action', 'appId'},
-  'native_notifications': {'action', 'title', 'body', 'payload', 'appId'},
-  'native_set_orientation': {'orientation'},
-  'native_set_location': {'latitude', 'longitude'},
-  'native_biometrics': {'action'},
+  'native_notifications': {'action'},
 };
 
 void main() {
@@ -112,33 +81,14 @@ void main() {
     (
       NativeTakeScreenshotCommand(registry),
       'native_take_screenshot',
-      ['-o', 'x.png', '--id', 'map', '--index', '1'],
-      {'id': 'map', 'index': 1},
+      ['-o', 'x.png'],
+      {},
     ),
-    (NativeDeviceInfoCommand(registry), 'native_device_info', [], {}),
     (
       NativeTapCommand(registry),
       'native_tap',
       ['--x', '10', '--y', '20.5'],
       {'x': 10, 'y': 20.5},
-    ),
-    (
-      NativeDoubleTapCommand(registry),
-      'native_double_tap',
-      ['--text', 'Here', '--index', '0', '--delay-ms', '80'],
-      {'text': 'Here', 'index': 0, 'delayMs': 80},
-    ),
-    (
-      NativeLongPressCommand(registry),
-      'native_long_press',
-      ['--x', '1', '--y', '2', '--duration-ms', '900'],
-      {'x': 1, 'y': 2, 'durationMs': 900},
-    ),
-    (
-      NativePinchCommand(registry),
-      'native_pinch',
-      ['--scale', '0.5', '--type', 'Map', '--duration-ms', '400'],
-      {'scale': 0.5, 'type': 'Map', 'durationMs': 400},
     ),
     (
       NativeSwipeCommand(registry),
@@ -194,65 +144,10 @@ void main() {
     ),
     (NativeHideKeyboardCommand(registry), 'native_hide_keyboard', [], {}),
     (
-      NativePermissionsCommand(registry),
-      'native_permissions',
-      ['--action', 'reset', '--permission', 'all', '--app-id', 'a.b'],
-      {'action': 'reset', 'permission': 'all', 'appId': 'a.b'},
-    ),
-    (
-      NativeOpenUrlCommand(registry),
-      'native_open_url',
-      ['--url', 'app://x?y=1'],
-      {'url': 'app://x?y=1'},
-    ),
-    (
-      NativeAppCommand(registry),
-      'native_app',
-      ['--action', 'restart', '--app-id', 'a.b'],
-      {'action': 'restart', 'appId': 'a.b'},
-    ),
-    (
       NativeNotificationsCommand(registry),
       'native_notifications',
-      [
-        '--action',
-        'push',
-        '--title',
-        'T',
-        '--body',
-        'B',
-        '--app-id',
-        'a.b',
-        '--payload',
-        '{"aps": {"alert": "x"}}',
-      ],
-      {
-        'action': 'push',
-        'title': 'T',
-        'body': 'B',
-        'appId': 'a.b',
-        'payload': {
-          'aps': {'alert': 'x'},
-        },
-      },
-    ),
-    (
-      NativeSetOrientationCommand(registry),
-      'native_set_orientation',
-      ['--orientation', 'landscape'],
-      {'orientation': 'landscape'},
-    ),
-    (
-      NativeSetLocationCommand(registry),
-      'native_set_location',
-      ['--latitude', '52.2297', '--longitude', '21.0122'],
-      {'latitude': 52.2297, 'longitude': 21.0122},
-    ),
-    (
-      NativeBiometricsCommand(registry),
-      'native_biometrics',
-      ['--action', 'nonMatch'],
-      {'action': 'nonMatch'},
+      ['--action', 'close'],
+      {'action': 'close'},
     ),
   ];
 
@@ -294,10 +189,6 @@ void main() {
   test('every MCP tool except connect / disconnect has a command', () {
     final mapped = {for (final (_, tool, _, _) in cases) tool};
 
-    expect(
-      mapped,
-      {..._toolProperties.keys},
-      reason: 'native_map_flutter_rect is covered in native_command_test',
-    );
+    expect(mapped, {..._toolProperties.keys});
   });
 }

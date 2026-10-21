@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math' show min;
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
@@ -56,7 +55,6 @@ class FakeNativeConnector implements NativeConnector {
   @override
   final FakeNativeDevice device;
 
-  NativeOrientation orientation = NativeOrientation.portrait;
   String? foregroundAppValue;
   Object? foregroundAppError;
   String screenshot;
@@ -71,16 +69,6 @@ class FakeNativeConnector implements NativeConnector {
   /// Errors thrown by the next [enterText] calls only, one per call.
   final List<Object> enterTextErrors = [];
 
-  /// Result of [isServerResponding].
-  bool serverResponding = true;
-  int healthChecks = 0;
-
-  /// Result of [reopenSession] (null: not supported); [reopenError] makes it
-  /// throw instead.
-  NativeConnector? reopened;
-  Object? reopenError;
-  int reopenCalls = 0;
-
   final List<({int x, int y})> taps = [];
   final List<NativeElement> tappedElements = [];
   final List<({NativeElement element, String text, bool clear})> enteredText =
@@ -94,11 +82,6 @@ class FakeNativeConnector implements NativeConnector {
 
   /// `holdMs` of each entry in [swipes].
   final List<int> swipeHolds = [];
-  final List<({int x, int y, int durationMs})> longPresses = [];
-  final List<({int x, int y, int delayMs})> doubleTaps = [];
-  final List<({int centerX, int centerY, int startSpan, int endSpan})> pinches =
-      [];
-  final List<NativeElement> elementScreenshots = [];
 
   /// When set, replaces [screens]: called with the call count (from 0).
   List<NativeElement> Function(int call)? onGetElements;
@@ -190,76 +173,15 @@ class FakeNativeConnector implements NativeConnector {
   }
 
   @override
-  Future<void> longPress(int x, int y, {int durationMs = 600}) async {
-    _maybeThrow();
-    longPresses.add((x: x, y: y, durationMs: durationMs));
-  }
-
-  @override
-  Future<void> doubleTap(int x, int y, {int delayMs = 100}) async {
-    _maybeThrow();
-    doubleTaps.add((x: x, y: y, delayMs: delayMs));
-  }
-
-  @override
-  Future<void> pinch({
-    required int centerX,
-    required int centerY,
-    required int startSpan,
-    required int endSpan,
-    int durationMs = 500,
-  }) async {
-    _maybeThrow();
-    pinches.add((
-      centerX: centerX,
-      centerY: centerY,
-      startSpan: startSpan,
-      endSpan: endSpan,
-    ));
-  }
-
-  @override
-  Future<String> takeElementScreenshot(NativeElement element) async {
-    _maybeThrow();
-    elementScreenshots.add(element);
-    return 'fake-element-png-base64';
-  }
-
-  @override
   Future<String> takeScreenshot() async {
     _maybeThrow();
     return screenshot;
   }
 
   @override
-  Future<NativeOrientation> getOrientation() async {
-    _maybeThrow();
-    return orientation;
-  }
-
-  @override
-  Future<void> setOrientation(NativeOrientation orientation) async {
-    _maybeThrow();
-    this.orientation = orientation;
-  }
-
-  @override
   Future<NativeScreen> getScreen() async {
     _maybeThrow();
     return screen;
-  }
-
-  @override
-  Future<bool> isServerResponding() async {
-    healthChecks++;
-    return serverResponding;
-  }
-
-  @override
-  Future<NativeConnector?> reopenSession() async {
-    reopenCalls++;
-    if (reopenError case final error?) throw error;
-    return reopened;
   }
 
   @override
@@ -290,30 +212,8 @@ class FakeServerBootstrap implements NativeServerBootstrap {
 
 /// In-memory [NativeDevice] that records every call.
 class FakeNativeDevice implements NativeDevice {
-  FakeNativeDevice({
-    this.deviceInfo = const NativeDeviceInfo(
-      osVersion: 'Android 9',
-      apiLevel: 28,
-      model: 'Pixel 3',
-      isEmulator: true,
-      id: 'emulator-5554',
-    ),
-  });
-
-  NativeDeviceInfo deviceInfo;
-
   /// Thrown by the next call, when set.
   Object? error;
-
-  /// Result of [setPermission].
-  NativePermissionChange permissionChange =
-      const NativePermissionChange(nativeNames: ['android.permission.CAMERA']);
-
-  /// Apps reported as running; [activateApp] adds, [terminateApp] removes.
-  final Set<String> runningApps = {};
-
-  /// App ids whose process a permission change kills.
-  bool permissionChangeKillsApp = false;
 
   final List<String> calls = [];
 
@@ -324,58 +224,8 @@ class FakeNativeDevice implements NativeDevice {
   }
 
   @override
-  Future<NativeDeviceInfo> info() async {
-    _record('info');
-    return deviceInfo;
-  }
-
-  @override
-  Future<NativePermissionChange> setPermission(
-    NativePermissionAction action,
-    NativePermission permission,
-    String appId,
-  ) async {
-    _record('permission ${action.name} ${permission.name} $appId');
-    if (permissionChangeKillsApp) runningApps.remove(appId);
-    return permissionChange;
-  }
-
-  @override
-  Future<void> openUrl(String url) async => _record('openUrl $url');
-
-  @override
-  Future<void> activateApp(String appId) async {
-    _record('activate $appId');
-    runningApps.add(appId);
-  }
-
-  @override
-  Future<bool> terminateApp(String appId) async {
-    _record('terminate $appId');
-    return runningApps.remove(appId);
-  }
-
-  @override
-  Future<bool?> isAppRunning(String appId) async => runningApps.contains(appId);
-
-  @override
   Future<void> openNotifications() async => _record('openNotifications');
 
   @override
   Future<void> closeNotifications() async => _record('closeNotifications');
-
-  @override
-  Future<void> pushNotification(
-    String appId,
-    Map<String, dynamic> payload,
-  ) async =>
-      _record('push $appId ${jsonEncode(payload)}');
-
-  @override
-  Future<void> setLocation(double latitude, double longitude) async =>
-      _record('location $latitude,$longitude');
-
-  @override
-  Future<void> biometrics(NativeBiometricAction action) async =>
-      _record('biometrics ${action.name}');
 }

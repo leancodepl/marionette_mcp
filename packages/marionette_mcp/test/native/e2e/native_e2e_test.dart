@@ -6,7 +6,7 @@ import 'package:test/test.dart';
 
 import 'support/e2e_harness.dart';
 
-/// End-to-end scenarios of the native lane (T-04): the real MCP server over
+/// End-to-end scenarios of the native lane: the real MCP server over
 /// stdio against the example app on an emulator or simulator. Excluded from
 /// a plain `dart test`; run them with
 ///
@@ -24,8 +24,7 @@ void main() {
     print('E2E artifacts: ${config.artifacts.path}');
     client = await McpTestClient.start(config.artifacts);
     await client.ok('native_connect', config.connectArgs);
-    await client
-        .ok('native_app', {'action': 'activate', 'appId': config.appId});
+    await config.launchApp();
   });
 
   tearDownAll(() async {
@@ -33,21 +32,20 @@ void main() {
     await client.close();
   });
 
-  /// Brings the app to the front, waits for its first screen (a deep link
-  /// sent while it starts is lost on Android — D11) and opens [route].
+  /// Brings the app to the front and opens [route] by deep link. A link sent
+  /// while the app is still starting is lost on Android, so it is sent again
+  /// until [waitFor] appears.
   Future<void> openScreen(String route, {required String waitFor}) async {
-    await client.ok('native_app', {'action': 'activate'});
-    await client.ok('native_wait_for', {
-      'textContains': 'Tab 1 of 4',
-      'timeoutMs': 20000,
-    });
-    await client.ok('native_open_url', {
-      'url': 'marionette-example://app$route',
-    });
-    await client.ok('native_wait_for', {
-      'textContains': waitFor,
-      'timeoutMs': 10000,
-    });
+    await config.launchApp();
+    for (var attempt = 1;; attempt++) {
+      await config.openUrl('marionette-example://app$route');
+      final shown = await client.call('native_wait_for', {
+        'textContains': waitFor,
+        'timeoutMs': 8000,
+      });
+      if (!shown.isError) return;
+      if (attempt == 3) fail('$route did not open: ${shown.text}');
+    }
   }
 
   void scenario(
@@ -64,34 +62,25 @@ void main() {
   // First: later scenarios may restart the app (a permission reset does
   // on iOS), which ends the VM service of `flutter run`.
   scenario(
-    'both lanes: Flutter bounds → native pixels, warning when covered',
+    'both lanes: the Flutter lane warns when native UI covers the app',
     () async {
       await client.ok('connect', {'uri': config.vmServiceUri});
       await openScreen('/testing/native-dialogs', waitFor: 'Show native alert');
 
-      final mapped = await client.ok('native_map_flutter_rect', {
-        'x': 0,
-        'y': 0,
-        'width': 100,
-        'height': 50,
-      });
-      expect(mapped.json['scale'], greaterThan(1));
-
-      if (config.isAndroid) {
-        // An alert of the app leaves iOS `resumed` (D22).
-        await client.ok('native_tap', {'text': 'Show native alert'});
-        await client.ok('native_wait_for', {'id': 'android:id/button1'});
-        final covered = await client.ok('get_interactive_elements');
-        expect(covered.text, contains('the app is not in front'));
-        await client.ok('native_tap', {'id': 'android:id/button1'});
-      }
+      await client.ok('native_tap', {'text': 'Show native alert'});
+      await client.ok('native_wait_for', {'id': 'android:id/button1'});
+      final covered = await client.ok('get_interactive_elements');
+      expect(covered.text, contains('the app is not in front'));
+      await client.ok('native_tap', {'id': 'android:id/button1'});
     },
     skip: config.vmServiceUri == null
         ? 'Set MARIONETTE_E2E_VM_SERVICE_URI (flutter run) for this scenario'
-        : null,
+        : config.isIos
+            ? 'An alert of the app leaves iOS resumed (D22)'
+            : null,
   );
 
-  scenario('§1a native controls: type into and tap a native view', () async {
+  scenario('native controls: type into and tap a native view', () async {
     await openScreen(
       '/testing/platform-views/native-controls',
       waitFor: 'Tap me (native)',
@@ -121,29 +110,23 @@ void main() {
     });
   });
 
-  scenario('§3 permission dialog: reset, ask and allow camera', () async {
+  scenario('permission dialog: reset, ask and allow camera', () async {
     // Resetting may terminate the app (iOS); openScreen starts it again.
-    await client.ok('native_permissions', {
-      'action': 'reset',
-      'permission': 'camera',
-      'appId': config.appId,
-    });
-    await openScreen('/testing/device', waitFor: 'Request camera');
-    await client.ok('native_scroll', {
-      'direction': 'up',
-      'text': 'Request camera',
-    });
-    await client.ok('native_tap', {'text': 'Request camera'});
+    await config.resetCameraPermission();
+    await openScreen('/testing/permission-dialogs', waitFor: 'Camera access');
+    await client.ok('native_tap', {'text': 'Request', 'index': 0});
 
     final allow = config.isAndroid
         ? {'textContains': 'While using', 'type': 'android.widget.Button'}
         : {'text': 'Allow', 'type': 'XCUIElementTypeButton'};
     await client.ok('native_wait_for', {...allow, 'timeoutMs': 10000});
     await client.ok('native_tap', allow);
-    await client.ok('native_wait_for', {'textContains': 'camera: granted'});
+    await client.ok('native_wait_for', {
+      'textContains': 'Camera access · granted',
+    });
   });
 
-  scenario('§11 native alert: shown by the app, answered natively', () async {
+  scenario('native alert: shown by the app, answered natively', () async {
     await openScreen('/testing/native-dialogs', waitFor: 'Show native alert');
     await client.ok('native_tap', {'text': 'Show native alert'});
 
@@ -155,7 +138,7 @@ void main() {
     await client.ok('native_wait_for', {'text': 'Alert result: ok'});
   });
 
-  scenario('§8 keyboard: type, edit with keys, read the value', () async {
+  scenario('keyboard: type, edit with keys, read the value', () async {
     await openScreen('/testing/keyboard', waitFor: 'Title');
     await client.ok('native_enter_text', {
       'label': 'Title',

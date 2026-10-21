@@ -8,24 +8,24 @@ Decisions are referenced from the code (`See docs/native-lane-decisions.md#dN`) 
 | --- | --- | --- |
 | [D1](#d1) | Ambiguous element selectors | Accepted |
 | [D2](#d2) | Coordinate space of the native lane | Accepted |
-| [D3](#d3) | Automatic recovery of a lost session | Accepted |
+| [D3](#d3) | Automatic recovery of a lost session | Deferred (first iteration) |
 | [D4](#d4) | Native session model of the CLI | Accepted |
-| [D5](#d5) | Heavy SDK views in a separate example app | Proposed (V-09 not started) |
-| [D6](#d6) | Screenshot of part of the screen | Accepted |
-| [D7](#d7) | Default app for device shortcuts | Accepted |
-| [D8](#d8) | Order of the large research topics | Proposed (X-01 / X-02 not started) |
-| [D9](#d9) | Granularity of device shortcut tools | Accepted |
+| [D5](#d5) | Heavy SDK views in a separate example app | Proposed |
+| [D6](#d6) | Screenshot of part of the screen | Deferred (first iteration) |
+| [D7](#d7) | Default app for device shortcuts | Deferred (first iteration) |
+| [D8](#d8) | Order of the large research topics | Proposed |
+| [D9](#d9) | Granularity of device shortcut tools | Deferred (first iteration) |
 | [D10](#d10) | UIAutomator2 local port and server reuse | Accepted |
-| [D11](#d11) | Starting and activating apps | Accepted |
+| [D11](#d11) | Starting and activating apps | Deferred (first iteration) |
 | [D12](#d12) | Device operations outside WebDriver | Accepted |
-| [D13](#d13) | Bridge from Flutter coordinates to the native lane | Accepted |
+| [D13](#d13) | Bridge from Flutter coordinates to the native lane | Deferred (first iteration) |
 | [D14](#d14) | Software keyboard and key presses | Accepted |
 | [D15](#d15) | Element state and the label / content of text fields | Accepted |
 | [D16](#d16) | Scrolling to an element and waiting for one | Accepted |
-| [D17](#d17) | Changing permissions without the system dialog | Accepted |
+| [D17](#d17) | Changing permissions without the system dialog | Deferred (first iteration) |
 | [D18](#d18) | UIAutomator2 idle wait | Accepted |
 | [D19](#d19) | Android toasts in the tree | Accepted |
-| [D20](#d20) | Simulated biometrics | Accepted |
+| [D20](#d20) | Simulated biometrics | Deferred (first iteration) |
 | [D21](#d21) | Opening a notification on iOS | Accepted |
 | [D22](#d22) | Flutter lane while system UI covers the app | Accepted |
 
@@ -74,11 +74,11 @@ For an agent, an error listing the candidates is cheaper than tapping the wrong 
 - Verification found that iOS `tapElement` re-located the element by its accessibility id, so `index: 1` tapped the *first* "Request" button (same id). This led to the "chosen element is the one acted on" rule above.
 
 
-### Follow-up (unit 8, 2026-10-20)
+### Follow-up (2026-10-20)
 
 - **Duplicate nodes from WebDriverAgent.** On iOS 26.4 the Face ID system alert (shown over the app by `local_auth`) is listed twice in the WDA page source — identical type, label, id and bounds — so `native_tap text="Cancel"` failed as ambiguous with two identical candidates. `parseWdaSource` now drops elements that are identical in every reported field; elements that differ in anything (another type, or the same label elsewhere on screen) are kept, and their ambiguity still fails with candidates. After the change the alert's "Cancel" is tapped directly. Unit test: two identical nodes become one, the same label at another position stays a separate element.
 
-### Follow-up (acceptance tests, 2026-10-21): disabled elements
+### Follow-up (2026-10-21): disabled elements
 
 While the iOS document picker (`UIDocumentPickerViewController`) is open, the app's Flutter buttons stay in the WebDriverAgent tree with `enabled="false"` (`traits="NotEnabled"`), and `native_tap text="Pick file"` tapped their position anyway: the touch landed on the picker and picked `marionette_file_18`, the cell under that point, while the tool reported success. While a share sheet was closing, a tap on "Take photo" was swallowed the same way. The tools that touch an element chosen by a selector — `native_tap`, `native_long_press`, `native_double_tap`, `native_pinch` and `native_enter_text` — now refuse an element with `enabled: false` and say that a sheet, picker or dialog may cover it; nothing is touched. Coordinates (x/y) are not checked. On a regular screen this also replaces a silent no-op on a disabled control (Android: "Disabled action") with a clear error. It does not cover everything: under the iOS photo picker (`PHPickerViewController`) the Back button and the tabs below stay enabled. Unit tests: tap, long press and double tap on a disabled element fail without a touch; typing into a disabled field fails. Live: iOS 26.4 with the document picker open — "Pick file" and "Take photo" are refused and the picker is untouched; Android API 35 — "Disabled action" is refused, the terms checkbox still toggles.
 
@@ -132,7 +132,7 @@ Agents work with screenshots. One coordinate space that matches the image remove
 
 ## D3 — Automatic recovery of a lost session
 
-- **Status:** Accepted (2026-10-15)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-15
 - **Applies to:** `RecoveringNativeConnector`, `NativeServiceContext.connect`, `WebDriverClient` error markers, every session-bound `native_*` tool.
 
 ### Context and dilemma
@@ -186,16 +186,20 @@ Most losses happen between calls (the server died while the agent was thinking),
 
 ---
 
-### Follow-up (unit 7, 2026-10-19)
+### Follow-up (2026-10-19)
 
 An operation still running when the connector was disposed — a read that `native_wait_for` had stopped waiting for — failed with "connection closed" once shutdown closed the HTTP client. The decorator took that for a lost session and **started a new one after `dispose()`**, launching UIAutomator2's instrumentation again and keeping the MCP server process alive after stdin EOF. A disposed decorator now never re-establishes: such failures, and later calls, end with `NativeNotConnectedException`. Verified: the same sequence now exits immediately; unit test for a failure arriving after dispose.
 
-### Follow-up (unit 10, 2026-10-20): a lost session on a healthy server
+### Follow-up (2026-10-20): a lost session on a healthy server
 
-`invalid session id` means the server answered and only the session is gone — on Android typically because another client (a CLI session, a second MCP server) took UIAutomator2's single session. Recovery treated it like a lost server: it disposed the connector, which stopped the server it had started, and started a new one; the asynchronous stop of the old instrumentation then killed the new server ("lost again right after re-establishing it", seen live in unit 9). Now, for `invalid session id`, the decorator first asks the connector to **open a new session on the same server** (`NativeConnector.reopenSession`); the server — and ownership of its bootstrap — moves to the new connector, and the old one only drops its lost session. If that fails, the full restart runs as before. A broken connection or an unreachable server still restarts (the server may be gone).
+`invalid session id` means the server answered and only the session is gone — on Android typically because another client (a CLI session, a second MCP server) took UIAutomator2's single session. Recovery treated it like a lost server: it disposed the connector, which stopped the server it had started, and started a new one; the asynchronous stop of the old instrumentation then killed the new server ("lost again right after re-establishing it", seen live). Now, for `invalid session id`, the decorator first asks the connector to **open a new session on the same server** (`NativeConnector.reopenSession`); the server — and ownership of its bootstrap — moves to the new connector, and the old one only drops its lost session. If that fails, the full restart runs as before. A broken connection or an unreachable server still restarts (the server may be gone).
 
 - Live, Android API 35: an MCP server running while a CLI session took its session — both MCP reads succeeded on a reopened session (≈ 0.1 s), and the CLI's next command opened its own again (≈ 0.2 s); no server restart.
 - Unit tests: reopen instead of restart for `invalid session id`; fallback to a restart when reopening fails; no reopen for a lost connection; the Android connector's `reopenSession` opens a second session on the same server and hands the bootstrap over.
+
+### Follow-up (scope cut, 2026-10-21)
+
+The first iteration of the native lane is cut down to what its use cases need (permissions, pickers, WebView, native views, notifications). Automatic recovery is deferred: `RecoveringNativeConnector`, `reopenSession` and `isServerResponding` were removed. A call on a lost session fails, and the agent calls `native_connect` again; the CLI still opens a new session when the saved one is gone (D4). Restore it from the history of this branch when concurrent MCP / CLI use needs it.
 
 ---
 
@@ -208,7 +212,7 @@ An operation still running when the connector was disposed — a read that `nati
 
 ### Context and dilemma
 
-The MCP server is one long-lived process that holds the device-side server (`adb shell am instrument -w` for UIAutomator2, `xcodebuild test-without-building` for WebDriverAgent) for the whole session. The CLI starts a new process for every command. Starting the server per command takes seconds to a minute and a new WebDriverAgent run can close a visible system alert; tearing it down after every command would make the next one start from scratch. Three assumptions of the plan had to be checked first: that a server started without a holding host process keeps working, that a detached `xcodebuild` survives the CLI and can be stopped by pid, and whether WebDriver sessions expire when idle.
+The MCP server is one long-lived process that holds the device-side server (`adb shell am instrument -w` for UIAutomator2, `xcodebuild test-without-building` for WebDriverAgent) for the whole session. The CLI starts a new process for every command. Starting the server per command takes seconds to a minute and a new WebDriverAgent run can close a visible system alert; tearing it down after every command would make the next one start from scratch. Three assumptions had to be checked first: that a server started without a holding host process keeps working, that a detached `xcodebuild` survives the CLI and can be stopped by pid, and whether WebDriver sessions expire when idle.
 
 ### Options considered
 
@@ -220,7 +224,7 @@ The MCP server is one long-lived process that holds the device-side server (`adb
 ### Decision
 
 - **Option 3.** `native-connect` starts the server detached and records `{platform, serial | udid, baseUrl, port, sessionId, defaultAppId, pid, startedServer}` in `~/.marionette/native/<name>.json` (atomic write, like the instance registry); `--native-session <name>` selects the entry (default `default`).
-  - **Android:** `adb shell am instrument -w …` started with `ProcessStartMode.detached` — the plan's `am instrument` **without** `-w` does not work (below).
+  - **Android:** `adb shell am instrument -w …` started with `ProcessStartMode.detached` — `am instrument` **without** `-w` does not work (below).
   - **iOS:** `xcodebuild test-without-building` started with `ProcessStartMode.detached`.
   - Both record the pid. A server that was already running (MCP server, an earlier session) is reused and marked as not started by the session.
 - **Every command attaches** through a bootstrap that only checks `/status` of the saved URL (never starts anything) and **reuses the saved WebDriver session**: `openSession(sessionId:)` checks it with a cheap call (`GET /orientation`) and opens a new one only when the server no longer has it; the new id is saved. At the end the connector is `release()`d — the client closes, the session stays. The app under test (D7) is saved too.
@@ -235,28 +239,32 @@ Measured: a detached server keeps working for at least 11 minutes with no host p
 ### Consequences
 
 - A detached server outlives a crashed or killed CLI; `marionette doctor` lists such servers as orphaned (`parent pid 1`, not in any session) with `kill <pid>` as the fix, and as owned when a process (e.g. an MCP server) holds them.
-- UIAutomator2 supports one session per device: an MCP server and a CLI session on the same Android device replace each other's sessions. Verified live: the CLI recreates its own and saves it, and since the D10 follow-up an MCP server that reused the CLI's server no longer stops it on exit; since unit 10 the MCP server's recovery opens a new session on the same server ([D3](#d3) follow-up), so both keep working; an action in flight can still be interrupted — `native-connect` warns and the docs recommend one client per Android device at a time. On iOS both work side by side (WebDriverAgent survives session deletes).
+- UIAutomator2 supports one session per device: an MCP server and a CLI session on the same Android device replace each other's sessions. Verified live: the CLI recreates its own and saves it, and since the D10 follow-up an MCP server that reused the CLI's server no longer stops it on exit; since the D3 follow-up the MCP server's recovery opens a new session on the same server ([D3](#d3) follow-up), so both keep working; an action in flight can still be interrupted — `native-connect` warns and the docs recommend one client per Android device at a time. On iOS both work side by side (WebDriverAgent survives session deletes).
 - Messages come from the shared handlers; the CLI rewrites tool names (`native_get_elements` → `native-get-elements`) in non-JSON output, and `help-ai` explains that a camelCase argument (`maxSwipes`) is the kebab-case option (`--max-swipes`).
 - New MCP tools need a matching CLI command and an entry in `help-ai`, written by hand — as for the Flutter lane.
 - The CLI depends on `marionette_mcp` internals (`src/native_service/…`), like its Flutter commands.
 
 ### Verification
 
-- **`am instrument` without `-w` (plan's assumption):** the server starts and answers `/status`, but every `POST /session` fails with "Got null UiAutomation from instrumentation" — the `am` process that provides UiAutomation is gone. An earlier test without `-w` that worked for 11 minutes had two stale `adb shell am instrument -w` host processes from earlier MCP runs still alive; without them it fails reproducibly.
+- **`am instrument` without `-w` (first assumption):** the server starts and answers `/status`, but every `POST /session` fails with "Got null UiAutomation from instrumentation" — the `am` process that provides UiAutomation is gone. An earlier test without `-w` that worked for 11 minutes had two stale `adb shell am instrument -w` host processes from earlier MCP runs still alive; without them it fails reproducibly.
 - **Detached `adb shell am instrument -w` (Android API 35):** after the starting process exited, the `adb` process ran under `launchd` (ppid 1) and sessions could be created; one session answered every minute for 11 minutes (≈ 0.13–0.15 s per check, no idle expiry).
 - **Detached `xcodebuild` (iOS 26.4):** healthy after 13 s, ppid 1 after the starter exited; session create 10–106 ms, page source ≈ 0.15–0.2 s; SIGTERM stopped `xcodebuild` in 2 s, the runner and the port with it.
 - **Session per command (Android, measured over 11 minutes):** create ≈ 1.15–1.2 s, source ≈ 0.11–0.13 s, delete ≈ 0.11–0.13 s.
 - **CLI live, Android API 35 and iOS 26.4 (compiled `marionette`):** `native-connect` from a clean device 4.4 s (Android) / 7.8 s (iOS); afterwards commands take 0.26–1.5 s each including process start (`native-tap` 0.26–0.5 s on Android, ≈ 1.25 s on iOS). The default app saved by `native-app --app-id` is used by a later `native-app --action activate` without it. `native-disconnect` stopped the held `adb` process, the server on the device and the forward (Android) and `xcodebuild`, WDA and port 8100 (iOS), and removed the entry.
-- **Plan acceptance — §3 permission dialogs only from the CLI, two devices at once** (`--native-session pixel` and `iphone`): `native-permissions --action reset --permission camera` → deep link to the permissions screen → `native-scroll` to "Request camera" → `native-tap` → `native-wait-for` the system dialog ("While using the app" / "Allow") → `native-tap` → status "camera: granted" on both platforms.
+- **Permission dialogs only from the CLI, two devices at once** (`--native-session pixel` and `iphone`): `native-permissions --action reset --permission camera` → deep link to the permissions screen → `native-scroll` to "Request camera" → `native-tap` → `native-wait-for` the system dialog ("While using the app" / "Allow") → `native-tap` → status "camera: granted" on both platforms.
 - **Both lanes from the CLI:** `marionette --uri <vm-service> native-map-flutter-rect --x 0 --y 0 --width 100 --height 50` → `rect` 300×150, scale 3.0, Flutter view 1280×2856 (Android API 35); without `-i` / `--uri` the command is a usage error naming them.
 - **Orphaned server:** with the iOS session's registry entry deleted, `doctor` reported "Orphaned WebDriverAgent (pid …)" with `kill <pid>` as the fix; an MCP `native_connect` meanwhile reused that WDA (0.73 s, D10 follow-up); `kill` stopped it.
 - **Every command live (compiled CLI, API 35 and iOS 26.4):** gestures on elements and points (`native-tap`, `-double-tap`, `-long-press` → counters +1; `native-pinch` scale 2 → 1.63–1.64, 0.5 → 0.92), `native-swipe` (chips move; iOS edge swipe goes back), `native-scroll` with `--within-type` / `--within-index` both ways and the end-of-list error, text (`native-enter-text` with `--label`, focused, `--clear`, Polish characters; `native-press-key` backspace / home / volume; unsupported keys and the Gboard floating toolbar refused with hints), `native-wait-for` visible / gone, `native-take-screenshot` full (1280×2856 / 1320×2868) and element (1184×288 / 1224×288), `native-device-info`, `native-set-orientation`, `native-set-location`, `native-notifications` open / close / push (title-body and `--payload` JSON; Android push refused with a hint), `native-app` activate / background / terminate / restart, `native-permissions` grant / revoke (termination reported) / reset, `native-biometrics` match / nonMatch / enroll / unenroll (iOS) and the Android enroll hint, `native-map-flutter-rect` with `--uri` on both platforms (rect 72, 900, 300×150 on iOS), `native-connect` twice ("already connected") and with an unknown serial (error, no session saved).
 - **Argument mapping:** a unit test parses every option of the 20 tool commands and checks the result equals the tool arguments, with the MCP schema's names and int / double types.
 - Unit tests: detached starts on both platforms (pid, `-w`, no second start), `stopServer`, session reuse and replacement, `release` keeps the session; CLI registry, attach / reuse / replacement, missing session and dead server messages, usage errors, `native-sessions`, `native-disconnect` of a reused server, doctor findings.
 
-### Follow-up (acceptance tests, 2026-10-21): missing options and connect errors
+### Follow-up (2026-10-21): missing options and connect errors
 
 A `native-*` command without a required option (`native-open-url <url>` with the URL as a positional argument, `native-press-key`, `native-app`, `native-permissions --action grant`, `native-set-location --latitude 1`) crashed with an unhandled `ArgumentError` and a stack trace, exit code 255: `package:args` checks `mandatory` options only when their value is read. It is now a usage error, exit code 64: "Missing required option --url." followed by the command's usage. Errors of `native-connect` and of attaching to a session also go through the MCP-to-CLI name mapping, so a device error hints "Pass serial to native-connect" instead of `native_connect`. Unit test: five commands without a required option exit 64 with that message. Live: the same commands and `native-connect --serial nope`.
+
+### Follow-up (scope cut, 2026-10-21)
+
+The native checks of `marionette doctor` (`NativeDoctor`: adb and devices, the UIAutomator2 cache, simulators, the WebDriverAgent build, port 8100, orphaned servers) are deferred to a later iteration; `doctor` checks Flutter instances only again. Orphaned detached servers can be found with `marionette native-sessions` and `ps`. The session model itself is unchanged.
 
 ---
 
@@ -264,12 +272,12 @@ A `native-*` command without a required option (`native-open-url <url>` with the
 
 ## D5 — Heavy SDK views in a separate example app
 
-- **Status:** Proposed — the work it applies to (V-09) has not started.
-- **Applies to:** V-09 (§1c: `flutter_stripe` `CardField`, `google_mobile_ads`, a PDF view); a future `example_sdk/` app.
+- **Status:** Proposed — verifying SDK views has not started.
+- **Applies to:** third-party SDK views (`flutter_stripe` `CardField`, `google_mobile_ads`, a PDF view); a future `example_sdk/` app.
 
 ### Context and dilemma
 
-Verifying the native lane on SDK views needs packages with their own requirements (minimum SDKs, Flutter versions, native configuration, keys). The main example app must keep working on the minimum supported Flutter (3.27 — dependencies there are pinned for it, see unit 8) and also serves as the `call_custom_extension` demo.
+Verifying the native lane on SDK views needs packages with their own requirements (minimum SDKs, Flutter versions, native configuration, keys). The main example app must keep working on the minimum supported Flutter (3.27 — dependencies there are pinned for it) and also serves as the `call_custom_extension` demo.
 
 ### Options considered
 
@@ -279,7 +287,7 @@ Verifying the native lane on SDK views needs packages with their own requirement
 
 ### Decision
 
-Option 2, when V-09 is taken up: a separate app with the same Testing-tab structure and instructions for its test keys.
+Option 2, when this work is taken up: a separate app with the same Testing-tab structure and instructions for its test keys.
 
 ### Rationale
 
@@ -299,7 +307,7 @@ None yet.
 
 ## D6 — Screenshot of part of the screen
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-19
 - **Applies to:** `native_take_screenshot` (selector mode); `NativeConnector.takeElementScreenshot`, `WebDriverClient.elementScreenshot`.
 
 ### Context and dilemma
@@ -331,13 +339,17 @@ No new dependency, and the element case covers the main use (a platform view, a 
 - Through the MCP server: Android API 28 — the pinch target (992×510 bounds) gives a 992×510 PNG; iOS 18.6 — the double-tap target (1224×288) gives 1224×288, the `horizontal_list` container 1224×190. The full screenshot is unchanged.
 - Unit tests cover the geometry XPath on both platforms, the id fallback and the "element is gone" error.
 
+### Follow-up (scope cut, 2026-10-21)
+
+Deferred in the first iteration (scope cut): `native_take_screenshot` captures the whole screen only; the element screenshot (`takeElementScreenshot`, `locateElement` on Android) was removed.
+
 ---
 
 <a id="d7"></a>
 
 ## D7 — Default app for device shortcuts
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-19
 - **Applies to:** `native_permissions`, `native_app`, `native_notifications action=push` (`appId`); `NativeServiceContext.defaultAppId`, `isSystemAppId`.
 
 ### Context and dilemma
@@ -368,6 +380,10 @@ An agent normally connects with the app on screen, so the default is right; opti
 - Live: sessions started with the launcher, Chrome or a SpringBoard alert in front had no default; the first runs showed that observing only at `native_connect` / `native_get_elements` was not enough (an agent waiting with `native_wait_for` and then calling `native_app` got "pass appId"), which added the observation in `native_wait_for`, before a shortcut, and for an explicit `appId`.
 - Unit tests: system prefixes, first app wins, lazy lookup, `native_wait_for` observation, explicit `appId`, reset on disconnect.
 
+### Follow-up (scope cut, 2026-10-21)
+
+Deferred in the first iteration (scope cut): no tool takes `appId` any more, so the default app, `isSystemAppId` and the `defaultAppId` of CLI sessions were removed.
+
 ---
 
 <a id="d8"></a>
@@ -375,7 +391,7 @@ An agent normally connects with the app on screen, so the default is right; opti
 ## D8 — Order of the large research topics
 
 - **Status:** Proposed — neither topic has started.
-- **Applies to:** X-01 (DOM access in WebViews) and X-02 (physical iPhones).
+- **Applies to:** DOM access in WebViews and physical iPhones.
 
 ### Context and dilemma
 
@@ -383,8 +399,8 @@ Both topics are large; there is capacity for one at a time.
 
 ### Options considered
 
-1. X-01 first: WebViews are part of everyday flows (sign-in, terms, web payments) and can be worked on with emulators and simulators.
-2. X-02 first: physical iPhones are needed for the camera and real biometrics, and for every device shortcut that currently uses `simctl`.
+1. DOM access first: WebViews are part of everyday flows (sign-in, terms, web payments) and can be worked on with emulators and simulators.
+2. Physical iPhones first: they are needed for the camera and real biometrics, and for every device shortcut that currently uses `simctl`.
 
 ### Decision
 
@@ -392,11 +408,11 @@ Option 1, unless a client project needs physical iPhones sooner.
 
 ### Rationale
 
-The native lane already reads and drives WebView content through accessibility (unit 7); DOM access would make it exact. Camera and biometrics are partly covered by simulator shortcuts ([D20](#d20)).
+The native lane already reads and drives WebView content through accessibility; DOM access would make it exact. Camera and biometrics stay limited to what the Simulator offers.
 
 ### Consequences
 
-The iOS camera (§1b) and everything listed for iPhones in the physical-device checklist stay unverified until X-02.
+The iOS camera preview and everything that needs a physical iPhone stay unverified until that work.
 
 ### Verification
 
@@ -408,7 +424,7 @@ To do: confirm with client projects that none needs physical iPhones first; if o
 
 ## D9 — Granularity of device shortcut tools
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-19
 - **Applies to:** `native_permissions`, `native_app`, `native_notifications`, `native_device_info`, `native_set_orientation`, `native_set_location`, `native_open_url`.
 
 ### Context and dilemma
@@ -422,7 +438,7 @@ Every MCP tool costs space in the agent's context (name, description, schema). O
 
 ### Decision
 
-Option 2: `native_permissions` (grant / revoke / reset), `native_app` (activate / background / terminate / restart), `native_notifications` (open / close / push). Operations with different annotations stay separate: `native_device_info` is read-only, `native_set_orientation` and `native_set_location` change state, `native_open_url` has a single parameter. Invalid `action` × parameter combinations are rejected in the handler before any device call. Biometrics (`native_biometrics`, S-05) is postponed to unit 8, where the example app gets a screen to verify it on. *Done in unit 8: `native_biometrics` with `match` / `nonMatch` / `enroll` / `unenroll` ([D20](#d20)).*
+Option 2: `native_permissions` (grant / revoke / reset), `native_app` (activate / background / terminate / restart), `native_notifications` (open / close / push). Operations with different annotations stay separate: `native_device_info` is read-only, `native_set_orientation` and `native_set_location` change state, `native_open_url` has a single parameter. Invalid `action` × parameter combinations are rejected in the handler before any device call. Biometrics (`native_biometrics`) is postponed until the example app gets a screen to verify it on. *Done later: `native_biometrics` with `match` / `nonMatch` / `enroll` / `unenroll` ([D20](#d20)).*
 
 ### Rationale
 
@@ -436,6 +452,10 @@ Fewer tools in context; consistent with `native_scroll` (one tool, several modes
 ### Verification
 
 - Unit tests for every action and invalid combination; all tools exercised live on Android API 28, API 35 and iOS 18.6.
+
+### Follow-up (scope cut, 2026-10-21)
+
+Deferred in the first iteration (scope cut): of the device shortcuts only `native_notifications` (open / close) remains. `native_permissions`, `native_open_url`, `native_app`, `native_device_info`, `native_set_orientation`, `native_set_location` and `native_biometrics` were removed; the use cases are covered by answering the system UI with `native_tap`.
 
 ---
 
@@ -490,28 +510,28 @@ Zero configuration in the common single-device case (still port 8200), correct b
   - A second process connected in ≈ 0.1 s by reusing the running server and left it running on disconnect; the first process's next call took ≈ 1.9 s because its session had been replaced (see consequences).
 - Android emulator (API 28): `sha256sum` is available and both installed APK hashes equal the pinned ones; two consecutive connects did not reinstall (`lastUpdateTime` unchanged, connect ≈ 1.7 s); the forward exists only during the session.
 
-### Follow-up (unit 9, 2026-10-20): reusing a running WebDriverAgent
+### Follow-up (2026-10-20): reusing a running WebDriverAgent
 
-The iOS bootstrap has the same fast path as Android — a healthy WebDriverAgent already listening on the port is reused when it serves the requested simulator — but it never matched: it compared `udid` from `/wda/device/info`, and WebDriverAgent 16.15 reports no such field (only `uuid`, a per-app identifier, `AA2E9EB0-…` vs the simulator's `C34D5845-…`). Every running WDA, including one orphaned by an interrupted Marionette process (the deferred item from unit 4), therefore failed `native_connect` with `portConflict`. The check now falls back to the WDA runner app (`com.facebook.WebDriverAgentRunner.xctrunner`) running inside the requested simulator (`simctl spawn <udid> launchctl list`); simulators share the host's network, so only one WDA can listen on the port. A reported `udid` is still trusted first.
+The iOS bootstrap has the same fast path as Android — a healthy WebDriverAgent already listening on the port is reused when it serves the requested simulator — but it never matched: it compared `udid` from `/wda/device/info`, and WebDriverAgent 16.15 reports no such field (only `uuid`, a per-app identifier, `AA2E9EB0-…` vs the simulator's `C34D5845-…`). Every running WDA, including one orphaned by an interrupted Marionette process, therefore failed `native_connect` with `portConflict`. The check now falls back to the WDA runner app (`com.facebook.WebDriverAgentRunner.xctrunner`) running inside the requested simulator (`simctl spawn <udid> launchctl list`); simulators share the host's network, so only one WDA can listen on the port. A reported `udid` is still trusted first.
 
 - Live, iOS 26.4: with a WDA started outside the MCP server, `native_connect` reused it in 0.75 s (≈ 5 s with a fresh start) and left it running afterwards; before the fix the same call failed with "Port 8100 is already in use by WebDriverAgent attached to a different simulator".
 - Unit test: without a reported udid, WDA whose runner runs in the simulator is reused; for another simulator, `portConflict`.
 - **Port 8100 taken by another program** (not WebDriverAgent): the bootstrap used to launch WDA anyway and wait 60 s, then failed with "WebDriverAgent did not become ready … retry". It now checks that the port is free before launching and fails at once with `portConflict` and an `lsof` hint (live: 0.9 s instead of 60 s; unit test).
 
-### Follow-up (unit 9, 2026-10-20): a reused UIAutomator2 server must keep its session
+### Follow-up (2026-10-20): a reused UIAutomator2 server must keep its session
 
 **UIAutomator2 10.3.2 stops itself when its current session is deleted** (log: `DeleteSession command` → `Stopping ServerInstrumentation` → instrumentation finished; deleting an unknown session id does not stop it). So a process that reused another process's server (the reuse path above) killed that server when it disconnected: an MCP server that reused the CLI's server stopped it on exit (seen live). This also corrects the verification bullet above ("A second process … left it running on disconnect") for this UIAutomator2 version.
 
 - **Decision:** on Android a connector does not delete its session when its bootstrap reused a server (`SharedServerBootstrap.startedServer == false`); the owner ends the server. `marionette native-disconnect` likewise deletes the session only when its `native-connect` started the server. iOS is unaffected — WebDriverAgent keeps running when a session is deleted.
 - **Live after the change (API 35):** an MCP server reusing the CLI's server, then exiting → the CLI's server keeps running and its next command works; a CLI session reusing an MCP server, then `native-disconnect` → "left running".
-- **Two clients on one Android device:** UIAutomator2 has a single session, so they take it from each other. A CLI command opens a new session ([D4](#d4)); the MCP server's recovery first failed here — it restarted its server and the old instrumentation's stop killed the new one — and since unit 10 opens a new session on the same server instead ([D3](#d3), follow-up). Both now keep working, but an action of one client can be interrupted when the other takes the session at that moment, so one client per Android device remains the recommendation; `native-connect` warns when it reuses another process's server.
+- **Two clients on one Android device:** UIAutomator2 has a single session, so they take it from each other. A CLI command opens a new session ([D4](#d4)); the MCP server's recovery first failed here — it restarted its server and the old instrumentation's stop killed the new one — and since then opens a new session on the same server instead ([D3](#d3), follow-up). Both now keep working, but an action of one client can be interrupted when the other takes the session at that moment, so one client per Android device remains the recommendation; `native-connect` warns when it reuses another process's server.
 - Unit tests: a session on a shared server is not deleted on dispose, one on an own server is; `native-disconnect` of a reused server sends no `DELETE`.
 
-### Follow-up (acceptance tests, 2026-10-21): a port taken by a dual-stack listener
+### Follow-up (2026-10-21): a port taken by a dual-stack listener
 
 Whether a local port is free was checked by binding it on 127.0.0.1. On macOS that bind succeeds while a dual-stack listener — IPv6 `*`, as `python3 -m http.server 8100` opens — owns the port and takes the connections to 127.0.0.1. `marionette doctor` then reported nothing with port 8100 taken, and an iOS connect would have started WebDriverAgent and waited for it until the timeout instead of failing at once with `portConflict`; the Android port choice had the same blind spot. The check (`canBindLoopbackPort`, now shared by the iOS and Android bootstraps and the doctor) also tries to connect to 127.0.0.1 and counts the port as free only when nothing answers. Unit test: a port a dual-stack server listens on is taken (on macOS the old check said free); a port nobody uses is free. Live on macOS with `python3 -m http.server 8100`: the doctor reports the port with the `lsof` fix (exit 1), MCP `native_connect` on iOS fails at once with `portConflict`; without it, both platforms connect as before.
 
-### Follow-up (acceptance tests, 2026-10-21): a device locked after a restart
+### Follow-up (2026-10-21): a device locked after a restart
 
 An Android device with a PIN, pattern or password (the emulator had a PIN, needed for the fingerprint used in the biometrics tests) keeps its user storage encrypted after a restart until the screen is unlocked. UIAutomator2 cannot start then — logcat: "SecurityException: Package io.appium.uiautomator2.server is not encryption aware!" — and `native_connect` waited 30 s and failed with `healthCheck` and a hint to read logcat. The bootstrap now reads `dumpsys user` before starting the server; when the current user is `RUNNING_LOCKED` it fails at once with `deviceLocked` and a hint how to unlock (on an emulator through `adb shell input`). Output it cannot read counts as unlocked. Unit tests: the parser (current user locked; unlocked, another user locked, no data) and a locked device failing before UIAutomator2 is started. Live on API 35 after a restart: CLI `native-connect` failed in 0.9 s and MCP `native_connect` in 87 ms with the hint; after unlocking as the hint says, both connect.
 
@@ -521,7 +541,7 @@ An Android device with a PIN, pattern or password (the emulator had a PIN, neede
 
 ## D11 — Starting and activating apps
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-19
 - **Applies to:** `native_app action=activate|restart`; `NativeDevice.activateApp`.
 
 ### Context and dilemma
@@ -554,14 +574,18 @@ Both mechanisms are official and predictable, and — verified — bring back th
 - iOS 18.6: the backgrounded app (pid 55167) on the Keyboard screen came back with the same pid and screen after `simctl launch`.
 - Live through the MCP server on API 35 and iOS 18.6: `background` → `activate` returns to the same screen; `restart` starts on Home; `terminate` twice reports "was not running" the second time.
 
-### Follow-up (unit 8, 2026-10-20)
+### Follow-up (2026-10-20)
 
 - **`terminate` on Android removes the app's notifications.** `am force-stop` cancels everything the app posted (API 35: 2 notification records before, 0 after), so "terminate, then open the app from its notification" cannot be tested that way; iOS `simctl terminate` keeps them. The result and the description of `native_app` now say so on Android and point to `action=background`. A cold start from a notification works when the system kills a background app (`adb shell am kill`): the notification stays, and tapping it starts the app with the payload.
 - Unit test: the Android result mentions the removed notifications and `action=background`, the iOS one does not.
 
-### Follow-up (unit 10, 2026-10-20): deep links during a cold start
+### Follow-up (2026-10-20): deep links during a cold start
 
 A deep link sent right after `restart` (or `activate` of an app that was not running) is lost on Android: the Flutter app has no link handler yet while it starts, so the intent is dropped (seen in units 6 and 8). Reproduced 3/3 on API 35 (`restart` → `native_open_url` → the app stays on Home); with `native_wait_for` on the first screen in between, 3/3 opened the target screen. iOS queues the URL until the app is ready (2/2 worked without waiting). This is app / framework behaviour, so the tools say it: the `native_open_url` description and the Android `restart` result tell the agent to wait for the first screen first. Unit test: the hint is in the Android result only.
+
+### Follow-up (scope cut, 2026-10-21)
+
+Deferred in the first iteration (scope cut): `native_app` was removed. The E2E tests start the app and open deep links with `adb` / `simctl` directly.
 
 ---
 
@@ -591,19 +615,23 @@ Separation of concerns, simple fakes (`FakeNativeDevice`), and the same device o
 
 ### Consequences
 
-- iOS shortcuts work on the Simulator only (`simctl`); physical iPhones need X-02.
+- iOS shortcuts work on the Simulator only (`simctl`); physical iPhones are not supported yet.
 - iOS Notification Center contents are visible to `native_get_elements` when it is opened over the home screen (SpringBoard is the active app), but not when opened over the app — WebDriverAgent keeps reporting the app's tree; a screenshot shows them.
 
 ### Verification
 
-- Endpoints / commands verified before implementation: `pm grant|revoke`, `pm clear-permission-flags` (present on API 35; absent on API 28 and — unit 10 — on API 29; API 30–34 not checked, the tool detects it at run time), `cmd package resolve-activity`, `am start`, `cmd statusbar expand-notifications|collapse` (API 28, 35), `pidof`, `adb emu geo fix` ("OK"); `simctl privacy` (services listed by Xcode 26.4; `camera` accepted although unlisted, `notifications` fails, `photos` recorded but ignored by the full-access Photo Library API, `grant all` partial on iOS 26.4 — see [D17](#d17)), `simctl openurl|launch|terminate|push|location`, `launchctl list` inside the simulator; W3C `/orientation` on UIAutomator2 and WebDriverAgent (screen size and bounds follow the rotation).
+- Endpoints / commands verified before implementation: `pm grant|revoke`, `pm clear-permission-flags` (present on API 35; absent on API 28 and 29; API 30–34 not checked, the tool detects it at run time), `cmd package resolve-activity`, `am start`, `cmd statusbar expand-notifications|collapse` (API 28, 35), `pidof`, `adb emu geo fix` ("OK"); `simctl privacy` (services listed by Xcode 26.4; `camera` accepted although unlisted, `notifications` fails, `photos` recorded but ignored by the full-access Photo Library API, `grant all` partial on iOS 26.4 — see [D17](#d17)), `simctl openurl|launch|terminate|push|location`, `launchctl list` inside the simulator; W3C `/orientation` on UIAutomator2 and WebDriverAgent (screen size and bounds follow the rotation).
 - Live through the MCP server on Android API 28, API 35 and iOS 18.6: device info, deep link `marionette-example://app/testing/gestures` (cold and warm start; iOS asks "Open in …?" first), https URL in the browser and back with `activate`, notification shade open / close (Android shade contents in the tree), iOS push with Polish characters visible as a banner and in Notification Center, orientation in both directions, location accepted.
 - iOS Notification Center: the first close gesture (swipe up in the middle) only scrolled the list; closing now swipes up from the bottom edge. Rotation is refused while Notification Center is in front ("Unable To Rotate Device"); that error is now typed with a hint to close it.
 - Unit tests for both devices on scripted processes, all tools on fakes.
 
-### Follow-up (acceptance tests, 2026-10-21): the shade on Android
+### Follow-up (2026-10-21): the shade on Android
 
 `cmd statusbar expand-notifications` returns at once, while the shade is still opening. A read right after `native_notifications action=open` reported `foregroundApp` as the app (61 ms read, Android API 35) — and once already listed the shade's notifications next to it — so an agent could not tell that a system surface covered the app. After `open` the tool now waits (at most 2 s) until the shade has focus (`mCurrentFocus` NotificationShade / StatusBar, the same check as `foregroundApp`), and after `close` until it has lost it; on timeout it still succeeds. Unit test: open and close keep reading the focus until the shade has moved. Live on API 35: `open` returns after about 330 ms and the next read reports `com.android.systemui`; after `close`, the app.
+
+### Follow-up (scope cut, 2026-10-21)
+
+First iteration (scope cut): `NativeDevice` keeps only the notification shade (`openNotifications` / `closeNotifications`); the other operations were removed with their tools (D9).
 
 ---
 
@@ -611,7 +639,7 @@ Separation of concerns, simple fakes (`FakeNativeDevice`), and the same device o
 
 ## D13 — Bridge from Flutter coordinates to the native lane
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-19
 - **Applies to:** `native_map_flutter_rect`; `marionette.getViewMetrics` in `marionette_flutter`; `VmServiceConnector.getViewMetrics`, `NativeServiceContext.flutterViewMetrics`.
 
 ### Context and dilemma
@@ -644,6 +672,10 @@ One tested conversion instead of arithmetic in the agent's head; the scale comes
 - Android API 28 with a 3-button navigation bar (Flutter view 1080×2028 at (0, 0) on a 1080×2160 screen, scale 2.75): the mapped "Double tap here" text starts at y = 1661 px and its container at 1584 px, as in the native tree (whose node is clipped by the tab bar); the "Settings" tab label maps to x = 945, the native button's center. A native double tap and a native tap at the mapped points incremented the counter and switched to the Settings tab.
 - Camera preview on the Android emulator renders (screenshot) but is in neither tree, which is the case this tool exists for.
 - Unit tests: the mapping (scale and offset), view detection on both platforms, missing / mismatched view and off-screen notes, missing Flutter lane; `viewMetricsOf` in `marionette_flutter`.
+
+### Follow-up (scope cut, 2026-10-21)
+
+Deferred in the first iteration (scope cut): `native_map_flutter_rect`, the `marionette.getViewMetrics` extension and the CLI command were removed. Native views that expose controls are reached through the native tree; surfaces without one (camera preview, map) wait for a later iteration.
 
 ---
 
@@ -680,7 +712,7 @@ No operation may have a hidden side effect: an unconditional Back would navigate
 
 - Some iOS keyboards (number pad, default keyboard of a plain `UITextField`) cannot be hidden by the tool; the agent gets a hint instead.
 - On iOS, `clear: true` (W3C element clear in WebDriverAgent) hides the keyboard while the field keeps focus; typing afterwards still works. Tapping a field that already has focus does not bring the keyboard back — tap another control (or unfocus) first.
-- On iOS the typed text of a field labelled by Flutter (`label="Title"`) is reported as the label, not the value, in `native_get_elements` — to be addressed by the richer element model (N-01). *Resolved by [D15](#d15): the content is reported as `value`.*
+- On iOS the typed text of a field labelled by Flutter (`label="Title"`) is reported as the label, not the value, in `native_get_elements` — to be addressed by a richer element model. *Resolved by [D15](#d15): the content is reported as `value`.*
 
 ### Verification
 
@@ -696,17 +728,17 @@ No operation may have a hidden side effect: an unconditional Back would navigate
 - Unit tests cover keycode mapping, Back never sent without a keyboard, polling and failure, iOS key mapping, dismiss key names without `return`, fail-fast without polling, focused typing with clear, and decorator classification.
 - Follow-up (2026-10-19, iOS 18.6): `native_hide_keyboard` failed with "no Done / dismiss key" after a field was cleared. Cause: the iOS keyboard check only looked for `XCUIElementTypeKeyboard` in the page source, but a hidden keyboard stays in the tree, parked just below the screen (`y` = application height, `visible="false"`; screenshots confirmed no keyboard on screen). Hiding then tried to dismiss a keyboard that was not there. The keyboard now counts as shown only when it has a size and its top edge is above the bottom of the application; `visible` is not used because WDA reports it inconsistently. The Done key itself was enabled in the empty field, which ruled out the first guess (`enablesReturnKeyAutomatically`). Verified live: in that state the tool reports "Keyboard was not shown"; with a keyboard on screen (empty or filled field) it hides it. Unit tests cover the parked keyboard and an on-screen one.
 
-### Follow-up (unit 8, 2026-10-20)
+### Follow-up (2026-10-20)
 
 - **Gboard's floating toolbar.** With a hardware keyboard attached (the emulator's default `hw.keyboard=yes`), Gboard shows only a small floating toolbar instead of the keyboard, and `dumpsys input_method` still reports `mInputShown=true`. Back does **not** close that toolbar: it reaches the app — on the native screen of the example app it closed both the IME and the Activity. `hideKeyboard` now measures how much of the IME window the keyboard covers (`dumpsys window`: the window's requested height `h` and `mGivenContentInsets` top `T` → (h − T) / h; a full keyboard covers about 40 % — API 28, 1215 of 2028 px inset — while the toolbar reports no cover at all: inset 2700 of 2700 px on API 35) and below 10 % fails with a hint (unfocus the field in the app, or start the emulator with `hw.keyboard=no`) instead of pressing Back. Unknown coverage (the window not found) keeps the old behaviour.
 - Verified live on Android API 35 (native screen of the example app, field focused, toolbar shown): `native_hide_keyboard` fails with the hint in 0.2 s and the native screen stays open. The on-screen keyboard path is unchanged (unit-tested; API 35 here always shows the toolbar). Unit tests cover the coverage parser and the guard.
 
 
-### Follow-up (unit 10, 2026-10-20): a field that changes before typing
+### Follow-up (2026-10-20): a field that changes before typing
 
-`native_enter_text` with a selector sometimes failed although the field was there: on iOS right after a deep link the screen was still moving and WebDriverAgent reported "The previously found element … is not present in the current view anymore" (`stale element reference`); on Android a set-text action was once refused (`invalid element state`, deferred since unit 5). In both cases nothing was typed. The tool now waits 300 ms, finds the field again with the same selector and types once more; a second failure of this kind becomes a typed error with a hint to wait until the screen has settled. Seen live in the E2E runs on iOS 26.4: two of five runs needed the retry and passed. Unit tests: each of the three errors is retried once, a second one fails with the hint, other errors are not retried.
+`native_enter_text` with a selector sometimes failed although the field was there: on iOS right after a deep link the screen was still moving and WebDriverAgent reported "The previously found element … is not present in the current view anymore" (`stale element reference`); on Android a set-text action was once refused (`invalid element state`). In both cases nothing was typed. The tool now waits 300 ms, finds the field again with the same selector and types once more; a second failure of this kind becomes a typed error with a hint to wait until the screen has settled. Seen live in the E2E runs on iOS 26.4: two of five runs needed the retry and passed. Unit tests: each of the three errors is retried once, a second one fails with the hint, other errors are not retried.
 
-### Follow-up (acceptance tests, 2026-10-21): the iOS Back hint
+### Follow-up (2026-10-21): the iOS Back hint
 
 The hint for `back` on iOS suggested `native_scroll direction=right startX=1 …`. Followed literally, that swipe covers the tool's default 400 px — about 30 % of the screen width on iOS 26.4 (iPhone 17 Pro Max, 1320 px) — and iOS cancels the interactive pop, while the tool reports success. The hint now names `native_swipe` from `startX=1` to about 70 % of the screen width; live, a swipe from (1, 1434) to (924, 1434) returned to the previous screen. `native_scroll` with `startX` / `startY` also reported "from screen center"; it now reports the start point. Unit tests: the hint names `native_swipe` and the 70 % distance; a scroll with an explicit start reports it.
 ---
@@ -734,7 +766,7 @@ Agents could see what an element says, but not its state: whether a switch is on
 - **Text fields keep their label in `text`** and report their content in `value`: Android takes `hint` → `content-desc` → `text` for `EditText` / `AutoCompleteTextView` (Flutter puts the label in `hint`, which stays after typing); `value` is `text` unless it is the hint (`showing-hint`, or equal to `hint`). iOS takes `label` → `placeholderValue` → `value` for text fields; `value` is reported unless it equals `placeholderValue` (an empty field reports its placeholder as its value).
 - iOS `value` is reported only for text fields and sliders. Other types use it for unrelated state: a selected tab button reports `value="1"`, the keyboard's "Next keyboard" key reports the list of keyboards.
 - `checked`: Android `checked` when `checkable="true"`; iOS `value` "1"/"0" of `Switch` / `CheckBox` / `Toggle` (a Flutter `CheckboxListTile` is an iOS `Switch`). `selected`: Android attribute, iOS `Selected` in `traits`. `focused`: Android only — WebDriverAgent has no focus attribute, so it is absent rather than `false`. `scrollable`: Android attribute; iOS `ScrollView` / `Table` / `CollectionView`. Scrollable containers are always listed, even without text or id, so they can serve as `native_scroll` `within`.
-- `native_get_elements` accepts the selector fields (`text`, `textContains`, `id`, `type`) as filters, `clickableOnly`, and `includeForegroundApp` (default `true`; `false` saves a device call). Android `package` per element and an explicit `index` field from the plan were not added: `foregroundApp` already tells a system surface apart, and the tree order is the index.
+- `native_get_elements` accepts the selector fields (`text`, `textContains`, `id`, `type`) as filters, `clickableOnly`, and `includeForegroundApp` (default `true`; `false` saves a device call). Android `package` per element and an explicit `index` field were not added: `foregroundApp` already tells a system surface apart, and the tree order is the index.
 
 ### Rationale
 
@@ -754,11 +786,11 @@ One shape for both platforms is what lets an agent use the same reasoning everyw
 - Unit tests cover both parsers (state, field label/value, iOS value types), `scaled` keeping the state, JSON omission of defaults, and the filters.
 
 
-### Follow-up (unit 10, 2026-10-20): the label of a focused field on iOS
+### Follow-up (2026-10-20): the label of a focused field on iOS
 
 A focused Flutter text field on iOS reports its hint as a second line of the label (`Title` becomes `Title\nSingle line — keyboard shows Done`), so the exact `label` of `native_enter_text` stopped matching the field it had just focused — the retry above then failed with "No native element with text=\"Title\"". The `label` selector now also matches the first line of an element's text; the exact `text` of the other tools is unchanged (use `textContains` to read such a field). Unit test: a focused field is found by its label, a plain `text` selector stays exact. Verified in three E2E runs on iOS 26.4.
 
-### Follow-up (acceptance tests, 2026-10-21): password fields on Android
+### Follow-up (2026-10-21): password fields on Android
 
 In a WebView on Android API 35 an `<input type="password">` is reported by UIAutomator with `password="true"` and its content in clear text in `text`; with no hint, that text also became the element's `text`, so `native_get_elements` returned the password twice. WebDriverAgent masks a secure field itself (`value` "••••••••", one bullet per character). The Android parser now does the same for any node with `password="true"`: `text` and `value` show one bullet per character. The length stays visible, as on iOS. Selectors cannot match a password by its content any more — they use the label, id or focus. Unit test: a filled password field is masked, an empty one keeps its hint, other fields are unchanged. Live on API 35: the WebView form's password reads "••••••••" and the page still receives the full password ("password length=8").
 
@@ -806,7 +838,7 @@ Correctness first: a search that silently skips its target, or a "found" that ca
 - Searching is slower: ≈ 2 s per swipe on Android API 28 and ≈ 2.3 s on iOS 18.6 including the settle reads. In a 60-row list (a row ≈ 25% of the container) reaching row 45 takes about 10 swipes; agents scrolling far should raise `maxSwipes`.
 - A swipe that does not move the content (wrong direction at the start of the list, or a swipe in a non-scrollable area) ends the search early with "reached the end" — that is the intended signal to try the opposite direction or a `within` container.
 - A plain `native_scroll` may still fling; an agent that taps right after it should read the elements again first (or use a target).
-- Off-screen zero-size nodes still appear in `native_get_elements`; `native_tap` on one would tap (0, 0). Tracked in the plan status as a follow-up. *Follow-up (2026-10-19): selectors of every tool now match only visible elements — a target that exists only off screen fails with a hint to `native_scroll` to it — and `native_get_elements` leaves zero-size nodes out, so `index` counts what is listed ([D1](#d1)).*
+- Off-screen zero-size nodes still appear in `native_get_elements`; `native_tap` on one would tap (0, 0). *Follow-up (2026-10-19): selectors of every tool now match only visible elements — a target that exists only off screen fails with a hint to `native_scroll` to it — and `native_get_elements` leaves zero-size nodes out, so `index` counts what is listed ([D1](#d1)).*
 
 ### Verification
 
@@ -815,30 +847,30 @@ Correctness first: a search that silently skips its target, or a "found" that ca
 - Off-screen check: on iOS "Show message in 2 s" is listed at (0, 0, 0×0) before scrolling; it is now found only after a swipe.
 - Unit tests cover zero-size matches, settling, the slow held drag, end detection (whole screen and container only), the 60% / 80% shares, `maxSwipes`, `within` validation, and every `native_wait_for` path.
 
-### Follow-up (unit 7, 2026-10-19)
+### Follow-up (2026-10-19)
 
 - **iOS off-screen elements with real coordinates.** WebDriverAgent lists a WebView's whole page, e.g. "Section 2" at y = 4851 px on a 2868 px screen; the zero-size rule did not catch it, so a search would have reported it as found. `parseWdaSource` now keeps only elements that overlap the application element (the screen) and clips partly visible ones to it — as UIAutomator does — so the center is always on screen. A clipped element no longer matches WDA's geometry XPath, so lookups for typing / element screenshots fall back to id or label for it. An element covered by another one (a photo under the picker's toolbar) is still considered visible: the tree does not say what is on top.
 - **End of content needs two unchanged swipes.** In a WebView page with a 900 px empty block, one swipe inside the block left the visible tree identical (only the block, clipped to the viewport) although the page moved, and the search stopped with "reached the end". The end is now reported after two consecutive swipes without a visible change; a real end costs one extra swipe (verified on Android and iOS: the search crosses the block, a missing target still stops at the end).
 - **`native_wait_for` honours `timeoutMs`.** The loop checked the deadline only between reads, so one slow read could stretch the wait: a read takes up to 10 s on an Android screen that never goes idle without [D18](#d18), and 3–4 s next to iOS system pickers. Each read is now limited to the remaining time; if no read finished at all the error says so, otherwise it is the regular "not found within …". (An 8 s wait that once returned after 259 s was the Mac going to sleep — macOS power log: idle sleep 19:14:45–19:19:05 — not the device; nothing in the tool can prevent that.)
 - **Sheets.** On iOS a downward swipe (`native_scroll direction=down`) while a sheet's content is already at its top dismisses the whole sheet (seen in the photo picker) — a native gesture, not a bug; inside sheets, search in the direction of unseen content.
 
-### Follow-up (unit 10, 2026-10-20): slow reads next to iOS system pickers
+### Follow-up (2026-10-20): slow reads next to iOS system pickers
 
 Reads with `UIDocumentPicker` open took 2.6–2.7 s each (75 KB page source) against 0.17 s on an app screen (10 KB), so a search in the picker takes tens of seconds. Measured on iOS 26.4 with WebDriverAgent's settings: waiting is not the cause — `waitForIdleTimeout` 0 and `animationCoolOffTimeout` 0 gave the same 2.7 s; a smaller `snapshotMaxDepth` (25 instead of 50) gave 2.0 s but can drop deep elements of real apps. The cost is the accessibility snapshot of the picker, a view of another process. **Decision:** keep the defaults and document it; searches in pickers are slow but correct. (Analogy to [D18](#d18) does not hold: there the cost was a wait, here it is the snapshot itself.)
 
-### Follow-up (acceptance tests, 2026-10-20): a target a lazy list has not built
+### Follow-up (2026-10-20): a target a lazy list has not built
 
 The hint to scroll was given only for a target that exists off screen. In a lazy list (Flutter `ListView.builder`, Android `RecyclerView`) a far item is not in the tree at all — on the Gestures & inspection screen "Row 40" was absent on both platforms, not even as a zero-size node — so `native_tap text="Row 40"` only said to call `native_get_elements`. When nothing matches and a scrollable container is on screen, the hint now also suggests `native_scroll` with the same selector as the target. Unit test: a miss on a screen with a scrollable container hints to scroll, a miss on a screen without one does not. Live on Android API 35 and iOS 26.4: `native_tap text="Row 40"` before scrolling names `native_scroll`.
 
-### Follow-up (acceptance tests, 2026-10-21): elements outside their WebView
+### Follow-up (2026-10-21): elements outside their WebView
 
 WebDriverAgent lists a WebView's whole page with real coordinates, and only elements outside the screen were dropped. On the WebView screen (iOS 26.4) "Section 2" lay below the WebView's frame, behind the bottom tabs, yet inside the screen — so `native_scroll text="Section 2"` reported it found after 5 swipes while the screenshot showed blank page, and a tap on it would have hit the tabs. WDA itself marked it `visible="false"`. The iOS parser now tracks the element hierarchy and clips each element to the frames of its `WebView`, `ScrollView`, `Table` and `CollectionView` ancestors (a container without size clips nothing); an element entirely outside them gets zero size and is not listed, like Flutter's off-screen nodes. UIAutomator already reports clipped bounds, so Android is unchanged. Unit test: an element below its WebView is dropped, one partly inside is clipped, a zero-size container clips nothing. Live on iOS 26.4: "Section 2" is found only once it is inside the WebView (after 7 swipes) and is visible on the screenshot; the WebView form, the lists of the Gestures & inspection screen and page scrolling behave as before.
 
-### Follow-up (acceptance tests, 2026-10-21): waiting for a system screen
+### Follow-up (2026-10-21): waiting for a system screen
 
 In the test with an agent that knew nothing of the code (Claude Code given only the MCP tools), the agent waited for the Android file picker with `native_wait_for textContains="documentsui"` — the picker's package name. It matched a label of the app itself ("SAF DocumentsUI / …"), so the wait returned at once, before the picker was there; the agent recovered only because it read the tree next. The description of `native_wait_for`, the server instructions and `help-ai` now say to wait for an element expected on the new screen, and that a package name is not element text — `foregroundApp` of `native_get_elements` tells which app is in front. A `foregroundApp` option for `native_wait_for` was considered and not added: the other nine agent runs waited correctly with selectors. Text only; no unit test (descriptions and instructions are not tested).
 
-### Follow-up (acceptance tests, 2026-10-21): a failed read while the app starts
+### Follow-up (2026-10-21): a failed read while the app starts
 
 In an E2E run on iOS 26.4, `native_permissions reset` terminated the app, `native_app activate` started it again, and the next `native_wait_for "Tab 1 of 4"` failed in the same second — the app process started a second later. A failed tree read ended the wait at once, although the element appeared moments later; the server log said only "Failed to native wait for", so the error itself was lost. `native_wait_for` now retries a failed read — up to three in a row, each after `intervalMs`, within `timeoutMs` — and fails with the last error only when the failure lasts; "not connected" and a session that recovery could not restore still fail at once. Separately, the server log line of a failed tool now ends with the error (the log handler printed only the message, for every tool). Unit tests: one failed read then the element → success; a lasting failure ends the wait well before `timeoutMs`; a lost session ends it without a read; a log line includes the error. The failure itself did not happen again in three manual tries and two E2E runs; the E2E scenarios pass on both platforms after the change.
 
@@ -848,14 +880,14 @@ In an E2E run on iOS 26.4, `native_permissions reset` terminated the app, `nativ
 
 ## D17 — Changing permissions without the system dialog
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-19
 - **Applies to:** `native_permissions`; `NativeDevice.setPermission`, `androidPermissionNames`, `iosPrivacyService`.
 
 ### Context and dilemma
 
 A test often needs a known permission state (granted, denied, or "never asked") before it starts, and an agent may want to skip a dialog. Both platforms have commands for it, with traps found while verifying them:
 
-- `pm reset-permissions -p <pkg>` from the plan does not exist: the command takes no package (API 28 and 35 help: "Revert all runtime permissions to their default state") and silently resets **every app** on the device.
+- `pm reset-permissions -p <pkg>` does not exist: the command takes no package (API 28 and 35 help: "Revert all runtime permissions to their default state") and silently resets **every app** on the device.
 - `pm revoke` kills the app's process; most `simctl privacy` changes terminate the iOS app too. The Flutter lane loses its connection.
 - Permission groups have different names per platform and API level (photos: `READ_EXTERNAL_STORAGE` before API 33, `READ_MEDIA_*` after; notifications need no permission before API 33). `pm grant` of a permission the app does not declare fails.
 - Xcode 26.4's `simctl privacy` cannot change notifications.
@@ -871,7 +903,7 @@ A test often needs a known permission state (granted, denied, or "never asked") 
 ### Decision
 
 - One shared set: `camera`, `microphone`, `photos`, `location`, `contacts`, `calendar`, `notifications`, `all`. Android maps each to its permissions for the device's API level and changes only those the app declares (from `dumpsys package`); none declared → an error naming the missing manifest entries. iOS maps to `simctl privacy` services (`camera` works although its help does not list it).
-- **Reset on Android** is option (c): revoke, then clear the flags that record "user set" / "don't ask again", so the app asks again. Where the command is missing (API 28 and 29, checked in unit 10; API 30–34 not checked) the permission is revoked and the result explains that a "don't ask again" choice cannot be undone without reinstalling.
+- **Reset on Android** is option (c): revoke, then clear the flags that record "user set" / "don't ask again", so the app asks again. Where the command is missing (API 28 and 29; API 30–34 not checked) the permission is revoked and the result explains that a "don't ask again" choice cannot be undone without reinstalling.
 - Unsupported combinations fail with a hint: notifications before API 33 ("nothing to change"), notifications on the iOS Simulator and grant / revoke of photos on iOS ("answer the dialog with `native_tap`", e.g. "Allow Full Access"); reset of iOS photos works.
 - On iOS, grant / revoke of `all` changes camera, microphone, location, contacts and calendar one by one and notes that photos and notifications were skipped; reset of `all` uses `simctl privacy reset all`.
 - The tool checks whether the app was running before the change and is not after it (`pidof`; `launchctl list` in the simulator) and then says the change terminated it and that the Flutter lane must reconnect.
@@ -894,6 +926,10 @@ Option (c) is the only per-app reset that keeps app data. Detecting termination 
 - iOS 26.4 (iPhone 17 Pro Max), Device & permissions screen: `reset all` → every group "denied" and "Request contacts" shows the dialog again; `grant all` (service by service) → camera, microphone, location, contacts, calendar "granted"; `grant photos` → unsupported (a "Request photos" tap after `simctl privacy grant photos` still showed "Limit Access… / Allow Full Access / Don't Allow"); `revoke camera` → "permanentlyDenied". Before the per-service change, `grant all` granted location only.
 - Android API 35, Device & permissions screen: `grant all` → camera, microphone, photos, location, contacts, calendar "granted" ("photos (storage)" stays denied: `READ_EXTERNAL_STORAGE` is declared up to API 32 only); `reset all` → all "denied", "Request location" shows the dialog again.
 - Unit tests: mapping per API level, declared-permission filtering, reset with and without flag clearing, never `reset-permissions`, typed failures, termination reporting.
+
+### Follow-up (scope cut, 2026-10-21)
+
+Deferred in the first iteration (scope cut): `native_permissions` was removed. The permission dialog is answered with `native_wait_for` + `native_tap`; to see it again, the permission is reset outside Marionette (`adb shell pm revoke`, `xcrun simctl privacy … reset`), as the server instructions and `help-ai` say.
 
 ---
 
@@ -930,7 +966,7 @@ On static screens the setting changes nothing — the wait ends as soon as the U
 
 - On continuously animating screens each read costs ~0.5 s instead of 10 s.
 - A transition longer than 500 ms can be read mid-way; tools that act on a target found that way may need `native_wait_for` first.
-- The value is set again for every session, including one re-established by [D3](#d3). *Verified in unit 10:* settings belong to the session, not the server — a new session of another client on the same running server reports the default `waitForIdleTimeout` of 10 000 ms, so nothing leaks to other tools.
+- The value is set again for every session, including one re-established by [D3](#d3). *Verified:* settings belong to the session, not the server — a new session of another client on the same running server reports the default `waitForIdleTimeout` of 10 000 ms, so nothing leaks to other tools.
 
 ### Verification
 
@@ -973,7 +1009,7 @@ A toast is short and disappears on its own, so waiting it out is invisible to th
 ### Consequences
 
 - A read during a toast takes up to ~3.5 s instead of failing.
-- On API 35 toast text can only be checked visually (`native_take_screenshot`); on API 28 and 29 it is readable as text (API 29 checked in unit 10: listed in 26 ms, gone after 2.8 s, no read failure). Which of API 30–34 behave which way is unverified (physical devices: checklist).
+- On API 35 toast text can only be checked visually (`native_take_screenshot`); on API 28 and 29 it is readable as text (API 29 checked: listed in 26 ms, gone after 2.8 s, no read failure). Which of API 30–34 behave which way is unverified.
 - Android heads-up notification banners are not in the UIAutomator2 tree on API 35 (the notification is readable in the shade, `native_notifications open`).
 - The listed toast has `0×0` bounds and the wrong package; consumers must not use its position.
 
@@ -989,7 +1025,7 @@ A toast is short and disappears on its own, so waiting it out is invisible to th
 
 ## D20 — Simulated biometrics
 
-- **Status:** Accepted (2026-10-20)
+- **Status:** Deferred in the first iteration (2026-10-21); accepted 2026-10-20
 - **Applies to:** `native_biometrics`; `NativeDevice.biometrics`, `NativeBiometricAction`; `SimctlClient.notify`.
 
 ### Context and dilemma
@@ -1024,6 +1060,10 @@ The prompt is the thing under test; faking the sensor is the only way to answer 
 - Live, Android API 35 emulator: after `locksettings set-pin 1111`, the Settings wizard enrolled a fingerprint with `native_biometrics match` answering its touches; the app's `BiometricPrompt` appears in the tree; `match` → success; `nonMatch` → "Not recognized" in the prompt; Back → failed. `enroll` returns the hint.
 - Unit tests: notifyutil arguments per action, emulator finger ids, enroll hint, the action passed by the tool, and rejection of an unknown action.
 
+### Follow-up (scope cut, 2026-10-21)
+
+Deferred in the first iteration (scope cut): `native_biometrics` and the Auth example screen (`local_auth`) were removed; biometric sign-in is not in the scope of the first iteration. The prompt can still be read with `native_get_elements`.
+
 ---
 
 <a id="d21"></a>
@@ -1055,7 +1095,7 @@ The gesture is a platform behaviour, works with existing tools and is now discov
 
 - Agents must use different gestures for the same thing on the two platforms; the text says so where it matters.
 - Opened over a foreground app, the Notification Center is not in the WebDriverAgent tree (the app's elements are returned instead, seen on iOS 26.4); over the home screen it is. The iOS result of `open` therefore also tells the agent to send the app to the background first.
-- Not specific to iOS 26: iOS 18.6 behaves the same. iOS 18.6 also collapses the list into a "1 Notification" button at the bottom of the cover sheet; it must be tapped to expand the list — the iOS result says so. Whether a physical iPhone behaves the same is unverified (checklist; the cover sheet is the lock screen, where a real device asks to unlock).
+- Not specific to iOS 26: iOS 18.6 behaves the same. iOS 18.6 also collapses the list into a "1 Notification" button at the bottom of the cover sheet; it must be tapped to expand the list — the iOS result says so. Whether a physical iPhone behaves the same is unverified (the cover sheet is the lock screen, where a real device asks to unlock).
 - Simulated push (`action=push`): the banner appears only when the app is already suspended. Pushed while the app is active — in front, or within about a second after `native_app action=background` — the app's notification delegate decides, and the example app's plugin shows nothing. The push result tells the agent to background the app a few seconds before pushing.
 
 ### Verification
@@ -1076,7 +1116,7 @@ The gesture is a platform behaviour, works with existing tools and is now discov
 
 ### Context and dilemma
 
-While a dialog, the notification shade, a biometric prompt, a browser or another native screen covers the app, `get_interactive_elements` still lists the Flutter widgets underneath as if they were reachable (checked for every kind of system UI in unit 8). An agent that only uses the Flutter lane taps them and nothing happens. The widget tree cannot know what is on top; the app's lifecycle state can, partly.
+While a dialog, the notification shade, a biometric prompt, a browser or another native screen covers the app, `get_interactive_elements` still lists the Flutter widgets underneath as if they were reachable (checked for every kind of system UI). An agent that only uses the Flutter lane taps them and nothing happens. The widget tree cannot know what is on top; the app's lifecycle state can, partly.
 
 ### Options considered
 

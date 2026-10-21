@@ -16,7 +16,7 @@ class PlatformViewsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              '§1a — Plain native controls',
+              'Plain native controls',
               style: Theme.of(context).textTheme.titleSmall,
             ),
           ),
@@ -33,7 +33,7 @@ class PlatformViewsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
-              '§1b — Surface / GPU-backed views',
+              'Surface / GPU-backed views',
               style: Theme.of(context).textTheme.titleSmall,
             ),
           ),

@@ -5,14 +5,6 @@
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!-- Testing → Device & permissions: one runtime permission per group that
-         native_permissions can change. -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <uses-permission android:name="android.permission.READ_CONTACTS"/>
-    <uses-permission android:name="android.permission.READ_CALENDAR"/>
-    <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
     <application
         android:label="counter"
         android:name="${applicationName}"
@@ -38,8 +30,8 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Deep links for native_open_url, e.g.
-                 marionette-example://app/testing/gestures -->
+            <!-- Deep links to a screen (used by the E2E tests), e.g.
+                 marionette-example://app/testing/keyboard -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -47,7 +39,7 @@
                 <data android:scheme="marionette-example"/>
             </intent-filter>
         </activity>
-        <!-- §7: OAuth redirect back from the browser (flutter_web_auth_2);
+        <!-- OAuth redirect back from the browser (flutter_web_auth_2);
              a scheme of its own so it does not compete with deep links. -->
         <activity
             android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
@@ -59,7 +51,7 @@
                 <data android:scheme="marionette-auth" />
             </intent-filter>
         </activity>
-        <!-- §10: full native screen opened over MethodChannel. -->
+        <!-- Full native screen opened over MethodChannel. -->
         <activity
             android:name=".NativeFormActivity"
             android:exported="false"

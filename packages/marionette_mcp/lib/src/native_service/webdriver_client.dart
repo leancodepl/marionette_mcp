@@ -187,18 +187,6 @@ class WebDriverClient {
     await _request('POST', '/session/$sessionId/element/$elementId/clear');
   }
 
-  /// PNG (base64) of just element [elementId]
-  /// (`GET /session/{id}/element/{eid}/screenshot`), in the same pixel grid
-  /// as [takeScreenshot] on both servers.
-  Future<String> elementScreenshot(String sessionId, String elementId) async {
-    final value = await _request(
-      'GET',
-      '/session/$sessionId/element/$elementId/screenshot',
-    );
-    if (value is String && value.isNotEmpty) return value;
-    throw const WebDriverException('Element screenshot was empty');
-  }
-
   /// Returns attribute [name] of element [elementId], or null when the
   /// server has no value for it (`GET .../element/{id}/attribute/{name}`).
   Future<String?> elementAttribute(
@@ -352,15 +340,6 @@ class WebDriverClient {
     final value = await _request('GET', '/session/$sessionId/orientation');
     if (value is String) return value;
     throw WebDriverException('Unexpected orientation: $value');
-  }
-
-  /// Rotates the screen (`POST /session/{id}/orientation`).
-  Future<void> setOrientation(String sessionId, String orientation) async {
-    await _request(
-      'POST',
-      '/session/$sessionId/orientation',
-      body: {'orientation': orientation},
-    );
   }
 
   /// Returns the window size from UIAutomator2's

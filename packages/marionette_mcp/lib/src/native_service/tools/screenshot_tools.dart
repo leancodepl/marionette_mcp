@@ -1,8 +1,5 @@
-import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
-import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
-import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/screenshot_saver.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -23,11 +20,8 @@ void registerNativeScreenshotTools(
         'status-bar panels). '
         'Use it when native_get_elements shows WebView or system UI you want '
         'to visually inspect, or when Flutter take_screenshots shows a blank '
-        'platform-view area. With a selector (text, textContains, id, type, '
-        'optional index — values from native_get_elements) captures just '
-        'that element, e.g. to check a WebView or an icon closely. By '
-        'default returns the capture as a base64 inline '
-        'PNG (no file written). When MARIONETTE_SCREENSHOTS_DIR is set, also '
+        'platform-view area. By default returns the capture as a base64 '
+        'inline PNG (no file written). When MARIONETTE_SCREENSHOTS_DIR is set, also '
         'saves the PNG to that directory and includes the absolute path '
         'alongside the inline image. When a path is returned, embed it as a '
         'markdown image so the user can see it. '
@@ -37,34 +31,19 @@ void registerNativeScreenshotTools(
       title: 'Native Take Screenshot',
       readOnlyHint: true,
     ),
-    inputSchema: ToolInputSchema(properties: nativeSelectorProperties()),
-    callback: (args, extra) => handleNativeTakeScreenshot(context, args),
+    inputSchema: const ToolInputSchema(properties: {}),
+    callback: (args, extra) => handleNativeTakeScreenshot(context),
   );
 }
 
 /// Handles `native_take_screenshot`.
 Future<CallToolResult> handleNativeTakeScreenshot(
-  NativeServiceContext context, [
-  Map<String, dynamic> args = const {},
-]) async {
+  NativeServiceContext context,
+) async {
   final logger = context.logger;
-  final selector = nativeSelectorFromArgs(args);
-  if (selector.isEmpty && selector.index != null) {
-    return invalidArguments(
-      'native_take_screenshot index requires a selector.',
-    );
-  }
-
-  logger.info(selector.isEmpty
-      ? 'Taking native screenshot'
-      : 'Taking native screenshot of ${selector.describe()}');
+  logger.info('Taking native screenshot');
   return runTool(logger, 'native take screenshot', () async {
-    final connector = context.requireConnector();
-    final pngBase64 = selector.isEmpty
-        ? await connector.takeScreenshot()
-        : await connector.takeElementScreenshot(
-            selectElement(await connector.getNativeElements(), selector),
-          );
+    final pngBase64 = await context.requireConnector().takeScreenshot();
     if (pngBase64.isEmpty) {
       return CallToolResult(
         content: [

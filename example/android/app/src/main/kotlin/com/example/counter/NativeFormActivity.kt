@@ -10,7 +10,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 
-// §10: a full native screen outside Flutter. Returns the typed text to the
+// A full native screen outside Flutter. Returns the typed text to the
 // Flutter screen that opened it.
 class NativeFormActivity : Activity() {
     companion object {

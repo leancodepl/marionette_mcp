@@ -18,7 +18,6 @@ class NativeSessionInfo {
     this.udid,
     this.port,
     this.sessionId,
-    this.defaultAppId,
     this.pid,
     this.startedServer = false,
   });
@@ -33,7 +32,6 @@ class NativeSessionInfo {
       udid: json['udid'] as String?,
       port: json['port'] as int?,
       sessionId: json['sessionId'] as String?,
-      defaultAppId: json['defaultAppId'] as String?,
       pid: json['pid'] as int?,
       startedServer: json['startedServer'] as bool? ?? false,
     );
@@ -61,10 +59,6 @@ class NativeSessionInfo {
   /// no longer has it.
   String? sessionId;
 
-  /// App under test for device shortcuts without `--app-id`
-  /// (docs/native-lane-decisions.md#d7).
-  String? defaultAppId;
-
   /// Pid of the detached process holding the server: `adb shell am
   /// instrument -w` (Android) or `xcodebuild` running WebDriverAgent (iOS).
   final int? pid;
@@ -82,7 +76,6 @@ class NativeSessionInfo {
         if (udid != null) 'udid': udid,
         if (port != null) 'port': port,
         if (sessionId != null) 'sessionId': sessionId,
-        if (defaultAppId != null) 'defaultAppId': defaultAppId,
         if (pid != null) 'pid': pid,
         'startedServer': startedServer,
       };
