@@ -105,6 +105,13 @@ enum AndroidBootstrapFailure {
     'Start an emulator or connect a device and check `adb devices`. Pass '
     'serial to native_connect when several devices are attached.',
   ),
+  deviceLocked(
+    'Unlock the device with its PIN, pattern or password, then retry '
+    'native_connect. On an emulator: `adb shell input keyevent '
+    'KEYCODE_WAKEUP`, swipe up to the PIN pad (`adb shell input swipe 500 '
+    '2000 500 800`), `adb shell input text <PIN>`, then `adb shell input '
+    'keyevent KEYCODE_ENTER`.',
+  ),
   apkOverrideMissing(
     'Fix the path in MARIONETTE_UIA2_SERVER_APK / MARIONETTE_UIA2_TEST_APK, '
     'or unset both to download the APKs automatically.',

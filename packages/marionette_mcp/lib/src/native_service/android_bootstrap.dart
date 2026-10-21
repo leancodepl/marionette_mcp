@@ -229,6 +229,17 @@ class AndroidBootstrap implements SharedServerBootstrap {
         '${processMessage(state)}',
       );
     }
+
+    // UIAutomator2 cannot start before the first unlock after a restart
+    // ("not encryption aware"); the health check would only time out.
+    if (await _adb.isCurrentUserLocked()) {
+      throw AndroidBootstrapException(
+        AndroidBootstrapFailure.deviceLocked,
+        'Android device ${serial ?? '(default)'} is locked: after a restart '
+        'its storage stays encrypted until the screen is unlocked, so '
+        'UIAutomator2 cannot start.',
+      );
+    }
   }
 
   /// Port of an existing forward from this device to UIAutomator2. An

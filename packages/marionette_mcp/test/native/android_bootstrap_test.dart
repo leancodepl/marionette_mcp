@@ -93,6 +93,25 @@ void main() {
       );
     });
 
+    test('a device locked after a restart fails at once with deviceLocked',
+        () async {
+      runner.onAdb(
+        ['shell', 'dumpsys', 'user'],
+        result: ok('Current user: 0\n  UserInfo{0:null:4c13}\n'
+            '    State: RUNNING_LOCKED\n'),
+      );
+
+      await expectLater(
+        bootstrap().ensureServerReady(),
+        failsWith(AndroidBootstrapFailure.deviceLocked),
+      );
+      expect(
+        runner.adbCommands.where((c) => c.contains('instrument')),
+        isEmpty,
+        reason: 'UIAutomator2 is not started on a locked device',
+      );
+    });
+
     test(
       'ensureServerReady installs, instruments, forwards, and becomes healthy',
       () async {

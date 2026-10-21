@@ -316,6 +316,41 @@ void main() {
     });
   });
 
+  group('parseCurrentUserLocked', () {
+    // Seen on API 35 after a restart of an emulator with a PIN: UIAutomator2
+    // failed with "Package ... is not encryption aware".
+    const dumpsys = '''
+Current user: 0
+
+Users:
+  UserInfo{0:null:4c13} serialNo=0 isPrimary=true
+    Type: android.os.usertype.full.SYSTEM
+    State: RUNNING_LOCKED
+  UserInfo{10:Guest:c13} serialNo=10
+    State: RUNNING_UNLOCKED
+''';
+
+    test('the current user locked after a restart', () {
+      expect(parseCurrentUserLocked(dumpsys), isTrue);
+    });
+
+    test('an unlocked current user, another user or no data', () {
+      expect(
+        parseCurrentUserLocked(
+          dumpsys.replaceFirst('RUNNING_LOCKED', 'RUNNING_UNLOCKED'),
+        ),
+        isFalse,
+      );
+      expect(
+        parseCurrentUserLocked(
+          dumpsys.replaceFirst('Current user: 0', 'Current user: 10'),
+        ),
+        isFalse,
+      );
+      expect(parseCurrentUserLocked(''), isFalse);
+    });
+  });
+
   group('parseKeyboardCoverage', () {
     test('floating toolbar covers nothing, a full keyboard a large part', () {
       expect(

@@ -125,6 +125,18 @@ class AdbClient {
     }
   }
 
+  /// Whether the current user is locked after a restart
+  /// ([parseCurrentUserLocked]); false when it cannot be read.
+  Future<bool> isCurrentUserLocked() async {
+    try {
+      final result = await shell(const ['dumpsys', 'user']);
+      return result.exitCode == 0 &&
+          parseCurrentUserLocked(processStdout(result));
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Package that owns the focused window (a system dialog when one covers
   /// the app), or null when it cannot be determined. Never throws.
   ///
@@ -144,6 +156,22 @@ class AdbClient {
     }
     return null;
   }
+}
+
+final _currentUserPattern = RegExp(r'Current user: (\d+)');
+
+/// Whether the current user in `dumpsys user` output is running but still
+/// locked (`RUNNING_LOCKED`): after a restart its storage stays encrypted
+/// until the screen is unlocked with the PIN, pattern or password. False
+/// when the output does not say.
+bool parseCurrentUserLocked(String dumpsysUser) {
+  final user = _currentUserPattern.firstMatch(dumpsysUser)?.group(1);
+  if (user == null) return false;
+  final start = dumpsysUser.indexOf('UserInfo{$user:');
+  if (start == -1) return false;
+  final state =
+      RegExp(r'State: (\w+)').firstMatch(dumpsysUser.substring(start));
+  return state?.group(1) == 'RUNNING_LOCKED';
 }
 
 final _sha256Pattern = RegExp(r'^[0-9a-fA-F]{64}$');

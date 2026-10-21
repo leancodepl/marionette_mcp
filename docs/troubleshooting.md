@@ -28,6 +28,7 @@ Start with `marionette doctor`: it checks adb and devices, the UIAutomator2 APKs
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | `native_connect` (Android): device not online / adb not found | No device, unauthorized device, adb missing | Start an emulator or accept the USB-debugging prompt; install platform-tools |
+| `native_connect` (Android): "device … is locked" (`deviceLocked`) | The device was restarted and has a PIN / pattern / password: its storage stays encrypted until the first unlock | Unlock the screen (emulator: wake it, swipe up, `adb shell input text <PIN>`, Enter), then connect again |
 | `native_connect` (Android): APK download fails | No network on the first connect | Connect once with network access, or point `MARIONETTE_UIA2_SERVER_APK` / `MARIONETTE_UIA2_TEST_APK` at local APKs |
 | `native_connect` (iOS): no prebuilt WebDriverAgent | WDA was never built | Build it once ([README](../README.md#native-lane-requirements-ios)) or set `MARIONETTE_WDA_XCTESTRUN` |
 | `native_connect` (iOS): port 8100 conflict | Another program, or WDA of another simulator, listens on 8100 | `lsof -nP -iTCP:8100 -sTCP:LISTEN` and stop it; `doctor` lists orphaned WDA processes with `kill <pid>` |
