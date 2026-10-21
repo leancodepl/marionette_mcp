@@ -27,9 +27,8 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   final bool _sharedServer;
 
   /// UIAutomator2 (10.3.2) stops itself when its session is deleted, so a
-  /// session on a server another process started (D10 reuse — an MCP server,
-  /// a CLI session) is left alone; that process ends it
-  /// (docs/native-lane-decisions.md#d10).
+  /// session on a server another process started (reuse — an MCP server,
+  /// a CLI session) is left alone; that process ends it.
   @override
   bool get deletesSessionOnDispose => !_sharedServer;
 
@@ -44,7 +43,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   /// How long UIAutomator2 waits for the UI to become idle before reading
   /// the tree or acting. Its default (10 s) made every read on a screen with
   /// continuous animation (video, map, loading thumbnails) take 10 s; 500 ms
-  /// still waits out ordinary transitions (docs/native-lane-decisions.md#d18).
+  /// still waits out ordinary transitions.
   static const waitForIdleTimeoutMs = 500;
 
   static Future<AndroidNativeConnector> connect({
@@ -102,7 +101,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   /// While a toast is shown, UIAutomator2 fails every page source with
   /// "Cannot set AccessibilityNodeInfo's field 'mSealed'" (seen on API 35;
   /// on API 28 it adds the toast to the tree instead). Reads are retried
-  /// until it is gone (docs/native-lane-decisions.md#d19).
+  /// until it is gone.
   @override
   Future<List<NativeElement>> getNativeElements() async {
     final stopwatch = Stopwatch()..start();
@@ -173,7 +172,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
 
     // The tap focused exactly the element the selector chose, so the focused
     // field comes first; an id lookup could return another element with the
-    // same id (docs/native-lane-decisions.md#d1). Compose-based search bars
+    // same id. Compose-based search bars
     // also expose the hint as a sibling View while the editable node has
     // empty text, which the focused lookup handles too.
     String? elementId = await _tryFind(
@@ -245,7 +244,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   /// Presses Back, which closes a shown IME without navigating. Back is
   /// only sent when the keyboard is shown — otherwise it would navigate —
   /// and not to Gboard's floating toolbar, which lets Back through to the
-  /// app (docs/native-lane-decisions.md#d14).
+  /// app.
   @override
   Future<bool> hideKeyboard() async {
     if (!await isKeyboardShown()) return false;

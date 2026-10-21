@@ -30,9 +30,8 @@ typedef PortProbe = Future<bool> Function(int port);
 /// platform cache directory. An APK is only (re)installed when the copy on
 /// the device differs from the local file.
 ///
-/// The local port is chosen as described in
-/// docs/native-lane-decisions.md#d10: `MARIONETTE_UIA2_PORT`, else the port
-/// of an existing forward to this device, else the first free port from
+/// The local port is `MARIONETTE_UIA2_PORT`, else the port of an existing
+/// forward to this device, else the first free port from
 /// [defaultLocalPort]. A healthy server behind an existing forward is reused
 /// and left running on [dispose], because another Marionette process owns
 /// it.
@@ -90,8 +89,8 @@ class AndroidBootstrap implements SharedServerBootstrap {
   final String? serial;
 
   /// Starts `adb shell am instrument -w` as a detached process that outlives
-  /// this one — for the CLI, whose commands are separate processes
-  /// (docs/native-lane-decisions.md#d4). Its pid is [detachedPid]. Without
+  /// this one — for the CLI, whose commands are separate processes.
+  /// Its pid is [detachedPid]. Without
   /// `-w` the server starts too, but cannot create sessions ("null
   /// UiAutomation"): the `am` process that provides UiAutomation is gone.
   /// Stop such a server with [stopServer].
@@ -578,8 +577,7 @@ int? parseUia2PortEnvironment(String? raw) {
 ///
 /// [explicitPort] (constructor argument, trusted as-is) wins; then the
 /// [uia2PortEnvironmentKey] value, which must be free; otherwise the first
-/// free port from [uia2DefaultLocalPort]. See
-/// docs/native-lane-decisions.md#d10.
+/// free port from [uia2DefaultLocalPort].
 Future<int> chooseUia2LocalPort({
   required int? explicitPort,
   required String? environmentValue,

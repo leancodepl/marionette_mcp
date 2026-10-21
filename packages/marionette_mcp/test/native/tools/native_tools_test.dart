@@ -169,7 +169,7 @@ void main() {
       );
     });
 
-    test('lists a toast although it has no bounds (D19)', () async {
+    test('lists a toast although it has no bounds', () async {
       final context = _contextWith(
         FakeNativeConnector.single([
           nativeElement(text: 'Visible'),
@@ -303,7 +303,7 @@ void main() {
       expect(connector.tappedElements, [deny, allow, deny]);
     });
 
-    test('an ambiguous selector fails and taps nothing (D1)', () async {
+    test('an ambiguous selector fails and taps nothing', () async {
       final connector = FakeNativeConnector.single([
         nativeElement(text: 'Request', y: 100),
         nativeElement(text: 'Request', y: 200),
@@ -697,7 +697,7 @@ void main() {
       expect(connector.enteredText, isEmpty);
     });
 
-    group('a field that changed before typing (D14)', () {
+    group('a field that changed before typing', () {
       final field = nativeElement(type: 'android.widget.EditText', id: 'f');
       for (final (name, error) in [
         (
@@ -983,7 +983,7 @@ void main() {
       expect(connector.getElementsCalls, 2);
     });
 
-    test('finds a toast and waits until it is gone (D19)', () async {
+    test('finds a toast and waits until it is gone', () async {
       final connector = FakeNativeConnector()
         ..onGetElements = (call) => [
               if (call < 1)

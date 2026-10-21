@@ -92,8 +92,7 @@ Future<CallToolResult> handleNativeEnterText(
       } on WebDriverException catch (error) {
         if (!isChangedFieldError(error)) rethrow;
         // The field was replaced or was still moving (a screen transition)
-        // and nothing was typed; find it again once
-        // (docs/native-lane-decisions.md#d14).
+        // and nothing was typed; find it again once.
         logger.info('Field changed before typing ($error); finding it again');
         await Future<void>.delayed(changedFieldRetryDelay);
         final again = requireEnabled(

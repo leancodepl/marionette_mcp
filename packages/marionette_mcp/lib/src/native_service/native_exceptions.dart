@@ -57,8 +57,7 @@ final class NativeElementNotFoundException extends NativeLaneException {
 }
 
 /// More than one element matched and none could be preferred, so acting on
-/// "the first one" could hit the wrong control. See
-/// docs/native-lane-decisions.md#d1.
+/// "the first one" could hit the wrong control.
 final class NativeAmbiguousElementException extends NativeLaneException {
   NativeAmbiguousElementException(
     String target,

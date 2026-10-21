@@ -239,7 +239,7 @@ void main() {
     });
 
     test(
-      'detached: holds the instrumentation in a detached process (D4)',
+      'detached: holds the instrumentation in a detached process',
       () async {
         final launches = <List<String>>[];
         final subject = AndroidBootstrap(
@@ -446,7 +446,7 @@ void main() {
       );
     });
 
-    group('existing forward (D10)', () {
+    group('existing forward', () {
       void forwardTo(int port) => runner.on(
             'adb',
             ['forward', '--list'],
@@ -512,7 +512,7 @@ void main() {
 }
 
 void _portSelectionTests() {
-  group('chooseUia2LocalPort (D10)', () {
+  group('chooseUia2LocalPort', () {
     Future<bool> Function(int) freeExcept(Set<int> busy) =>
         (port) async => !busy.contains(port);
 

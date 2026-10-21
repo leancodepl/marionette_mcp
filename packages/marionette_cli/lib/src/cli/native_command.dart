@@ -27,7 +27,7 @@ String nativeSessionName(ArgResults? globalResults) {
 /// Each command parses its options into the tool's arguments and calls the
 /// same handler as the MCP tool, so behaviour, validation and messages are
 /// shared. The device-side server keeps running between commands and the
-/// WebDriver session is reused (docs/native-lane-decisions.md#d4).
+/// WebDriver session is reused.
 abstract class NativeCommand extends Command<int> {
   NativeSessionRegistry get nativeRegistry;
 

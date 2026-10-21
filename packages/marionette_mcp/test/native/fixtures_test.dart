@@ -64,7 +64,7 @@ void main() {
       );
     });
 
-    test('permission screen: two "Request" buttons are ambiguous (D1)', () {
+    test('permission screen: two "Request" buttons are ambiguous', () {
       final screen = Fixture('android', 'android28_permission_screen');
 
       expect(
@@ -202,8 +202,7 @@ void main() {
     });
   });
 
-  group('iOS 26.4 / 18.6 fixtures (points converted to screenshot pixels, D2)',
-      () {
+  group('iOS 26.4 / 18.6 fixtures (points converted to screenshot pixels)', () {
     test('the application spans exactly the screenshot', () {
       for (final name in [
         'ios26_home',
@@ -223,7 +222,7 @@ void main() {
       }
     });
 
-    test('native controls: the button wins over its own label (D1)', () {
+    test('native controls: the button wins over its own label', () {
       for (final name in ['ios26_native_controls', 'ios18_native_controls']) {
         final controls = Fixture('ios', name);
 
@@ -249,7 +248,7 @@ void main() {
       );
     });
 
-    test('permission screen: "Request" buttons share text and id (D1)', () {
+    test('permission screen: "Request" buttons share text and id', () {
       expect(
         () => Fixture('ios', 'ios18_permission_screen')
             .select(const NativeSelector(id: 'Request')),

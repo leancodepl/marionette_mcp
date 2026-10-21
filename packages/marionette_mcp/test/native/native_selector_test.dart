@@ -59,7 +59,7 @@ void main() {
     });
   });
 
-  group('selectElement (D1)', () {
+  group('selectElement', () {
     test('returns the single match', () {
       final ok = nativeElement(text: 'OK');
 
@@ -194,7 +194,7 @@ void main() {
       );
     });
 
-    test('no match on a screen with a list hints to scroll (D16)', () {
+    test('no match on a screen with a list hints to scroll', () {
       // A lazy list builds only the rows near the screen, so "Row 40" is not
       // in the tree at all — not even as an off-screen node.
       final elements = [
@@ -225,7 +225,7 @@ void main() {
       );
     });
 
-    test('a toast is never a target, and the error says why (D19)', () {
+    test('a toast is never a target, and the error says why', () {
       final toast = nativeElement(
         type: 'android.widget.Toast',
         text: 'Saved',
@@ -243,7 +243,7 @@ void main() {
       );
     });
 
-    test('a label also matches the first line (focused field on iOS, D15)', () {
+    test('a label also matches the first line (focused field on iOS)', () {
       final focused = nativeElement(
         type: 'XCUIElementTypeTextField',
         text: 'Title\nSingle line — keyboard shows Done',
@@ -263,7 +263,7 @@ void main() {
       );
     });
 
-    test('off-screen (zero-size) elements never match (D16)', () {
+    test('off-screen (zero-size) elements never match', () {
       final offScreen = nativeElement(text: 'Row 40', width: 0, height: 0);
       final onScreen = nativeElement(text: 'Row 4', y: 300);
 

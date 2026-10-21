@@ -5,7 +5,7 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 ///
 /// Shared by every `native_*` tool that targets an element, so they resolve
 /// targets identically. Resolution rules (ambiguity, `index`) are described
-/// in [selectElement] and docs/native-lane-decisions.md#d1.
+/// in [selectElement].
 final class NativeSelector {
   const NativeSelector({
     this.text,
@@ -36,7 +36,7 @@ final class NativeSelector {
 
   /// Whether [text] also matches the first line of a longer text — for a
   /// field's label: a focused Flutter field on iOS reports its label with
-  /// the hint as a second line (docs/native-lane-decisions.md#d15).
+  /// the hint as a second line.
   final bool textMatchesFirstLine;
 
   /// Whether no matching criterion is set ([index] alone is not one).
@@ -91,14 +91,14 @@ const _maxSimilar = 5;
 /// - Only visible elements count ([NativeElement.isVisible]): Flutter on iOS
 ///   keeps off-screen nodes in the tree with zero size at (0, 0), and acting
 ///   on one would hit the top-left corner. A target that exists only off
-///   screen fails with a hint to scroll (docs/native-lane-decisions.md#d16).
+///   screen fails with a hint to scroll.
 /// - With [NativeSelector.index], returns that match (0-based, tree order,
 ///   counting all matches); out of range throws
 ///   [NativeElementNotFoundException].
 /// - Otherwise a single match is returned. With several, clickable elements
 ///   are preferred — a label inside a button usually matches too. If more
 ///   than one candidate remains, [NativeAmbiguousElementException] lists them
-///   rather than guessing (docs/native-lane-decisions.md#d1).
+///   rather than guessing.
 /// - No match throws [NativeElementNotFoundException] with up to five
 ///   similar texts as a hint, and a hint to scroll when a scrollable
 ///   container is on screen (a lazy list does not build far items).
@@ -152,7 +152,7 @@ NativeElement selectElement(
 /// [element] (selected by [selector]) if it is enabled. Touching a disabled
 /// one does nothing at best; on iOS the app's elements stay in the tree,
 /// disabled, under a system sheet or picker, and a touch at their position
-/// lands on the sheet instead (docs/native-lane-decisions.md#d1).
+/// lands on the sheet instead.
 NativeElement requireEnabled(NativeElement element, NativeSelector selector) {
   if (element.enabled) return element;
   throw NativeOperationFailedException(

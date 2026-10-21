@@ -2,7 +2,7 @@ import 'package:marionette_mcp/src/formatting.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('coveredAppWarning (D22)', () {
+  group('coveredAppWarning', () {
     test('warns while the app is not in front', () {
       for (final state in ['inactive', 'paused', 'hidden']) {
         expect(

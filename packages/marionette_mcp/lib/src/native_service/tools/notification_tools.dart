@@ -18,7 +18,7 @@ enum NativeNotificationsAction {
 }
 
 /// Registers `native_notifications`, which opens and closes the system
-/// notification list (docs/native-lane-decisions.md#d12, #d21).
+/// notification list.
 void registerNativeNotificationTools(
   McpServer server,
   NativeServiceContext context,
@@ -70,8 +70,7 @@ Future<CallToolResult> handleNativeNotifications(
           await connector.device.openNotifications();
         }
         // The iOS Notification Center ignores taps on a notification (it
-        // only hints a side swipe; iOS 18.6 and 26.4); a swipe right opens it
-        // (docs/native-lane-decisions.md#d21).
+        // only hints a side swipe; iOS 18.6 and 26.4); a swipe right opens it.
         return _text('Opened the notifications. Read them with '
             'native_get_elements; close with action=close.'
             '${ios ? ' To open one, swipe it right with native_swipe — a tap '

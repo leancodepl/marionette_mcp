@@ -13,7 +13,7 @@ import 'package:marionette_mcp/src/native_service/xpath.dart';
 ///
 /// WebDriverAgent reports and accepts coordinates in points; this connector
 /// converts them to screenshot pixels with the display scale read at
-/// connect time (see docs/native-lane-decisions.md#d2).
+/// connect time.
 final class IosNativeConnector extends WebDriverNativeConnector {
   IosNativeConnector._({
     required super.client,
@@ -140,7 +140,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
 
   /// Taps the center of [element]. Re-locating it through WDA (by id or
   /// label) could hit a different element with the same id — exactly the
-  /// ambiguity the selector already resolved (docs/native-lane-decisions.md#d1).
+  /// ambiguity the selector already resolved.
   @override
   Future<void> tapElement(NativeElement element) {
     final center = element.center;

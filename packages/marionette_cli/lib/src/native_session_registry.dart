@@ -7,7 +7,7 @@ import 'package:path/path.dart' as p;
 /// A native automation session kept between CLI commands.
 ///
 /// The device-side server runs detached from the CLI and every command
-/// attaches to it (docs/native-lane-decisions.md#d4).
+/// attaches to it.
 class NativeSessionInfo {
   NativeSessionInfo({
     required this.name,

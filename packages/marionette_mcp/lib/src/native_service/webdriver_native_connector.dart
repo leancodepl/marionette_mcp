@@ -14,7 +14,7 @@ import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 /// Coordinates crossing this class are screenshot pixels; the server may
 /// work in other units. [serverUnitScale] converts between the two: element
 /// bounds from the server are multiplied by it, coordinates sent to the
-/// server divided by it (see docs/native-lane-decisions.md#d2).
+/// server divided by it.
 abstract base class WebDriverNativeConnector implements NativeConnector {
   WebDriverNativeConnector({
     required this.client,
@@ -44,8 +44,8 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   /// [capabilities] and hands both to [create].
   ///
   /// With [sessionId], that session is reused while the server still has it
-  /// (the CLI keeps one session across its commands,
-  /// docs/native-lane-decisions.md#d4); otherwise a new one is opened.
+  /// (the CLI keeps one session across its commands); otherwise a new one
+  /// is opened.
   ///
   /// When opening the session fails, the client is closed and — if
   /// [ownsBootstrap] — the bootstrap disposed before the error propagates.
@@ -209,8 +209,8 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
       error.error == 'no such element' || error.httpStatus == 404;
 
   /// Closes the client but keeps the session and the server, for a later
-  /// process to reuse them through `openSession(sessionId: …)` — the CLI
-  /// (docs/native-lane-decisions.md#d4). Afterwards [dispose] does nothing.
+  /// process to reuse them through `openSession(sessionId: …)` — the CLI.
+  /// Afterwards [dispose] does nothing.
   void release() {
     if (_disposed) return;
     _disposed = true;

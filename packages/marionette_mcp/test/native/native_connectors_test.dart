@@ -76,7 +76,7 @@ void main() {
       );
     });
 
-    test('lowers the UIAutomator2 idle wait for the session (D18)', () async {
+    test('lowers the UIAutomator2 idle wait for the session', () async {
       server.onValue('POST', '/session/sess-1/appium/settings', null);
       final connector = await connect();
       addTearDown(connector.dispose);
@@ -92,9 +92,8 @@ void main() {
       );
     });
 
-    test(
-        'a session on a server another process started is not deleted '
-        '(D10)', () async {
+    test('a session on a server another process started is not deleted',
+        () async {
       final shared = _SharedBootstrap(server.baseUrl, startedServer: false);
       final connector = await AndroidNativeConnector.connect(
         bootstrap: shared,
@@ -118,7 +117,7 @@ void main() {
       expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
     });
 
-    group('reusing a session (D4)', () {
+    group('reusing a session', () {
       Future<AndroidNativeConnector> connectTo(String sessionId) =>
           AndroidNativeConnector.connect(
             bootstrap: bootstrap,
@@ -156,7 +155,7 @@ void main() {
       });
     });
 
-    group('while a toast is shown (D19)', () {
+    group('while a toast is shown', () {
       const toastError = FakeResponse.error(
         'unknown error',
         "Cannot set AccessibilityNodeInfo's field 'mSealed' to 'true'",

@@ -98,8 +98,8 @@ class IosBootstrap implements NativeServerBootstrap {
         _logger = logger ?? logging.Logger('IosBootstrap');
 
   /// Starts `xcodebuild` as a detached process that outlives this one — for
-  /// the CLI, whose commands are separate processes
-  /// (docs/native-lane-decisions.md#d4). Its pid is [detachedPid]; [dispose]
+  /// the CLI, whose commands are separate processes.
+  /// Its pid is [detachedPid]; [dispose]
   /// leaves it running.
   final bool detached;
 
@@ -462,7 +462,7 @@ class IosBootstrap implements NativeServerBootstrap {
   /// WDA 16 does not report the simulator UDID (`/wda/device/info` has a
   /// per-app `uuid` only), so the check falls back to the runner app running
   /// inside that simulator: simulators share the host network, so only one
-  /// WDA can listen on the port (docs/native-lane-decisions.md#d10).
+  /// WDA can listen on the port.
   Future<bool> _wdaServesSimulator(Uri baseUri, String expectedUdid) async {
     final client = WebDriverClient(baseUri.toString());
     try {

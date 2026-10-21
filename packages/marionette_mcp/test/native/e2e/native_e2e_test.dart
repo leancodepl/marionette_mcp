@@ -76,7 +76,7 @@ void main() {
     skip: config.vmServiceUri == null
         ? 'Set MARIONETTE_E2E_VM_SERVICE_URI (flutter run) for this scenario'
         : config.isIos
-            ? 'An alert of the app leaves iOS resumed (D22)'
+            ? 'An alert of the app leaves iOS resumed'
             : null,
   );
 

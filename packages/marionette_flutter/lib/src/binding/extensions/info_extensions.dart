@@ -58,8 +58,7 @@ void registerInfoExtensions({
       return MarionetteExtensionResult.success({
         'elements': elements,
         // Not `resumed` while system UI or another screen covers the app,
-        // which the widget tree cannot show
-        // (docs/native-lane-decisions.md#d22).
+        // which the widget tree cannot show.
         'appLifecycleState': WidgetsBinding.instance.lifecycleState?.name,
       });
     },

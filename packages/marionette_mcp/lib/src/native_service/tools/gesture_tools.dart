@@ -359,8 +359,8 @@ Future<CallToolResult> handleNativeSwipe(
   });
 }
 
-/// Handles `native_scroll`. Search, settling, end-of-content detection and
-/// `within` are described in docs/native-lane-decisions.md#d16.
+/// Handles `native_scroll`: search, settling, end-of-content detection and
+/// `within`.
 Future<CallToolResult> handleNativeScroll(
   NativeServiceContext context,
   Map<String, dynamic> args,
@@ -520,7 +520,7 @@ Future<CallToolResult> handleNativeScroll(
 /// Consecutive swipes without a visible change that mean the end of the
 /// content. One is not enough: while a swipe crosses a large uniform area
 /// (an empty block, a big image, a WebView spacer) the tree looks the same
-/// although the content moved (docs/native-lane-decisions.md#d16).
+/// although the content moved.
 const _endOfContentSwipes = 2;
 
 /// Most UI-tree reads spent waiting for a fling to stop after a swipe.

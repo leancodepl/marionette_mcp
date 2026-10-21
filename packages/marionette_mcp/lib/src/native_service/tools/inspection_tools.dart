@@ -142,9 +142,9 @@ Future<CallToolResult> handleNativeGetElements(
         ? connector.foregroundApp
             .then<String?>((value) => value, onError: (Object _) => null)
         : null;
-    // Off-screen (zero-size) nodes are left out, as for every selector
-    // (docs/native-lane-decisions.md#d16), so index counts what is listed;
-    // a toast has no bounds but is listed (docs/native-lane-decisions.md#d19).
+    // Off-screen (zero-size) nodes are left out, as for every selector, so
+    // index counts what is listed;
+    // a toast has no bounds but is listed.
     final elements = (await connector.getNativeElements()).where(
       (element) =>
           element.isListed &&
@@ -162,7 +162,7 @@ Future<CallToolResult> handleNativeGetElements(
   });
 }
 
-/// Handles `native_wait_for` (docs/native-lane-decisions.md#d16).
+/// Handles `native_wait_for`.
 Future<CallToolResult> handleNativeWaitFor(
   NativeServiceContext context,
   Map<String, dynamic> args,

@@ -16,7 +16,7 @@ export 'package:marionette_mcp/src/native_service/native_key.dart';
 /// by `native_take_screenshot`, on every platform.
 ///
 /// Servers that work in other units (WebDriverAgent uses points) are
-/// converted by the connector; see docs/native-lane-decisions.md#d2. This
+/// converted by the connector. This
 /// differs from the Flutter lane, which reports logical pixels — coordinates
 /// from the two lanes must never be mixed.
 class NativeBounds {
@@ -75,8 +75,7 @@ class NativeScreen {
 
 /// A single element of the native UI hierarchy.
 ///
-/// State fields and the label / content split of text fields are described
-/// in docs/native-lane-decisions.md#d15. Produced by [parseAndroidUiDump] / [parseWdaSource] and consumed by
+/// Produced by [parseAndroidUiDump] / [parseWdaSource] and consumed by
 /// [NativeConnector] implementations and the MCP tool layer.
 class NativeElement {
   const NativeElement({
@@ -156,12 +155,12 @@ class NativeElement {
 
   /// Whether the element occupies screen space. Flutter on iOS keeps
   /// off-screen semantics nodes in the tree with zero-size bounds at (0, 0);
-  /// those are not visible (docs/native-lane-decisions.md#d16).
+  /// those are not visible.
   bool get isVisible => bounds.width > 0 && bounds.height > 0;
 
   /// An Android toast. UIAutomator2 adds the toast being shown to the tree
   /// without bounds (seen on API 28; on API 35 the read fails instead), so it
-  /// can be read but not acted on (docs/native-lane-decisions.md#d19).
+  /// can be read but not acted on.
   bool get isToast => className == 'android.widget.Toast';
 
   /// Whether reading tools list the element: visible ones and toasts.
@@ -205,8 +204,7 @@ abstract interface class NativeServerBootstrap {
   Future<void> dispose();
 }
 
-/// A bootstrap that may reuse a server another process started
-/// (docs/native-lane-decisions.md#d10).
+/// A bootstrap that may reuse a server another process started.
 abstract interface class SharedServerBootstrap
     implements NativeServerBootstrap {
   /// Whether [ensureServerReady] started the server, rather than reusing
@@ -291,7 +289,7 @@ abstract class NativeConnector {
   Future<NativeScreen> getScreen();
 
   /// Operations on the device that do not use the UI session (the
-  /// notification shade); see docs/native-lane-decisions.md#d12.
+  /// notification shade).
   NativeDevice get device;
 
   /// Ends the session and tears down any resources the connector started.
@@ -640,7 +638,7 @@ List<NativeElement> parseWdaSource(String xml) {
           _wdaScrollableTypes.contains(tag.substring(_wdaTypePrefix.length));
     },
     // A scrolled page or list shows only what lies inside its frame; WDA
-    // lists the rest with real coordinates (docs/native-lane-decisions.md#d16).
+    // lists the rest with real coordinates.
     viewportOf: (attributes) {
       final tag = attributes[uiNodeTagKey]!;
       if (!tag.startsWith(_wdaTypePrefix) ||
@@ -701,7 +699,7 @@ List<NativeElement> parseWdaSource(String xml) {
   // nodes as 0×0 at (0, 0) — and reports full bounds of partly visible
   // ones. Keep what overlaps the application (the screen) and clip it to
   // the screen, as UIAutomator does, so the center is always a tappable
-  // point (docs/native-lane-decisions.md#d16).
+  // point.
   final screen = elements
       .where((e) => e.className == 'XCUIElementTypeApplication')
       .map((e) => e.bounds)
@@ -717,8 +715,7 @@ List<NativeElement> parseWdaSource(String xml) {
         ];
 
   // WDA can list the same element twice (seen with the buttons of the Face
-  // ID alert); identical copies would make every selector for it ambiguous
-  // (docs/native-lane-decisions.md#d1).
+  // ID alert); identical copies would make every selector for it ambiguous.
   final seen = <String>{};
   return [
     for (final element in onScreen)

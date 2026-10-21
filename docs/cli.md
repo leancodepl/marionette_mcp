@@ -88,7 +88,7 @@ marionette native-take-screenshot --output ./system.png
 marionette native-disconnect
 ```
 
-`native-connect` starts the device-side server detached from the CLI, so it keeps running between commands, and saves the session in `~/.marionette/native/<name>.json`. Every `native-*` command attaches to it and reuses the WebDriver session — no per-command setup. `native-disconnect` stops the server it started. Use `--native-session <name>` to drive several devices at once (e.g. an Android phone and an iPhone in one script); `native-sessions` lists them. Prefer one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other — the CLI opens a new session for its next command, the MCP server needs `native_connect` again (`native-connect` warns when it reuses another process's server). Design and measurements: [D4](./native-lane-decisions.md#d4).
+`native-connect` starts the device-side server detached from the CLI, so it keeps running between commands, and saves the session in `~/.marionette/native/<name>.json`. Every `native-*` command attaches to it and reuses the WebDriver session — no per-command setup. `native-disconnect` stops the server it started. Use `--native-session <name>` to drive several devices at once (e.g. an Android phone and an iPhone in one script); `native-sessions` lists them. Prefer one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other — the CLI opens a new session for its next command, the MCP server needs `native_connect` again (`native-connect` warns when it reuses another process's server).
 
 ## Command reference
 

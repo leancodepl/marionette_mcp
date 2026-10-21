@@ -14,8 +14,7 @@ import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 
 /// Starts the device-side server detached from the CLI and records the
-/// session, so later `native-*` commands attach to it
-/// (docs/native-lane-decisions.md#d4).
+/// session, so later `native-*` commands attach to it.
 class NativeConnectCommand extends Command<int> {
   NativeConnectCommand(this._registry) {
     argParser
@@ -132,7 +131,7 @@ class NativeConnectCommand extends Command<int> {
       '${info.startedServer ? '' : ' — reusing a server that was already running'}.',
     );
     if (!info.startedServer && platform == NativePlatform.android) {
-      // UIAutomator2 has one session per device (D10): the two clients take
+      // UIAutomator2 has one session per device: the two clients take
       // it from each other.
       stdout.writeln(
         'Warning: another process (e.g. an MCP server) uses UIAutomator2 on '
@@ -173,8 +172,7 @@ class NativeDisconnectCommand extends Command<int> {
     }
 
     // UIAutomator2 stops itself when its session is deleted: on a server
-    // another process started, the session is left to that process
-    // (docs/native-lane-decisions.md#d10).
+    // another process started, the session is left to that process.
     final sessionId = info.sessionId;
     if (sessionId != null && info.startedServer) {
       final client = WebDriverClient(info.baseUrl);

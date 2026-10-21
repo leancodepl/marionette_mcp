@@ -285,7 +285,7 @@ void main() {
     );
 
     test(
-      'detached: starts xcodebuild detached and reports its pid (D4)',
+      'detached: starts xcodebuild detached and reports its pid',
       () async {
         final wda = await FakeWebDriverServer.start();
         addTearDown(wda.close);

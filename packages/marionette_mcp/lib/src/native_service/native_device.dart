@@ -1,9 +1,8 @@
 /// Device operations of the native lane that do not go through the
 /// WebDriver session: the notification shade. Backed by `adb` (Android).
-/// See docs/native-lane-decisions.md#d12.
 library;
 
-/// Device operations outside the WebDriver session (D12).
+/// Device operations outside the WebDriver session.
 ///
 /// Failures are reported as `NativeLaneException`s with a hint; operations
 /// a platform cannot do throw `NativeUnsupportedException`.

@@ -45,7 +45,7 @@ const webDriverServerUnreachable = 'server unreachable';
 /// code).
 ///
 /// Together with [webDriverServerUnreachable] and the W3C `invalid session
-/// id` it signals a lost session; see docs/native-lane-decisions.md#d3.
+/// id` it signals a lost session.
 const webDriverConnectionLost = 'connection lost';
 
 /// W3C error code for a session the server no longer knows.

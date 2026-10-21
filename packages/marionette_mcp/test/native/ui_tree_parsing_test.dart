@@ -115,7 +115,7 @@ void main() {
       expect(clickableEmpty.resourceId, isNull);
     });
 
-    test('keeps the toast UIAutomator2 adds without bounds (D19)', () {
+    test('keeps the toast UIAutomator2 adds without bounds', () {
       final elements = parseAndroidUiDump(
         '<hierarchy>'
         '<node class="android.widget.Button" clickable="true" text="Save" '
@@ -314,7 +314,7 @@ void main() {
 }
 
 void _unitTests() {
-  group('NativeBounds.scaled (D2)', () {
+  group('NativeBounds.scaled', () {
     test('multiplies and rounds every edge', () {
       const bounds = NativeBounds(x: 10, y: 20, width: 101, height: 33);
 
