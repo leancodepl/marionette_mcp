@@ -77,6 +77,11 @@ For an agent, an error listing the candidates is cheaper than tapping the wrong 
 ### Follow-up (unit 8, 2026-10-20)
 
 - **Duplicate nodes from WebDriverAgent.** On iOS 26.4 the Face ID system alert (shown over the app by `local_auth`) is listed twice in the WDA page source — identical type, label, id and bounds — so `native_tap text="Cancel"` failed as ambiguous with two identical candidates. `parseWdaSource` now drops elements that are identical in every reported field; elements that differ in anything (another type, or the same label elsewhere on screen) are kept, and their ambiguity still fails with candidates. After the change the alert's "Cancel" is tapped directly. Unit test: two identical nodes become one, the same label at another position stays a separate element.
+
+### Follow-up (acceptance tests, 2026-10-21): disabled elements
+
+While the iOS document picker (`UIDocumentPickerViewController`) is open, the app's Flutter buttons stay in the WebDriverAgent tree with `enabled="false"` (`traits="NotEnabled"`), and `native_tap text="Pick file"` tapped their position anyway: the touch landed on the picker and picked `marionette_file_18`, the cell under that point, while the tool reported success. While a share sheet was closing, a tap on "Take photo" was swallowed the same way. The tools that touch an element chosen by a selector — `native_tap`, `native_long_press`, `native_double_tap`, `native_pinch` and `native_enter_text` — now refuse an element with `enabled: false` and say that a sheet, picker or dialog may cover it; nothing is touched. Coordinates (x/y) are not checked. On a regular screen this also replaces a silent no-op on a disabled control (Android: "Disabled action") with a clear error. It does not cover everything: under the iOS photo picker (`PHPickerViewController`) the Back button and the tabs below stay enabled. Unit tests: tap, long press and double tap on a disabled element fail without a touch; typing into a disabled field fails. Live: iOS 26.4 with the document picker open — "Pick file" and "Take photo" are refused and the picker is untouched; Android API 35 — "Disabled action" is refused, the terms checkbox still toggles.
+
 ---
 
 <a id="d2"></a>

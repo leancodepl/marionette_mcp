@@ -638,6 +638,9 @@ platforms — never Flutter logical pixels (use native-map-flutter-rect).
   another screen covers it). On iOS an alert or sheet shown by the app
   itself gives no warning — if a Flutter action has no effect, check
   native-get-elements.
+- native-tap, native-enter-text and the gestures refuse a disabled element
+  (enabled: false). On iOS the app's elements stay listed, disabled, under
+  a system sheet or picker — act on the sheet or close it first.
 - A focused Flutter text field on iOS shows its hint as a second line of
   its label; --label matches the first line, --text of
   native-get-elements needs the whole text (use --text-contains).

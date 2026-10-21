@@ -149,6 +149,22 @@ NativeElement selectElement(
   ]);
 }
 
+/// [element] (selected by [selector]) if it is enabled. Touching a disabled
+/// one does nothing at best; on iOS the app's elements stay in the tree,
+/// disabled, under a system sheet or picker, and a touch at their position
+/// lands on the sheet instead (docs/native-lane-decisions.md#d1).
+NativeElement requireEnabled(NativeElement element, NativeSelector selector) {
+  if (element.enabled) return element;
+  throw NativeOperationFailedException(
+    'The native element ${selector.describe()} is disabled, so it was not '
+    'touched. A system sheet, picker or dialog in front of the app may '
+    'cover it.',
+    hint: 'Call native_get_elements: act on what is in front (or close it, '
+        'e.g. with its Cancel button), or wait until the element is '
+        'enabled.',
+  );
+}
+
 String _describe(NativeElement element) => [
       element.className,
       if (element.text != null)

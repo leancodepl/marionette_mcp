@@ -265,6 +265,30 @@ void main() {
       );
     });
 
+    test('refuses a disabled element instead of touching it', () async {
+      // Seen on iOS 26.4: an app button under the document picker is
+      // disabled; a tap at its position picked a file in the picker.
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'Pick file', clickable: false, enabled: false),
+      ]);
+      final context = _contextWith(connector);
+
+      for (final handle in [
+        handleNativeTap,
+        handleNativeLongPress,
+        handleNativeDoubleTap,
+      ]) {
+        expect(
+          await handle(context, {'text': 'Pick file'}),
+          _isToolError(allOf(contains('is disabled'), contains('Hint:'))),
+        );
+      }
+      expect(connector.tappedElements, isEmpty);
+      expect(connector.taps, isEmpty);
+      expect(connector.longPresses, isEmpty);
+      expect(connector.doubleTaps, isEmpty);
+    });
+
     test('taps coordinates', () async {
       final connector = FakeNativeConnector();
 
@@ -662,6 +686,25 @@ void main() {
 
       expect(result, _isToolSuccess(contains('the focused field')));
       expect(connector.typedText, [(text: '42', clear: true)]);
+      expect(connector.enteredText, isEmpty);
+    });
+
+    test('refuses a disabled field', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(
+          type: 'android.widget.EditText',
+          text: 'Title',
+          enabled: false,
+        ),
+      ]);
+
+      expect(
+        await handleNativeEnterText(
+          _contextWith(connector),
+          {'label': 'Title', 'text': 'x'},
+        ),
+        _isToolError(contains('is disabled')),
+      );
       expect(connector.enteredText, isEmpty);
     });
 

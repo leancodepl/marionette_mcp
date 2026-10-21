@@ -341,11 +341,16 @@ final class _PointTarget {
 
   bool get isEmpty => point == null && selector.isEmpty;
 
-  /// The selected element, or null for coordinates / an empty target.
+  /// The selected element, or null for coordinates / an empty target. A
+  /// disabled element fails: a gesture on it would do nothing, or land on a
+  /// sheet covering it.
   Future<NativeElement?> element(NativeConnector connector) async =>
       selector.isEmpty
           ? null
-          : selectElement(await connector.getNativeElements(), selector);
+          : requireEnabled(
+              selectElement(await connector.getNativeElements(), selector),
+              selector,
+            );
 
   String describe() {
     final p = point;

@@ -83,8 +83,10 @@ Future<CallToolResult> handleNativeEnterText(
     if (selector.isEmpty) {
       await connector.typeText(input, clear: clear);
     } else {
-      final match =
-          selectElement(await connector.getNativeElements(), selector);
+      final match = requireEnabled(
+        selectElement(await connector.getNativeElements(), selector),
+        selector,
+      );
       try {
         await connector.enterText(match, input, clear: clear);
       } on WebDriverException catch (error) {
@@ -94,8 +96,10 @@ Future<CallToolResult> handleNativeEnterText(
         // (docs/native-lane-decisions.md#d14).
         logger.info('Field changed before typing ($error); finding it again');
         await Future<void>.delayed(changedFieldRetryDelay);
-        final again =
-            selectElement(await connector.getNativeElements(), selector);
+        final again = requireEnabled(
+          selectElement(await connector.getNativeElements(), selector),
+          selector,
+        );
         try {
           await connector.enterText(again, input, clear: clear);
         } on WebDriverException catch (retryError) {
