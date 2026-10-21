@@ -39,6 +39,7 @@ Start with `marionette doctor`: it checks adb and devices, the UIAutomator2 APKs
 | `native_hide_keyboard` refuses on an Android emulator | Gboard's floating toolbar (hardware keyboard attached) | Unfocus the field in the app, or start the emulator with `hw.keyboard=no` |
 | Reads take 2–3 s next to iOS pickers | WebDriverAgent snapshots the picker of another process | Expected ([D16](./native-lane-decisions.md#d16)); prefer `native_wait_for` over repeated reads |
 | iOS notification in the Notification Center does not open on tap | iOS ignores taps there | Swipe it right with `native_swipe` ([D21](./native-lane-decisions.md#d21)) |
+| iOS: the app closes on its own; tools still succeed but `foregroundApp` is SpringBoard or Spotlight | A crash inside XCTest in the app (`EXC_BAD_ACCESS` in `XCTAutomationSession`, see `~/Library/Logs/DiagnosticReports/Runner-*.ips`), seen when WebDriverAgent is stopped and started again many times — e.g. a new MCP server process per call | Keep one session: a long-lived MCP server, or a detached WDA (`marionette native-connect --platform ios`) that later processes reuse; bring the app back with `native_app action=activate` |
 | iOS: "Unable To Rotate Device" | Simulator state | Restart the simulator |
 | iOS: notifications never show | Alerts disabled for the app after earlier installs | Reinstall the app or enable notifications in Settings |
 

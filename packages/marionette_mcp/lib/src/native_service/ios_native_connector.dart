@@ -203,9 +203,12 @@ final class IosNativeConnector extends WebDriverNativeConnector {
           ),
         NativeKey.back => throw const NativeUnsupportedException(
             'iOS has no Back key.',
+            // A short edge swipe (e.g. native_scroll's default 400 px) is
+            // cancelled by iOS; the pop needs most of the screen width.
             hint: 'Tap the navigation bar back button (e.g. native_tap '
-                'id="Back") or swipe right from the left screen edge '
-                '(native_scroll direction=right startX=1 …).',
+                'id="Back") or swipe right from the left screen edge across '
+                'most of the screen (native_swipe startX=1, endX = about 70% '
+                'of the screen width, startY = endY = mid-screen).',
           ),
         NativeKey.recents => throw const NativeUnsupportedException(
             'iOS has no recent-apps key.',

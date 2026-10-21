@@ -664,10 +664,11 @@ Future<CallToolResult> handleNativeScroll(
       startX: startX,
       startY: startY,
     );
-    final inArea = container == null
-        ? 'from screen center'
-        : 'within '
-            '${within!.describe()}';
+    final inArea = container != null
+        ? 'within ${within!.describe()}'
+        : startX != null
+            ? 'from ($startX, $startY)'
+            : 'from screen center';
 
     // While searching, a fling could carry the target past the viewport
     // between two reads; see [_searchSwipeDurationMs].

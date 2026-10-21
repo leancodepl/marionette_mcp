@@ -684,6 +684,10 @@ No operation may have a hidden side effect: an unconditional Back would navigate
 ### Follow-up (unit 10, 2026-10-20): a field that changes before typing
 
 `native_enter_text` with a selector sometimes failed although the field was there: on iOS right after a deep link the screen was still moving and WebDriverAgent reported "The previously found element … is not present in the current view anymore" (`stale element reference`); on Android a set-text action was once refused (`invalid element state`, deferred since unit 5). In both cases nothing was typed. The tool now waits 300 ms, finds the field again with the same selector and types once more; a second failure of this kind becomes a typed error with a hint to wait until the screen has settled. Seen live in the E2E runs on iOS 26.4: two of five runs needed the retry and passed. Unit tests: each of the three errors is retried once, a second one fails with the hint, other errors are not retried.
+
+### Follow-up (acceptance tests, 2026-10-21): the iOS Back hint
+
+The hint for `back` on iOS suggested `native_scroll direction=right startX=1 …`. Followed literally, that swipe covers the tool's default 400 px — about 30 % of the screen width on iOS 26.4 (iPhone 17 Pro Max, 1320 px) — and iOS cancels the interactive pop, while the tool reports success. The hint now names `native_swipe` from `startX=1` to about 70 % of the screen width; live, a swipe from (1, 1434) to (924, 1434) returned to the previous screen. `native_scroll` with `startX` / `startY` also reported "from screen center"; it now reports the start point. Unit tests: the hint names `native_swipe` and the 70 % distance; a scroll with an explicit start reports it.
 ---
 
 <a id="d15"></a>

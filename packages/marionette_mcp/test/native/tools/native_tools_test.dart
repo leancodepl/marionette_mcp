@@ -368,6 +368,24 @@ void main() {
       ]);
     });
 
+    test('reports the explicit start point, not screen center', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(width: 1000, height: 2000),
+      ]);
+
+      final result = await handleNativeScroll(
+        _contextWith(connector),
+        {'direction': 'right', 'startX': 1, 'startY': 1400},
+      );
+
+      expect(
+        result,
+        _isToolSuccess(
+          allOf(contains('from (1, 1400)'), isNot(contains('center'))),
+        ),
+      );
+    });
+
     test('scrolls until the text appears', () async {
       final connector = FakeNativeConnector(
         screens: [

@@ -1046,6 +1046,23 @@ void main() {
         }
       });
 
+      test('the back hint suggests an edge swipe long enough to pop', () async {
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        // A 400 px edge swipe (native_scroll default) is cancelled by iOS.
+        await expectLater(
+          connector.pressKey(NativeKey.back),
+          throwsA(
+            isA<NativeUnsupportedException>().having(
+              (e) => e.hint,
+              'hint',
+              allOf(contains('native_swipe startX=1'), contains('70%')),
+            ),
+          ),
+        );
+      });
+
       test('a button the Simulator lacks is reported as unsupported', () async {
         server.on(
           'POST',
