@@ -86,6 +86,24 @@ void main() {
         64);
   });
 
+  test('a missing required option is a usage error, not a crash', () async {
+    saveSession();
+
+    for (final args in [
+      ['native-open-url', 'app://positional'],
+      ['native-press-key'],
+      ['native-app'],
+      ['native-permissions', '--action', 'grant'],
+      ['native-set-location', '--latitude', '1'],
+    ]) {
+      final result = await run(args);
+
+      expect(result.code, 64, reason: '$args');
+      expect(result.err, contains('Missing required option --'),
+          reason: '$args');
+    }
+  });
+
   test('native-map-flutter-rect without the Flutter app is a usage error',
       () async {
     saveSession();

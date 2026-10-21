@@ -254,6 +254,10 @@ Measured: a detached server keeps working for at least 11 minutes with no host p
 - **Argument mapping:** a unit test parses every option of the 20 tool commands and checks the result equals the tool arguments, with the MCP schema's names and int / double types.
 - Unit tests: detached starts on both platforms (pid, `-w`, no second start), `stopServer`, session reuse and replacement, `release` keeps the session; CLI registry, attach / reuse / replacement, missing session and dead server messages, usage errors, `native-sessions`, `native-disconnect` of a reused server, doctor findings.
 
+### Follow-up (acceptance tests, 2026-10-21): missing options and connect errors
+
+A `native-*` command without a required option (`native-open-url <url>` with the URL as a positional argument, `native-press-key`, `native-app`, `native-permissions --action grant`, `native-set-location --latitude 1`) crashed with an unhandled `ArgumentError` and a stack trace, exit code 255: `package:args` checks `mandatory` options only when their value is read. It is now a usage error, exit code 64: "Missing required option --url." followed by the command's usage. Errors of `native-connect` and of attaching to a session also go through the MCP-to-CLI name mapping, so a device error hints "Pass serial to native-connect" instead of `native_connect`. Unit test: five commands without a required option exit 64 with that message. Live: the same commands and `native-connect --serial nope`.
+
 ---
 
 <a id="d5"></a>

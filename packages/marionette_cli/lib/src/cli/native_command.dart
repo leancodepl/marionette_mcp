@@ -87,7 +87,7 @@ abstract class NativeCommand extends Command<int> {
       );
       return 1;
     } catch (e) {
-      stderr.writeln('Could not attach to native session "$name": $e');
+      stderr.writeln(cliText('Could not attach to native session "$name": $e'));
       return 1;
     }
 
@@ -181,7 +181,13 @@ abstract class NativeCommand extends Command<int> {
 
   /// Value of option [name], or null when not given.
   String? string(String name) {
-    final value = _results?[name] as String?;
+    final String? value;
+    try {
+      value = _results?[name] as String?;
+    } on ArgumentError {
+      // package:args checks `mandatory` only when the value is read.
+      usageException('Missing required option --$name.');
+    }
     return (value == null || value.isEmpty) ? null : value;
   }
 

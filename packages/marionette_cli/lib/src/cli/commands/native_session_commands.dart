@@ -118,7 +118,7 @@ class NativeConnectCommand extends Command<int> {
       }
     } catch (e) {
       await stopStarted?.call();
-      stderr.writeln('Failed to connect native session "$name": $e');
+      stderr.writeln(cliText('Failed to connect native session "$name": $e'));
       return 1;
     }
 
