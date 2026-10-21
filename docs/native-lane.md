@@ -35,7 +35,7 @@ Use one client per Android device at a time: UIAutomator2 has a single session, 
 - **Scroll** with `native_scroll`: until a target is visible, inside a container (`within`), stopping at the end of the list. `native_swipe` is a raw gesture that does not wait for the content to settle.
 - **Type** with `native_enter_text` (appends; `clear` empties first; without a selector it types into the focused field). Hide the keyboard with `native_hide_keyboard`; keys with `native_press_key`.
 - **Permissions:** answer the system dialog with `native_wait_for` + `native_tap`. It shows only while the permission is undecided; to see it again, reset the permission outside Marionette (`adb shell pm revoke <package> <permission>`, `xcrun simctl privacy <udid> reset all <bundle id>`).
-- **Notifications:** `native_notifications` opens / closes the shade (Android) or the Notification Center (iOS); read them with `native_get_elements` and open one with `native_tap` (iOS Notification Center: a swipe right).
+- **Notifications:** `native_notifications` opens / closes the shade (Android) or the Notification Center (iOS); read them with `native_get_elements` and open one with `native_tap` (iOS Notification Center: a group expands on the first tap; if a tap only shows an "Open" button, tap "Open").
 - **Screenshots** of system UI with `native_take_screenshot` (whole screen); Flutter's `take_screenshots` shows only Flutter.
 - **When the app is covered**, `get_interactive_elements` warns that it is not in front — except for an alert or sheet the app itself shows on iOS.
 
@@ -55,7 +55,7 @@ Verified on an Android emulator (API 28, 29, 35) and the iOS Simulator (18.6, 26
 | Software keyboard | — | iOS: keys are elements; Android: not exposed | Type with `native_enter_text` |
 | Native alerts (`AlertDialog`, `UIAlertController`, ATT) | — | ✓ | |
 | Native screens (Activity / view controller) | — | ✓ | |
-| Notifications | — | ✓ in the shade / Notification Center | iOS: open one with a swipe right; Android heads-up banners only on screenshots |
+| Notifications | — | ✓ in the shade / Notification Center | iOS: a group expands on the first tap, a tap may only show "Open"; Android heads-up banners only on screenshots |
 | Toasts (Android) | — | API 28–29: read-only element; API 35: screenshot only | Reads wait while a toast is shown |
 | Biometric prompt | — | ✓ read | Answering it needs simulated biometrics, which the tools do not offer |
 | Browser sign-in (Custom Tab, `ASWebAuthenticationSession`) | — | ✓ consent alert, form, redirect | |

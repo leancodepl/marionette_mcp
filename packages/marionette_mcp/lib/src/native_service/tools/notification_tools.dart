@@ -28,8 +28,10 @@ void registerNativeNotificationTools(
     description: 'open / close the notification shade (Android) or '
         'Notification Center (iOS, by swipe). Read the notifications with '
         'native_get_elements while the shade is open. To open a notification, '
-        'native_tap it (Android, iOS banner); in the iOS Notification Center '
-        'a tap does nothing — swipe it right with native_swipe. Requires '
+        'native_tap it. In the iOS Notification Center the first tap on a '
+        'group of one app\'s notifications expands it; a tap on a single '
+        'notification may only slide it aside and show an "Open" button — '
+        'native_wait_for text="Open", then native_tap it. Requires '
         'native_connect.',
     annotations: const ToolAnnotations(title: 'Native Notifications'),
     inputSchema: ToolInputSchema(
@@ -69,15 +71,18 @@ Future<CallToolResult> handleNativeNotifications(
         } else {
           await connector.device.openNotifications();
         }
-        // The iOS Notification Center ignores taps on a notification (it
-        // only hints a side swipe; iOS 18.6 and 26.4); a swipe right opens it.
+        // In the iOS Notification Center a tap on a group expands it, and a
+        // tap on a notification may only slide it aside to show "Open"
+        // (seen on the Simulator).
         return _text('Opened the notifications. Read them with '
             'native_get_elements; close with action=close.'
-            '${ios ? ' To open one, swipe it right with native_swipe — a tap '
-                'does nothing here. If only "N Notifications" is listed, tap '
-                'it first to expand the list. Opened over the app, the '
-                'Notification Center is not in the tree: send the app to the '
-                'background (native_press_key key=home) first.' : ''}');
+            '${ios ? ' Notifications of one app are grouped: the first tap '
+                'on a group expands it. If a tap on a notification only '
+                'slides it aside, native_wait_for text="Open" and native_tap '
+                'it. If only "N Notifications" is listed, tap it first to '
+                'expand the list. Opened over the app, the Notification '
+                'Center is not in the tree: send the app to the background '
+                '(native_press_key key=home) first.' : ''}');
       case NativeNotificationsAction.close:
         if (ios) {
           await _swipeNotificationCenter(connector, open: false);

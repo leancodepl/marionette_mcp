@@ -45,16 +45,16 @@ void main() {
       expect(device.calls, isEmpty);
     });
 
-    test('iOS says a notification opens with a swipe, Android does not',
-        () async {
+    test('iOS explains groups and the Open button, Android does not', () async {
       final android =
           _text(await handleNativeNotifications(context, {'action': 'open'}));
       await context.connect(NativePlatform.ios);
       final ios =
           _text(await handleNativeNotifications(context, {'action': 'open'}));
 
-      expect(android, isNot(contains('swipe it right')));
-      expect(ios, contains('swipe it right with native_swipe'));
+      expect(android, isNot(contains('"Open"')));
+      expect(ios, contains('the first tap on a group expands it'));
+      expect(ios, contains('native_wait_for text="Open"'));
     });
 
     test('rejects an unknown action', () async {

@@ -579,8 +579,10 @@ platforms — never Flutter logical pixels.
 
 ### Platform notes
 
-- iOS Notification Center: a tap on a notification does nothing; swipe it
-  right with native-swipe. A collapsed "N Notifications" button must be
+- iOS Notification Center: notifications of one app are grouped, and the
+  first tap on a group expands it. A tap on a notification may only slide
+  it aside and show an "Open" button: native-wait-for --text Open, then
+  native-tap --text Open. A collapsed "N Notifications" button must be
   tapped first. Opened over the app it is not in the tree — background the
   app first (native-press-key --key home). A banner can be tapped.
 - Android: toasts and heads-up banners are visible only on screenshots on
