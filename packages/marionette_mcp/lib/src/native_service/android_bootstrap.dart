@@ -491,23 +491,6 @@ class AndroidBootstrap implements SharedServerBootstrap {
   static Future<String> _sha256Of(File file) async =>
       sha256.convert(await file.readAsBytes()).toString();
 
-  /// Directory the UIAutomator2 APKs are downloaded to when no cache
-  /// directory is given.
-  static Directory get defaultCacheDir => _defaultCacheDir();
-
-  /// File names of the pinned UIAutomator2 APKs in the cache directory.
-  static const apkFileNames = [_serverApkName, _testApkName];
-
-  /// Whether the cached APK [fileName] in [cacheDir] matches its pinned
-  /// checksum; null when it is not cached. A mismatching copy is downloaded
-  /// again by [ensureServerReady].
-  static Future<bool?> cachedApkValid(
-      Directory cacheDir, String fileName) async {
-    final file = File('${cacheDir.path}/$fileName');
-    if (!await file.exists()) return null;
-    return await _sha256Of(file) == pinnedApkSha256[fileName];
-  }
-
   static Directory _defaultCacheDir() {
     final environment = Platform.environment;
     final xdgCache = environment['XDG_CACHE_HOME'];

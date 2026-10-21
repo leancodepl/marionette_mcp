@@ -47,25 +47,10 @@
 			</array>
 		</dict>
 	</dict>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>marionette-example</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>marionette-example</string>
-			</array>
-		</dict>
-	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>This app uses the camera for profile pictures and native-lane testing demos.</string>
-	<key>GOOGLE_MAPS_API_KEY</key>
-	<string>RANDOM_KEY</string>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>Native-lane testing: App Tracking Transparency prompt (Native dialogs screen).</string>
+	<string>This app uses the camera for native-lane testing demos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app accesses your photo library so you can choose a profile picture.</string>
+	<string>This app accesses your photo library for native-lane testing demos.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

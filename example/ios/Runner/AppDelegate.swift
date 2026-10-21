@@ -1,5 +1,4 @@
 import Flutter
-import GoogleMaps
 import UIKit
 import UserNotifications
 
@@ -9,10 +8,6 @@ import UserNotifications
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_MAPS_API_KEY") as? String,
-       !apiKey.isEmpty {
-      GMSServices.provideAPIKey(apiKey)
-    }
     // flutter_local_notifications: deliver notification taps to the plugin.
     UNUserNotificationCenter.current().delegate = self
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

@@ -74,9 +74,8 @@ class _PickersAndSheetsScreenState extends State<PickersAndSheetsScreen> {
       if (!mounted) return;
 
       setState(
-        () => _lastResult = image == null
-            ? 'Photo picker cancelled'
-            : 'Photo: ${image.name}',
+        () => _lastResult =
+            image == null ? 'Photo picker cancelled' : 'Photo: ${image.name}',
       );
     });
   }
@@ -85,7 +84,8 @@ class _PickersAndSheetsScreenState extends State<PickersAndSheetsScreen> {
     await _run('Camera capture', () async {
       if (kIsWeb) {
         if (mounted) {
-          setState(() => _lastResult = 'Camera capture is not supported on web');
+          setState(
+              () => _lastResult = 'Camera capture is not supported on web');
         }
         return;
       }
@@ -101,9 +101,8 @@ class _PickersAndSheetsScreenState extends State<PickersAndSheetsScreen> {
       if (!mounted) return;
 
       setState(
-        () => _lastResult = image == null
-            ? 'Camera capture cancelled'
-            : 'Photo: ${image.name}',
+        () => _lastResult =
+            image == null ? 'Camera capture cancelled' : 'Photo: ${image.name}',
       );
     });
   }
@@ -111,9 +110,8 @@ class _PickersAndSheetsScreenState extends State<PickersAndSheetsScreen> {
   Future<void> _share(BuildContext buttonContext) async {
     await _run('Share sheet', () async {
       final box = buttonContext.findRenderObject() as RenderBox?;
-      final origin = box == null
-          ? null
-          : box.localToGlobal(Offset.zero) & box.size;
+      final origin =
+          box == null ? null : box.localToGlobal(Offset.zero) & box.size;
 
       final result = await SharePlus.instance.share(
         ShareParams(
@@ -155,7 +153,8 @@ class _PickersAndSheetsScreenState extends State<PickersAndSheetsScreen> {
             ),
           ListTile(
             title: const Text('Files'),
-            subtitle: const Text('SAF DocumentsUI / UIDocumentPickerViewController'),
+            subtitle:
+                const Text('SAF DocumentsUI / UIDocumentPickerViewController'),
             trailing: FilledButton(
               onPressed: _busy ? null : _pickFile,
               child: const Text('Pick file'),
@@ -164,7 +163,8 @@ class _PickersAndSheetsScreenState extends State<PickersAndSheetsScreen> {
           const Divider(),
           ListTile(
             title: const Text('Photos'),
-            subtitle: const Text('Android photo picker / PHPickerViewController'),
+            subtitle:
+                const Text('Android photo picker / PHPickerViewController'),
             trailing: FilledButton(
               onPressed: _busy ? null : _pickPhoto,
               child: const Text('Pick photo'),

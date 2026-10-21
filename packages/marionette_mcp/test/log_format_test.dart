@@ -4,8 +4,8 @@ import 'package:test/test.dart';
 
 void main() {
   test('a log line includes the error of a failed tool call', () {
-    // The server log of an E2E failure said only "Failed to native wait
-    // for", without the reason.
+    // The server log of a failed tool call said only "Failed to native
+    // wait for", without the reason.
     final record = logging.LogRecord(
       logging.Level.WARNING,
       'Failed to native wait for',

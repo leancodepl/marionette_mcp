@@ -1,13 +1,9 @@
-import 'dart:io';
-
-import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:flutter/material.dart';
 
 import 'native_demo_channel.dart';
 
-/// Native dialogs from plugins and platform code: an AlertDialog /
-/// UIAlertController shown over MethodChannel, and the iOS App Tracking
-/// Transparency prompt. Neither is in the Flutter tree.
+/// A native dialog from platform code: an AlertDialog / UIAlertController
+/// shown over MethodChannel. It is not in the Flutter tree.
 class NativeDialogsScreen extends StatefulWidget {
   const NativeDialogsScreen({super.key});
 
@@ -17,7 +13,6 @@ class NativeDialogsScreen extends StatefulWidget {
 
 class _NativeDialogsScreenState extends State<NativeDialogsScreen> {
   String _alertResult = 'none';
-  String _trackingStatus = 'not requested';
 
   Future<void> _showAlert() async {
     final result = await NativeDemoChannel.showAlert(
@@ -25,11 +20,6 @@ class _NativeDialogsScreenState extends State<NativeDialogsScreen> {
       message: 'Shown by platform code, outside Flutter.',
     );
     if (mounted) setState(() => _alertResult = result);
-  }
-
-  Future<void> _requestTracking() async {
-    final status = await AppTrackingTransparency.requestTrackingAuthorization();
-    if (mounted) setState(() => _trackingStatus = status.name);
   }
 
   @override
@@ -53,14 +43,6 @@ class _NativeDialogsScreenState extends State<NativeDialogsScreen> {
             child: const Text('Show native alert'),
           ),
           Text('Alert result: $_alertResult'),
-          if (Platform.isIOS) ...[
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _requestTracking,
-              child: const Text('Request tracking'),
-            ),
-            Text('Tracking: $_trackingStatus'),
-          ],
         ],
       ),
     );

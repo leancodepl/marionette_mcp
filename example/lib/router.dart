@@ -10,19 +10,15 @@ import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/testing/camera_platform_view_screen.dart';
 import 'screens/testing/native_dialogs_screen.dart';
 import 'screens/testing/native_screen_screen.dart';
 import 'screens/testing/notifications_screen.dart';
-import 'screens/testing/oauth_screen.dart';
-import 'screens/testing/google_maps_platform_view_screen.dart';
 import 'screens/testing/native_controls_platform_view_screen.dart';
 import 'screens/testing/keyboard_screen.dart';
 import 'screens/testing/permission_dialogs_screen.dart';
 import 'screens/testing/pickers_and_sheets_screen.dart';
 import 'screens/testing/platform_views_screen.dart';
 import 'screens/testing/testing_screen.dart';
-import 'screens/testing/video_player_platform_view_screen.dart';
 import 'screens/webview_screen.dart';
 
 /// Page name → route path mapping used by the custom VM service extension.
@@ -33,16 +29,12 @@ const availablePages = <String, String>{
   'webview': '/testing/webview',
   'platform_views': '/testing/platform-views',
   'native_controls_platform_view': '/testing/platform-views/native-controls',
-  'camera_platform_view': '/testing/platform-views/camera',
-  'google_maps_platform_view': '/testing/platform-views/google-maps',
-  'video_player_platform_view': '/testing/platform-views/video-player',
   'permission_dialogs': '/testing/permission-dialogs',
   'pickers_and_sheets': '/testing/pickers-and-sheets',
   'keyboard': '/testing/keyboard',
   'native_dialogs': '/testing/native-dialogs',
   'native_screen': '/testing/native-screen',
   'notifications': '/testing/notifications',
-  'oauth': '/testing/oauth',
   'settings': '/settings',
   'items': '/settings/items',
   'about': '/settings/about',
@@ -80,20 +72,6 @@ final router = GoRouter(
                   builder: (context, state) =>
                       const NativeControlsPlatformViewScreen(),
                 ),
-                GoRoute(
-                  path: 'camera',
-                  builder: (context, state) => const CameraPlatformViewScreen(),
-                ),
-                GoRoute(
-                  path: 'google-maps',
-                  builder: (context, state) =>
-                      const GoogleMapsPlatformViewScreen(),
-                ),
-                GoRoute(
-                  path: 'video-player',
-                  builder: (context, state) =>
-                      const VideoPlayerPlatformViewScreen(),
-                ),
               ],
             ),
             GoRoute(
@@ -119,10 +97,6 @@ final router = GoRouter(
             GoRoute(
               path: 'notifications',
               builder: (context, state) => const NotificationsScreen(),
-            ),
-            GoRoute(
-              path: 'oauth',
-              builder: (context, state) => const OAuthScreen(),
             ),
           ],
         ),

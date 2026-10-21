@@ -54,14 +54,6 @@ class TestingScreen extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.login),
-            title: const Text('OAuth'),
-            subtitle: const Text('Sign-in in the system browser'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/testing/oauth'),
-          ),
-          const Divider(),
-          ListTile(
             leading: const Icon(Icons.notifications_outlined),
             title: const Text('Notifications'),
             subtitle: const Text('Local notifications, toasts'),
@@ -80,7 +72,7 @@ class TestingScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.chat_bubble_outline),
             title: const Text('Native dialogs'),
-            subtitle: const Text('Platform alerts, tracking prompt'),
+            subtitle: const Text('Platform alerts'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.go('/testing/native-dialogs'),
           ),

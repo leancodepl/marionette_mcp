@@ -280,14 +280,6 @@ void main() {
       },
     );
 
-    test('cachedApkValid: missing, mismatching and pinned copies', () async {
-      const name = 'appium-uiautomator2-server-v10.3.2.apk';
-      expect(await AndroidBootstrap.cachedApkValid(cacheDir, name), isNull);
-
-      await File('${cacheDir.path}/$name').writeAsString('not an apk');
-      expect(await AndroidBootstrap.cachedApkValid(cacheDir, name), isFalse);
-    });
-
     test('stopServer force-stops both packages and removes the forward',
         () async {
       await AndroidBootstrap.stopServer(

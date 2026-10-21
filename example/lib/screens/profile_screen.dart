@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../widgets/profile_picture_section.dart';
-
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -61,10 +59,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const ProfilePictureSection(),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
             TextField(
               key: const ValueKey('name_field'),
               decoration: const InputDecoration(

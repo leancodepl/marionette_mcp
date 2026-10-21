@@ -67,16 +67,4 @@ Verified on an Android emulator (API 28, 29, 35) and the iOS Simulator (18.6, 26
 - **iOS (Simulator):** a notification banner shows only while the app is in the background; keyboards without a Done key cannot be hidden by the tool; a focused Flutter field adds its hint to its label.
 - **Both:** an element covered by another one (e.g. under a toolbar) still counts as visible — scroll a little more before tapping near an edge; after a lost device-side session call `native_connect` again.
 
-## Testing the native lane
-
-Device tests (tag `device`) drive the example app through the real MCP server and CLI. They are skipped by a plain `dart test`:
-
-```sh
-cd packages/marionette_mcp && dart test -P device       # Android
-MARIONETTE_E2E_PLATFORM=ios dart test -P device         # iOS Simulator
-cd packages/marionette_cli && dart test -P device
-```
-
-The example app must be installed; set `MARIONETTE_E2E_VM_SERVICE_URI` (from `flutter run`) to include the scenario that uses both lanes. On failure a screenshot, the native tree and the server log are written to `MARIONETTE_E2E_ARTIFACTS`.
-
 Problems and fixes: [Troubleshooting → Native lane](./troubleshooting.md#native-lane).
