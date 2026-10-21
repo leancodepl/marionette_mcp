@@ -589,6 +589,10 @@ Separation of concerns, simple fakes (`FakeNativeDevice`), and the same device o
 - iOS Notification Center: the first close gesture (swipe up in the middle) only scrolled the list; closing now swipes up from the bottom edge. Rotation is refused while Notification Center is in front ("Unable To Rotate Device"); that error is now typed with a hint to close it.
 - Unit tests for both devices on scripted processes, all tools on fakes.
 
+### Follow-up (acceptance tests, 2026-10-21): the shade on Android
+
+`cmd statusbar expand-notifications` returns at once, while the shade is still opening. A read right after `native_notifications action=open` reported `foregroundApp` as the app (61 ms read, Android API 35) — and once already listed the shade's notifications next to it — so an agent could not tell that a system surface covered the app. After `open` the tool now waits (at most 2 s) until the shade has focus (`mCurrentFocus` NotificationShade / StatusBar, the same check as `foregroundApp`), and after `close` until it has lost it; on timeout it still succeeds. Unit test: open and close keep reading the focus until the shade has moved. Live on API 35: `open` returns after about 330 ms and the next read reports `com.android.systemui`; after `close`, the app.
+
 ---
 
 <a id="d13"></a>

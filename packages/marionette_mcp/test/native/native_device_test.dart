@@ -304,12 +304,38 @@ void main() {
     });
 
     test('notifications use cmd statusbar; push is unsupported', () async {
+      // The shade takes focus a moment after the command (seen on API 35):
+      // the first read still shows the app.
+      var shade = false;
+      var readsUntilMoved = 0;
+      runner
+        ..onAdb(['shell', 'cmd', 'statusbar'], respond: (args) {
+          shade = args.last == 'expand-notifications';
+          readsUntilMoved = 1;
+          return ok();
+        })
+        ..onAdb(['shell', 'dumpsys', 'window'], respond: (_) {
+          final moved = readsUntilMoved-- <= 0;
+          final focus = moved == shade
+              ? 'Window{6bb05b2 u0 NotificationShade}'
+              : 'Window{a719f4f u0 $_app/$_app.MainActivity}';
+          return ok('  mCurrentFocus=$focus\n');
+        });
+
       await device.openNotifications();
+      final afterOpen = runner.adbCommands.length;
       await device.closeNotifications();
 
-      expect(runner.adbCommands, [
+      List<String> command(List<String> c) => c.take(4).toList();
+      expect(runner.adbCommands.take(afterOpen).map(command), [
         ['shell', 'cmd', 'statusbar', 'expand-notifications'],
+        ['shell', 'dumpsys', 'window', 'displays'],
+        ['shell', 'dumpsys', 'window', 'displays'],
+      ]);
+      expect(runner.adbCommands.skip(afterOpen).map(command), [
         ['shell', 'cmd', 'statusbar', 'collapse'],
+        ['shell', 'dumpsys', 'window', 'displays'],
+        ['shell', 'dumpsys', 'window', 'displays'],
       ]);
       expect(
         () => device.pushNotification(_app, const {'aps': <String, dynamic>{}}),
