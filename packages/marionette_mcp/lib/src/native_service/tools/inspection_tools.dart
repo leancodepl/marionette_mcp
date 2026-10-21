@@ -87,7 +87,11 @@ void registerNativeInspectionTools(
           'to timeoutMs (default $_defaultWaitTimeoutMs, max '
           '$_maxWaitTimeoutMs). Returns the first matching element for '
           '"visible". Use it instead of fixed sleeps for system dialogs, '
-          'toasts, and screens that appear after a delay. '
+          'toasts, and screens that appear after a delay. To wait for a '
+          'system screen (a picker, a browser), wait for an element you '
+          'expect on it: a package name is not element text and can match '
+          'a label of the app — foregroundApp of native_get_elements tells '
+          'which app is in front. '
           '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(

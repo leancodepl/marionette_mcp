@@ -552,7 +552,9 @@ platforms — never Flutter logical pixels (use native-map-flutter-rect).
   native-wait-for [selector without --index] [--state visible|gone]
                   [--timeout-ms 10000] [--interval-ms 500]
       Prints the element (visible) or the elapsed time (gone); exit 1 on
-      timeout, naming the foreground app.
+      timeout, naming the foreground app. Wait for an element of the
+      expected screen, not for a package name (not element text; see
+      foregroundApp of native-get-elements).
   native-tap <selector> | --x X --y Y
   native-double-tap <selector> | --x X --y Y [--delay-ms 100]
   native-long-press <selector> | --x X --y Y [--duration-ms 600]
