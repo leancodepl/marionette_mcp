@@ -69,6 +69,23 @@ void main() {
   _unitTests();
 
   group('parseAndroidUiDump', () {
+    test('masks the content of a password field, as iOS does', () {
+      // Seen on API 35: a WebView <input type="password"> reports its
+      // content in clear text, with no hint to fall back to.
+      final elements = parseAndroidUiDump('''
+<hierarchy>
+  <node class="android.widget.EditText" text="tajne123" resource-id="password" password="true" clickable="true" bounds="[48,1185][1233,1305]"/>
+  <node class="android.widget.EditText" text="" hint="Password" resource-id="empty" password="true" clickable="true" bounds="[48,1305][1233,1425]"/>
+  <node class="android.widget.EditText" text="Zażółć" resource-id="name" password="false" clickable="true" bounds="[48,975][1233,1095]"/>
+</hierarchy>''');
+
+      expect(elements[0].value, '••••••••');
+      expect(elements[0].text, '••••••••');
+      expect(elements[1].value, isNull);
+      expect(elements[1].text, 'Password');
+      expect(elements[2].value, 'Zażółć');
+    });
+
     test('parses interactive and labelled nodes with expected fields', () {
       final elements = parseAndroidUiDump(androidFixture);
 
@@ -451,6 +468,37 @@ void _unitTests() {
     // Partly visible: clipped to the screen, so the center is on it.
     expect(elements[2].bounds.toJson(),
         {'x': 16, 'y': 940, 'width': 100, 'height': 16});
+  });
+
+  test('WDA: elements outside their WebView or scroll view are dropped', () {
+    // Seen on iOS 26.4: after scrolling, "Section 2" of a WebView page lay
+    // below the WebView's frame, behind the tab bar, yet on screen.
+    final elements = parseWdaSource('''
+<XCUIElementTypeApplication name="Counter" label="Counter" x="0" y="0" width="440" height="956">
+  <XCUIElementTypeWebView name="platform_view[1]" x="0" y="182" width="440" height="660">
+    <XCUIElementTypeWebView x="0" y="182" width="440" height="660">
+      <XCUIElementTypeStaticText label="Inside" x="16" y="700" width="100" height="30"/>
+      <XCUIElementTypeStaticText label="Partly inside" x="16" y="830" width="100" height="30"/>
+      <XCUIElementTypeStaticText label="Section 2" x="16" y="879" width="106" height="30"/>
+    </XCUIElementTypeWebView>
+  </XCUIElementTypeWebView>
+  <XCUIElementTypeScrollView x="0" y="100" width="440" height="0">
+    <XCUIElementTypeStaticText label="Unsized container" x="16" y="120" width="100" height="30"/>
+  </XCUIElementTypeScrollView>
+  <XCUIElementTypeButton label="Testing" enabled="true" x="220" y="842" width="110" height="80"/>
+</XCUIElementTypeApplication>''');
+
+    expect(elements.map((e) => e.text), [
+      'Counter',
+      null, // the named WebView itself
+      'Inside',
+      'Partly inside',
+      'Unsized container',
+      'Testing',
+    ]);
+    // Partly inside: clipped to the WebView, so the center is on it.
+    expect(elements[3].bounds.toJson(),
+        {'x': 16, 'y': 830, 'width': 100, 'height': 12});
   });
 
   test('WDA: identical duplicate elements are listed once', () {

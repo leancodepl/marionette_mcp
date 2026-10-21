@@ -363,6 +363,10 @@ abstract class NativeConnector {
 /// attribute map, chosen so it cannot collide with real XML attribute names.
 const uiNodeTagKey = '#tag';
 
+/// Key under which [parseUiTree] stores the clip of a node's viewport
+/// ancestors (see its `viewportOf`).
+const uiNodeClipKey = '#clip';
+
 /// Parses [xml] and returns the attribute maps of all nodes for which
 /// [isRelevant] returns true, in document order. Each map additionally
 /// contains the node's tag name under [uiNodeTagKey].
@@ -376,11 +380,18 @@ const uiNodeTagKey = '#tag';
 /// other named entities, or DTDs — acceptable because both servers emit
 /// plain escaped XML. Malformed input yields best-effort results rather
 /// than throwing.
+///
+/// With [viewportOf], a node that it maps to bounds clips its descendants:
+/// each relevant node inside one or more such ancestors gets the
+/// intersection of their bounds under [uiNodeClipKey] (`x,y,width,height`).
 List<Map<String, String>> parseUiTree(
   String xml, {
   required bool Function(Map<String, String> attributes) isRelevant,
+  NativeBounds? Function(Map<String, String> attributes)? viewportOf,
 }) {
   final nodes = <Map<String, String>>[];
+  // Clip in effect inside each open element (null: no viewport ancestor).
+  final clips = <NativeBounds?>[];
   var i = 0;
 
   while (i < xml.length) {
@@ -399,6 +410,7 @@ List<Map<String, String>> parseUiTree(
       continue;
     }
     if (xml.startsWith('<!', open) || xml.startsWith('</', open)) {
+      if (xml.startsWith('</', open) && clips.isNotEmpty) clips.removeLast();
       final end = xml.indexOf('>', open);
       i = end == -1 ? xml.length : end + 1;
       continue;
@@ -411,8 +423,23 @@ List<Map<String, String>> parseUiTree(
 
     final tagContent = xml.substring(open + 1, close);
     final attributes = _parseTag(tagContent);
+    final clip = clips.lastOrNull;
     if (attributes != null && isRelevant(attributes)) {
-      nodes.add(attributes);
+      nodes.add({
+        ...attributes,
+        if (clip != null)
+          uiNodeClipKey: '${clip.x},${clip.y},${clip.width},${clip.height}',
+      });
+    }
+    if (!tagContent.endsWith('/')) {
+      final viewport = attributes == null ? null : viewportOf?.call(attributes);
+      clips.add(
+        viewport == null
+            ? clip
+            : clip == null
+                ? viewport
+                : _intersection(clip, viewport),
+      );
     }
 
     i = close + 1;
@@ -530,7 +557,13 @@ List<NativeElement> parseAndroidUiDump(String xml) {
         resourceId.isNotEmpty;
   });
 
-  return nodes.map((attributes) {
+  return nodes.map((node) {
+    // A WebView password field reports its content in clear text; mask it
+    // like iOS does for a secure field, one bullet per character.
+    final password = node['text'] ?? '';
+    final attributes = node['password'] == 'true' && password.isNotEmpty
+        ? {...node, 'text': '•' * password.runes.length}
+        : node;
     final resourceId = attributes['resource-id'] ?? '';
     final className = attributes['class'] ?? attributes[uiNodeTagKey]!;
     final rawText = attributes['text'] ?? '';
@@ -610,6 +643,9 @@ const _wdaValueTypes = {..._wdaFieldTypes, 'Slider'};
 /// XCUI container types that scroll.
 const _wdaScrollableTypes = {'ScrollView', 'Table', 'CollectionView'};
 
+/// XCUI types that show only the part of their content inside their frame.
+const _wdaViewportTypes = {..._wdaScrollableTypes, 'WebView'};
+
 /// Parses WebDriverAgent source XML (tags named `XCUIElementType*`) into
 /// [NativeElement]s.
 ///
@@ -646,15 +682,37 @@ List<NativeElement> parseWdaSource(String xml) {
     return null;
   }
 
-  final nodes = parseUiTree(xml, isRelevant: (attributes) {
-    if (!attributes[uiNodeTagKey]!.startsWith(_wdaTypePrefix)) return false;
-    final name = attributes['name'] ?? '';
-    final tag = attributes[uiNodeTagKey]!;
-    return isClickable(attributes) ||
-        textOf(attributes) != null ||
-        name.isNotEmpty ||
-        _wdaScrollableTypes.contains(tag.substring(_wdaTypePrefix.length));
-  });
+  NativeBounds boundsOf(Map<String, String> attributes) => NativeBounds(
+        x: _parseWdaInt(attributes['x']),
+        y: _parseWdaInt(attributes['y']),
+        width: _parseWdaInt(attributes['width']),
+        height: _parseWdaInt(attributes['height']),
+      );
+
+  final nodes = parseUiTree(
+    xml,
+    isRelevant: (attributes) {
+      if (!attributes[uiNodeTagKey]!.startsWith(_wdaTypePrefix)) return false;
+      final name = attributes['name'] ?? '';
+      final tag = attributes[uiNodeTagKey]!;
+      return isClickable(attributes) ||
+          textOf(attributes) != null ||
+          name.isNotEmpty ||
+          _wdaScrollableTypes.contains(tag.substring(_wdaTypePrefix.length));
+    },
+    // A scrolled page or list shows only what lies inside its frame; WDA
+    // lists the rest with real coordinates (docs/native-lane-decisions.md#d16).
+    viewportOf: (attributes) {
+      final tag = attributes[uiNodeTagKey]!;
+      if (!tag.startsWith(_wdaTypePrefix) ||
+          !_wdaViewportTypes.contains(tag.substring(_wdaTypePrefix.length))) {
+        return null;
+      }
+      final bounds = boundsOf(attributes);
+      // A container without size (not laid out yet) clips nothing.
+      return bounds.width > 0 && bounds.height > 0 ? bounds : null;
+    },
+  );
 
   final elements = nodes.map((attributes) {
     final name = attributes['name'] ?? '';
@@ -672,17 +730,25 @@ List<NativeElement> parseWdaSource(String xml) {
         ? rawValue
         : null;
 
+    final rawClip = attributes[uiNodeClipKey]?.split(',').map(int.parse);
+    final clip = rawClip == null
+        ? null
+        : NativeBounds(
+            x: rawClip.elementAt(0),
+            y: rawClip.elementAt(1),
+            width: rawClip.elementAt(2),
+            height: rawClip.elementAt(3),
+          );
+    final bounds = boundsOf(attributes);
+
     return NativeElement(
       className: tag,
       text: textOf(attributes),
       resourceId: name.isNotEmpty ? name : null,
       clickable: isClickable(attributes),
-      bounds: NativeBounds(
-        x: _parseWdaInt(attributes['x']),
-        y: _parseWdaInt(attributes['y']),
-        width: _parseWdaInt(attributes['width']),
-        height: _parseWdaInt(attributes['height']),
-      ),
+      // Outside its viewport the element is hidden: zero size, like
+      // Flutter's off-screen nodes, so it is not listed.
+      bounds: clip == null ? bounds : _intersection(bounds, clip),
       value: value,
       enabled: attributes['enabled'] != 'false',
       checked: isToggle ? rawValue == '1' : null,
@@ -741,8 +807,17 @@ NativeBounds _clip(NativeBounds a, NativeBounds b) {
   );
 }
 
+/// The common part of [a] and [b]; zero-size when they do not overlap.
+NativeBounds _intersection(NativeBounds a, NativeBounds b) => _overlaps(a, b)
+    ? _clip(a, b)
+    : NativeBounds(x: a.x, y: a.y, width: 0, height: 0);
+
 /// Whether [a] and [b] share a non-empty area.
 bool _overlaps(NativeBounds a, NativeBounds b) =>
+    a.width > 0 &&
+    a.height > 0 &&
+    b.width > 0 &&
+    b.height > 0 &&
     a.x < b.x + b.width &&
     b.x < a.x + a.width &&
     a.y < b.y + b.height &&

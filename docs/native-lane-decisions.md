@@ -736,6 +736,11 @@ One shape for both platforms is what lets an agent use the same reasoning everyw
 ### Follow-up (unit 10, 2026-10-20): the label of a focused field on iOS
 
 A focused Flutter text field on iOS reports its hint as a second line of the label (`Title` becomes `Title\nSingle line — keyboard shows Done`), so the exact `label` of `native_enter_text` stopped matching the field it had just focused — the retry above then failed with "No native element with text=\"Title\"". The `label` selector now also matches the first line of an element's text; the exact `text` of the other tools is unchanged (use `textContains` to read such a field). Unit test: a focused field is found by its label, a plain `text` selector stays exact. Verified in three E2E runs on iOS 26.4.
+
+### Follow-up (acceptance tests, 2026-10-21): password fields on Android
+
+In a WebView on Android API 35 an `<input type="password">` is reported by UIAutomator with `password="true"` and its content in clear text in `text`; with no hint, that text also became the element's `text`, so `native_get_elements` returned the password twice. WebDriverAgent masks a secure field itself (`value` "••••••••", one bullet per character). The Android parser now does the same for any node with `password="true"`: `text` and `value` show one bullet per character. The length stays visible, as on iOS. Selectors cannot match a password by its content any more — they use the label, id or focus. Unit test: a filled password field is masked, an empty one keeps its hint, other fields are unchanged. Live on API 35: the WebView form's password reads "••••••••" and the page still receives the full password ("password length=8").
+
 ---
 
 <a id="d16"></a>
@@ -803,6 +808,10 @@ Reads with `UIDocumentPicker` open took 2.6–2.7 s each (75 KB page source) aga
 ### Follow-up (acceptance tests, 2026-10-20): a target a lazy list has not built
 
 The hint to scroll was given only for a target that exists off screen. In a lazy list (Flutter `ListView.builder`, Android `RecyclerView`) a far item is not in the tree at all — on the Gestures & inspection screen "Row 40" was absent on both platforms, not even as a zero-size node — so `native_tap text="Row 40"` only said to call `native_get_elements`. When nothing matches and a scrollable container is on screen, the hint now also suggests `native_scroll` with the same selector as the target. Unit test: a miss on a screen with a scrollable container hints to scroll, a miss on a screen without one does not. Live on Android API 35 and iOS 26.4: `native_tap text="Row 40"` before scrolling names `native_scroll`.
+
+### Follow-up (acceptance tests, 2026-10-21): elements outside their WebView
+
+WebDriverAgent lists a WebView's whole page with real coordinates, and only elements outside the screen were dropped. On the WebView screen (iOS 26.4) "Section 2" lay below the WebView's frame, behind the bottom tabs, yet inside the screen — so `native_scroll text="Section 2"` reported it found after 5 swipes while the screenshot showed blank page, and a tap on it would have hit the tabs. WDA itself marked it `visible="false"`. The iOS parser now tracks the element hierarchy and clips each element to the frames of its `WebView`, `ScrollView`, `Table` and `CollectionView` ancestors (a container without size clips nothing); an element entirely outside them gets zero size and is not listed, like Flutter's off-screen nodes. UIAutomator already reports clipped bounds, so Android is unchanged. Unit test: an element below its WebView is dropped, one partly inside is clipped, a zero-size container clips nothing. Live on iOS 26.4: "Section 2" is found only once it is inside the WebView (after 7 swipes) and is visible on the screenshot; the WebView form, the lists of the Gestures & inspection screen and page scrolling behave as before.
 
 ---
 
