@@ -11,7 +11,7 @@
 
 Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP client to the Flutter app you run in debug mode. The agent sees the screen, taps, types, scrolls, reads the logs, hot reloads, and writes a report of what it did. If you know Playwright MCP: this is that, for Flutter.
 
-**[Website](https://marionette.leancode.co)** · **[Docs](https://marionette.leancode.co/docs)** · [Video](https://youtu.be/JYsFDbKTJ54) · [Article](https://leancode.co/blog/marionette-mcp-in-flutter-apps?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-readme)
+**[Website](https://marionette.leancode.co)** · **[Docs](https://marionette.leancode.co/docs/)** · [Video](https://youtu.be/JYsFDbKTJ54) · [Article](https://leancode.co/blog/marionette-mcp-in-flutter-apps?utm_source=github.com&utm_medium=referral&utm_campaign=marionette-readme)
 
 ## Quick start
 
@@ -32,7 +32,7 @@ Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP c
    }
    ```
 
-2. Give your agent a bridge: the MCP server or the `marionette` CLI, whichever you prefer ([every agent](https://marionette.leancode.co/docs#bridge)):
+2. Give your agent a bridge: the MCP server or the `marionette` CLI, whichever you prefer ([every agent](https://marionette.leancode.co/docs/#bridge)):
 
    ```bash
    # MCP server, registered with Claude Code
@@ -48,7 +48,7 @@ Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP c
    > Connect to ws://127.0.0.1:9101/…/ws. On Profile, a malformed email must show an error and keep Submit disabled, and a valid one must submit.
 
 > [!IMPORTANT]
-> Flutter's own widgets work as is. **A custom design system needs one configuration step**, or the agent cannot see your buttons and fields: see [Configure](https://marionette.leancode.co/docs/configure).
+> Flutter's own widgets work as is. **A custom design system needs one configuration step**, or the agent cannot see your buttons and fields: see [Configure](https://marionette.leancode.co/docs/configure/).
 
 ## What the agent can do
 
@@ -60,9 +60,9 @@ Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP c
 | **Iterate** | `hot_reload`, `hot_restart` |
 | **Extend** | your app's own actions, registered with `registerMarionetteExtension` |
 
-With `MarionetteConfiguration(enableSessionReports: true)`, every run leaves a folder: a `steps.md` the server writes, one line per tool call, and a `report.md` the agent writes from it. See [Reports](https://marionette.leancode.co/docs/reports).
+With `MarionetteConfiguration(enableSessionReports: true)`, every run leaves a folder: a `steps.md` the server writes, one line per tool call, and a `report.md` the agent writes from it. See [Reports](https://marionette.leancode.co/docs/reports/).
 
-The `marionette` CLI drives the app with the same actions as shell commands: see [Drive](https://marionette.leancode.co/docs/drive#cli).
+The `marionette` CLI drives the app with the same actions as shell commands: see [Drive](https://marionette.leancode.co/docs/drive/#cli).
 
 ## Agent Skill
 
@@ -77,11 +77,11 @@ npx skills add leancodepl/marionette_mcp # without the Dart toolchain
 
 | Page | What is inside |
 | --- | --- |
-| [Start](https://marionette.leancode.co/docs) | Setup, every agent's config, the first prompt, the example app, FAQ |
-| [Concepts](https://marionette.leancode.co/docs/concepts) | How the agent sees a screen, selectors, compaction, the single-binding rule |
-| [Configure](https://marionette.leancode.co/docs/configure) | Custom design systems, Semantics, logs, device config, custom extensions |
-| [Drive](https://marionette.leancode.co/docs/drive) | Prompts for common jobs, every tool with its CLI command, the CLI |
-| [Reports](https://marionette.leancode.co/docs/reports) | Session folders, `steps.md`, `report.md`, the verdict |
+| [Start](https://marionette.leancode.co/docs/) | Setup, every agent's config, the first prompt, the example app, FAQ |
+| [Concepts](https://marionette.leancode.co/docs/concepts/) | How the agent sees a screen, selectors, compaction, the single-binding rule |
+| [Configure](https://marionette.leancode.co/docs/configure/) | Custom design systems, Semantics, logs, device config, custom extensions |
+| [Drive](https://marionette.leancode.co/docs/drive/) | Prompts for common jobs, every tool with its CLI command, the CLI |
+| [Reports](https://marionette.leancode.co/docs/reports/) | Session folders, `steps.md`, `report.md`, the verdict |
 
 ## Packages
 

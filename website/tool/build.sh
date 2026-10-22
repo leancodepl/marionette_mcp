@@ -21,6 +21,10 @@ else
 fi
 $jaspr build --sitemap-domain "$SITE_URL" --dart-define=SITE_URL="$SITE_URL"
 
+# Jaspr writes each route without a trailing slash, which Netlify redirects
+# to the directory; list the URLs it serves directly.
+sed -i -E 's#(<loc>[^<]*[^/])</loc>#\1/</loc>#' build/jaspr/sitemap.xml
+
 # Ship only the rendered page and its assets, not build_runner's intermediate
 # package sources.
 rm -rf build/jaspr/packages build/jaspr/.dart_tool build/jaspr/.build.manifest

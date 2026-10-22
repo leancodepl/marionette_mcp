@@ -170,7 +170,7 @@ class DrivePage extends StatelessComponent {
           children: [
             p(
               rich(
-                'The [Agent Skill](/docs#skill) teaches these; they are also '
+                'The [Agent Skill](/docs/#skill) teaches these; they are also '
                 'the checklist for reading a run.',
               ),
             ),

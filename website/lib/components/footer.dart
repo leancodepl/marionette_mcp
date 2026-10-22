@@ -118,7 +118,7 @@ class SiteFooter extends StatelessComponent {
               ),
             ]),
             div(classes: (Hero.actions + Hero.center).name, [
-              Button(href: '/docs', [
+              Button(href: '/docs/', [
                 Icon.book.build(size: 18),
                 const .text('Get started'),
               ]),
@@ -173,19 +173,19 @@ class SiteFooter extends StatelessComponent {
             h3([.text('Docs')]),
             ul([
               li([
-                a(href: '/docs', [.text('Start')]),
+                a(href: '/docs/', [.text('Start')]),
               ]),
               li([
-                a(href: '/docs/concepts', [.text('Concepts')]),
+                a(href: '/docs/concepts/', [.text('Concepts')]),
               ]),
               li([
-                a(href: '/docs/configure', [.text('Configure')]),
+                a(href: '/docs/configure/', [.text('Configure')]),
               ]),
               li([
-                a(href: '/docs/drive', [.text('Drive')]),
+                a(href: '/docs/drive/', [.text('Drive')]),
               ]),
               li([
-                a(href: '/docs/reports', [.text('Reports')]),
+                a(href: '/docs/reports/', [.text('Reports')]),
               ]),
             ]),
           ],

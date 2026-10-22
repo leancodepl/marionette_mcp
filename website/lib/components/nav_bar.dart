@@ -97,7 +97,7 @@ class NavBar extends StatelessComponent {
           ul(classes: _links.name, [
             li([
               a(
-                href: '/docs',
+                href: '/docs/',
                 classes: onDocs ? _active.name : null,
                 attributes: page == .start
                     ? const {'aria-current': 'page'}
