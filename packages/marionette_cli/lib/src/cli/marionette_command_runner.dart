@@ -60,8 +60,9 @@ class MarionetteCommandRunner extends CommandRunner<int> {
         defaultsTo: '5',
       )
       ..addOption(
-        'native-session',
-        help: 'Name of the native session for native-* commands.',
+        'native-device',
+        help: 'Name of the native-lane device connection (from '
+            'native-connect) for native-* commands.',
         defaultsTo: 'default',
       )
       ..addOption(

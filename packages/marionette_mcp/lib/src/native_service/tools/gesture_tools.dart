@@ -9,6 +9,7 @@ import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 
 const _defaultSwipeDistance = 400;
 const _defaultMaxSwipes = 10;
@@ -112,7 +113,7 @@ Map<String, JsonSchema> _pointProperties(String purpose) => {
 
 /// Registers native tap, press, pinch, swipe and scroll tools.
 void registerNativeGestureTools(
-  McpServer server,
+  LoggedMcpServer server,
   NativeServiceContext context,
 ) {
   server

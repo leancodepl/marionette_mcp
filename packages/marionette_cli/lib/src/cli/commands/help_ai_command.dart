@@ -51,9 +51,9 @@ gets its own fresh session directory, appending one line to its steps.md (see
       --uri <ws-uri>       VM service WebSocket URI — bypasses registry,
                            mutually exclusive with --instance
       --timeout <seconds>  Connection timeout (default: 5)
-      --native-session <name>
-                           Native session for native-* commands
-                           (default: "default")
+      --native-device <name>
+                           Device connection (from native-connect) for
+                           native-* commands (default: "default")
       --session <title>    Session title for this command's directory
                            (.marionette/sessions/<title>-<timestamp>/).
                            Keep it under ~60 characters — longer is
@@ -62,6 +62,8 @@ gets its own fresh session directory, appending one line to its steps.md (see
       --session-dir <path> Base directory .marionette/sessions/ is created
                            under (default: current directory, or
                            $MARIONETTE_SESSION_DIR if set)
+                           native-* commands log a step only when
+                           --session or --session-dir is given
 
 ## Commands
 
@@ -587,8 +589,8 @@ native-get-elements when an action has no effect.
 3. `marionette native-disconnect` when done (stops the server it started).
 
 Several devices at once: give each a name with
-`--native-session <name>` (before the command), e.g.
-`marionette --native-session iphone native-tap --text Allow`.
+`--native-device <name>` (before the command), e.g.
+`marionette --native-device iphone native-tap --text Allow`.
 Prefer one client per Android device at a time: UIAutomator2 has a single
 session, so an MCP server and a CLI session on the same device take it from
 each other, and the MCP server then needs native_connect again

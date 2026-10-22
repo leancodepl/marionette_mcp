@@ -10,6 +10,7 @@ import 'package:marionette_mcp/src/native_service/tools/keyboard_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/notification_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/text_tools.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
@@ -75,14 +76,19 @@ final class NativeServiceContext {
   NativePlatform? platform;
 
   /// Registers all native-lane MCP tools with [server].
-  void registerTools(McpServer server) {
-    registerNativeConnectionTools(server, this);
-    registerNativeInspectionTools(server, this);
-    registerNativeGestureTools(server, this);
-    registerNativeTextTools(server, this);
-    registerNativeKeyboardTools(server, this);
-    registerNativeScreenshotTools(server, this);
-    registerNativeNotificationTools(server, this);
+  ///
+  /// Every call is recorded to the active session's steps.md through
+  /// [stepLogger] — the one the Flutter lane's `connect` opens a session in,
+  /// so both lanes log into the same run.
+  void registerTools(McpServer server, {StepLogger? stepLogger}) {
+    final loggedServer = LoggedMcpServer(server, stepLogger ?? StepLogger());
+    registerNativeConnectionTools(loggedServer, this);
+    registerNativeInspectionTools(loggedServer, this);
+    registerNativeGestureTools(loggedServer, this);
+    registerNativeTextTools(loggedServer, this);
+    registerNativeKeyboardTools(loggedServer, this);
+    registerNativeScreenshotTools(loggedServer, this);
+    registerNativeNotificationTools(loggedServer, this);
   }
 
   /// Replaces any active session with a new one for [platform].

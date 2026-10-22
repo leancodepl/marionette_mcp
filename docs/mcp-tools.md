@@ -5,7 +5,7 @@ This page moved to the Marionette website:
 - [Drive: every tool](https://marionette.leancode.co/docs/drive#tools)
 - [Start: give your agent the tools](https://marionette.leancode.co/docs#bridge)
 
-The native lane tools are documented here until they move to the website.
+The native lane tools are documented here until they move to the website. Their calls are logged to the session's `steps.md` like the Flutter tools.
 
 ## Native lane
 
@@ -23,5 +23,5 @@ Tools for system / native UI outside the Flutter widget tree (permission dialogs
 | `native_enter_text` | Type `text` into a native field chosen by a selector (`label`, `textContains`, `id`, `type`, optional `index`), or — without a selector — into the field that has keyboard focus. Text is appended; `clear: true` empties the field first; a field that changed before anything was typed is found again once. `label` also matches the first line of a field's label. |
 | `native_press_key` | Press a system / hardware key: `back`, `home`, `enter`, `backspace`, `tab`, `recents`, `volume_up`, `volume_down`. `back`, `recents` and `tab` are Android-only; the iOS Simulator has only `home` of the hardware buttons. |
 | `native_hide_keyboard` | Hide the software keyboard if it is shown and report whether it was. Android presses Back only while the keyboard is shown; iOS uses the keyboard's Done / dismiss key and fails with a hint when there is none; Android fails with a hint when only Gboard's floating toolbar is shown (hardware keyboard attached), because Back would close the screen. |
-| `native_take_screenshot` | Returns a base64 inline PNG of the full device screen via the native session (system UI, WebViews). When `MARIONETTE_SCREENSHOTS_DIR` is set, also saves the PNG to that directory and includes the absolute path alongside the inline image. |
+| `native_take_screenshot` | Returns a base64 inline PNG of the full device screen via the native session (system UI, WebViews). With `inline: false` saves it into the session directory instead and returns its path, like `take_screenshots`. |
 | `native_notifications` | `open` / `close` the notification shade (Android) or Notification Center (iOS, by swipe). Open a notification with `native_tap`. In the iOS Notification Center the first tap on a group of one app's notifications expands it, and a tap on a notification may only slide it aside and show an "Open" button — wait for it (`native_wait_for` `text: "Open"`) and tap it; a collapsed "N Notifications" button must be tapped first. Android heads-up banners are not in the tree — read them with `native_take_screenshot`. Toasts: on older Android (seen on API 28) listed read-only by `native_get_elements` / `native_wait_for` (`android.widget.Toast`, no bounds, cannot be tapped); on recent Android (API 35) not listed, and a tree read waits until the toast is gone. |

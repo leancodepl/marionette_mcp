@@ -4,10 +4,11 @@ import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 
 /// Registers native key and software-keyboard tools.
 void registerNativeKeyboardTools(
-  McpServer server,
+  LoggedMcpServer server,
   NativeServiceContext context,
 ) {
   server

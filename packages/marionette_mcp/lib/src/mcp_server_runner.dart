@@ -19,7 +19,7 @@ Usage:
 6. Use "hot_reload" after making code changes to reload the app without losing state.
 7. Use "hot_restart" to fully restart the app from main() and reset all state — needed for changes a hot reload cannot pick up (e.g. main()/bootstrap edits, global singletons, or state shape). Requires the app to be running via `flutter run`.
 
-Native screenshots: native_take_screenshot returns a base64 inline PNG (default — no file written). When MARIONETTE_SCREENSHOTS_DIR is set, it also saves the PNG to that directory and includes its absolute path alongside the inline image. When a path is returned, show the PNG to the user by embedding it as a markdown image: ![](/absolute/path.png). Do not rely on the inline image payload alone — hosts may hide it from the user.
+Native screenshots: native_take_screenshot returns a base64 inline PNG; pass inline: false to save it into the session directory instead, like take_screenshots. native_* calls are logged to the same session's steps.md.
 
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 
@@ -65,7 +65,7 @@ Future<int> runMcpServer({
   );
 
   vmService.registerTools(server);
-  native.registerTools(server);
+  native.registerTools(server, stepLogger: vmService.stepLogger);
 
   // Both lanes hold connections that keep the process alive: a native
   // session and the VM service WebSocket (without disconnecting it the

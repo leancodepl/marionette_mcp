@@ -63,10 +63,10 @@ void main() {
 
   test('a named session is used and named in the hint', () async {
     final result = await run(
-      ['--native-session', 'pixel', 'native-tap', '--text', 'Allow'],
+      ['--native-device', 'pixel', 'native-tap', '--text', 'Allow'],
     );
 
-    expect(result.err, contains('--native-session pixel native-connect'));
+    expect(result.err, contains('--native-device pixel native-connect'));
   });
 
   test('malformed values are usage errors', () async {

@@ -19,9 +19,9 @@ marionette native-take-screenshot --output ./system.png
 marionette native-disconnect
 ```
 
-`native-connect` starts the device-side server detached from the CLI, so it keeps running between commands, and saves the session in `~/.marionette/native/<name>.json`. Every `native-*` command attaches to it and reuses the WebDriver session — no per-command setup. `native-disconnect` stops the server it started. Use `--native-session <name>` to drive several devices at once (e.g. an Android phone and an iPhone in one script); `native-sessions` lists them. Prefer one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other — the CLI opens a new session for its next command, the MCP server needs `native_connect` again (`native-connect` warns when it reuses another process's server).
+`native-connect` starts the device-side server detached from the CLI, so it keeps running between commands, and saves the session in `~/.marionette/native/<name>.json`. Every `native-*` command attaches to it and reuses the WebDriver session — no per-command setup. `native-disconnect` stops the server it started. Use `--native-device <name>` to drive several devices at once (e.g. an Android phone and an iPhone in one script); `native-sessions` lists them. Prefer one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other — the CLI opens a new session for its next command, the MCP server needs `native_connect` again (`native-connect` warns when it reuses another process's server).
 
-`--native-session <name>` (default `default`) is a global option, given before the command.
+`--native-device <name>` (default `default`) is a global option, given before the command. A `native-*` command logs its step to a session directory's `steps.md` when `--session` or `--session-dir` is given.
 
 | Command | Description |
 | --- | --- |

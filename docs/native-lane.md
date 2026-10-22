@@ -75,37 +75,13 @@ Or copy the build output into `~/.cache/marionette_mcp/wda/` — Marionette scan
 ### MCP and CLI
 
 - **MCP:** `native_connect` with `platform` (`android` / `ios`) and optionally `serial` / `udid`. The server process holds the device-side server until `native_disconnect` or exit.
-- **CLI:** `marionette native-connect --platform android|ios` starts the device-side server **detached** from the CLI, so every later `marionette native-*` command attaches to it and reuses the WebDriver session; `native-disconnect` stops it. `--native-session <name>` drives several devices at once ([CLI guide](./cli.md#native-lane-system-ui)).
+- **CLI:** `marionette native-connect --platform android|ios` starts the device-side server **detached** from the CLI, so every later `marionette native-*` command attaches to it and reuses the WebDriver session; `native-disconnect` stops it. `--native-device <name>` drives several devices at once ([CLI guide](./cli.md#native-lane-system-ui)).
 
 Use one client per Android device at a time: UIAutomator2 has a single session, so an MCP server and a CLI session on the same device take it from each other: the CLI opens a new session for its next command, the MCP server needs `native_connect` again.
 
-### Screenshots
+### Screenshots and session reports
 
-`native_take_screenshot` returns an inline PNG image by default — **no files are written to disk** unless you opt in.
-
-To also save PNG files locally, set `MARIONETTE_SCREENSHOTS_DIR` to an existing or creatable directory path. Files are named with a UTC timestamp and a `native` suffix (e.g. `2026-08-06T09-35-17.281020Z_native.png`). Flutter's `take_screenshots` stores screenshots in the session directory instead (session reports).
-
-```bash
-export MARIONETTE_SCREENSHOTS_DIR="$HOME/marionette-screenshots"
-```
-
-When running the MCP server from an AI tool, set the variable in that tool's MCP config. For Cursor (`.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "marionette": {
-      "command": "marionette_mcp",
-      "args": [],
-      "env": {
-        "MARIONETTE_SCREENSHOTS_DIR": "/path/to/screenshots"
-      }
-    }
-  }
-}
-```
-
-Restart the MCP server after changing the variable so it picks up the new value.
+`native_take_screenshot` returns an inline PNG. With `inline: false` it saves the screenshot into the session directory instead (`screenshots/`), like `take_screenshots`. The session is opened by the Flutter lane's `connect` when the app enables session reports, and `native_*` calls are logged to its `steps.md` too. In the CLI, a `native-*` command logs its step only when `--session` or `--session-dir` is given, since it has no Flutter connection to ask whether reports are enabled.
 
 ## Working with it
 

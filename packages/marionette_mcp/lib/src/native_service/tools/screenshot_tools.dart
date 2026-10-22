@@ -1,12 +1,13 @@
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
-import 'package:marionette_mcp/src/screenshot_saver.dart';
+import 'package:marionette_mcp/src/session/session.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers native screenshot tools.
 void registerNativeScreenshotTools(
-  McpServer server,
+  LoggedMcpServer server,
   NativeServiceContext context,
 ) {
   server.registerTool(
@@ -20,27 +21,56 @@ void registerNativeScreenshotTools(
         'status-bar panels). '
         'Use it when native_get_elements shows WebView or system UI you want '
         'to visually inspect, or when Flutter take_screenshots shows a blank '
-        'platform-view area. By default returns the capture as a base64 '
-        'inline PNG (no file written). When MARIONETTE_SCREENSHOTS_DIR is set, also '
-        'saves the PNG to that directory and includes the absolute path '
-        'alongside the inline image. When a path is returned, embed it as a '
-        'markdown image so the user can see it. '
+        'platform-view area. Returns the capture as a base64 inline PNG; '
+        'with inline: false saves it into the session directory instead and '
+        'returns its path. '
         '$nativeRoutingPreferFlutter '
         'Requires native_connect.',
     annotations: const ToolAnnotations(
       title: 'Native Take Screenshot',
       readOnlyHint: true,
     ),
-    inputSchema: const ToolInputSchema(properties: {}),
-    callback: (args, extra) => handleNativeTakeScreenshot(context),
+    inputSchema: ToolInputSchema(
+      properties: {
+        'inline': JsonSchema.boolean(
+          description: 'If false, saves the screenshot into the session '
+              'directory and returns its path instead of the image data. '
+              'Defaults to true.',
+        ),
+      },
+    ),
+    callback: (args, extra) => handleNativeTakeScreenshot(
+      context,
+      session: server.stepLogger.session,
+      args: args,
+    ),
   );
 }
 
-/// Handles `native_take_screenshot`.
+/// Handles `native_take_screenshot`: returns the capture inline or — when
+/// `args['inline'] == false` — saves it into [session]'s screenshots
+/// directory and returns its path, as `take_screenshots` does.
 Future<CallToolResult> handleNativeTakeScreenshot(
-  NativeServiceContext context,
-) async {
+  NativeServiceContext context, {
+  Session? session,
+  Map<String, dynamic> args = const {},
+}) async {
   final logger = context.logger;
+  final inline = args['inline'] != false;
+  if (!inline && session == null) {
+    return CallToolResult(
+      isError: true,
+      content: [
+        const TextContent(
+          text: 'inline: false requires an active session, which is only '
+              'created once the Flutter connect succeeds and only when the '
+              'app enables session reports '
+              '(MarionetteConfiguration.enableSessionReports).',
+        ),
+      ],
+    );
+  }
+
   logger.info('Taking native screenshot');
   return runTool(logger, 'native take screenshot', () async {
     final pngBase64 = await context.requireConnector().takeScreenshot();
@@ -51,15 +81,14 @@ Future<CallToolResult> handleNativeTakeScreenshot(
         ],
       );
     }
-    final saved = saveScreenshotPng(pngBase64, suffix: 'native');
-    if (saved != null) {
-      logger.info('Saved native screenshot to ${saved.path}');
+    if (inline) {
+      return CallToolResult(
+        content: [ImageContent(data: pngBase64, mimeType: 'image/png')],
+      );
     }
+    final path = session!.saveScreenshots([pngBase64]).single;
     return CallToolResult(
-      content: screenshotToolContent(
-        pngBase64: pngBase64,
-        savedFile: saved,
-      ),
+      content: [TextContent(text: 'Saved 1 screenshot(s):\n$path')],
     );
   });
 }

@@ -31,6 +31,26 @@ const _maxStackFrames = 4;
 /// records what was acted on, not the payload.
 const _selectorArgKeys = ['key', 'identifier', 'text', 'type', 'uri', 'x', 'y'];
 
+/// Extra arg names shown for the native lane's tools (`native_*`) and CLI
+/// commands (`native-*`), which select elements by these fields and name
+/// what they act on with them (`direction`, `action`, `state`, `platform`).
+/// `within` (a container selector) and the typed text of
+/// `native_enter_text` are left out like other payloads.
+const _nativeSelectorArgKeys = [
+  'label',
+  'textContains',
+  'id',
+  'index',
+  'startX',
+  'startY',
+  'endX',
+  'endY',
+  'direction',
+  'action',
+  'state',
+  'platform',
+];
+
 /// Tools whose successful result is a short, synthesized confirmation
 /// message (e.g. "Successfully tapped"), never a dump of application data —
 /// safe to echo verbatim (truncated) in steps.md. Everything else —
@@ -58,6 +78,16 @@ const _shortConfirmationTools = {
   'hot_reload',
   'hot_restart',
   'take_screenshots',
+  'native_connect',
+  'native_disconnect',
+  'native_tap',
+  'native_swipe',
+  'native_scroll',
+  'native_enter_text',
+  'native_press_key',
+  'native_hide_keyboard',
+  'native_notifications',
+  'native_take_screenshot',
 };
 
 /// Tools whose success message is one status line followed by session
@@ -257,9 +287,16 @@ String _redactUrisIn(String text) =>
 /// [StepLogger] (MCP tool calls) and the CLI (command invocations), which
 /// use the same field names.
 String describeStepSelector(String toolName, Map<String, dynamic> args) {
+  final tool = toolName.replaceAll('-', '_');
+  final isNative = tool.startsWith('native_');
+  // native_enter_text's `text` is what gets typed, not a selector.
+  final isNativeEnterText = tool == 'native_enter_text';
   final parts = <String>[
-    for (final key in _selectorArgKeys)
-      if (args[key] != null)
+    for (final key in [
+      ..._selectorArgKeys,
+      if (isNative) ..._nativeSelectorArgKeys,
+    ])
+      if (args[key] != null && !(isNativeEnterText && key == 'text'))
         key == 'uri'
             ? 'uri=${_redactUri(args[key].toString())}'
             : '$key=${_oneLine(args[key].toString())}',
@@ -282,8 +319,14 @@ String describeStepSelector(String toolName, Map<String, dynamic> args) {
   }
   // Matches both the MCP tool name (enter_text) and the CLI command name
   // (enter-text).
-  if (toolName.replaceAll('-', '_') == 'enter_text') {
+  if (tool == 'enter_text') {
     parts.add(_describeEnterTextInput(args));
+  }
+  if (isNativeEnterText) {
+    parts.add(_describeEnterTextInput({
+      'key': args['label'] ?? args['id'] ?? args['textContains'],
+      'input': args['text'],
+    }));
   }
   return parts.join(' ');
 }

@@ -3,6 +3,7 @@ import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 
 /// Actions of `native_notifications`.
 enum NativeNotificationsAction {
@@ -20,7 +21,7 @@ enum NativeNotificationsAction {
 /// Registers `native_notifications`, which opens and closes the system
 /// notification list.
 void registerNativeNotificationTools(
-  McpServer server,
+  LoggedMcpServer server,
   NativeServiceContext context,
 ) {
   server.registerTool(

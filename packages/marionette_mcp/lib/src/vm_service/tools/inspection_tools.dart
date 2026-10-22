@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/session/session.dart';
@@ -8,7 +5,6 @@ import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
-import 'package:path/path.dart' as p;
 
 /// Registers read-only MCP tools that inspect the running app:
 /// `get_interactive_elements`, `get_logs`, `take_screenshots`.
@@ -202,7 +198,7 @@ Future<CallToolResult> takeScreenshots(
     );
   }
 
-  final paths = _saveScreenshots(session.screenshotsDir, screenshots);
+  final paths = session.saveScreenshots(screenshots);
   return CallToolResult(
     content: [
       TextContent(
@@ -210,40 +206,6 @@ Future<CallToolResult> takeScreenshots(
       ),
     ],
   );
-}
-
-/// Saves each base64-encoded PNG in [screenshots] into [screenshotsDir],
-/// numbered sequentially after whatever is already there, and returns the
-/// paths written to.
-List<String> _saveScreenshots(
-  Directory screenshotsDir,
-  List<String> screenshots,
-) {
-  screenshotsDir.createSync(recursive: true);
-  // The next index is one past the highest existing numeric name, not a
-  // count of PNGs present — a gap (e.g. 01.png and 03.png after 02.png was
-  // deleted) would otherwise make a count-based index collide with, and
-  // overwrite, the existing 03.png.
-  final highestExisting = screenshotsDir
-      .listSync()
-      .whereType<File>()
-      .where((f) => p.extension(f.path) == '.png')
-      .map((f) => int.tryParse(p.basenameWithoutExtension(f.path)))
-      .whereType<int>()
-      .fold(0, (highest, n) => n > highest ? n : highest);
-  var nextIndex = highestExisting + 1;
-
-  final paths = <String>[];
-  for (final screenshot in screenshots) {
-    final path = p.join(
-      screenshotsDir.path,
-      '${nextIndex.toString().padLeft(2, '0')}.png',
-    );
-    File(path).writeAsBytesSync(base64Decode(screenshot));
-    paths.add(path);
-    nextIndex++;
-  }
-  return paths;
 }
 
 /// `ancestor_keys` as worded for `get_interactive_elements`, which lists a

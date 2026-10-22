@@ -7,10 +7,11 @@ import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 
 /// Registers native text-entry tools.
 void registerNativeTextTools(
-  McpServer server,
+  LoggedMcpServer server,
   NativeServiceContext context,
 ) {
   server.registerTool(

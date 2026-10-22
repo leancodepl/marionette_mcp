@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
@@ -10,6 +11,7 @@ import 'package:marionette_mcp/src/native_service/tools/keyboard_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/text_tools.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+import 'package:marionette_mcp/src/session/session.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
 
@@ -839,6 +841,35 @@ void main() {
           _contextWith(FakeNativeConnector(screenshot: '')),
         ),
         _isToolSuccess('Native screenshot was empty'),
+      );
+    });
+
+    test('inline: false saves into the session directory', () async {
+      final dir = Directory.systemTemp.createTempSync('native_shot_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final session = Session.open(Directory('${dir.path}/run'));
+
+      final result = await handleNativeTakeScreenshot(
+        _contextWith(FakeNativeConnector(screenshot: 'cG5n')),
+        session: session,
+        args: {'inline': false},
+      );
+
+      expect(result.content.whereType<ImageContent>(), isEmpty);
+      final saved = File('${session.screenshotsDir.path}/01.png');
+      expect(saved.readAsBytesSync(), utf8.encode('png'));
+      expect(result, _isToolSuccess(contains(saved.path)));
+    });
+
+    test('inline: false without a session is an error', () async {
+      final connector = FakeNativeConnector(screenshot: 'cG5n');
+
+      expect(
+        await handleNativeTakeScreenshot(
+          _contextWith(connector),
+          args: {'inline': false},
+        ),
+        _isToolError(contains('requires an active session')),
       );
     });
   });

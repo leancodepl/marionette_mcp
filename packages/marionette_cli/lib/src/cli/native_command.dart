@@ -10,14 +10,17 @@ import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
+import 'package:marionette_mcp/src/session/session.dart';
+import 'package:marionette_mcp/src/session/session_manager.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
-/// Name of the native session used when `--native-session` is not given.
+/// Name of the native session used when `--native-device` is not given.
 const defaultNativeSession = 'default';
 
-/// Reads the `--native-session` global option.
+/// Reads the `--native-device` global option.
 String nativeSessionName(ArgResults? globalResults) {
-  final raw = globalResults?['native-session'] as String?;
+  final raw = globalResults?['native-device'] as String?;
   return (raw != null && raw.isNotEmpty) ? raw : defaultNativeSession;
 }
 
@@ -55,7 +58,7 @@ abstract class NativeCommand extends Command<int> {
     if (info == null) {
       stderr.writeln(
         'No native session "$name". Start one with: marionette '
-        '${name == defaultNativeSession ? '' : '--native-session $name '}'
+        '${name == defaultNativeSession ? '' : '--native-device $name '}'
         'native-connect --platform android|ios',
       );
       return 1;
@@ -86,8 +89,20 @@ abstract class NativeCommand extends Command<int> {
     final context = NativeServiceContext()
       ..connector = connector
       ..platform = platform;
+    final session = _openReportSession();
     try {
-      final result = await execute(context, args);
+      final CallToolResult result;
+      try {
+        result = await execute(context, args);
+      } catch (e) {
+        _logStep(session, args, describeStepError('$e'));
+        rethrow;
+      }
+      _logStep(
+        session,
+        args,
+        result.isError ? describeStepError(_firstText(result)) : 'ok',
+      );
       return await _print(result);
     } finally {
       info.sessionId = connector.sessionId;
@@ -95,6 +110,41 @@ abstract class NativeCommand extends Command<int> {
       connector.release();
     }
   }
+
+  /// The CLI cannot ask the app whether it enables session reports (a
+  /// native command has no Flutter connection), so a native command logs its
+  /// step only when `--session` or `--session-dir` asks for a report
+  /// directory. Best-effort, like the Flutter commands' logging.
+  Session? _openReportSession() {
+    final title = globalResults?['session'] as String?;
+    final baseDir = globalResults?['session-dir'] as String?;
+    if (title == null && baseDir == null) return null;
+    try {
+      return SessionManager().create(title: title, baseDirOverride: baseDir);
+    } catch (e) {
+      stderr.writeln(
+        'Warning: could not open a session directory, so this run will not '
+        'be logged: $e',
+      );
+      return null;
+    }
+  }
+
+  void _logStep(Session? session, Map<String, dynamic> args, String outcome) {
+    if (session == null) return;
+    final line =
+        formatStepLine(name, describeStepSelector(name, args), outcome);
+    try {
+      session.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
+    } on FileSystemException catch (e) {
+      stderr.writeln('Warning: could not write to steps.md: $e');
+    }
+  }
+
+  static String _firstText(CallToolResult result) => result.content
+      .whereType<TextContent>()
+      .map((c) => c.text)
+      .firstWhere((t) => t.isNotEmpty, orElse: () => '');
 
   Future<int> _print(CallToolResult result) async {
     final isError = result.isError;
