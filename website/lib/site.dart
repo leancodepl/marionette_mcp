@@ -1,6 +1,8 @@
 /// Site-wide constants: where the site lives and where it links to.
 library;
 
+import 'package:jaspr/jaspr.dart' show kReleaseMode;
+
 const productionUrl = 'https://marionette.leancode.co';
 
 /// Public URL of the deployed site. Preview deployments override it with
@@ -8,8 +10,9 @@ const productionUrl = 'https://marionette.leancode.co';
 const siteUrl = String.fromEnvironment('SITE_URL', defaultValue: productionUrl);
 
 /// Whether this build is the live site. Previews and local builds load no
-/// analytics, so they never count as visits.
-const isProduction = siteUrl == productionUrl;
+/// analytics, so they never count as visits. `jaspr serve` defaults to the
+/// production URL too, so only `jaspr build`, a release build, counts.
+const isProduction = kReleaseMode && siteUrl == productionUrl;
 
 /// [siteUrl] with a guaranteed trailing slash, for canonical and Open Graph
 /// URLs.

@@ -29,8 +29,9 @@ change nothing in `website/` or the package version.
 sends.
 
 Production pages load LeanCode's CookieScript consent banner and Google Tag
-Manager container (`lib/tracking.dart`), first in `<head>`. Deploy Previews and
-local builds load neither, so they never count as visits.
+Manager container (`lib/tracking.dart`), first in `<head>`. Deploy Previews,
+`jaspr serve` and builds with any other `SITE_URL` load neither, so they never
+count as visits.
 
 ## Layout
 
