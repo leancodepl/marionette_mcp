@@ -433,9 +433,15 @@ from each other. Call `native_disconnect` when you're done.
   rather than guessing. A disabled element (`enabled: false`) is refused,
   not touched: on iOS the app's elements stay listed, disabled, under a
   system sheet — act on the sheet first.
-- **Coordinates** (`x`/`y`, `bounds`, swipe points) are screenshot pixels on
+- **Coordinates** (`x`/`y`, `bounds`, swipe points) are screen pixels on
   every platform. Never reuse Flutter coordinates in the native lane or the
-  other way round.
+  other way round. `native_take_screenshot` fits the image in 2000×2000
+  like `take_screenshots`; when it shrinks it, the result gives the factor —
+  multiply a point read off the image by it to get native `x`/`y`.
+- **Read before you look.** `native_get_elements` costs a few hundred
+  tokens on a typical system screen; a screenshot costs about 1.5k. Take one
+  only for what the tree doesn't show (heads-up banners, toasts, a camera
+  preview), and with `inline: false` for evidence.
 - **Wait, don't sleep.** `native_wait_for` (state `visible` or `gone`, hard
   `timeoutMs`) for a dialog, the next screen or a disappearing toast. Wait
   for an element you expect on that screen, not for a package name.

@@ -354,7 +354,7 @@ class WebDriverClient {
   }
 
   /// Returns WDA's `GET /session/{id}/wda/screen`: screen size in points and
-  /// the display scale (screenshot pixels per point).
+  /// the display scale (screen pixels per point).
   Future<({int width, int height, double scale})> wdaScreen(
     String sessionId,
   ) async {

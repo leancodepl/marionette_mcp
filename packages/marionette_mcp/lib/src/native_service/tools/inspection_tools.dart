@@ -46,8 +46,8 @@ void registerNativeInspectionTools(
       'native_get_elements',
       description: 'Returns the native UI hierarchy as JSON: '
           '{ elements: [...], foregroundApp: string? }. '
-          'Each element has type, optional text/id, bounds in screenshot '
-          'pixels (the pixel grid of native_take_screenshot), and clickable; '
+          'Each element has type, optional text/id, bounds in screen pixels '
+          '(the units native x/y take), and clickable; '
           'state is included only when it carries information: value (typed '
           'content of a field — on iOS the only place a Flutter field shows '
           'it), enabled: false, focused: true (Android only), checked '

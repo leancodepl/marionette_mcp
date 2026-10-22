@@ -8,7 +8,7 @@ Each fixture is a pair:
 
 - `<name>.xml` — raw page source from UIAutomator2 / WebDriverAgent, in the
   server's own units (pixels on Android, points on iOS);
-- `<name>.json` — screen size in screenshot pixels, scale, foreground app and
+- `<name>.json` — screen size in screen pixels, scale, foreground app and
   OS version at capture time.
 
 ## Capturing a fixture

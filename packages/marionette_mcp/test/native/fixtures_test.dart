@@ -8,7 +8,7 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:test/test.dart';
 
-/// A captured fixture: elements in screenshot pixels plus metadata.
+/// A captured fixture: elements in screen pixels plus metadata.
 final class Fixture {
   Fixture(this.platform, this.name) {
     final base = 'test/native/fixtures/$platform/$name';
@@ -141,7 +141,7 @@ void main() {
     });
   });
 
-  group('iOS 26.4 fixtures (points converted to screenshot pixels)', () {
+  group('iOS 26.4 fixtures (points converted to screen pixels)', () {
     test('the application spans exactly the screenshot', () {
       for (final name in [
         'ios26_home',

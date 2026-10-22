@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:image/image.dart' as img;
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
@@ -842,6 +843,21 @@ void main() {
         ),
         _isToolSuccess('Native screenshot was empty'),
       );
+    });
+
+    test('fits a large capture in 2000x2000 and gives the factor', () async {
+      final png = base64Encode(
+        img.encodePng(img.Image(width: 1320, height: 2868)),
+      );
+
+      final result = await handleNativeTakeScreenshot(
+        _contextWith(FakeNativeConnector(screenshot: png)),
+      );
+
+      final image = result.content.whereType<ImageContent>().single;
+      final decoded = img.decodePng(base64Decode(image.data))!;
+      expect((decoded.width, decoded.height), (920, 2000));
+      expect(result, _isToolSuccess(contains('multiply image coordinates')));
     });
 
     test('inline: false saves into the session directory', () async {

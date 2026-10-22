@@ -99,14 +99,14 @@ enum SwipeDirection {
   }
 }
 
-/// JSON schema properties for an x/y point in screenshot pixels.
+/// JSON schema properties for an x/y point in screen pixels.
 Map<String, JsonSchema> _pointProperties(String purpose) => {
       'x': JsonSchema.number(
-        description: 'X coordinate $purpose in screenshot pixels. Must be '
+        description: 'X coordinate $purpose in screen pixels. Must be '
             'paired with y. Do not use Flutter logical coordinates.',
       ),
       'y': JsonSchema.number(
-        description: 'Y coordinate $purpose in screenshot pixels. Must be '
+        description: 'Y coordinate $purpose in screen pixels. Must be '
             'paired with x.',
       ),
     };
@@ -122,9 +122,9 @@ void registerNativeGestureTools(
       description:
           'Taps a native / system control, chosen by a selector (text, '
           'textContains, id, type, optional index — values from '
-          'native_get_elements) or by x+y coordinates in screenshot pixels '
-          '(the pixel grid of native_take_screenshot and of the bounds in '
-          'native_get_elements). Use either a selector or x+y, not both. '
+          'native_get_elements) or by x+y coordinates in screen pixels '
+          '(the units of the bounds in native_get_elements; a point read off '
+          'native_take_screenshot needs the factor it reports). Use either a selector or x+y, not both. '
           '$nativeSelectorRules '
           '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
@@ -140,7 +140,7 @@ void registerNativeGestureTools(
     ..registerTool(
       'native_swipe',
       description: 'Swipes one finger from (startX, startY) to (endX, endY) in '
-          'screenshot pixels over durationMs (default '
+          'screen pixels over durationMs (default '
           '$_defaultSwipeDurationMs). Use for drags, sliders, and edge '
           'gestures (e.g. iOS back: start at x=1). For scrolling until '
           'something appears, use native_scroll. '
@@ -171,7 +171,7 @@ void registerNativeGestureTools(
           'see content below). Swipes from screen center by default; within '
           '(a selector of a scrollable container, e.g. a horizontal list) '
           'swipes inside that container instead; startX/startY set the '
-          'finger start explicitly (screenshot pixels). Optional distance '
+          'finger start explicitly (screen pixels). Optional distance '
           'defaults to $_defaultSwipeDistance; within a container 80% of it '
           '(also the maximum), 60% while searching. Searching swipes are '
           'slow drags so the list does not fling past the target. '
@@ -200,15 +200,15 @@ void registerNativeGestureTools(
                 '(default $_defaultMaxSwipes, max $_maxMaxSwipes).',
           ),
           'distance': JsonSchema.number(
-            description: 'Swipe distance in screenshot pixels '
+            description: 'Swipe distance in screen pixels '
                 '(default: $_defaultSwipeDistance).',
           ),
           'startX': JsonSchema.number(
-            description: 'Optional finger start X in screenshot pixels. '
+            description: 'Optional finger start X in screen pixels. '
                 'Requires startY. Default: screen center. Not with within.',
           ),
           'startY': JsonSchema.number(
-            description: 'Optional finger start Y in screenshot pixels. '
+            description: 'Optional finger start Y in screen pixels. '
                 'Requires startX.',
           ),
         },

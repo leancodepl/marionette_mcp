@@ -579,7 +579,7 @@ void main() {
       final connector = await connect();
       addTearDown(connector.dispose);
 
-      // Bounds are screenshot pixels; the center (60, 36) is sent to WDA in
+      // Bounds are screen pixels; the center (60, 36) is sent to WDA in
       // points.
       await connector.tapElement(
         nativeElement(text: 'OK', x: 12, y: 12, width: 96, height: 48),
@@ -592,7 +592,7 @@ void main() {
       );
     });
 
-    test('reports element bounds in screenshot pixels', () async {
+    test('reports element bounds in screen pixels', () async {
       server.onValue(
         'GET',
         '/session/sess-1/source',
@@ -614,7 +614,7 @@ void main() {
       });
     });
 
-    test('swipe and tapAt convert screenshot pixels to points', () async {
+    test('swipe and tapAt convert screen pixels to points', () async {
       server.onValue('POST', '/session/sess-1/actions', null);
       final connector = await connect();
       addTearDown(connector.dispose);
@@ -630,7 +630,7 @@ void main() {
       expect((swipe[2] as Map)['y'], 100);
     });
 
-    test('getScreen reports the screen in screenshot pixels', () async {
+    test('getScreen reports the screen in screen pixels', () async {
       final connector = await connect();
       addTearDown(connector.dispose);
 

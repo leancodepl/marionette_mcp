@@ -7,8 +7,8 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// Adds `--x` / `--y` for gestures at a point instead of an element.
 void _addPointOptions(NativeCommand command) {
   command.argParser
-    ..addOption('x', help: 'X in screenshot pixels (with --y).')
-    ..addOption('y', help: 'Y in screenshot pixels (with --x).');
+    ..addOption('x', help: 'X in screen pixels (with --y).')
+    ..addOption('y', help: 'Y in screen pixels (with --x).');
 }
 
 class NativeTapCommand extends NativeCommand {
@@ -47,7 +47,7 @@ class NativeSwipeCommand extends NativeCommand {
     for (final option in ['start-x', 'start-y', 'end-x', 'end-y']) {
       argParser.addOption(
         option,
-        help: 'In screenshot pixels.',
+        help: 'In screen pixels.',
         mandatory: true,
       );
     }
@@ -105,7 +105,7 @@ class NativeScrollCommand extends NativeCommand {
         help: 'Container to swipe in: index among matches.',
       )
       ..addOption('max-swipes', help: 'Search limit (default 10).')
-      ..addOption('distance', help: 'Swipe length in screenshot pixels.')
+      ..addOption('distance', help: 'Swipe length in screen pixels.')
       ..addOption('start-x', help: 'Swipe start (with --start-y).')
       ..addOption('start-y', help: 'Swipe start (with --start-x).');
   }

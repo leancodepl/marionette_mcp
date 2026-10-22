@@ -12,7 +12,7 @@ import 'package:marionette_mcp/src/native_service/xpath.dart';
 /// session, and obtain a ready connector.
 ///
 /// WebDriverAgent reports and accepts coordinates in points; this connector
-/// converts them to screenshot pixels with the display scale read at
+/// converts them to screen pixels with the display scale read at
 /// connect time.
 final class IosNativeConnector extends WebDriverNativeConnector {
   IosNativeConnector._({
@@ -26,7 +26,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   @override
   NativeDevice get device => const IosNativeDevice();
 
-  /// Screenshot pixels per point; read by [_loadScale] during [connect].
+  /// Screen pixels per point; read by [_loadScale] during [connect].
   double _scale = 1;
 
   @override
@@ -350,7 +350,7 @@ bool _looksLikeBundleIdentifier(String value) =>
 
 /// XPath selecting the WDA element of [element]'s type at exactly its bounds,
 /// converted to server units with [toServerUnits] (WDA reports integer
-/// points, so the conversion back from screenshot pixels is exact).
+/// points, so the conversion back from screen pixels is exact).
 String wdaGeometryXPath(
     NativeElement element, int Function(int) toServerUnits) {
   final bounds = element.bounds;

@@ -12,8 +12,9 @@ import 'package:marionette_mcp/src/native_service/native_key.dart';
 export 'package:marionette_mcp/src/native_service/native_device.dart';
 export 'package:marionette_mcp/src/native_service/native_key.dart';
 
-/// Rectangle in **screenshot pixels**: the pixel grid of the image returned
-/// by `native_take_screenshot`, on every platform.
+/// Rectangle in **screen pixels**: the device screen's own pixels, on every
+/// platform. `native_take_screenshot` may return a smaller image and then
+/// reports the factor between the two.
 ///
 /// Servers that work in other units (WebDriverAgent uses points) are
 /// converted by the connector. This
@@ -52,8 +53,8 @@ class NativeBounds {
       };
 }
 
-/// Size of the device screen in screenshot pixels, plus how many
-/// screenshot pixels make up one server unit ([scale]; 1 on Android, the
+/// Size of the device screen in screen pixels, plus how many
+/// screen pixels make up one server unit ([scale]; 1 on Android, the
 /// display scale such as 3 on iOS, where WebDriverAgent works in points).
 class NativeScreen {
   const NativeScreen({
@@ -106,7 +107,7 @@ class NativeElement {
   /// Whether the platform reports the element as tappable.
   final bool clickable;
 
-  /// On-screen rectangle in screenshot pixels.
+  /// On-screen rectangle in screen pixels.
   final NativeBounds bounds;
 
   /// Content of an editable field (what was typed), when it differs from a
@@ -166,7 +167,7 @@ class NativeElement {
   /// Whether reading tools list the element: visible ones and toasts.
   bool get isListed => isVisible || isToast;
 
-  /// Center of [bounds] in screenshot pixels — the natural tap target.
+  /// Center of [bounds] in screen pixels — the natural tap target.
   ({int x, int y}) get center => (
         x: bounds.x + bounds.width ~/ 2,
         y: bounds.y + bounds.height ~/ 2,
@@ -217,7 +218,7 @@ abstract interface class SharedServerBootstrap
 ///
 /// Implementations own the underlying WebDriver session and any device-side
 /// processes; [dispose] must release both. All coordinates, in and out, are
-/// screenshot pixels (see [NativeBounds]).
+/// screen pixels (see [NativeBounds]).
 abstract class NativeConnector {
   /// Returns the interactive/labelled elements currently on screen,
   /// spanning the whole device UI (system dialogs included), not just the
@@ -236,7 +237,7 @@ abstract class NativeConnector {
   /// Taps [element], typically at its [NativeElement.center].
   Future<void> tapElement(NativeElement element);
 
-  /// Taps at ([x], [y]) in screenshot pixels.
+  /// Taps at ([x], [y]) in screen pixels.
   Future<void> tapAt(int x, int y);
 
   /// Focuses [element] and types [text] into it; [clear] empties the field
@@ -285,7 +286,7 @@ abstract class NativeConnector {
   /// not just the Flutter view hierarchy.
   Future<String> takeScreenshot();
 
-  /// Current screen size in screenshot pixels and the server-unit scale.
+  /// Current screen size in screen pixels and the server-unit scale.
   Future<NativeScreen> getScreen();
 
   /// Operations on the device that do not use the UI session (the

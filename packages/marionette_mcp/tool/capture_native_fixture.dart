@@ -7,7 +7,7 @@
 //     --platform ios --udid <UDID> --name ios26_native_controls
 //
 // Writes test/native/fixtures/<platform>/<name>.xml (raw page source, server
-// units) and <name>.json (screen in screenshot pixels, scale, foreground
+// units) and <name>.json (screen in screen pixels, scale, foreground
 // app, OS version). Navigate the app to the screen first. Fixtures are
 // committed, so check them for personal data before adding them.
 import 'dart:convert';

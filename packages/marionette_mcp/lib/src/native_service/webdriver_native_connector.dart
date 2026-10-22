@@ -11,7 +11,7 @@ import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 /// protocol differs per platform ([tapElement], [enterText],
 /// [foregroundApp]).
 ///
-/// Coordinates crossing this class are screenshot pixels; the server may
+/// Coordinates crossing this class are screen pixels; the server may
 /// work in other units. [serverUnitScale] converts between the two: element
 /// bounds from the server are multiplied by it, coordinates sent to the
 /// server divided by it.
@@ -89,10 +89,10 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   /// in server units.
   List<NativeElement> parseSource(String xml);
 
-  /// Screenshot pixels per server unit: 1 when the server works in pixels.
+  /// Screen pixels per server unit: 1 when the server works in pixels.
   double get serverUnitScale => 1;
 
-  /// Converts a coordinate in screenshot pixels to server units.
+  /// Converts a coordinate in screen pixels to server units.
   int toServerUnits(int pixels) =>
       serverUnitScale == 1 ? pixels : (pixels / serverUnitScale).round();
 

@@ -1,4 +1,5 @@
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/screenshot_scaling.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
@@ -21,9 +22,11 @@ void registerNativeScreenshotTools(
         'status-bar panels). '
         'Use it when native_get_elements shows WebView or system UI you want '
         'to visually inspect, or when Flutter take_screenshots shows a blank '
-        'platform-view area. Returns the capture as a base64 inline PNG; '
-        'with inline: false saves it into the session directory instead and '
-        'returns its path. '
+        'platform-view area. Returns the capture as a base64 inline PNG, '
+        'downscaled to fit 2000x2000 like take_screenshots; then the result '
+        'says by how much, so a point read off the image can be turned into '
+        'native x/y. With inline: false saves it into the session directory '
+        'instead and returns its path. '
         '$nativeRoutingPreferFlutter '
         'Requires native_connect.',
     annotations: const ToolAnnotations(
@@ -47,9 +50,11 @@ void registerNativeScreenshotTools(
   );
 }
 
-/// Handles `native_take_screenshot`: returns the capture inline or — when
-/// `args['inline'] == false` — saves it into [session]'s screenshots
-/// directory and returns its path, as `take_screenshots` does.
+/// Handles `native_take_screenshot`: downscales the capture like
+/// `take_screenshots` (see [scaleScreenshot]) and returns it inline or —
+/// when `args['inline'] == false` — saves it into [session]'s screenshots
+/// directory and returns its path. A downscaled capture comes with a note on
+/// how image coordinates map to native x/y.
 Future<CallToolResult> handleNativeTakeScreenshot(
   NativeServiceContext context, {
   Session? session,
@@ -73,22 +78,33 @@ Future<CallToolResult> handleNativeTakeScreenshot(
 
   logger.info('Taking native screenshot');
   return runTool(logger, 'native take screenshot', () async {
-    final pngBase64 = await context.requireConnector().takeScreenshot();
-    if (pngBase64.isEmpty) {
+    final captured = await context.requireConnector().takeScreenshot();
+    if (captured.isEmpty) {
       return CallToolResult(
         content: [
           const TextContent(text: 'Native screenshot was empty'),
         ],
       );
     }
+    // A capture that cannot be decoded is passed on unchanged.
+    final scaled = scaleScreenshot(captured);
+    final pngBase64 = scaled?.pngBase64 ?? captured;
+    final note = scaled?.note;
     if (inline) {
       return CallToolResult(
-        content: [ImageContent(data: pngBase64, mimeType: 'image/png')],
+        content: [
+          ImageContent(data: pngBase64, mimeType: 'image/png'),
+          if (note != null) TextContent(text: note),
+        ],
       );
     }
     final path = session!.saveScreenshots([pngBase64]).single;
     return CallToolResult(
-      content: [TextContent(text: 'Saved 1 screenshot(s):\n$path')],
+      content: [
+        TextContent(
+          text: 'Saved 1 screenshot(s):\n$path${note == null ? '' : '\n$note'}',
+        ),
+      ],
     );
   });
 }

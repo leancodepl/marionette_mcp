@@ -604,8 +604,10 @@ accessibility identifier), `--type`, `--index`. All given options must
 match. If several elements match and only one is tappable, that one is
 used; otherwise the command fails and lists the candidates — add --index
 or a more specific option. Coordinates (--x/--y, --start-x …) are
-screenshot pixels, the pixel grid of native-take-screenshot, on both
-platforms — never Flutter logical pixels.
+screen pixels, the units of bounds in native-get-elements, on both
+platforms — never Flutter logical pixels. native-take-screenshot fits the
+image in 2000x2000 and then prints the factor that turns image
+coordinates into screen pixels.
 
 ### Session commands
 
@@ -622,7 +624,7 @@ platforms — never Flutter logical pixels.
   native-get-elements [selector without --index] [--clickable-only]
                       [--no-include-foreground-app]
       JSON {"elements": [...], "foregroundApp": "..."}; each element has
-      type, text, id, bounds {x, y, width, height} (screenshot pixels),
+      type, text, id, bounds {x, y, width, height} (screen pixels),
       clickable, and state when informative: value (typed content),
       enabled, focused, checked, selected, scrollable.
   native-wait-for [selector without --index] [--state visible|gone]
