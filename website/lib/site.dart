@@ -9,9 +9,10 @@ const productionUrl = 'https://marionette.leancode.co';
 /// `--dart-define=SITE_URL=https://…` at build time.
 const siteUrl = String.fromEnvironment('SITE_URL', defaultValue: productionUrl);
 
-/// Whether this build is the live site. Previews and local builds load no
-/// analytics, so they never count as visits. `jaspr serve` defaults to the
-/// production URL too, so only `jaspr build`, a release build, counts.
+/// Whether this build is the live site: a release build (`jaspr build`, or
+/// `jaspr serve --release`) for the production URL. Previews, other
+/// `SITE_URL`s and plain `jaspr serve` load no analytics, so they never count
+/// as visits.
 const isProduction = kReleaseMode && siteUrl == productionUrl;
 
 /// [siteUrl] with a guaranteed trailing slash, for canonical and Open Graph
