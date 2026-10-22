@@ -26,6 +26,10 @@ final class VmServiceContext {
   final SessionManager _sessionManager;
   final StepLogger _stepLogger;
 
+  /// Records tool calls into the session `connect` opens; shared with the
+  /// native lane so its calls land in the same steps.md.
+  StepLogger get stepLogger => _stepLogger;
+
   /// Owns the registry of dynamic extension tools across the lifetime of
   /// this context. Reused across connect/disconnect cycles so a previously
   /// disabled tool can be revived in place — see [DynamicExtensionTools].

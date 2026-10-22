@@ -7,19 +7,37 @@ import 'screens/dismissible_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/items_screen.dart';
 import 'screens/mouse_tap_screen.dart';
-import 'screens/notifications_screen.dart';
 import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/scoped_matching_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/testing/native_dialogs_screen.dart';
+import 'screens/testing/native_screen_screen.dart';
+import 'screens/testing/notifications_screen.dart';
+import 'screens/testing/native_controls_platform_view_screen.dart';
+import 'screens/testing/keyboard_screen.dart';
+import 'screens/testing/permission_dialogs_screen.dart';
+import 'screens/testing/pickers_and_sheets_screen.dart';
+import 'screens/testing/platform_views_screen.dart';
+import 'screens/testing/testing_screen.dart';
+import 'screens/webview_screen.dart';
 
 /// Page name → route path mapping used by the custom VM service extension.
 const availablePages = <String, String>{
   'home': '/',
   'profile': '/profile',
+  'testing': '/testing',
+  'webview': '/testing/webview',
+  'platform_views': '/testing/platform-views',
+  'native_controls_platform_view': '/testing/platform-views/native-controls',
+  'permission_dialogs': '/testing/permission-dialogs',
+  'pickers_and_sheets': '/testing/pickers-and-sheets',
+  'keyboard': '/testing/keyboard',
+  'native_dialogs': '/testing/native-dialogs',
+  'native_screen': '/testing/native-screen',
+  'notifications': '/testing/notifications',
   'settings': '/settings',
-  'notifications': '/settings/notifications',
   'items': '/settings/items',
   'about': '/settings/about',
   'page_view': '/settings/page-view',
@@ -42,16 +60,57 @@ final router = GoRouter(
           builder: (context, state) => const ProfileScreen(),
         ),
         GoRoute(
+          path: '/testing',
+          builder: (context, state) => const TestingScreen(),
+          routes: [
+            GoRoute(
+              path: 'webview',
+              builder: (context, state) => const WebViewScreen(),
+            ),
+            GoRoute(
+              path: 'platform-views',
+              builder: (context, state) => const PlatformViewsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'native-controls',
+                  builder: (context, state) =>
+                      const NativeControlsPlatformViewScreen(),
+                ),
+              ],
+            ),
+            GoRoute(
+              path: 'permission-dialogs',
+              builder: (context, state) => const PermissionDialogsScreen(),
+            ),
+            GoRoute(
+              path: 'pickers-and-sheets',
+              builder: (context, state) => const PickersAndSheetsScreen(),
+            ),
+            GoRoute(
+              path: 'keyboard',
+              builder: (context, state) => const KeyboardScreen(),
+            ),
+            GoRoute(
+              path: 'native-dialogs',
+              builder: (context, state) => const NativeDialogsScreen(),
+            ),
+            GoRoute(
+              path: 'native-screen',
+              builder: (context, state) => const NativeScreenScreen(),
+            ),
+            GoRoute(
+              path: 'notifications',
+              builder: (context, state) => const NotificationsScreen(),
+            ),
+          ],
+        ),
+        GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
           routes: [
             GoRoute(
               path: 'items',
               builder: (context, state) => const ItemsScreen(),
-            ),
-            GoRoute(
-              path: 'notifications',
-              builder: (context, state) => const NotificationsScreen(),
             ),
             GoRoute(
               path: 'page-view',
@@ -113,6 +172,11 @@ class ScaffoldWithNav extends StatelessWidget {
             label: 'Profile',
           ),
           NavigationDestination(
+            icon: Icon(Icons.science_outlined),
+            selectedIcon: Icon(Icons.science),
+            label: 'Testing',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
@@ -124,7 +188,8 @@ class ScaffoldWithNav extends StatelessWidget {
 
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    if (location.startsWith('/settings')) return 2;
+    if (location.startsWith('/settings')) return 3;
+    if (location.startsWith('/testing')) return 2;
     if (location.startsWith('/profile')) return 1;
     return 0;
   }
@@ -136,6 +201,8 @@ class ScaffoldWithNav extends StatelessWidget {
       case 1:
         context.go('/profile');
       case 2:
+        context.go('/testing');
+      case 3:
         context.go('/settings');
     }
   }

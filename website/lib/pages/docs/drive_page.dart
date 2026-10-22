@@ -312,6 +312,10 @@ class DrivePage extends StatelessComponent {
               ],
             ),
             Callout(
+              'The `native_*` tools for system UI are listed on the '
+              '[Native lane](/docs/native#tools) page.',
+            ),
+            Callout(
               '`press_key` reaches shortcuts, focus and submit on every '
               'platform, but editing inside a text field with keys works on '
               'desktop and web only. On iOS and Android the keyboard owns the '

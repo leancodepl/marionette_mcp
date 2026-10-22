@@ -64,6 +64,8 @@ With `MarionetteConfiguration(enableSessionReports: true)`, every run leaves a f
 
 The `marionette` CLI drives the app with the same actions as shell commands: see [Drive](https://marionette.leancode.co/docs/drive#cli).
 
+For UI **outside** the Flutter widget tree (system permission dialogs, OS sheets, webviews), use the native lane: `native_connect` with `platform` `android` | `ios`, then `native_get_elements` / `native_tap` / etc. Prefer Flutter tools when the target is an in-app widget. The CLI has the same native lane as `native-*` commands (`marionette native-connect --platform android`, `marionette native-tap --text Allow`). Setup (adb, a WebDriverAgent build), the CLI and the workflow: [Native lane](https://marionette.leancode.co/docs/native).
+
 ## Agent Skill
 
 `marionette_flutter` ships an [Agent Skill](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette-flutter-drive-app/SKILL.md) that teaches an agent to set up an app for Marionette, drive it and write the report:
@@ -82,6 +84,7 @@ npx skills add leancodepl/marionette_mcp # without the Dart toolchain
 | [Configure](https://marionette.leancode.co/docs/configure) | Custom design systems, Semantics, logs, device config, custom extensions |
 | [Drive](https://marionette.leancode.co/docs/drive) | Prompts for common jobs, every tool with its CLI command, the CLI |
 | [Reports](https://marionette.leancode.co/docs/reports) | Session folders, `steps.md`, `report.md`, the verdict |
+| [Native lane](https://marionette.leancode.co/docs/native) | **System UI outside Flutter: dialogs, pickers, notifications, WebViews — setup, workflow, what each lane sees.** |
 
 ## Packages
 

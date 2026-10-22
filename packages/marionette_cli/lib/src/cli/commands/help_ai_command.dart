@@ -51,6 +51,9 @@ gets its own fresh session directory, appending one line to its steps.md (see
       --uri <ws-uri>       VM service WebSocket URI — bypasses registry,
                            mutually exclusive with --instance
       --timeout <seconds>  Connection timeout (default: 5)
+      --native-device <name>
+                           Device connection (from native-connect) for
+                           native-* commands (default: "default")
       --session <title>    Session title for this command's directory
                            (.marionette/sessions/<title>-<timestamp>/).
                            Keep it under ~60 characters — longer is
@@ -59,6 +62,8 @@ gets its own fresh session directory, appending one line to its steps.md (see
       --session-dir <path> Base directory .marionette/sessions/ is created
                            under (default: current directory, or
                            $MARIONETTE_SESSION_DIR if set)
+                           native-* commands log a step only when
+                           --session or --session-dir is given
 
 ## Commands
 
@@ -323,6 +328,8 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
                           Repeat it, outermost first, to go deeper
     --direction <dir>     left, right, up, or down (required for this mode)
     --distance <number>   Swipe distance in pixels (default: 200)
+    --start-x <number>    Optional finger start X (requires --start-y)
+    --start-y <number>    Optional finger start Y (requires --start-x)
 
   Coordinate-based options (all required together):
     --start-x <number>    Start X coordinate
@@ -333,6 +340,7 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
   Examples:
     marionette -i my-app swipe --type PageView --direction left
     marionette -i my-app swipe --key carousel --direction right --distance 300
+    marionette -i my-app swipe --text Notes --direction up --start-x 200 --start-y 800
     marionette -i my-app swipe --start-x 300 --start-y 400 --end-x 50 --end-y 400
 
   Output (stdout):
@@ -560,6 +568,134 @@ Run the Marionette MCP server (preserves original marionette_mcp behavior).
 
 ---
 
+## Native lane (system UI outside Flutter)
+
+Flutter commands only see the app's widget tree. Permission dialogs, system
+alerts, share sheets, pickers, notifications, browser sign-in, native
+screens and WebView content are only reachable through the
+native-* commands (UIAutomator2 on Android, WebDriverAgent on an iOS
+Simulator). While system UI covers the app, get-interactive-elements still
+lists the Flutter widgets underneath as if they were reachable — check
+native-get-elements when an action has no effect.
+
+### Workflow
+
+1. `marionette native-connect --platform android [--serial <serial>]`
+   or `marionette native-connect --platform ios [--udid <udid>]`.
+   Starts the device-side server once (the first Android start downloads
+   it; iOS needs a prebuilt WebDriverAgent — see https://marionette.leancode.co/docs/native#setup). The
+   server keeps running between commands.
+2. Run native-* commands. They reuse the session; no per-command setup.
+3. `marionette native-disconnect` when done (stops the server it started).
+
+Several devices at once: give each a name with
+`--native-device <name>` (before the command), e.g.
+`marionette --native-device iphone native-tap --text Allow`.
+Prefer one client per Android device at a time: UIAutomator2 has a single
+session, so an MCP server and a CLI session on the same device take it from
+each other, and the MCP server then needs native_connect again
+(native-connect warns when it reuses another process's server).
+
+### Selectors and coordinates
+
+Element commands take a selector: `--text` (exact; `--label` in
+native-enter-text), `--text-contains`, `--id` (Android resource id / iOS
+accessibility identifier), `--type`, `--index`. All given options must
+match. If several elements match and only one is tappable, that one is
+used; otherwise the command fails and lists the candidates — add --index
+or a more specific option. Coordinates (--x/--y, --start-x …) are
+screen pixels, the units of bounds in native-get-elements, on both
+platforms — never Flutter logical pixels. native-take-screenshot fits the
+image in 2000x2000 and then prints the factor that turns image
+coordinates into screen pixels.
+
+### Session commands
+
+  native-connect --platform android|ios [--serial S] [--udid U]
+      Start or reuse the server and save the session. Exit 1 with the
+      reason and a hint when the device or server is not available.
+  native-sessions
+      List sessions: name, platform, device, URL, running / not running.
+  native-disconnect
+      Delete the session; stop the server if native-connect started it.
+
+### Commands (each mirrors the MCP tool native_<name>)
+
+  native-get-elements [selector without --index] [--clickable-only]
+                      [--no-include-foreground-app]
+      JSON {"elements": [...], "foregroundApp": "..."}; each element has
+      type, text, id, bounds {x, y, width, height} (screen pixels),
+      clickable, and state when informative: value (typed content),
+      enabled, focused, checked, selected, scrollable.
+  native-wait-for [selector without --index] [--state visible|gone]
+                  [--timeout-ms 10000] [--interval-ms 500]
+      Prints the element (visible) or the elapsed time (gone); exit 1 on
+      timeout, naming the foreground app. Wait for an element of the
+      expected screen, not for a package name (not element text; see
+      foregroundApp of native-get-elements).
+  native-tap <selector> | --x X --y Y
+  native-swipe --start-x --start-y --end-x --end-y [--duration-ms 300]
+      iOS back gesture: start at x=1. It does not wait for the content to
+      settle — on iOS a tap right after a fling only stops the scrolling;
+      use native-wait-for (or native-scroll, which settles) before tapping.
+  native-scroll --direction up|down|left|right [target selector]
+                [--within-text|--within-text-contains|--within-id|
+                 --within-type|--within-index] [--max-swipes 10]
+                [--distance D] [--start-x X --start-y Y]
+      Direction is the finger's. With a target, swipes until it is visible
+      and stops at the end of the list; --within-* swipes inside that
+      container (nested lists, pickers).
+  native-enter-text --text T [--label|--text-contains|--id|--type|--index]
+                    [--clear]
+      Appends; without a selector types into the focused field (also
+      Flutter fields on Android).
+  native-press-key --key back|home|enter|backspace|tab|recents|volume_up|
+                         volume_down
+      back, recents, tab: Android only.
+  native-hide-keyboard
+  native-take-screenshot --output file.png
+  native-notifications --action open|close
+
+  Messages and hints are shared with the MCP tools: an argument named in
+  camelCase (maxSwipes, timeoutMs, action=close) is the option in kebab
+  case (--max-swipes, --timeout-ms, --action close).
+
+  Examples:
+    marionette native-connect --platform android
+    marionette native-wait-for --text Allow --timeout-ms 5000
+    marionette native-tap --text Allow
+    marionette native-enter-text --label "User name" --text "Jan"
+    marionette native-scroll --direction up --within-id "File View" \
+        --text marionette_file_37.txt
+
+### Platform notes
+
+- iOS Notification Center: notifications of one app are grouped, and the
+  first tap on a group expands it. A tap on a notification may only slide
+  it aside and show an "Open" button: native-wait-for --text Open, then
+  native-tap --text Open. A collapsed "N Notifications" button must be
+  tapped first. Opened over the app it is not in the tree — background the
+  app first (native-press-key --key home). A banner can be tapped.
+- Android: toasts and heads-up banners are visible only on screenshots on
+  recent versions (older ones list toasts read-only); a tree read during a
+  toast waits until it is gone.
+- Android with a hardware keyboard shows Gboard's floating toolbar:
+  native-hide-keyboard refuses (Back would close the screen).
+- Permission dialogs show only while the permission is undecided. To see
+  one again, reset it outside Marionette (`adb shell pm revoke <package>
+  <permission>`, `xcrun simctl privacy <udid> reset all <bundle id>`); this
+  ends the app's Flutter connection.
+- get-interactive-elements warns when the app is not in front (system UI or
+  another screen covers it). On iOS an alert or sheet shown by the app
+  itself gives no warning — if a Flutter action has no effect, check
+  native-get-elements.
+- native-tap and native-enter-text refuse a disabled element
+  (enabled: false). On iOS the app's elements stay listed, disabled, under
+  a system sheet or picker — act on the sheet or close it first.
+- A focused Flutter text field on iOS shows its hint as a second line of
+  its label; --label matches the first line, --text of
+  native-get-elements needs the whole text (use --text-contains).
+
 ## Exit Codes
 
   0    Success
@@ -588,5 +724,6 @@ If a command fails with a connection error, the app may have stopped.
 - Run `get-interactive-elements` first to discover what's on screen before interacting;
   add --ancestor-keys to list just one subtree on busy screens
 - Instance names allow any characters except "/", "\", or control characters (e.g. device IDs like 192.168.1.1:5555)
-- Commands are stateless — each opens a fresh connection, so no session management needed
+- Flutter commands are stateless — each opens a fresh connection, so no session management needed
+- native-* commands share a session started by native-connect; run native-disconnect at the end
 ''';

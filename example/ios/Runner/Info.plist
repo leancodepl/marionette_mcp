@@ -47,6 +47,10 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera for native-lane testing demos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app accesses your photo library for native-lane testing demos.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

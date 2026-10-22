@@ -154,6 +154,48 @@ void main() {
         expect(selector, isNot(contains('super secret value')));
       });
     });
+
+    group('native lane', () {
+      test('shows the native selector fields', () {
+        final selector = describeStepSelector('native_tap', {
+          'textContains': 'Allow',
+          'type': 'android.widget.Button',
+          'index': 1,
+        });
+
+        expect(
+          selector,
+          'type=android.widget.Button textContains=Allow index=1',
+        );
+      });
+
+      test('native_enter_text logs the label, never the typed text', () {
+        final selector = describeStepSelector('native_enter_text', {
+          'label': 'User name',
+          'text': 'Jan Kowalski',
+        });
+
+        expect(selector, 'label=User name input_len=12');
+      });
+
+      test('native_enter_text redacts a sensitive field, also in the CLI', () {
+        final selector = describeStepSelector('native-enter-text', {
+          'id': 'password',
+          'text': 'hunter2',
+        });
+
+        expect(selector, 'id=password input=[redacted]');
+      });
+
+      test('Flutter tools do not pick up the native fields', () {
+        final selector = describeStepSelector('swipe', {
+          'key': 'pager',
+          'direction': 'left',
+        });
+
+        expect(selector, 'key=pager');
+      });
+    });
   });
 
   group('formatStepLine', () {
@@ -206,6 +248,25 @@ void main() {
 
       final content = session.stepsFile.readAsStringSync();
       expect(content, contains('tap key=submit_button -> Successfully tapped'));
+    });
+
+    test('logs a native action with its confirmation', () {
+      final session = openSession();
+      final logger = StepLogger()..session = session;
+
+      logger.logStep(
+        'native_tap',
+        {'text': 'Allow'},
+        const CallToolResult(
+          content: [TextContent(text: 'Successfully tapped native element')],
+        ),
+      );
+
+      final content = session.stepsFile.readAsStringSync();
+      expect(
+        content,
+        contains('native_tap text=Allow -> Successfully tapped native element'),
+      );
     });
 
     test('prefixes an error outcome', () {
