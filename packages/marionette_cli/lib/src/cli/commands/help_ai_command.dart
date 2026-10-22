@@ -583,7 +583,7 @@ native-get-elements when an action has no effect.
 1. `marionette native-connect --platform android [--serial <serial>]`
    or `marionette native-connect --platform ios [--udid <udid>]`.
    Starts the device-side server once (the first Android start downloads
-   it; iOS needs a prebuilt WebDriverAgent — see docs/native-lane.md). The
+   it; iOS needs a prebuilt WebDriverAgent — see https://marionette.leancode.co/docs/native#setup). The
    server keeps running between commands.
 2. Run native-* commands. They reuse the session; no per-command setup.
 3. `marionette native-disconnect` when done (stops the server it started).

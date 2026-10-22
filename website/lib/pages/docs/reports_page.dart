@@ -76,7 +76,7 @@ const _toc = [
   ('patrol', 'From a run to a Patrol test'),
 ];
 
-/// Docs, page 5: what a run leaves behind, and why it can be trusted.
+/// Docs, page 6: what a run leaves behind, and why it can be trusted.
 class ReportsPage extends StatelessComponent {
   const ReportsPage({required this.version, required this.loop, super.key});
 
@@ -214,7 +214,9 @@ class ReportsPage extends StatelessComponent {
               rich(
                 'For evidence, the agent calls `take_screenshots(inline: '
                 'false)`: the image goes to `screenshots/` and the agent gets '
-                'its path instead of the pixels, which saves context.',
+                'its path instead of the pixels, which saves context. Calls '
+                'of the [native lane](/docs/native#reports) are logged the '
+                'same way.',
               ),
             ),
           ],

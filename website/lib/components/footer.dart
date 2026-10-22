@@ -185,6 +185,9 @@ class SiteFooter extends StatelessComponent {
                 a(href: '/docs/drive', [.text('Drive')]),
               ]),
               li([
+                a(href: '/docs/native', [.text('Native lane')]),
+              ]),
+              li([
                 a(href: '/docs/reports', [.text('Reports')]),
               ]),
             ]),

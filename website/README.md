@@ -33,7 +33,7 @@ sends.
 | Path | What lives there |
 | --- | --- |
 | `lib/pages/home_page.dart` | The landing page, assembled from `lib/components/`. |
-| `lib/pages/docs/` | The five docs pages. They are the documentation: `docs/*.md` in the repository only link here. |
+| `lib/pages/docs/` | The six docs pages. They are the documentation: `docs/*.md` in the repository only link here. |
 | `lib/components/the_loop.dart`, `loop_player.dart` | The landing page's replay of one recorded run, and the island that plays it. |
 | `lib/components/xray.dart` | The Concepts page's screenshot next to its element listing. CSS only. |
 | `demo/loop.json`, `demo/xray.json` | The recorded data both of them show. |

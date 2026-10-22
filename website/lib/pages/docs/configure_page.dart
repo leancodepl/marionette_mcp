@@ -205,6 +205,10 @@ class ConfigurePage extends StatelessComponent {
                   'Content inside one of your widgets is out of reach',
                   'Remove that widget from `shouldStopTraversalAtElement`.',
                 ],
+                [
+                  'A dialog, picker or WebView is not in the listing',
+                  'Drawn by the platform: use the [native lane](/docs/native).',
+                ],
               ],
             ),
           ],

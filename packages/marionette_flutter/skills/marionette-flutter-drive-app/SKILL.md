@@ -407,8 +407,8 @@ has no visible effect, check `native_get_elements`.
 **Setup.** Android needs `adb` on `PATH` and a device or emulator; Marionette
 downloads and installs UIAutomator2 itself on the first connect. iOS works on
 the **Simulator only** (not physical iPhones yet) and needs a one-time
-WebDriverAgent build — the steps are in the repository's
-`docs/native-lane.md`. Nothing changes in the app: the native lane doesn't
+WebDriverAgent build — the steps are on the
+[Native lane](https://marionette.leancode.co/docs/native#setup) docs page. Nothing changes in the app: the native lane doesn't
 need `MarionetteBinding`, but every flow you drive with it still starts in
 an app you reach with `connect`.
 
@@ -687,7 +687,7 @@ args.
 | Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                                   | See *The single-binding rule*, above                                                                                             |
 | Session directory lands somewhere unexpected (e.g. not the project root)                           | No `MARIONETTE_SESSION_DIR` set and the server's own working directory isn't reliably the repo root | Pass `session_dir` to `connect` (`--session-dir` on the CLI) explicitly — see *Reporting what you found*, above                  |
 | A Flutter tap does nothing while a dialog, sheet or picker is open                                 | System UI covers the app; the Flutter tree still lists the widgets underneath                       | Switch to the native lane — see *System UI outside Flutter*, above                                                               |
-| `native_connect` fails                                                                             | No device / `adb` (Android), no booted simulator or no WebDriverAgent build (iOS)                   | Follow the hint in the error; setup is in the repository's `docs/native-lane.md`                                                 |
+| `native_connect` fails                                                                             | No device / `adb` (Android), no booted simulator or no WebDriverAgent build (iOS)                   | Follow the hint in the error; setup is on the [Native lane](https://marionette.leancode.co/docs/native#setup) docs page                                     |
 | A native call says several elements match                                                          | Ambiguous native selector                                                                           | Add `index` or a more specific `type` / `id` — the error lists the candidates                                                    |
 | A native call says the session or server is gone                                                   | The device-side server stopped, or another client took the Android session                          | `native_connect` again; use one client per Android device                                                                        |
 | Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                                     | Not supported by design — see *When not to use*                                                                                  |

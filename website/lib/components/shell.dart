@@ -16,6 +16,7 @@ enum SitePage {
   concepts('/docs/concepts', 'Concepts'),
   configure('/docs/configure', 'Configure'),
   drive('/docs/drive', 'Drive'),
+  native('/docs/native', 'Native lane'),
   reports('/docs/reports', 'Reports');
 
   SitePage(this.path, this.title);
@@ -26,7 +27,7 @@ enum SitePage {
   final String title;
 
   /// The docs pages, in reading order.
-  static const docs = [start, concepts, configure, drive, reports];
+  static const docs = [start, concepts, configure, drive, native, reports];
 
   bool get isDocs => this != home;
 }
