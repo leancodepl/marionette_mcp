@@ -501,6 +501,38 @@ void _unitTests() {
         {'x': 16, 'y': 830, 'width': 100, 'height': 12});
   });
 
+  test('WDA: frames inside a remote view are moved to the screen', () {
+    // Seen on iOS 26.4: the share sheet's content, served by another
+    // process, reports frames relative to its container.
+    final elements = parseWdaSource('''
+<XCUIElementTypeApplication name="Counter" label="Counter" x="0" y="0" width="440" height="956">
+  <XCUIElementTypeOther name="ShareSheet.RemoteContainerView" x="9" y="565" width="422" height="382">
+    <XCUIElementTypeOther x="0" y="0" width="422" height="382">
+      <XCUIElementTypeCell name="Copy" label="Copy" enabled="true" x="24" y="107" width="374" height="52"/>
+    </XCUIElementTypeOther>
+  </XCUIElementTypeOther>
+  <XCUIElementTypeScrollView x="0" y="100" width="440" height="600">
+    <XCUIElementTypeStaticText label="Scrolled above" x="16" y="20" width="100" height="30"/>
+  </XCUIElementTypeScrollView>
+  <XCUIElementTypeWebView x="0" y="182" width="440" height="660">
+    <XCUIElementTypeOther x="0" y="0" width="440" height="660">
+      <XCUIElementTypeOther x="0" y="182" width="440" height="660">
+        <XCUIElementTypeSwitch label="Accept terms" enabled="true" x="18" y="462" width="16" height="16"/>
+      </XCUIElementTypeOther>
+    </XCUIElementTypeOther>
+  </XCUIElementTypeWebView>
+</XCUIElementTypeApplication>''');
+
+    expect(elements.firstWhere((e) => e.text == 'Copy').bounds.toJson(),
+        {'x': 33, 'y': 672, 'width': 374, 'height': 52});
+    // Seen on iOS 26.4: a WebView has a (0, 0) node of its own size, but
+    // the frames below it are on screen.
+    expect(elements.firstWhere((e) => e.text == 'Accept terms').bounds.toJson(),
+        {'x': 18, 'y': 462, 'width': 16, 'height': 16});
+    expect(elements.map((e) => e.text), isNot(contains('Scrolled above')),
+        reason: 'content scrolled out of its container is not moved');
+  });
+
   test('WDA: identical duplicate elements are listed once', () {
     final elements = parseWdaSource('''
 <XCUIElementTypeApplication name="Counter" label="Counter" x="0" y="0" width="440" height="956">

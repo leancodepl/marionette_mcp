@@ -101,7 +101,11 @@ abstract class NativeCommand extends Command<int> {
       _logStep(
         session,
         args,
-        result.isError ? describeStepError(_firstText(result)) : 'ok',
+        result.isError
+            ? describeStepError(_firstText(result))
+            : session == null
+                ? 'ok'
+                : describeSuccess(result, session),
       );
       return await _print(result);
     } finally {
@@ -129,6 +133,9 @@ abstract class NativeCommand extends Command<int> {
       return null;
     }
   }
+
+  /// Outcome logged in [session]'s steps.md for a successful [result].
+  String describeSuccess(CallToolResult result, Session session) => 'ok';
 
   void _logStep(Session? session, Map<String, dynamic> args, String outcome) {
     if (session == null) return;

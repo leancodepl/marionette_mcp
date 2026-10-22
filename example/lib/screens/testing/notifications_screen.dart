@@ -71,7 +71,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
     if (mounted) setState(() => _status = 'notification in 3 s');
     const title = 'Marionette';
-    const body = 'Local notification — tap to open the app';
+    const body = 'Local notification — open it to return to the app';
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
         'marionette_demo',
@@ -130,7 +130,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Text(
             'Post a notification in 3 s (send the app to the background '
             'with native_press_key key=home to see a banner), read it '
-            'with native_notifications action=open and tap it to come back.',
+            'with native_notifications action=open and open it to come back '
+            '(Android: tap it; iOS: swipe it right).',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),

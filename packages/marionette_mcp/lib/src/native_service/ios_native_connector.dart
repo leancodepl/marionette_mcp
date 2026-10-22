@@ -224,9 +224,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     try {
       await client.wdaDismissKeyboard(sessionId, keyNames: _dismissKeyNames);
     } on WebDriverException {
-      // WDA found no way to dismiss it; confirm once below instead of
-      // waiting for an animation that will not happen.
-      dismissed = false;
+      dismissed = await _tapAccessoryDone();
     }
     final attempts = dismissed ? 5 : 1;
     for (var attempt = 0; attempt < attempts; attempt++) {
@@ -241,6 +239,24 @@ final class IosNativeConnector extends WebDriverNativeConnector {
           "the app's own Done button, or unfocus the field via the Flutter "
           'lane.',
     );
+  }
+
+  /// Taps the Done button of the bar above the keyboard (a WebView field's
+  /// accessory bar), which WDA's dismiss does not look at. Returns false
+  /// when there is none, so the caller confirms once instead of waiting
+  /// for an animation that will not happen.
+  Future<bool> _tapAccessoryDone() async {
+    try {
+      final done = await client.findElement(
+        sessionId,
+        'xpath',
+        '//XCUIElementTypeToolbar//XCUIElementTypeButton[@name="Done"]',
+      );
+      await client.elementClick(sessionId, done);
+      return true;
+    } on WebDriverException {
+      return false;
+    }
   }
 
   /// Locates the WDA element for [element]: first by its type and exact

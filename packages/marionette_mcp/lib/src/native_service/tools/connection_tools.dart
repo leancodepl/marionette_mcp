@@ -18,10 +18,9 @@ void registerNativeConnectionTools(
           'Flutter widget tree — permission dialogs, system sheets, and other '
           'surfaces outside Marionette\'s Flutter lane. Independent of the '
           'Flutter "connect" tool; both lanes may be used together. '
-          'If the device-side server or session is lost later, it is '
-          're-established once automatically: reads are retried, but an '
-          'interrupted action is not repeated — the tool then reports that '
-          'it may or may not have happened. '
+          'Call it before the flow opens system UI: starting WebDriverAgent '
+          'can dismiss an alert already on screen. If a native call later '
+          'says the device-side server or session is gone, call it again. '
           '$nativeRoutingPreferFlutter '
           'Requires platform=android|ios; optionally pass serial (Android) or '
           'udid (iOS simulator).',

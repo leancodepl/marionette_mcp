@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'photo_permission.dart';
+
 /// Pickers and sheets — OS-owned file/photo/camera/share UI.
 class PickersAndSheetsScreen extends StatefulWidget {
   const PickersAndSheetsScreen({super.key});
@@ -63,7 +65,8 @@ class _PickersAndSheetsScreenState extends State<PickersAndSheetsScreen> {
 
   Future<void> _pickPhoto() async {
     await _run('Photo picker', () async {
-      if (!kIsWeb && !await _ensurePermission(Permission.photos)) {
+      final permission = await photoLibraryPermission();
+      if (!kIsWeb && !await _ensurePermission(permission)) {
         if (mounted) {
           setState(() => _lastResult = 'Photos permission denied');
         }

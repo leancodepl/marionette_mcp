@@ -187,6 +187,16 @@ void main() {
         expect(selector, 'id=password input=[redacted]');
       });
 
+      test('native_scroll shows the container it scrolled within', () {
+        final selector = describeStepSelector('native_scroll', {
+          'direction': 'up',
+          'text': 'Row 40',
+          'within': {'id': 'list', 'index': 0},
+        });
+
+        expect(selector, 'text=Row 40 direction=up within=id:list,index:0');
+      });
+
       test('Flutter tools do not pick up the native fields', () {
         final selector = describeStepSelector('swipe', {
           'key': 'pager',

@@ -128,6 +128,12 @@ class NativePage extends StatelessComponent {
               'app in front, so it gives no warning. If a Flutter action has '
               'no effect there, check `native_get_elements`.',
             ),
+            const Callout(
+              'The warning follows the app’s lifecycle, which changes a moment '
+              'after system UI opens or closes. After either, '
+              '`native_wait_for` the expected screen before trusting the '
+              'Flutter listing.',
+            ),
           ],
         ),
         const DocSection(
@@ -198,7 +204,9 @@ class NativePage extends StatelessComponent {
               rich(
                 '`native_connect` with `platform: android` or `ios`, plus '
                 '`serial` or `udid` when several devices are attached. It is '
-                'separate from `connect`: a run usually uses both. If a '
+                'separate from `connect`: a run usually uses both. Call it '
+                'before the flow opens system UI: starting WebDriverAgent can '
+                'dismiss an alert already on screen. If a '
                 'native call later says the device-side server or session is '
                 'gone, call `native_connect` again; `native_disconnect` ends '
                 'it.',
@@ -301,9 +309,10 @@ class NativePage extends StatelessComponent {
               ),
               li(
                 rich(
-                  'A disabled element is refused, not touched: on iOS the '
-                  'app’s elements stay listed, disabled, under a system '
-                  'sheet. Act on the sheet first.',
+                  'A disabled element is refused, not touched. On iOS the '
+                  'app’s elements stay listed under a sheet or an alert, '
+                  'and not all of them are disabled: act on what is in '
+                  'front first.',
                 ),
               ),
               li(
@@ -351,7 +360,7 @@ class NativePage extends StatelessComponent {
                 '`native_notifications` opens and closes the notification '
                 'shade on Android and the Notification Center on iOS. Read '
                 'the notifications with `native_get_elements`, open one with '
-                '`native_tap`.',
+                '`native_tap` (on iOS, a swipe — see below).',
               ),
             ),
             ul(classes: Prose.checklist.name, [
@@ -359,14 +368,15 @@ class NativePage extends StatelessComponent {
                 rich(
                   'On iOS, send the app to the background first '
                   '(`native_press_key` `home`): opened over the app, the '
-                  'Notification Center is not in the tree.',
+                  'Notification Center is not in the tree. Open it after the '
+                  'banner is gone: a banner on screen can take the swipe.',
                 ),
               ),
               li(
                 rich(
                   'iOS groups an app’s notifications: the first tap on a '
-                  'group expands it. A tap on a notification may only slide '
-                  'it aside and show "Open"; then wait for it and tap it.',
+                  'group expands it. Open a notification by swiping it '
+                  'right across its full width; a tap does not open it.',
                 ),
               ),
               li(
@@ -472,7 +482,9 @@ class NativePage extends StatelessComponent {
             const Callout(
               'A `native-*` CLI command has no Flutter connection to ask '
               'whether reports are on, so it logs its step only when '
-              '`--session` or `--session-dir` is given.',
+              '`--session` or `--session-dir` is given. '
+              '`native-take-screenshot` then also keeps a copy in the '
+              'session’s `screenshots/`.',
             ),
           ],
         ),
@@ -520,8 +532,16 @@ class NativePage extends StatelessComponent {
                   "Gboard's floating toolbar: unfocus the field in the app.",
                 ],
                 [
+                  'A WebView checkbox shows no `checked` state (Android)',
+                  'Android WebView does not report it: read the page instead.',
+                ],
+                [
+                  'A tap in an iOS WebView hits the wrong element',
+                  'The keyboard scrolled it: tap by screenshot coordinates.',
+                ],
+                [
                   'An iOS notification does not open on tap',
-                  'Tap it in the expanded group, then tap "Open".',
+                  'Swipe it right across its full width with `native_swipe`.',
                 ],
               ],
             ),

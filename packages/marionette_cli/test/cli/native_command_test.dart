@@ -12,6 +12,10 @@ const _source = '<hierarchy>'
     'bounds="[0,0][100,50]"/>'
     '</hierarchy>';
 
+/// A valid 1x1 PNG, base64-encoded.
+const _onePixelPng =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
 void main() {
   late Directory tempDir;
   late NativeSessionRegistry nativeRegistry;
@@ -129,6 +133,38 @@ void main() {
 
     expect(result.code, 0, reason: result.err);
     expect(nativeRegistry.get('default')!.sessionId, 'fresh');
+  });
+
+  test('with --session-dir, a screenshot is kept in the report too', () async {
+    saveSession(sessionId: 'kept');
+    server
+      ..on('GET', '/session/kept/orientation', 'PORTRAIT')
+      ..on('GET', '/session/kept/screenshot', _onePixelPng);
+    final output = '${tempDir.path}/shot.png';
+
+    final result = await run([
+      '--session-dir',
+      '${tempDir.path}/reports',
+      'native-take-screenshot',
+      '-o',
+      output,
+    ]);
+
+    expect(result.code, 0, reason: result.err);
+    expect(File(output).existsSync(), isTrue);
+    expect(result.out, contains('Saved a copy in the session: '));
+    final sessionDir = Directory('${tempDir.path}/reports/.marionette/sessions')
+        .listSync()
+        .whereType<Directory>()
+        .single;
+    expect(
+      File('${sessionDir.path}/screenshots/01.png').existsSync(),
+      isTrue,
+    );
+    expect(
+      File('${sessionDir.path}/steps.md').readAsStringSync(),
+      contains('Saved 1 screenshot(s): screenshots/01.png'),
+    );
   });
 
   test('a tool error exits 1 with the shared message on stderr', () async {

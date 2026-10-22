@@ -580,7 +580,9 @@ native-get-elements when an action has no effect.
 
 ### Workflow
 
-1. `marionette native-connect --platform android [--serial <serial>]`
+1. Before the flow opens system UI (starting WebDriverAgent can dismiss an
+   alert already on screen):
+   `marionette native-connect --platform android [--serial <serial>]`
    or `marionette native-connect --platform ios [--udid <udid>]`.
    Starts the device-side server once (the first Android start downloads
    it; iOS needs a prebuilt WebDriverAgent — see https://marionette.leancode.co/docs/native#setup). The
@@ -671,9 +673,9 @@ coordinates into screen pixels.
 ### Platform notes
 
 - iOS Notification Center: notifications of one app are grouped, and the
-  first tap on a group expands it. A tap on a notification may only slide
-  it aside and show an "Open" button: native-wait-for --text Open, then
-  native-tap --text Open. A collapsed "N Notifications" button must be
+  first tap on a group expands it. Open a notification by swiping it right
+  across its full width (native-swipe at its vertical center); a tap does
+  not open it. A collapsed "N Notifications" button must be
   tapped first. Opened over the app it is not in the tree — background the
   app first (native-press-key --key home). A banner can be tapped.
 - Android: toasts and heads-up banners are visible only on screenshots on
@@ -681,17 +683,22 @@ coordinates into screen pixels.
   toast waits until it is gone.
 - Android with a hardware keyboard shows Gboard's floating toolbar:
   native-hide-keyboard refuses (Back would close the screen).
+- iOS WebView: once the keyboard has scrolled it, WebKit can report its
+  elements shifted until the WebView is opened again. If a tap there hits the
+  wrong thing, compare with a screenshot and tap by coordinates.
 - Permission dialogs show only while the permission is undecided. To see
   one again, reset it outside Marionette (`adb shell pm revoke <package>
   <permission>`, `xcrun simctl privacy <udid> reset all <bundle id>`); this
   ends the app's Flutter connection.
 - get-interactive-elements warns when the app is not in front (system UI or
-  another screen covers it). On iOS an alert or sheet shown by the app
+  another screen covers it). The warning lags a moment: after system UI
+  opens or closes, native-wait-for the expected screen first. On iOS an alert or sheet shown by the app
   itself gives no warning — if a Flutter action has no effect, check
   native-get-elements.
 - native-tap and native-enter-text refuse a disabled element
-  (enabled: false). On iOS the app's elements stay listed, disabled, under
-  a system sheet or picker — act on the sheet or close it first.
+  (enabled: false). On iOS the app's elements stay listed under a sheet,
+  picker or alert, and not all of them are disabled (the app's own alerts
+  disable none) — act on what is in front or close it first.
 - A focused Flutter text field on iOS shows its hint as a second line of
   its label; --label matches the first line, --text of
   native-get-elements needs the whole text (use --text-contains).

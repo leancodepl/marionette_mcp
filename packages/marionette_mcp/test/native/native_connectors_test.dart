@@ -987,6 +987,40 @@ void main() {
         );
       });
 
+      test('hideKeyboard taps Done in the bar above the keyboard', () async {
+        // Seen on iOS 26.4: a WebView field's accessory bar holds the only
+        // Done, outside the keyboard, so WDA's dismiss fails.
+        sourceWithKeyboard([true, false]);
+        server
+          ..on(
+            'POST',
+            '/session/sess-1/wda/keyboard/dismiss',
+            (_) => const FakeResponse.error(
+              'unknown error',
+              'Did not know how to dismiss the keyboard.',
+            ),
+          )
+          ..onValue('POST', '/session/sess-1/element', {
+            'ELEMENT': 'done-1',
+          })
+          ..onValue('POST', '/session/sess-1/element/done-1/click', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        expect(await connector.hideKeyboard(), isTrue);
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element')
+              .single
+              .body!['value'],
+          contains('XCUIElementTypeToolbar'),
+        );
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/done-1/click'),
+          hasLength(1),
+        );
+      });
+
       test('hideKeyboard fails fast when WDA cannot dismiss it', () async {
         sourceWithKeyboard([true]);
         server.on(

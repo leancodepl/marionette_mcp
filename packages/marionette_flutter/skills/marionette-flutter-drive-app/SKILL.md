@@ -402,7 +402,10 @@ Flutter lane.
 `get_interactive_elements` starts with a warning ("the app is not in front")
 when system UI covers the app — trust it when it's there. It can't be there
 for an alert or sheet the app itself shows on iOS, so if a Flutter action
-has no visible effect, check `native_get_elements`.
+has no visible effect, check `native_get_elements`. The warning follows the
+app's lifecycle, which changes a moment after system UI opens or closes:
+after either, `native_wait_for` the expected screen before trusting the
+Flutter listing.
 
 **Setup.** Android needs `adb` on `PATH` and a device or emulator; Marionette
 downloads and installs UIAutomator2 itself on the first connect. iOS works on
@@ -414,7 +417,9 @@ an app you reach with `connect`.
 
 **Connecting.** Call `native_connect` with `platform: android | ios` (plus
 `serial` / `udid` when several devices are attached) — separately from
-`connect`; the two lanes are independent and you usually want both. If a
+`connect`; the two lanes are independent and you usually want both. Call it
+before the flow opens system UI — starting WebDriverAgent can dismiss an
+alert already on screen. If a
 native call later says the device-side server or session is gone, call
 `native_connect` again. Prefer one client per Android device: an MCP server
 and a CLI session on the same device take UIAutomator2's single session
@@ -431,8 +436,10 @@ from each other. Call `native_disconnect` when you're done.
   in `native_enter_text` is chosen by `label`). An ambiguous selector fails
   and lists the candidates — add `index` or a more specific `type` / `id`
   rather than guessing. A disabled element (`enabled: false`) is refused,
-  not touched: on iOS the app's elements stay listed, disabled, under a
-  system sheet — act on the sheet first.
+  not touched. On iOS the app's elements stay listed under a sheet or an
+  alert, and not all of them are disabled (the app's own alerts disable
+  none): when an `XCUIElementTypeAlert` or a sheet is listed, act on it
+  first.
 - **Coordinates** (`x`/`y`, `bounds`, swipe points) are screen pixels on
   every platform. Never reuse Flutter coordinates in the native lane or the
   other way round. `native_take_screenshot` fits the image in 2000×2000
@@ -453,6 +460,10 @@ from each other. Call `native_disconnect` when you're done.
   need; `native_press_key` for `back`, `home`, `enter` and friends
   (`back` is Android-only). `native_enter_text` without a selector types into
   the focused field — also a Flutter field Android doesn't list natively.
+  On iOS, once the keyboard has scrolled a WebView, WebKit can report its
+  elements shifted until the WebView is opened again: if a tap there hits
+  the wrong thing, compare with `native_take_screenshot` and tap by
+  coordinates.
 - **Permissions.** Answer the system dialog with `native_wait_for` +
   `native_tap` (e.g. text "Allow"). A dialog appears only while the
   permission is undecided; to see it again, reset the permission outside
@@ -462,11 +473,13 @@ from each other. Call `native_disconnect` when you're done.
 - **Notifications.** `native_notifications` opens / closes the shade
   (Android) or the Notification Center (iOS); read them with
   `native_get_elements` and open one with `native_tap`. On iOS the first tap
-  on a group of one app's notifications expands it, and a tap on a
-  notification may only slide it aside — then `native_wait_for` text "Open"
-  and tap that. Send the app to the background (`native_press_key` `home`)
-  before opening the Notification Center. Android heads-up banners, and
-  toasts on recent versions, show only on `native_take_screenshot`.
+  on a group of one app's notifications (or on a collapsed "N Notifications"
+  button) expands it, and a notification opens with a swipe right across
+  its full width (`native_swipe` at its vertical center) — a tap does not
+  open it. Send the app to the background (`native_press_key` `home`) and
+  wait until the banner is gone before opening the Notification Center.
+  Android heads-up banners, and toasts on recent versions, show only on
+  `native_take_screenshot`.
 
 **Reports.** Native-lane calls are logged to the same `steps.md` as the
 Flutter ones once `connect` has opened a session, so `Tested:` covers both

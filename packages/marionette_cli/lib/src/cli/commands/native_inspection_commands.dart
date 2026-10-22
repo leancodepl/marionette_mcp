@@ -6,7 +6,9 @@ import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
+import 'package:marionette_mcp/src/session/session.dart';
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:path/path.dart' as p;
 
 class NativeGetElementsCommand extends NativeCommand {
   NativeGetElementsCommand(this.nativeRegistry) {
@@ -120,6 +122,20 @@ class NativeTakeScreenshotCommand extends NativeCommand {
     Map<String, dynamic> args,
   ) =>
       handleNativeTakeScreenshot(context);
+
+  /// Keeps a copy in the report's `screenshots/`, as `native_take_screenshot`
+  /// with `inline: false` does, so the report can cite it.
+  @override
+  String describeSuccess(CallToolResult result, Session session) {
+    final image = result.content.whereType<ImageContent>().firstOrNull;
+    if (image == null) return 'ok';
+    final saved = session.saveScreenshots([image.data]).single;
+    stdout.writeln('Saved a copy in the session: $saved');
+    final note = result.content.whereType<TextContent>().firstOrNull?.text;
+    return 'Saved 1 screenshot(s): '
+        '${p.relative(saved, from: session.directory.path)}'
+        '${note == null ? '' : ' $note'}';
+  }
 
   @override
   Future<void> saveImage(ImageContent image) async {

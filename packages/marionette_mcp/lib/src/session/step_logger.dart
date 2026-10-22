@@ -34,8 +34,8 @@ const _selectorArgKeys = ['key', 'identifier', 'text', 'type', 'uri', 'x', 'y'];
 /// Extra arg names shown for the native lane's tools (`native_*`) and CLI
 /// commands (`native-*`), which select elements by these fields and name
 /// what they act on with them (`direction`, `action`, `state`, `platform`).
-/// `within` (a container selector) and the typed text of
-/// `native_enter_text` are left out like other payloads.
+/// `within` (a container selector) is summarized separately, and the typed
+/// text of `native_enter_text` is left out like other payloads.
 const _nativeSelectorArgKeys = [
   'label',
   'textContains',
@@ -321,6 +321,14 @@ String describeStepSelector(String toolName, Map<String, dynamic> args) {
   // (enter-text).
   if (tool == 'enter_text') {
     parts.add(_describeEnterTextInput(args));
+  }
+  // native_scroll's container, e.g. `within=id:list`.
+  if (args['within'] case final Map<String, dynamic> within when isNative) {
+    final fields = [
+      for (final MapEntry(:key, :value) in within.entries)
+        if (value != null) '$key:${_oneLine(value.toString())}',
+    ];
+    if (fields.isNotEmpty) parts.add('within=${fields.join(',')}');
   }
   if (isNativeEnterText) {
     parts.add(_describeEnterTextInput({

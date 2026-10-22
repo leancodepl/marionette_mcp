@@ -45,16 +45,50 @@ void main() {
       expect(device.calls, isEmpty);
     });
 
-    test('iOS explains groups and the Open button, Android does not', () async {
+    test('iOS retries a swipe that did not open it from the home screen',
+        () async {
+      // Seen on iOS 26.4: with a banner on screen, the first swipe missed.
+      connector
+        ..foregroundAppValue = 'com.apple.springboard'
+        ..onGetElements = (_) => [
+              if (connector.swipes.length > 1)
+                nativeElement(
+                  type: 'XCUIElementTypeWindow',
+                  id: 'SBCoverSheetWindow',
+                ),
+            ];
+      await context.connect(NativePlatform.ios);
+
+      final result = await handleNativeNotifications(context, {
+        'action': 'open',
+      });
+
+      expect(result.isError, isNot(true));
+      expect(connector.swipes, hasLength(2));
+    });
+
+    test('iOS reports a Notification Center that did not open', () async {
+      connector.foregroundAppValue = 'com.apple.springboard';
+      await context.connect(NativePlatform.ios);
+
+      final result = await handleNativeNotifications(context, {
+        'action': 'open',
+      });
+
+      expect(result.isError, isTrue);
+      expect(_text(result), contains('did not open'));
+    });
+
+    test('iOS explains notification groups, Android does not', () async {
       final android =
           _text(await handleNativeNotifications(context, {'action': 'open'}));
       await context.connect(NativePlatform.ios);
       final ios =
           _text(await handleNativeNotifications(context, {'action': 'open'}));
 
-      expect(android, isNot(contains('"Open"')));
+      expect(android, isNot(contains('group')));
       expect(ios, contains('the first tap on a group expands it'));
-      expect(ios, contains('native_wait_for text="Open"'));
+      expect(ios, contains('swiping it right'));
     });
 
     test('rejects an unknown action', () async {

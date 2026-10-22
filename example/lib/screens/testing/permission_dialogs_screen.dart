@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'photo_permission.dart';
+
 /// Permission dialogs — OS-owned alerts (permissioncontroller / SpringBoard).
 class PermissionDialogsScreen extends StatefulWidget {
   const PermissionDialogsScreen({super.key});
@@ -14,6 +16,7 @@ class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
   PermissionStatus? _notificationStatus;
   PermissionStatus? _cameraStatus;
   PermissionStatus? _photosStatus;
+  Permission _photos = Permission.photos;
   Permission? _requesting;
 
   @override
@@ -23,10 +26,11 @@ class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
   }
 
   Future<void> _refreshStatuses() async {
+    _photos = await photoLibraryPermission();
     final results = await Future.wait([
       Permission.notification.status,
       Permission.camera.status,
-      Permission.photos.status,
+      _photos.status,
     ]);
     if (!mounted) return;
     setState(() {
@@ -100,9 +104,8 @@ class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
             title: const Text('Photos'),
             subtitle: Text(_statusLine('Photo library access', _photosStatus)),
             trailing: FilledButton(
-              onPressed: _requesting == Permission.photos
-                  ? null
-                  : () => _request(Permission.photos),
+              onPressed:
+                  _requesting == _photos ? null : () => _request(_photos),
               child: const Text('Request'),
             ),
           ),

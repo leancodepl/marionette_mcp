@@ -7,7 +7,10 @@ import 'package:marionette_mcp/src/version.g.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
-const _instructions = '''
+/// Instructions the server sends to the agent. Claude Code keeps only the
+/// first 4096 characters, so they must stay within that; details belong in
+/// the tool descriptions.
+const serverInstructions = '''
 Marionette MCP enables AI agents to interact with Flutter apps running in debug mode. It provides tools to inspect UI elements, tap buttons, enter text, scroll, take screenshots, retrieve logs, and perform hot reloads and hot restarts.
 
 Usage:
@@ -19,21 +22,15 @@ Usage:
 6. Use "hot_reload" after making code changes to reload the app without losing state.
 7. Use "hot_restart" to fully restart the app from main() and reset all state — needed for changes a hot reload cannot pick up (e.g. main()/bootstrap edits, global singletons, or state shape). Requires the app to be running via `flutter run`.
 
-Native screenshots: native_take_screenshot returns a base64 inline PNG, fitted in 2000x2000 like take_screenshots; when it is downscaled the result gives the factor — multiply a point read off the image by it to get native x/y (bounds from native_get_elements need no conversion). Prefer native_get_elements over screenshots to read a screen; pass inline: false to save it into the session directory instead, like take_screenshots. native_* calls are logged to the same session's steps.md.
-
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 
 When the same key exists in several identical subtrees (grid cells, repeated cards, embedded app instances), a plain match always hits the first one. Pass "ancestor_keys" alongside the selector to scope the search to one subtree, e.g. `{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}`. The keys nest, outermost first — each is looked up inside the previous one's subtree — so `["session_2", "grid.cell_3"]` reaches a cell whose own key also repeats in the other sessions. Only descendants of the last key match, never that element itself. If a key has no element the call fails naming it, instead of searching the whole tree; scroll_to keeps scrolling first, because the scope may not be built yet. ancestor_keys is ignored when targeting by coordinates or focused_element. "get_interactive_elements" accepts "ancestor_keys" as well, to list only that subtree — use it to find the right scope keys and to keep the listing small on busy screens.
 
-Native lane (system UI outside the Flutter widget tree):
-- When: prefer Flutter tools for in-app widgets. Use the native_* tools when the target is not in the Flutter tree — permission dialogs, system alerts, sheets and pickers, notifications, browser sign-in, native screens, WebView content — or when get_interactive_elements warns that the app is not in front. The warning is reliable when present, but an alert or sheet shown by the app itself on iOS gives none: if a Flutter action has no effect, check native_get_elements. Capture system UI with native_take_screenshot (take_screenshots shows only Flutter).
-- Session: call native_connect first; if a call reports that the device-side server or session is gone, call native_connect again. Prefer one client (MCP server or CLI) per Android device — they share UIAutomator2's single session.
-- Find and act: native_get_elements lists what is on screen (a text field's label as text, its typed content as value). native_tap and native_enter_text take a selector (text, textContains, id, type, index); an ambiguous selector fails and lists the candidates — pass index or a more specific selector. A disabled element (enabled: false) is refused, not touched: on iOS the app's elements stay listed, disabled, under a system sheet or picker — act on the sheet or close it first. Native coordinates (x/y, startX/startY, bounds) are screen pixels on every platform; never reuse Flutter coordinates.
-- Waiting: use native_wait_for instead of fixed delays (a dialog, delayed content, the next screen). Wait for an element you expect on the new screen, not for an app's package name (it is not element text; foregroundApp of native_get_elements tells which app is in front). Elements outside the screen are not listed — content appearing below the bottom edge needs a scroll first. native_swipe does not wait for the content to settle (on iOS a tap right after a fling only stops it); native_scroll does.
-- Scrolling: native_scroll with a target selector scrolls until it is visible and stops at the end of the list; within (the container's selector) scrolls nested lists and pickers. A target left at a screen edge or under a toolbar / tab bar may be covered — scroll a little more before tapping. Reads next to iOS system pickers take 2–3 s each.
-- Keyboard: call native_hide_keyboard after typing when the keyboard covers UI you need (it refuses Gboard's floating toolbar on an emulator with a hardware keyboard, where Back would close the screen). To type into a focused Flutter field that native_get_elements does not show (Android), use native_enter_text without a selector.
-- Permissions: answer the system dialog with native_wait_for + native_tap (e.g. text "Allow"). The dialog shows only while the permission is undecided; to see it again, reset the permission outside Marionette (`adb shell pm revoke <package> <permission>`, `xcrun simctl privacy <udid> reset all <bundle id>`) — this ends the app's Flutter connection.
-- Notifications: native_notifications open, then read them with native_get_elements. In the iOS Notification Center the first tap on a group of one app's notifications expands it, and a tap on a notification may only slide it aside — then native_wait_for text="Open" and native_tap it; tap a collapsed "N Notifications" first, and send the app to the background (native_press_key key=home) before opening the Notification Center. On Android, heads-up banners — and toasts on recent versions — are visible only on native_take_screenshot.
+Native lane — UI outside the Flutter tree (permission dialogs, system alerts, pickers and sheets, notifications, browser sign-in, native screens, WebView content): use the native_* tools; prefer Flutter tools for in-app widgets.
+- get_interactive_elements warns when the app is not in front (an alert the app itself shows on iOS gives no warning — if a Flutter action has no effect, check native_get_elements). The warning lags a moment: after system UI opens or closes, native_wait_for the expected screen first.
+- Call native_connect before the flow opens system UI (starting WebDriverAgent can dismiss an alert already on screen); call it again if a native call says the session or server is gone. One client per Android device.
+- Read screens with native_get_elements; take native_take_screenshot only for what the tree lacks (heads-up banners, toasts, camera preview). Native x/y and bounds are screen pixels, never Flutter coordinates; a downscaled screenshot reports the factor to them.
+- Wait with native_wait_for, not delays. Permission dialogs: answer them with native_wait_for + native_tap; to see one again, reset the permission outside Marionette (adb shell pm revoke, xcrun simctl privacy … reset), which ends the Flutter connection.
 ''';
 
 /// Runs the Marionette MCP server with the given configuration.
@@ -60,7 +57,7 @@ Future<int> runMcpServer({
       capabilities: ServerCapabilities(
         tools: ServerCapabilitiesTools(listChanged: true),
       ),
-      instructions: _instructions,
+      instructions: serverInstructions,
     ),
   );
 

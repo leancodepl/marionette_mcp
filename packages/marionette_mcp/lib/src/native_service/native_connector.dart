@@ -322,14 +322,24 @@ const uiNodeClipKey = '#clip';
 /// With [viewportOf], a node that it maps to bounds clips its descendants:
 /// each relevant node inside one or more such ancestors gets the
 /// intersection of their bounds under [uiNodeClipKey] (`x,y,width,height`).
+///
+/// With [adjust], each node's attributes are rewritten before anything else
+/// sees them, given the already adjusted attributes of its parent element
+/// (null for the root).
 List<Map<String, String>> parseUiTree(
   String xml, {
   required bool Function(Map<String, String> attributes) isRelevant,
   NativeBounds? Function(Map<String, String> attributes)? viewportOf,
+  Map<String, String> Function(
+    Map<String, String> attributes,
+    Map<String, String>? parent,
+  )? adjust,
 }) {
   final nodes = <Map<String, String>>[];
   // Clip in effect inside each open element (null: no viewport ancestor).
   final clips = <NativeBounds?>[];
+  // Adjusted attributes of each open element, for [adjust].
+  final parents = <Map<String, String>?>[];
   var i = 0;
 
   while (i < xml.length) {
@@ -348,7 +358,10 @@ List<Map<String, String>> parseUiTree(
       continue;
     }
     if (xml.startsWith('<!', open) || xml.startsWith('</', open)) {
-      if (xml.startsWith('</', open) && clips.isNotEmpty) clips.removeLast();
+      if (xml.startsWith('</', open) && clips.isNotEmpty) {
+        clips.removeLast();
+        parents.removeLast();
+      }
       final end = xml.indexOf('>', open);
       i = end == -1 ? xml.length : end + 1;
       continue;
@@ -360,7 +373,10 @@ List<Map<String, String>> parseUiTree(
     if (close == -1) break;
 
     final tagContent = xml.substring(open + 1, close);
-    final attributes = _parseTag(tagContent);
+    final parsed = _parseTag(tagContent);
+    final attributes = parsed == null || adjust == null
+        ? parsed
+        : adjust(parsed, parents.lastOrNull);
     final clip = clips.lastOrNull;
     if (attributes != null && isRelevant(attributes)) {
       nodes.add({
@@ -378,6 +394,7 @@ List<Map<String, String>> parseUiTree(
                 ? viewport
                 : _intersection(clip, viewport),
       );
+      parents.add(attributes);
     }
 
     i = close + 1;
@@ -629,6 +646,7 @@ List<NativeElement> parseWdaSource(String xml) {
 
   final nodes = parseUiTree(
     xml,
+    adjust: _toScreenFrame,
     isRelevant: (attributes) {
       if (!attributes[uiNodeTagKey]!.startsWith(_wdaTypePrefix)) return false;
       final name = attributes['name'] ?? '';
@@ -723,6 +741,69 @@ List<NativeElement> parseWdaSource(String xml) {
       if (seen.add(jsonEncode(element.toJson()))) element,
   ];
 }
+
+/// Offset that turns a node's frame into screen coordinates, inherited by
+/// its descendants (see [_toScreenFrame]).
+const _wdaOffsetXKey = '#dx';
+const _wdaOffsetYKey = '#dy';
+
+/// Rewrites a WDA node's `x`/`y` to screen coordinates.
+///
+/// A view served by another process (the share sheet's
+/// `ShareSheet.RemoteContainerView`, seen on iOS 26.4) reports its
+/// descendants' frames relative to itself: its content starts at (0, 0)
+/// with the container's size, though the container is elsewhere on screen.
+/// From there on, the subtree is moved by the container's origin. A WebView
+/// has nodes of the same shape, but below them frames are on screen again:
+/// a node whose own frame lies within its parent's ends the move for its
+/// subtree. Content merely scrolled out of its container keeps its frame.
+Map<String, String> _toScreenFrame(
+  Map<String, String> attributes,
+  Map<String, String>? parent,
+) {
+  if (parent == null || !attributes.containsKey('x')) return attributes;
+  var dx = _parseWdaInt(parent[_wdaOffsetXKey]);
+  var dy = _parseWdaInt(parent[_wdaOffsetYKey]);
+  final raw = _wdaFrame(attributes, 0, 0);
+  final parentFrame = _wdaFrame(parent, 0, 0);
+  final sized = raw.width > 0 && raw.height > 0;
+  if (sized &&
+      raw.x == 0 &&
+      raw.y == 0 &&
+      (parentFrame.x != 0 || parentFrame.y != 0) &&
+      (raw.width - parentFrame.width).abs() <= 1 &&
+      (raw.height - parentFrame.height).abs() <= 1) {
+    dx = parentFrame.x;
+    dy = parentFrame.y;
+  } else if ((dx != 0 || dy != 0) && sized && _contains(parentFrame, raw)) {
+    dx = 0;
+    dy = 0;
+  }
+  if (dx == 0 && dy == 0) return attributes;
+  final frame = _wdaFrame(attributes, dx, dy);
+  return {
+    ...attributes,
+    'x': '${frame.x}',
+    'y': '${frame.y}',
+    _wdaOffsetXKey: '$dx',
+    _wdaOffsetYKey: '$dy',
+  };
+}
+
+NativeBounds _wdaFrame(Map<String, String> attributes, int dx, int dy) =>
+    NativeBounds(
+      x: _parseWdaInt(attributes['x']) + dx,
+      y: _parseWdaInt(attributes['y']) + dy,
+      width: _parseWdaInt(attributes['width']),
+      height: _parseWdaInt(attributes['height']),
+    );
+
+/// Whether [inner] lies within [outer], allowing a point of rounding.
+bool _contains(NativeBounds outer, NativeBounds inner) =>
+    inner.x >= outer.x - 1 &&
+    inner.y >= outer.y - 1 &&
+    inner.x + inner.width <= outer.x + outer.width + 1 &&
+    inner.y + inner.height <= outer.y + outer.height + 1;
 
 /// WDA emits integer coordinates, but tolerate decimal strings too.
 int _parseWdaInt(String? value) {
