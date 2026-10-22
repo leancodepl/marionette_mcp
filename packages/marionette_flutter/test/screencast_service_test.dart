@@ -675,4 +675,46 @@ void main() {
       await service.stop();
     });
   });
+
+  group('defaultFrameCapturer', () {
+    testWidgets(
+        'When the target is smaller than the viewport, Then the whole scene is downscaled into it',
+        (tester) async {
+      tester.view.physicalSize = const Size(200, 400);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        const ColoredBox(
+          color: Color(0xFFFF0000),
+          child: Align(
+            alignment: Alignment.bottomRight,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              heightFactor: 0.5,
+              child: ColoredBox(color: Color(0xFF0000FF)),
+            ),
+          ),
+        ),
+      );
+
+      final captured = await tester.runAsync(
+        () => defaultFrameCapturer(
+          tester.binding.renderViews.first,
+          targetWidth: 100,
+          targetHeight: 200,
+        ),
+      );
+
+      expect(captured!.width, equals(100));
+      expect(captured.height, equals(200));
+      // A top-left 100x200 crop of the 200x400 scene would be red everywhere.
+      expect(_pixelAt(captured, 25, 50), equals([255, 0, 0, 255]));
+      expect(_pixelAt(captured, 75, 150), equals([0, 0, 255, 255]));
+    });
+  });
+}
+
+List<int> _pixelAt(CapturedFrame frame, int x, int y) {
+  final offset = (y * frame.width + x) * 4;
+  return frame.bytes.sublist(offset, offset + 4);
 }
