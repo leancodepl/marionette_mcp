@@ -2,6 +2,7 @@
 
 - Add the native lane for UI outside the Flutter widget tree — permission dialogs, system alerts, pickers and sheets, WebView content, native views and screens, notifications — on an Android device or emulator (UIAutomator2) and the iOS Simulator (WebDriverAgent). New MCP tools `native_connect`, `native_disconnect`, `native_get_elements`, `native_wait_for`, `native_tap`, `native_enter_text`, `native_scroll`, `native_swipe`, `native_press_key`, `native_hide_keyboard`, `native_take_screenshot` and `native_notifications`, mirrored by `marionette native-*` CLI commands (the device-side server keeps running between commands; `--native-device` names a connection). Native screenshots are fitted in 2000×2000 like `take_screenshots`, with the factor to native coordinates. Native calls are logged to session reports, `get_interactive_elements` warns when system UI covers the app, and the `marionette-flutter-drive-app` Agent Skill explains when and how to switch lanes. See [Native lane](https://marionette.leancode.co/docs/native)
 - Fix: the stdio server exits on stdin EOF while connected to an app (the VM service connection kept the process alive)
+- Fix `record-video --width/--height` recording only the top-left corner of the screen at full scale instead of the whole screen scaled down to that size. Web recordings were not affected ([#134](https://github.com/leancodepl/marionette_mcp/issues/134))
 
 # 0.7.0
 
