@@ -155,10 +155,23 @@ class VmServiceConnector {
   /// Returns true if currently connected to a VM service.
   bool get isConnected => _service != null && _isolateId != null;
 
+  /// How long [connect] waits for the app's VM service by default.
+  static const defaultConnectTimeout = Duration(seconds: 30);
+
+  /// How long [disconnect] waits for the old VM service to close.
+  static const _disposeTimeout = Duration(seconds: 5);
+
   /// Connects to a VM service at the given URI.
   ///
+  /// Gives up with a [TimeoutException] when the VM service doesn't finish
+  /// the handshake within [timeout], for example because the app is paused
+  /// or its device went to sleep, and leaves the connector disconnected.
+  ///
   /// Throws an exception if connection fails.
-  Future<void> connect(String uri) async {
+  Future<void> connect(
+    String uri, {
+    Duration timeout = defaultConnectTimeout,
+  }) async {
     if (isConnected) {
       _logger.warning('Already connected, disconnecting first');
       await disconnect();
@@ -166,9 +179,19 @@ class VmServiceConnector {
 
     _logger.info('Connecting to VM service at $uri');
 
-    try {
-      _service = await vmServiceConnectUri(uri);
-      _serviceEventSubscription = _service!.onServiceEvent.listen((e) {
+    // A handshake that times out keeps running in the background, so it
+    // must neither publish its service nor leak it once it finally returns.
+    var abandoned = false;
+    VmService? service;
+
+    Future<String> handshake() async {
+      final connected = await vmServiceConnectUri(uri);
+      if (abandoned) {
+        await connected.dispose();
+        throw StateError('Abandoned connection to $uri');
+      }
+      service = _service = connected;
+      _serviceEventSubscription = connected.onServiceEvent.listen((e) {
         switch (e.kind) {
           case EventKind.kServiceRegistered:
             final serviceName = e.service!;
@@ -188,33 +211,68 @@ class VmServiceConnector {
         }
       });
       try {
-        await _service!
+        await connected
             .streamListen(EventStreams.kService)
             .timeout(const Duration(milliseconds: 500));
       } catch (e) {
         _logger.info('streamListen(EventStreams.kService) skipped: $e');
       }
 
-      _isolateId = await _findIsolateWithMarionetteExtensions();
+      return _findIsolateWithMarionetteExtensions();
+    }
+
+    try {
+      final isolateId = await handshake().timeout(
+        timeout,
+        onTimeout: () {
+          abandoned = true;
+          throw TimeoutException(
+            'Timed out connecting to the VM service at $uri after '
+            '${timeout.inSeconds}s. Make sure the app is still running, '
+            'is not paused in the debugger, and its device is awake, '
+            'then call connect again.',
+            timeout,
+          );
+        },
+      );
+      _isolateId = isolateId;
       _logger.info('Connected to isolate: $_isolateId');
     } catch (err) {
       _logger.severe('Failed to connect to VM service', err);
-      await disconnect();
+      // Only tear down the service this attempt opened: a later connect may
+      // already have replaced it.
+      if (identical(_service, service)) {
+        await disconnect();
+      }
       rethrow;
     }
   }
 
   /// Disconnects from the current VM service.
+  ///
+  /// Doesn't wait more than a few seconds for an unresponsive VM service to
+  /// close its connection, so a hung app can't block the next [connect].
   Future<void> disconnect() async {
-    if (_service != null) {
+    final service = _service;
+    if (service != null) {
       _logger.info('Disconnecting from VM service');
-      await _serviceEventSubscription?.cancel();
-      _serviceEventSubscription = null;
-      await _service!.dispose();
+      final subscription = _serviceEventSubscription;
       _service = null;
       _isolateId = null;
+      _serviceEventSubscription = null;
       _registeredServices.clear();
       _pendingServiceRequests.clear();
+      try {
+        await Future.wait([
+          if (subscription != null) subscription.cancel(),
+          service.dispose(),
+        ]).timeout(_disposeTimeout);
+      } on TimeoutException {
+        _logger.warning(
+          'VM service did not close within ${_disposeTimeout.inSeconds}s; '
+          'dropping the connection',
+        );
+      }
       _logger.fine('Disconnected');
     }
   }
