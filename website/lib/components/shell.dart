@@ -22,6 +22,11 @@ enum SitePage {
 
   final String path;
 
+  /// The URL to link to. Netlify serves each page from its directory and
+  /// redirects the bare path there with a 301, so links, the canonical URL
+  /// and the sitemap all carry the trailing slash.
+  String get href => path == '/' ? path : '$path/';
+
   /// The page's name in the docs sidebar.
   final String title;
 
@@ -70,7 +75,7 @@ class PageShell extends StatelessComponent {
   @override
   Component build(BuildContext context) {
     return .fragment([
-      a(href: '${page.path}#main', classes: _skipLink.name, const [
+      a(href: '${page.href}#main', classes: _skipLink.name, const [
         .text('Skip to content'),
       ]),
       NavBar(page: page),

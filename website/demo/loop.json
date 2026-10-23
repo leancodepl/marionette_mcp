@@ -12,7 +12,7 @@
   },
   "app": "example/ (marionette_mcp repo), flutter run --debug",
   "recordedAt": "2026-10-06",
-  "prompt": "Hot reload the app, then check the Profile form: a malformed email must show an error and keep Submit disabled, and a valid one must submit. Write a report.",
+  "prompt": "Hot reload the app, then check the Profile form: a malformed email must show an error and keep Submit disabled, and a valid one must submit.",
   "sessionDir": ".marionette/sessions/profile-email-validation-20261006T1326",
   "beats": [
     {

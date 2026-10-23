@@ -233,7 +233,7 @@ class DocsLayout extends StatelessComponent {
         pageHead(
           title: page == .start ? 'Docs — $siteName' : '$title — $siteName',
           description: description,
-          path: page.path.substring(1),
+          path: page.href.substring(1),
           structuredData: structuredData,
         ),
         div(classes: (Utility.container + _docs).name, [
@@ -246,7 +246,7 @@ class DocsLayout extends StatelessComponent {
                 for (final (i, docsPage) in SitePage.docs.indexed)
                   li(classes: docsPage == page ? _current.name : null, [
                     a(
-                      href: docsPage.path,
+                      href: docsPage.href,
                       attributes: docsPage == page
                           ? const {'aria-current': 'page'}
                           : null,
@@ -258,7 +258,7 @@ class DocsLayout extends StatelessComponent {
                     if (docsPage == page)
                       div(classes: _sections.name, [
                         DocsToc(
-                          path: page.path,
+                          path: page.href,
                           ids: [for (final (id, _) in toc) id],
                           labels: [for (final (_, label) in toc) label],
                         ),
@@ -283,12 +283,12 @@ class DocsLayout extends StatelessComponent {
               attributes: const {'aria-label': 'Previous and next page'},
               [
                 if (previous != null)
-                  a(href: previous.path, [
+                  a(href: previous.href, [
                     const span([.text('← Previous')]),
                     strong([.text(previous.title)]),
                   ]),
                 if (next != null)
-                  a(href: next.path, classes: _next.name, [
+                  a(href: next.href, classes: _next.name, [
                     const span([.text('Next →')]),
                     strong([.text(next.title)]),
                   ]),

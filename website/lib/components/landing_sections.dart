@@ -243,7 +243,7 @@ class WhatYouGetBack extends StatelessComponent {
               copyText: '',
             ),
             p(classes: Prose.more.name, const [
-              a(href: '/docs/reports', [
+              a(href: '/docs/reports/', [
                 .text('How a report is written, with examples →'),
               ]),
             ]),
@@ -361,7 +361,7 @@ class QuickStart extends StatelessComponent {
             [
               firstPromptTabs(name: 'prompt-landing'),
               p(classes: Prose.more.name, const [
-                a(href: '/docs', [.text('The full setup, step by step →')]),
+                a(href: '/docs/', [.text('The full setup, step by step →')]),
               ]),
             ],
           ),
@@ -617,7 +617,7 @@ class BridgeOptions extends StatelessComponent {
             _block(const ['\$ $cliInstallCommand'], cliInstallCommand),
           ]),
           p(classes: _link.name, const [
-            a(href: '/docs/drive#cli', [.text('What the CLI can do →')]),
+            a(href: '/docs/drive/#cli', [.text('What the CLI can do →')]),
           ]),
         ]),
       ]),
@@ -690,7 +690,7 @@ class DesignSystem extends StatelessComponent {
               ),
             ]),
             p(classes: Prose.more.name, const [
-              a(href: '/docs/configure', [
+              a(href: '/docs/configure/', [
                 .text('Configure your design system →'),
               ]),
             ]),
@@ -732,7 +732,7 @@ class MoreThanTests extends StatelessComponent {
             "Your app's own tools",
             'Register an extension, such as “go to a page” or “seed test '
                 'data”, and it becomes a named tool with a validated schema.',
-            href: '/docs/configure#extensions',
+            href: '/docs/configure/#extensions',
             linkLabel: 'Custom extensions →',
           ),
           Feature(
@@ -740,7 +740,7 @@ class MoreThanTests extends StatelessComponent {
             'MCP server or CLI',
             'Two bridges to the same app. Pick the one you and your agent '
                 'prefer; both write the same session reports.',
-            href: '/docs/concepts#mcp-or-cli',
+            href: '/docs/concepts/#mcp-or-cli',
             linkLabel: 'Compare them →',
           ),
           Feature(
@@ -748,7 +748,7 @@ class MoreThanTests extends StatelessComponent {
             'An Agent Skill in the package',
             '`dart run skills@ get` installs a skill that teaches the agent '
                 'to set up your app and drive it well.',
-            href: '/docs#skill',
+            href: '/docs/#skill',
             linkLabel: 'Install the skill →',
           ),
           Feature(
@@ -831,7 +831,7 @@ class WhereItFits extends StatelessComponent {
                 'and profile builds.',
               ),
             ]),
-            const a(href: '/docs/concepts', [.text('How it works →')]),
+            const a(href: '/docs/concepts/', [.text('How it works →')]),
           ]),
           Card(classes: _col, [
             p(classes: _role.name, const [.text('Regression suites')]),
