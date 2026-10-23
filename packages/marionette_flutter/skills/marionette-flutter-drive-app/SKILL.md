@@ -257,10 +257,19 @@ is to actually run the app and look, rather than reason about the code:
 
 ## Connecting
 
-Every action needs a VM service WebSocket URI (`ws://127.0.0.1:PORT/TOKEN=/ws`)
-— the developer running the app has it in their `flutter run` console output,
-or in a DevTools link. Ask for it and pass it to `connect` (MCP) or `--uri` /
-a registered `-i <name>` (CLI) before anything else.
+Every action needs a VM service WebSocket URI (`ws://127.0.0.1:PORT/TOKEN=/ws`).
+Get it one of two ways, then pass it to `connect` (MCP) or `--uri` / a
+registered `-i <name>` (CLI) before anything else:
+
+- **The developer runs the app.** The URI is in their `flutter run` console
+  output, or in a DevTools link. Ask for it.
+- **You run the app.** Start `flutter run` yourself, in the background since
+  it keeps running, on the device the developer wants. Among its first lines
+  it prints `A Dart VM Service on <device> is available at:
+  http://127.0.0.1:PORT/TOKEN=/`; the URI is that address as
+  `ws://127.0.0.1:PORT/TOKEN=/ws`, and the DevTools line after it carries the
+  same value as its `uri=` parameter. `hot_reload` and `hot_restart` then act
+  on your own `flutter run`.
 
 If more than one running instance is already in play — several apps
 registered with the CLI, or the user's message mentions more than one device
@@ -612,18 +621,21 @@ That prints every command's syntax, expected output, and exit codes — treat
 it as the authoritative low-level reference; everything in the capability
 table above maps onto it one-for-one (`tap` ↔
 `tap --key/--identifier/--text/--type/--x/--y`, `get_interactive_elements` ↔
-`get-interactive-elements`, etc.), plus `record-video`, which only exists on
-this side. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
+`get-interactive-elements`, etc.), except the app's custom extensions
+(`list_custom_extensions`, `call_custom_extension` and the named tools built
+from their schemas), which only the MCP server offers. `record-video` only
+exists on this side. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
 outermost first:
 `tap --key cell.joinButton --ancestor-keys session_2 --ancestor-keys grid.cell_3`.
 Use `--uri <ws-uri>` for a one-off session
 and `register <name> <uri>` + `-i <name>` for repeated interaction with the
 same app; `marionette doctor` checks connectivity of every registered
-instance and `unregister` cleans up stale ones. Session reports work the same
-way here: pass `--session <title>` (the CLI's equivalent of `session_title`)
-consistently across a script's invocations to log a multi-step run into one
-session directory instead of a fresh, untitled one per command — see
-*Reporting what you found*, above.
+instance and `unregister` cleans up stale ones. Session reports work here too,
+with one difference: every CLI invocation is its own process and writes its
+own session directory. `--session <title>` (the CLI's equivalent of
+`session_title`) names that directory; it does not join invocations into one
+run, so a multi-step CLI run leaves one directory per command, where the MCP
+server keeps one per connection — see *Reporting what you found*, above.
 
 ## Keeping this skill in sync
 
