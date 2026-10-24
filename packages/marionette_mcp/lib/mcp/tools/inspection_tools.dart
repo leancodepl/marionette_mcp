@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/src/session/step_logger.dart';
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
+import 'package:marionette_mcp/mcp/step_logging.dart';
+import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:path/path.dart' as p;
@@ -43,6 +43,20 @@ class GetInteractiveElementsTool extends BaseTool {
         title: 'Get Interactive Elements',
         readOnlyHint: true,
         idempotentHint: true,
+      );
+
+  @override
+  ToolOutputSchema get outputSchema => ToolOutputSchema(
+        properties: {
+          'elements': JsonSchema.array(
+            items: JsonSchema.object(
+              properties: {},
+              additionalProperties: true,
+            ),
+          ),
+          'count': JsonSchema.integer(),
+        },
+        required: ['elements', 'count'],
       );
 
   @override
@@ -87,7 +101,10 @@ class GetInteractiveElementsTool extends BaseTool {
         buffer.writeln(formatElement(element as Map<String, dynamic>));
       }
 
-      return CallToolResult(content: [TextContent(text: buffer.toString())]);
+      return CallToolResult(
+        content: [TextContent(text: buffer.toString())],
+        structuredContent: {'elements': elements, 'count': elements.length},
+      );
     });
   }
 }
@@ -111,6 +128,15 @@ class GetLogsTool extends BaseTool {
       const ToolAnnotations(title: 'Get Application Logs', readOnlyHint: true);
 
   @override
+  ToolOutputSchema get outputSchema => ToolOutputSchema(
+        properties: {
+          'logs': JsonSchema.array(items: JsonSchema.string()),
+          'count': JsonSchema.integer(),
+        },
+        required: ['logs', 'count'],
+      );
+
+  @override
   ToolInputSchema get inputSchema => const ToolInputSchema(properties: {});
 
   @override
@@ -128,6 +154,7 @@ class GetLogsTool extends BaseTool {
       if (count == 0) {
         return CallToolResult(
           content: [const TextContent(text: 'No logs collected')],
+          structuredContent: {'logs': logs, 'count': count},
         );
       }
 
@@ -138,7 +165,10 @@ class GetLogsTool extends BaseTool {
         buffer.writeln(log);
       }
 
-      return CallToolResult(content: [TextContent(text: buffer.toString())]);
+      return CallToolResult(
+        content: [TextContent(text: buffer.toString())],
+        structuredContent: {'logs': logs, 'count': count},
+      );
     } on VmServiceExtensionException catch (err) {
       // Surface the VM service's own error message verbatim — it carries
       // setup instructions for enabling log collection.
@@ -175,6 +205,16 @@ class TakeScreenshotsTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Take Screenshots', readOnlyHint: true);
+
+  @override
+  ToolOutputSchema get outputSchema => ToolOutputSchema(
+        properties: {
+          'count': JsonSchema.integer(),
+          'inline': JsonSchema.boolean(),
+          'paths': JsonSchema.array(items: JsonSchema.string()),
+        },
+        required: ['count', 'inline'],
+      );
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -220,11 +260,13 @@ Future<CallToolResult> takeScreenshots(
   if (screenshots.isEmpty) {
     return CallToolResult(
       content: [const TextContent(text: 'No screenshots captured')],
+      structuredContent: {'count': 0, 'inline': inline},
     );
   }
 
   if (inline) {
     return CallToolResult(
+      structuredContent: {'count': screenshots.length, 'inline': true},
       content: screenshots
           .map(
             (screenshot) =>
@@ -250,6 +292,7 @@ Future<CallToolResult> takeScreenshots(
 
   final paths = _saveScreenshots(session.screenshotsDir, screenshots);
   return CallToolResult(
+    structuredContent: {'count': paths.length, 'inline': false, 'paths': paths},
     content: [
       TextContent(
         text: 'Saved ${paths.length} screenshot(s):\n${paths.join('\n')}',

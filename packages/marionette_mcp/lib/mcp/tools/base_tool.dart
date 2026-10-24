@@ -18,7 +18,7 @@ abstract class BaseTool {
   String get name;
 
   /// Human-readable description of what this tool does.
-  String get description;
+  String? get description;
 
   /// JSON schema defining the input arguments.
   /// Use [JsonSchema.object()] to create an object schema.
@@ -48,8 +48,8 @@ extension ToolRegistration on McpServer {
   /// Register a [BaseTool] with this server.
   ///
   /// Use [callback] to wrap execution with shared concerns such as logging.
-  void registerBaseTool(BaseTool tool, {ToolFunction? callback}) {
-    registerTool(
+  RegisteredTool registerBaseTool(BaseTool tool, {ToolFunction? callback}) {
+    return registerTool(
       tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,

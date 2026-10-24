@@ -1,5 +1,6 @@
 # Unreleased
 
+- Add output schemas and structured success results to MCP tools while preserving existing text and images.
 - Upgrade `mcp_dart` to `^2.4.3` and use its fixed dynamic-tool removal on reconnect.
 - Fix server shutdown leaving app connections open and failed web recording startup leaving its WebSocket listener open.
 - Keep in-flight tool steps in their original report across reconnects, and clear connection status when the app disconnects.

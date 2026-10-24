@@ -12,7 +12,7 @@ void main() {
     final connector = _DelayedVersionConnector();
     final context = VmServiceContext(connector: connector);
     final server = _CapturingServer();
-    context.registerTools(server);
+    registerMcpTools(server, context: context);
     Future<CallToolResult> connect(String title) async =>
         server.callbacks['connect']!({
           'uri': 'ws://$title/ws',
@@ -54,7 +54,7 @@ void main() {
     final connector = _DelayedDisconnectConnector();
     final context = VmServiceContext(connector: connector);
     final server = _CapturingServer();
-    context.registerTools(server);
+    registerMcpTools(server, context: context);
     addTearDown(() async {
       if (!connector.release.isCompleted) connector.release.complete();
       await context.dispose();

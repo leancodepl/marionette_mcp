@@ -1,12 +1,11 @@
-import 'dart:convert';
-
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/tools/arg_coercion.dart';
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 import 'base_tool.dart';
+import 'tool_results.dart';
 
 /// Creates the extension tools with their shared dependencies.
 List<BaseTool> createExtensionTools({
@@ -45,6 +44,18 @@ class ListCustomExtensionsTool extends BaseTool {
       );
 
   @override
+  ToolOutputSchema get outputSchema => ToolOutputSchema(
+        properties: {
+          'extensions': JsonSchema.array(
+            items:
+                JsonSchema.object(properties: {}, additionalProperties: true),
+          ),
+          'count': JsonSchema.integer(),
+        },
+        required: ['extensions', 'count'],
+      );
+
+  @override
   ToolInputSchema get inputSchema => const ToolInputSchema(properties: {});
 
   @override
@@ -60,6 +71,7 @@ class ListCustomExtensionsTool extends BaseTool {
 
       if (extensions.isEmpty) {
         return CallToolResult(
+          structuredContent: {'extensions': extensions, 'count': 0},
           content: [
             const TextContent(text: 'No custom extensions registered.'),
           ],
@@ -79,7 +91,13 @@ class ListCustomExtensionsTool extends BaseTool {
         buffer.writeln();
       }
 
-      return CallToolResult(content: [TextContent(text: buffer.toString())]);
+      return CallToolResult(
+        content: [TextContent(text: buffer.toString())],
+        structuredContent: {
+          'extensions': extensions,
+          'count': extensions.length,
+        },
+      );
     });
   }
 }
@@ -113,6 +131,9 @@ class CallCustomExtensionTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Call Custom Extension');
+
+  @override
+  ToolOutputSchema get outputSchema => extensionResponseOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -164,6 +185,6 @@ Future<CallToolResult> callCustomExtension(
       extensionName,
       extensionArgs,
     );
-    return CallToolResult(content: [TextContent(text: jsonEncode(response))]);
+    return extensionResponseResult(response);
   });
 }

@@ -1,10 +1,13 @@
 /// Marionette MCP server composition.
 library;
 
-import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/version.g.dart';
+import 'package:mcp_dart/mcp_dart.dart';
 
 import 'server_context.dart';
+import 'step_logging.dart';
+import 'tools/dynamic_extension_tools.dart';
+import 'tools/tools.dart';
 
 export 'server_context.dart';
 export 'tools/tools.dart';
@@ -44,7 +47,27 @@ McpServer createMcpServer({required VmServiceContext context}) {
     ),
   );
 
-  context.registerTools(server);
+  registerMcpTools(server, context: context);
 
   return server;
+}
+
+/// Registers the complete catalog on a server owned by the caller.
+///
+/// A context belongs to one server and must be disposed when its transport ends.
+void registerMcpTools(McpServer server, {required VmServiceContext context}) {
+  context.attachDynamicTools(DynamicExtensionTools(
+    server: server,
+    connector: context.connector,
+    logger: context.logger,
+    stepLogger: context.stepLogger,
+  ));
+  for (final tool in createAllTools(context: context)) {
+    server.registerBaseTool(
+      tool,
+      callback: tool is ConnectionTool
+          ? tool.execute
+          : withStepLogging(context.stepLogger, tool.name, tool.execute),
+    );
+  }
 }

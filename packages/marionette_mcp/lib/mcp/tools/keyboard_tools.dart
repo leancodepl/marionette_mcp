@@ -1,9 +1,10 @@
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
+import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 import 'base_tool.dart';
+import 'tool_results.dart';
 
 /// Creates the keyboard tools with their shared dependencies.
 List<BaseTool> createKeyboardTools({
@@ -36,6 +37,9 @@ class PressKeyTool extends BaseTool {
 
   @override
   ToolAnnotations get annotations => const ToolAnnotations(title: 'Press Key');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -77,9 +81,7 @@ class PressKeyTool extends BaseTool {
     return runTool(logger, 'press key', () async {
       final response = await connector.pressKey(key, modifiers: modifiers);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [TextContent(text: message ?? 'Successfully pressed key')],
-      );
+      return messageResult(message ?? 'Successfully pressed key');
     });
   }
 }

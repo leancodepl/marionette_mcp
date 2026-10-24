@@ -307,6 +307,12 @@ disconnecting.
 | Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens a fresh session directory (`session_title`) that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                                                                                                                                                             |
 | Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
+MCP tools advertise output schemas. When your client exposes
+`structuredContent`, read the returned `elements`, `logs`, screenshot `paths`,
+or action `message` directly instead of parsing the display text. Custom
+extension results are under `response`; inline screenshot images remain in
+`content`. Check `isError` first: error results can omit structured data.
+
 ## Good practices
 
 - **Look before you act.** Call `get_interactive_elements` (or

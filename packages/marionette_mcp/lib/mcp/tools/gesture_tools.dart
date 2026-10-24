@@ -1,11 +1,12 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/mcp/tools/ancestor_keys_description.dart';
+import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/formatting.dart';
-import 'package:marionette_mcp/src/vm_service/tools/ancestor_keys_description.dart';
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 import 'base_tool.dart';
+import 'tool_results.dart';
 
 /// Creates the gesture tools with their shared dependencies.
 List<BaseTool> createGestureTools({
@@ -40,6 +41,9 @@ class TapTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Tap Element');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -94,9 +98,7 @@ class TapTool extends BaseTool {
     return runTool(logger, 'tap', () async {
       final response = await connector.tap(matcher);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [TextContent(text: message ?? 'Successfully tapped')],
-      );
+      return messageResult(message ?? 'Successfully tapped');
     });
   }
 }
@@ -118,6 +120,9 @@ class SecondaryTapTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Secondary Tap Element');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -170,11 +175,7 @@ class SecondaryTapTool extends BaseTool {
     return runTool(logger, 'secondary tap', () async {
       final response = await connector.secondaryTap(matcher);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [
-          TextContent(text: message ?? 'Successfully secondary tapped'),
-        ],
-      );
+      return messageResult(message ?? 'Successfully secondary tapped');
     });
   }
 }
@@ -196,6 +197,9 @@ class DoubleTapTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Double Tap Element');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -263,9 +267,7 @@ class DoubleTapTool extends BaseTool {
     return runTool(logger, 'double tap', () async {
       final response = await connector.doubleTap(matcher, delayMs: delay);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [TextContent(text: message ?? 'Successfully double tapped')],
-      );
+      return messageResult(message ?? 'Successfully double tapped');
     });
   }
 }
@@ -287,6 +289,9 @@ class LongPressTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Long Press Element');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -344,9 +349,7 @@ class LongPressTool extends BaseTool {
     return runTool(logger, 'long press', () async {
       final response = await connector.longPress(matcher, durationMs: duration);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [TextContent(text: message ?? 'Successfully long pressed')],
-      );
+      return messageResult(message ?? 'Successfully long pressed');
     });
   }
 }
@@ -371,6 +374,9 @@ class SwipeTool extends BaseTool {
 
   @override
   ToolAnnotations get annotations => const ToolAnnotations(title: 'Swipe');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -465,9 +471,7 @@ class SwipeTool extends BaseTool {
     return runTool(logger, 'swipe', () async {
       final response = await connector.swipe(swipeArgs);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [TextContent(text: message ?? 'Successfully swiped')],
-      );
+      return messageResult(message ?? 'Successfully swiped');
     });
   }
 }
@@ -493,6 +497,9 @@ class PinchZoomTool extends BaseTool {
 
   @override
   ToolAnnotations get annotations => const ToolAnnotations(title: 'Pinch Zoom');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -581,9 +588,7 @@ class PinchZoomTool extends BaseTool {
         startDistance: startDistance,
       );
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [TextContent(text: message ?? 'Successfully pinch zoomed')],
-      );
+      return messageResult(message ?? 'Successfully pinch zoomed');
     });
   }
 }
@@ -613,6 +618,15 @@ class PressBackButtonTool extends BaseTool {
       const ToolAnnotations(title: 'Press Back Button');
 
   @override
+  ToolOutputSchema get outputSchema => ToolOutputSchema(
+        properties: {
+          'message': JsonSchema.string(),
+          'didPop': JsonSchema.boolean(),
+        },
+        required: ['message'],
+      );
+
+  @override
   ToolInputSchema get inputSchema => const ToolInputSchema(properties: {});
 
   @override
@@ -626,15 +640,12 @@ class PressBackButtonTool extends BaseTool {
       final message = response['message'] as String?;
       final didPop = response['didPop'];
 
-      return CallToolResult(
-        content: [
-          TextContent(
-            text: message ??
-                (didPop == true
-                    ? 'Back button pressed, route was popped'
-                    : 'Back button pressed, no route to pop'),
-          ),
-        ],
+      return messageResult(
+        message ??
+            (didPop == true
+                ? 'Back button pressed, route was popped'
+                : 'Back button pressed, no route to pop'),
+        fields: {if (didPop is bool) 'didPop': didPop},
       );
     });
   }
@@ -657,6 +668,9 @@ class ScrollToTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Scroll to Element');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -692,11 +706,7 @@ class ScrollToTool extends BaseTool {
     return runTool(logger, 'scroll to element', () async {
       final response = await connector.scrollToElement(matcher);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [
-          TextContent(text: message ?? 'Successfully scrolled to element'),
-        ],
-      );
+      return messageResult(message ?? 'Successfully scrolled to element');
     });
   }
 }

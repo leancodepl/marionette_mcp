@@ -1,9 +1,10 @@
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
+import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 import 'base_tool.dart';
+import 'tool_results.dart';
 
 /// Creates the device tools with their shared dependencies.
 List<BaseTool> createDeviceTools({
@@ -29,6 +30,9 @@ class SetDeviceConfigTool extends BaseTool {
   @override
   ToolAnnotations get annotations =>
       const ToolAnnotations(title: 'Set Device Config');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -115,9 +119,7 @@ Future<CallToolResult> setDeviceConfig(
       reset: reset,
     );
     final message = response['message'] as String?;
-    return CallToolResult(
-      content: [TextContent(text: message ?? 'Device config updated')],
-    );
+    return messageResult(message ?? 'Device config updated');
   });
 }
 

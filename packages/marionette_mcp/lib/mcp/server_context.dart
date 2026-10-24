@@ -1,312 +1,63 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/mcp/step_logging.dart';
 import 'package:marionette_mcp/src/session/session_manager.dart';
-import 'package:marionette_mcp/src/session/step_logger.dart';
-import 'package:marionette_mcp/src/version.g.dart' as v;
-import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
-import 'package:mcp_dart/mcp_dart.dart';
 
-import 'tools/tools.dart';
+import 'tools/dynamic_extension_tools.dart';
 
-/// Context for managing VM service connection and registering MCP tools.
+/// Shared app connection and session state, owned by the server lifecycle.
+///
+/// Tool metadata and registration live in the MCP composition and tool classes.
 final class VmServiceContext {
   VmServiceContext({VmServiceConnector? connector})
-      : connector = connector ?? VmServiceConnector(),
-        _logger = logging.Logger('VmServiceContext'),
-        _sessionManager = SessionManager(),
-        _stepLogger = StepLogger();
+      : connector = connector ?? VmServiceConnector();
 
   final VmServiceConnector connector;
-  final logging.Logger _logger;
-  final SessionManager _sessionManager;
-  final StepLogger _stepLogger;
+  final logging.Logger logger = logging.Logger('VmServiceContext');
+  final SessionManager sessionManager = SessionManager();
+  final StepLogger stepLogger = StepLogger();
 
-  /// Owns the registry of dynamic extension tools across the lifetime of
-  /// this context. Each connection replaces its app-specific registrations.
   DynamicExtensionTools? _dynamicTools;
   bool _disposed = false;
   int _connectionEpoch = 0;
 
-  /// Registers all VM service related tools with the MCP server.
-  ///
-  /// Every tool is wrapped with [withStepLogging] so each call is
-  /// recorded to the active session's steps.md (see [StepLogger]) — except
-  /// `connect`/`disconnect`, registered on the raw server: they own the
-  /// version-compatibility handshake with the binding and the session
-  /// lifecycle itself. Connect logs only for the epoch it still owns;
-  /// disconnect retains the closing session while cleanup waits. Both log
-  /// manually so overlapping requests cannot write into a replacement report.
-  /// All other tools come from the central typed tool registry.
-  void registerTools(McpServer server) {
-    _dynamicTools = DynamicExtensionTools(
-      server: server,
-      connector: connector,
-      logger: _logger,
-      stepLogger: _stepLogger,
-    );
-    _registerConnectionTools(server);
-    for (final tool in createAllTools(
-      connector: connector,
-      logger: _logger,
-      stepLogger: _stepLogger,
-    )) {
-      server.registerBaseTool(
-        tool,
-        callback: withStepLogging(_stepLogger, tool.name, tool.execute),
-      );
-    }
-  }
+  /// Whether the server owner has retired this context.
+  bool get isDisposed => _disposed;
 
-  void _registerConnectionTools(McpServer server) {
-    server
-      ..registerTool(
-        'connect',
-        description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
-        annotations: const ToolAnnotations(title: 'Connect to App'),
-        inputSchema: ToolInputSchema(
-          properties: {
-            'uri': JsonSchema.string(
-              description:
-                  'VM service URI (e.g., ws://127.0.0.1:8181/ws). This is printed in the Flutter app console when running in debug mode.',
-            ),
-            'session_title': JsonSchema.string(
-              description:
-                  'A short title for this run, e.g. "profile validation". '
-                  'Keep it under ~60 characters — longer is truncated. '
-                  'Ignored unless the app enabled session reports. '
-                  'Slugified and timestamped into the session directory '
-                  'name. Purely a human-readable label — every connect '
-                  'opens its own fresh session directory, even if this '
-                  'matches an earlier title. Falls back to "run-<timestamp>" '
-                  'when omitted.',
-            ),
-            'session_dir': JsonSchema.string(
-              description:
-                  'Base directory .marionette/sessions/ is created under. '
-                  'Overrides the MARIONETTE_SESSION_DIR environment variable. '
-                  'Only needed when the MCP client hasn\'t set that variable '
-                  'and the process\'s working directory isn\'t the project root.',
-            ),
-          },
-          required: ['uri'],
-        ),
-        callback: (args, extra) async {
-          final epoch = ++_connectionEpoch;
-          final result = await _connect(args, epoch);
-          if (!_disposed && epoch == _connectionEpoch) {
-            _stepLogger.logStep('connect', args, result);
-          }
-          return result;
-        },
-      )
-      ..registerTool(
-        'disconnect',
-        description:
-            'Disconnects from the currently connected Flutter app. After disconnecting, you must call connect again to use any other tools.',
-        annotations: const ToolAnnotations(title: 'Disconnect from App'),
-        inputSchema: const ToolInputSchema(properties: {}),
-        callback: (args, extra) async {
-          final epoch = ++_connectionEpoch;
-          final disconnectLogger = StepLogger()..session = _stepLogger.session;
-          _logger.info('Disconnecting from app');
+  /// Starts a transition that supersedes older connection/session work.
+  int beginTransition() => ++_connectionEpoch;
 
-          try {
-            // Retire dynamic tools before tearing down the connection so a
-            // mid-disconnect tools/list reflects only what's still callable.
-            _disableDynamicTools();
-            await connector.disconnect();
+  /// Whether asynchronous work still belongs to the active connection.
+  bool ownsConnection(int epoch) => !_disposed && epoch == _connectionEpoch;
 
-            final session = disconnectLogger.session;
-            final nudge = session == null
-                ? ''
-                : '\nSession: ${session.directory.path}\nWrite report.md now.';
-            final result = CallToolResult(
-              content: [
-                TextContent(
-                  text: 'Successfully disconnected from app$nudge',
-                ),
-              ],
-            );
-            // Attribute the step to the connection being closed. A newer
-            // connect may already own a different session while cleanup waits.
-            if (!_disposed) {
-              disconnectLogger.logStep('disconnect', args, result);
-            }
-            if (epoch == _connectionEpoch) _stepLogger.session = null;
-            return result;
-          } catch (err) {
-            _logger.severe('Error during disconnect', err);
-            final result = CallToolResult(
-              isError: true,
-              content: [TextContent(text: 'Error during disconnect: $err')],
-            );
-            if (!_disposed) {
-              disconnectLogger.logStep('disconnect', args, result);
-            }
-            return result;
-          }
-        },
-      );
-  }
-
-  Future<CallToolResult> _connect(
-    Map<String, dynamic> args,
-    int epoch,
-  ) async {
-    final uri = args['uri'] as String;
-    _logger.info('Connecting to app at $uri');
-    // A new connect attempt immediately supersedes whatever session
-    // was active before, regardless of whether this attempt itself
-    // succeeds — otherwise a call that slips in while this attempt is
-    // still in flight (or after it fails) would append to a session
-    // that's no longer the one actually in use.
-    _stepLogger.session = null;
-    _disableDynamicTools();
-
-    try {
-      _ensureCurrentConnection(epoch);
-      await connector.connect(uri);
-      _ensureCurrentConnection(epoch);
-
-      // Version compatibility check — unwind the connection on mismatch
-      // so the next call to connect can start fresh.
-      try {
-        final bindingVersion = await connector.getVersion();
-        _ensureCurrentConnection(epoch);
-        if (bindingVersion != v.version) {
-          await connector.disconnect();
-          return CallToolResult(
-            isError: true,
-            content: [
-              TextContent(
-                text: 'Version mismatch: marionette_mcp is ${v.version}, '
-                    'but marionette_flutter binding is $bindingVersion. '
-                    'Please ensure both packages are the same version.',
-              ),
-            ],
-          );
-        }
-      } catch (err) {
-        _logger.warning('Failed to check binding version', err);
-        if (!_disposed && epoch == _connectionEpoch) {
-          await connector.disconnect();
-        }
-        return CallToolResult(
-          isError: true,
-          content: [
-            TextContent(
-              text: 'Failed to verify marionette_flutter binding version. '
-                  'Please ensure marionette_flutter is up to date. '
-                  'Error: $err',
-            ),
-          ],
-        );
-      }
-
-      // Promote each schema-bearing custom extension into a first-class
-      // MCP tool. Failures here are logged but don't fail the connect —
-      // the generic call_custom_extension fallback keeps working.
-      await _registerDynamicTools();
-      _ensureCurrentConnection(epoch);
-
-      // Session reports are opt-in app-side
-      // (MarionetteConfiguration.enableSessionReports): with them off,
-      // connect writes nothing to disk and steps go unlogged. Failing
-      // to even determine that counts as off too, same as a session
-      // directory that fails to open below — the app connection and
-      // every other tool already work fine either way, so neither is
-      // worth dropping an otherwise-working connection over.
-      var sessionReportsEnabled = false;
-      try {
-        sessionReportsEnabled = await connector.getSessionReportsEnabled();
-      } catch (err) {
-        _logger.warning(
-          'Failed to read binding configuration; continuing without '
-          'session reports',
-          err,
-        );
-      }
-      _ensureCurrentConnection(epoch);
-      if (!sessionReportsEnabled) {
-        _stepLogger.session = null;
-        return CallToolResult(
-          content: [
-            TextContent(text: 'Successfully connected to app at $uri'),
-          ],
-        );
-      }
-
-      try {
-        final session = _sessionManager.create(
-          title: args['session_title'] as String?,
-          baseDirOverride: args['session_dir'] as String?,
-        );
-        _stepLogger.session = session;
-
-        return CallToolResult(
-          content: [
-            TextContent(
-              text: 'Successfully connected to app at $uri\n'
-                  'Opened session: ${session.directory.path}',
-            ),
-          ],
-        );
-      } catch (err) {
-        // Session setup is best-effort: the app connection and every
-        // other tool already work fine without it, so a directory
-        // creation failure (e.g. an unwritable session_dir) shouldn't
-        // drop an otherwise-working connection. Degrade the same way
-        // an app that opted out of session reports already does —
-        // connect succeeds, just without step logging.
-        _logger.warning(
-          'Failed to open session directory; continuing without '
-          'session reports',
-          err,
-        );
-        _stepLogger.session = null;
-        return CallToolResult(
-          content: [
-            TextContent(
-              text: 'Successfully connected to app at $uri\n'
-                  'Could not open a session directory, so this run '
-                  'will not be logged: $err',
-            ),
-          ],
-        );
-      }
-    } catch (err) {
-      _logger.severe('Failed to connect to app', err);
-      return CallToolResult(
-        isError: true,
-        content: [TextContent(text: 'Failed to connect to app: $err')],
-      );
-    }
-  }
-
-  Future<void> _registerDynamicTools() async {
-    // A reconnect without a clean disconnect would leak the previous
-    // batch — remove any leftovers before registering fresh ones.
-    _dynamicTools?.removeAll();
-    await _dynamicTools?.registerAll();
-  }
-
-  void _disableDynamicTools() => _dynamicTools?.removeAll();
-
-  void _ensureCurrentConnection(int epoch) {
-    if (_disposed || epoch != _connectionEpoch) {
+  /// Rejects asynchronous work superseded by another transition or disposal.
+  void ensureCurrentConnection(int epoch) {
+    if (!ownsConnection(epoch)) {
       throw StateError('The app connection was closed or superseded.');
     }
   }
 
+  /// Gives this context ownership of its app-specific MCP registrations.
+  void attachDynamicTools(DynamicExtensionTools tools) {
+    if (_disposed || _dynamicTools != null) {
+      throw StateError(
+          'The context is disposed or already attached to a server.');
+    }
+    _dynamicTools = tools;
+  }
+
+  /// Discovers the connected app's schema-bearing extension tools.
+  Future<void> registerDynamicTools() async => _dynamicTools?.registerAll();
+
+  /// Retires all app-specific tools before replacing or closing a connection.
+  void removeDynamicTools() => _dynamicTools?.removeAll();
+
   /// Releases dynamic registrations, reports, and the VM-service connection.
-  ///
-  /// Called by the server owner on transport close, startup failure, or signal.
   Future<void> dispose() async {
     _disposed = true;
     ++_connectionEpoch;
-    _disableDynamicTools();
-    _stepLogger.session = null;
+    removeDynamicTools();
+    stepLogger.session = null;
     await connector.disconnect();
   }
 }

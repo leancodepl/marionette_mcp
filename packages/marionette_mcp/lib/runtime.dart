@@ -6,7 +6,7 @@ library;
 export 'src/formatting.dart';
 export 'src/session/session.dart';
 export 'src/session/session_manager.dart';
-export 'src/session/step_logger.dart';
+export 'src/session/report_steps.dart';
 export 'src/video/ffmpeg_process.dart';
 export 'src/video/frame_protocol.dart';
 export 'src/video/recording_session.dart';

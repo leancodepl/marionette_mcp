@@ -1,11 +1,12 @@
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/mcp/tools/ancestor_keys_description.dart';
+import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/formatting.dart';
-import 'package:marionette_mcp/src/vm_service/tools/ancestor_keys_description.dart';
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 import 'base_tool.dart';
+import 'tool_results.dart';
 
 /// Creates the text tools with their shared dependencies.
 List<BaseTool> createTextTools({
@@ -30,6 +31,9 @@ class EnterTextTool extends BaseTool {
 
   @override
   ToolAnnotations get annotations => const ToolAnnotations(title: 'Enter Text');
+
+  @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
 
   @override
   ToolInputSchema get inputSchema => ToolInputSchema(
@@ -92,9 +96,7 @@ class EnterTextTool extends BaseTool {
     return runTool(logger, 'enter text', () async {
       final response = await connector.enterText(matcher, input);
       final message = response['message'] as String?;
-      return CallToolResult(
-        content: [TextContent(text: message ?? 'Successfully entered text')],
-      );
+      return messageResult(message ?? 'Successfully entered text');
     });
   }
 }

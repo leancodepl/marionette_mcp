@@ -3,6 +3,7 @@ import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 import 'base_tool.dart';
+import 'tool_results.dart';
 
 /// Creates the system tools with their shared dependencies.
 List<BaseTool> createSystemTools({
@@ -29,6 +30,9 @@ class HotReloadTool extends BaseTool {
   ToolAnnotations get annotations => const ToolAnnotations(title: 'Hot Reload');
 
   @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
+
+  @override
   ToolInputSchema get inputSchema => const ToolInputSchema(properties: {});
 
   @override
@@ -41,11 +45,7 @@ class HotReloadTool extends BaseTool {
     try {
       final reloaded = await connector.hotReload();
       if (reloaded) {
-        return CallToolResult(
-          content: [
-            const TextContent(text: 'Hot reload completed successfully'),
-          ],
-        );
+        return messageResult('Hot reload completed successfully');
       }
       return CallToolResult(
         isError: true,
@@ -84,6 +84,9 @@ class HotRestartTool extends BaseTool {
       const ToolAnnotations(title: 'Hot Restart');
 
   @override
+  ToolOutputSchema get outputSchema => messageOutputSchema;
+
+  @override
   ToolInputSchema get inputSchema => const ToolInputSchema(properties: {});
 
   @override
@@ -96,11 +99,7 @@ class HotRestartTool extends BaseTool {
     try {
       final restarted = await connector.hotRestart();
       if (restarted) {
-        return CallToolResult(
-          content: [
-            const TextContent(text: 'Hot restart completed successfully'),
-          ],
-        );
+        return messageResult('Hot restart completed successfully');
       }
       return CallToolResult(
         isError: true,

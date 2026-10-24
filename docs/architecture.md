@@ -11,19 +11,25 @@ packages/marionette_mcp/
   lib/mcp/
     mcp.dart                   createMcpServer and server instructions
     server_config.dart         options shared with marionette mcp
-    server_context.dart        app connection and session lifecycle
+    server_context.dart        shared connection/session state and ownership
+    server_runner.dart         logging, transport startup, and shutdown
+    step_logging.dart          MCP result/session logging adapter
     tools/
       base_tool.dart           metadata and execute contract
       tools.dart               createAllTools and registration
+      connection_tools.dart    connect/disconnect contracts and lifecycle calls
+      dynamic_extension_tools.dart  app-defined typed tools and registrations
       *_tools.dart             tools grouped by responsibility
   lib/src/                     runtime implementation details
 ```
 
 Each static tool extends `BaseTool` and receives its connector and logger
 through its constructor. Screenshot tools also receive the session step
-logger. `createAllTools` composes these tools without opening sockets or
-starting a process. `createMcpServer` registers them and applies step logging
-once, at the composition boundary. Connection tools own their additional
+logger. `createAllTools` composes all 20 built-in tools, including connection
+tools, without opening sockets or starting a process. `createMcpServer` uses
+`registerMcpTools` to register them and apply step logging once, at the
+composition boundary. The context contains no tool definitions or registration
+loop. Connection tools own their additional
 session-report transitions; app-defined tools are discovered dynamically.
 In-flight tool calls retain their original report session; a superseded
 connection attempt cannot add a step to its replacement's report.
@@ -34,7 +40,31 @@ CLI adapters import `package:marionette_mcp/runtime.dart` for app connections,
 selectors, reports, and recording. They import
 `package:marionette_mcp/marionette_mcp.dart` for server startup. Other packages
 should use these entrypoints rather than importing `lib/src` files. Existing
-MCP tools and executable options keep their names and wire schemas.
+MCP tools and executable options keep their names and input schemas.
+Shared report formatting and persistence live in `src/session/report_steps.dart`
+without an MCP dependency; MCP result interpretation lives in `mcp/step_logging.dart`.
+Former internal MCP paths are compatibility exports of the new implementations.
+
+## Structured tool results
+
+Every built-in tool advertises an `outputSchema` and returns matching
+`structuredContent` on success. The SDK validates these results. Existing
+human-readable text and inline images remain available in `content`; error
+results retain `isError: true` and need not match a success schema.
+
+| Tool family | Structured success data |
+| --- | --- |
+| Actions, keyboard, device config, reload/restart | `message`; back navigation may also include `didPop` |
+| UI inspection | `elements`, `count` |
+| Logs | `logs`, `count` |
+| Screenshots | `count`, `inline`, and saved `paths` when applicable; image bytes stay in `content` |
+| Extension discovery | `extensions`, `count` |
+| Generic and dynamically promoted extensions | `response`, an object containing the app's result |
+| Connect | `uri`, `sessionReportsEnabled`, optional `sessionPath` or nonfatal `warning` |
+| Disconnect | `disconnected`, optional closing `sessionPath` |
+
+Extension output fields are app-defined, so their response envelope permits
+arbitrary properties rather than claiming a schema the app has not supplied.
 
 For embedding, `createMcpServer(context: context)` accepts an explicitly owned
 `VmServiceContext`. The caller must await `context.dispose()` and
@@ -66,9 +96,13 @@ and `packages/marionette_cli`, then `flutter test --no-pub` in
 `packages/marionette_flutter`.
 
 `server_api_test.dart` drives the real executable through public SDK client
-APIs under legacy initialization and stateless discovery. Its catalog fixture
+APIs under legacy initialization and stateless discovery, including successful
+structured results, dynamic extension removal, and ordinary error results.
+Its catalog fixture
 was captured from the original 0.7.0 implementation with SDK 2.4.3; update it
-only for an intentional tool-contract change. Shutdown regressions use a real
+only for an intentional tool-contract change. The comparison permits the new
+output schemas while preserving every original input contract and annotation.
+Shutdown regressions use a real
 Dart VM service fixture and cover connected EOF and signals.
 
 `dart tool/check_frame_protocol.dart` checks Flutter-encoded frames against
