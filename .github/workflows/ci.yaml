@@ -128,51 +128,68 @@ jobs:
           flutter-version: '3.27.0'
           cache: true
 
-      - name: Install workspace dependencies
-        run: flutter pub get
+      # The standalone server and Flutter binding have independent consumers.
+      # Flutter 3.27's flutter_test pins meta 1.15, while mcp_dart needs 1.16.
+      # Select workspace members without overriding dependency constraints.
+      - name: Install minimum-Dart workspace dependencies
+        run: |
+          cat > pubspec_overrides.yaml <<'YAML'
+          workspace:
+            - packages/marionette_mcp
+            - packages/marionette_cli
+            - tool
+          YAML
+          dart pub get --no-example
 
       - name: Check frame protocol compatibility
         run: dart tool/check_frame_protocol.dart
 
       - name: Analyze marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart analyze --fatal-infos lib bin test
+        working-directory: packages/marionette_mcp
+        run: dart analyze --fatal-infos lib bin test
 
       - name: Analyze marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart analyze --fatal-infos lib bin test
-
-      - name: Analyze marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter analyze --fatal-infos lib
-
-      - name: Analyze marionette_logger
-        run: |
-          cd packages/marionette_logger
-          flutter analyze --fatal-infos lib
-
-      - name: Analyze marionette_logging
-        run: |
-          cd packages/marionette_logging
-          flutter analyze --fatal-infos lib
+        working-directory: packages/marionette_cli
+        run: dart analyze --fatal-infos lib bin test
 
       - name: Run tests for marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart test
+        working-directory: packages/marionette_mcp
+        run: dart test
 
       - name: Run tests for marionette_cli
+        working-directory: packages/marionette_cli
+        run: dart test
+
+      - name: Install minimum-Flutter workspace dependencies
         run: |
-          cd packages/marionette_cli
-          dart test
+          cat > pubspec_overrides.yaml <<'YAML'
+          workspace:
+            - packages/marionette_flutter
+            - packages/marionette_logger
+            - packages/marionette_logging
+            - example
+          YAML
+          flutter pub get
+
+      - name: Analyze marionette_flutter
+        working-directory: packages/marionette_flutter
+        run: flutter analyze --fatal-infos lib
+
+      - name: Analyze marionette_logger
+        working-directory: packages/marionette_logger
+        run: flutter analyze --fatal-infos lib
+
+      - name: Analyze marionette_logging
+        working-directory: packages/marionette_logging
+        run: flutter analyze --fatal-infos lib
 
       - name: Run tests for marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter test --no-pub
+        working-directory: packages/marionette_flutter
+        run: flutter test --no-pub
+
+      - name: Remove workspace selection
+        if: always()
+        run: rm -f pubspec_overrides.yaml
 
   publish:
     name: Publish packages

@@ -71,7 +71,18 @@ was captured from the original 0.7.0 implementation with SDK 2.4.3; update it
 only for an intentional tool-contract change. Shutdown regressions use a real
 Dart VM service fixture and cover connected EOF and signals.
 
-`dart run tool/check_frame_protocol.dart` checks Flutter-encoded frames against
+`dart tool/check_frame_protocol.dart` checks Flutter-encoded frames against
 the MCP consumer, including fragmented delivery. CI runs this check on both
 the normal and minimum supported toolchains. This keeps the production
 packages independent while detecting drift in their shared wire format.
+
+The minimum-toolchain CI job selects separate workspace groups for the
+standalone Dart server/CLI and the Flutter binding/adapters. Flutter 3.27's
+`flutter_test` pins `meta` to 1.15, while `mcp_dart` 2.4.3 requires 1.16 or
+newer. Temporary `pubspec_overrides.yaml` files select workspace members only;
+they never override dependency constraints. Dart checks use `--no-example` to
+avoid resolving Flutter examples in the server-only workspace. The normal
+CI job continues to validate the complete workspace on the pinned Flutter SDK.
+The complete workspace and the MCP package's Flutter example combine both
+dependency graphs and therefore require a newer Flutter SDK. Flutter 3.27 is
+supported for apps using the binding with the server running separately.
