@@ -2,26 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/version.g.dart';
-import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
+import 'package:marionette_mcp/mcp/mcp.dart';
 import 'package:mcp_dart/mcp_dart.dart';
-
-const _instructions = '''
-Marionette MCP enables AI agents to interact with Flutter apps running in debug mode. It provides tools to inspect UI elements, tap buttons, enter text, scroll, take screenshots, retrieve logs, and perform hot reloads and hot restarts.
-
-Usage:
-1. Start the Flutter app in debug mode and note the VM service URI (e.g., ws://127.0.0.1:8181/ws).
-2. Use the "connect" tool with the VM service URI to establish a connection.
-3. Use "get_interactive_elements" to discover available UI elements.
-4. Interact with elements using "tap", "enter_text", or "scroll_to" tools.
-5. Use "take_screenshots" to see the current app state and "get_logs" to debug issues.
-6. Use "hot_reload" after making code changes to reload the app without losing state.
-7. Use "hot_restart" to fully restart the app from main() and reset all state — needed for changes a hot reload cannot pick up (e.g. main()/bootstrap edits, global singletons, or state shape). Requires the app to be running via `flutter run`.
-
-Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
-
-When the same key exists in several identical subtrees (grid cells, repeated cards, embedded app instances), a plain match always hits the first one. Pass "ancestor_keys" alongside the selector to scope the search to one subtree, e.g. `{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}`. The keys nest, outermost first — each is looked up inside the previous one's subtree — so `["session_2", "grid.cell_3"]` reaches a cell whose own key also repeats in the other sessions. Only descendants of the last key match, never that element itself. If a key has no element the call fails naming it, instead of searching the whole tree; scroll_to keeps scrolling first, because the scope may not be built yet. ancestor_keys is ignored when targeting by coordinates or focused_element. "get_interactive_elements" accepts "ancestor_keys" as well, to list only that subtree — use it to find the right scope keys and to keep the listing small on busy screens.
-''';
 
 /// Runs the Marionette MCP server with the given configuration.
 ///
@@ -32,34 +14,34 @@ Future<int> runMcpServer({
   String? logFile,
   int? ssePort,
 }) async {
-  setupLogging(logLevel, logFile);
+  final logSubscription = setupLogging(logLevel, logFile);
 
   final vmService = VmServiceContext();
 
-  final server = McpServer(
-    const Implementation(name: 'marionette-mcp', version: version),
-    options: const McpServerOptions(
-      // listChanged: true advertises that the tool set can change at
-      // runtime — required for clients to refetch tools/list when an app
-      // connects with custom extensions registered via
-      // registerMarionetteExtension.
-      capabilities: ServerCapabilities(
-        tools: ServerCapabilitiesTools(listChanged: true),
-      ),
-      instructions: _instructions,
-    ),
-  );
-
-  vmService.registerTools(server);
-
-  if (ssePort != null) {
-    return _runSseServer(server, ssePort);
-  } else {
-    return _runStdioServer(server);
+  final server = createMcpServer(context: vmService);
+  try {
+    return ssePort == null
+        ? await _runStdioServer(server)
+        : await _runSseServer(server, ssePort);
+  } finally {
+    // The app connection outlives individual tool calls, so the server owns it.
+    // Closing only the MCP transport leaves its VM-service socket alive.
+    try {
+      await vmService.dispose();
+    } finally {
+      try {
+        await server.close();
+      } finally {
+        await logSubscription.cancel();
+      }
+    }
   }
 }
 
-void setupLogging(String logLevelName, String? logFile) {
+StreamSubscription<logging.LogRecord> setupLogging(
+  String logLevelName,
+  String? logFile,
+) {
   final logLevel = logging.Level.LEVELS.firstWhere(
     (e) => e.name == logLevelName,
     orElse: () => logging.Level.INFO,
@@ -69,14 +51,14 @@ void setupLogging(String logLevelName, String? logFile) {
 
   if (logFile != null) {
     final file = File(logFile)..createSync(recursive: true);
-    logging.Logger.root.onRecord.listen((record) {
+    return logging.Logger.root.onRecord.listen((record) {
       file.writeAsStringSync(
         '[${record.level.name}][${record.loggerName}][${_formatTime(record.time)}] ${record.message}\n',
         mode: FileMode.append,
       );
     });
   } else {
-    logging.Logger.root.onRecord.listen((record) {
+    return logging.Logger.root.onRecord.listen((record) {
       stderr.writeln(
         '[${record.level.name}][${record.loggerName}][${_formatTime(record.time)}] ${record.message}',
       );
@@ -135,7 +117,6 @@ Future<int> _runStdioServer(McpServer server) async {
   // Release the signal subscriptions so the event loop can drain and the
   // process actually exits on the stdin-EOF path.
   exitSignal.dispose();
-  await server.close();
   await transport.close();
   logger.info('Stopped');
   return 0;
@@ -143,33 +124,36 @@ Future<int> _runStdioServer(McpServer server) async {
 
 Future<int> _runSseServer(McpServer server, int ssePort) async {
   final logger = logging.Logger('main');
-  final sseServerManager = SseServerManager(server);
+  final manager = SseServerManager(server);
+  final exitSignal = ExitSignal();
+  HttpServer? httpServer;
   try {
-    final httpServer = await HttpServer.bind(
+    final listener = await HttpServer.bind(
       InternetAddress.loopbackIPv4,
       ssePort,
     );
+    httpServer = listener;
     logger.fine('Running MCP server on SSE port $ssePort');
-    unawaited(
-      ExitSignal().wait.then((signal) {
-        logger.info('Received ${signal.name}, stopping');
-        unawaited(httpServer.close());
-      }),
-    );
-
-    await for (final request in httpServer) {
-      unawaited(sseServerManager.handleRequest(request));
+    unawaited(exitSignal.wait.then((signal) async {
+      logger.info('Received ${signal.name}, stopping');
+      await listener.close(force: true);
+    }));
+    await for (final request in listener) {
+      unawaited(manager.handleRequest(request));
     }
-
-    logger.info('Stopping');
-    await server.close();
+    logger.info('Stopped');
+    return 0;
   } catch (e, st) {
     logger.severe('Error when waiting for MCP client connection', e, st);
     return 1;
+  } finally {
+    exitSignal.dispose();
+    await httpServer?.close(force: true);
+    await Future.wait([
+      for (final transport in manager.activeSseTransports.values.toList())
+        transport.close(),
+    ]);
   }
-
-  logger.info('Stopped');
-  return 0;
 }
 
 /// Waits for SIGINT or SIGTERM to signal graceful shutdown.

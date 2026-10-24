@@ -4,7 +4,7 @@ import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
+import 'package:marionette_mcp/runtime.dart';
 
 class LongPressCommand extends InstanceCommand {
   LongPressCommand(this._registry) {
@@ -37,14 +37,9 @@ class LongPressCommand extends InstanceCommand {
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
-    final matcher = buildMatcherFromArgs(
-      key: argResults?['key'] as String?,
-      identifier: argResults?['identifier'] as String?,
-      text: argResults?['text'] as String?,
-      type: argResults?['type'] as String?,
-      x: _parseNum(argResults?['x'] as String?),
-      y: _parseNum(argResults?['y'] as String?),
-      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
+    final matcher = buildValidatedMatcherFromArgs(
+      argResults,
+      fail: usageException,
     );
 
     if (!hasSelector(matcher)) {
@@ -65,10 +60,5 @@ class LongPressCommand extends InstanceCommand {
         response['message'] as String? ?? 'Successfully long pressed';
     stdout.writeln(message);
     return 0;
-  }
-
-  num? _parseNum(String? value) {
-    if (value == null) return null;
-    return num.tryParse(value);
   }
 }

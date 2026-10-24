@@ -3,10 +3,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/src/session/session_manager.dart';
-import 'package:marionette_mcp/src/session/step_logger.dart';
-import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
+import 'package:marionette_mcp/runtime.dart';
 
 /// Base class for commands that operate on a connected Flutter app instance.
 ///

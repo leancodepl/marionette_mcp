@@ -4,13 +4,7 @@ import 'dart:io';
 import 'package:marionette_cli/src/cli/adb_helper.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/src/video/ffmpeg_process.dart';
-import 'package:marionette_mcp/src/video/recording_session.dart';
-import 'package:marionette_mcp/src/video/tcp_frame_reader.dart';
-import 'package:marionette_mcp/src/video/video_options.dart';
-import 'package:marionette_mcp/src/video/video_recorder.dart';
-import 'package:marionette_mcp/src/video/ws_frame_server.dart';
-import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
+import 'package:marionette_mcp/runtime.dart';
 
 /// Signature for checking whether ffmpeg is available.
 typedef FfmpegAvailabilityChecker = Future<bool> Function({String ffmpegPath});
@@ -353,18 +347,29 @@ class RecordVideoCommand extends InstanceCommand {
         // returned transport info without actually starting the screencast,
         // so we just need one real startScreencast with wsPort.
         final wsServer = await _wsFrameServerFactory();
-        await connector.startScreencast(
-          maxWidth: effectiveSize?.width,
-          maxHeight: effectiveSize?.height,
-          wsPort: wsServer.port,
-        );
-        session = await _wsSessionFactory(
-          frameSource: wsServer,
-          outputFile: outputPath,
-          width: videoSize.width,
-          height: videoSize.height,
-          ffmpegPath: ffmpegPath,
-        );
+        try {
+          await connector.startScreencast(
+            maxWidth: effectiveSize?.width,
+            maxHeight: effectiveSize?.height,
+            wsPort: wsServer.port,
+          );
+          session = await _wsSessionFactory(
+            frameSource: wsServer,
+            outputFile: outputPath,
+            width: videoSize.width,
+            height: videoSize.height,
+            ffmpegPath: ffmpegPath,
+          );
+          // The session now owns the server and closes it on stop().
+        } catch (_) {
+          // Until the session is created, this scope owns the server.
+          try {
+            await wsServer.close();
+          } catch (_) {
+            // Preserve the startup error if cleanup also fails.
+          }
+          rethrow;
+        }
       } else {
         // Auto or forced TCP: try TCP first.
         //

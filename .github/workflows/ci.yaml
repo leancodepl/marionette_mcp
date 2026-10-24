@@ -64,6 +64,9 @@ jobs:
             exit 1
           fi
 
+      - name: Check frame protocol compatibility
+        run: dart tool/check_frame_protocol.dart
+
       - name: Analyze marionette_mcp
         run: |
           cd packages/marionette_mcp
@@ -176,6 +179,9 @@ jobs:
         run: |
           cd packages/marionette_logging
           flutter pub get
+
+      - name: Check frame protocol compatibility
+        run: dart tool/check_frame_protocol.dart
 
       - name: Analyze marionette_mcp
         run: |

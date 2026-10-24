@@ -4,7 +4,7 @@ import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
+import 'package:marionette_mcp/runtime.dart';
 
 class EnterTextCommand extends InstanceCommand {
   EnterTextCommand(this._registry) {
@@ -39,13 +39,9 @@ class EnterTextCommand extends InstanceCommand {
   @override
   Future<int> execute(VmServiceConnector connector) async {
     final input = argResults!['input'] as String;
-    final focused = argResults!['focused'] as bool;
-    final matcher = buildMatcherFromArgs(
-      key: argResults?['key'] as String?,
-      identifier: argResults?['identifier'] as String?,
-      text: argResults?['text'] as String?,
-      focused: focused,
-      ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
+    final matcher = buildValidatedMatcherFromArgs(
+      argResults,
+      fail: usageException,
     );
 
     if (!hasSelector(matcher)) {

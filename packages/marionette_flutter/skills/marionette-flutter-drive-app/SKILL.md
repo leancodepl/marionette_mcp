@@ -616,6 +616,10 @@ table above maps onto it one-for-one (`tap` ↔
 this side. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
 outermost first:
 `tap --key cell.joinButton --ancestor-keys session_2 --ancestor-keys grid.cell_3`.
+Coordinate targeting requires both `--x` and `--y` as finite numbers; coordinate
+swipes require all four start/end coordinates. Do not mix coordinate or focused
+targeting with element selectors. Invalid combinations fail before invoking
+the app. Ancestor scope still applies only to element targeting.
 Use `--uri <ws-uri>` for a one-off session
 and `register <name> <uri>` + `-i <name>` for repeated interaction with the
 same app; `marionette doctor` checks connectivity of every registered

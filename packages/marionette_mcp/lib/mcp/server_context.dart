@@ -3,20 +3,15 @@ import 'package:marionette_mcp/src/session/session_manager.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
-import 'package:marionette_mcp/src/vm_service/tools/device_tools.dart';
-import 'package:marionette_mcp/src/vm_service/tools/extension_tools.dart';
-import 'package:marionette_mcp/src/vm_service/tools/gesture_tools.dart';
-import 'package:marionette_mcp/src/vm_service/tools/inspection_tools.dart';
-import 'package:marionette_mcp/src/vm_service/tools/keyboard_tools.dart';
-import 'package:marionette_mcp/src/vm_service/tools/system_tools.dart';
-import 'package:marionette_mcp/src/vm_service/tools/text_tools.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
+import 'tools/tools.dart';
+
 /// Context for managing VM service connection and registering MCP tools.
 final class VmServiceContext {
-  VmServiceContext()
-      : connector = VmServiceConnector(),
+  VmServiceContext({VmServiceConnector? connector})
+      : connector = connector ?? VmServiceConnector(),
         _logger = logging.Logger('VmServiceContext'),
         _sessionManager = SessionManager(),
         _stepLogger = StepLogger();
@@ -27,23 +22,23 @@ final class VmServiceContext {
   final StepLogger _stepLogger;
 
   /// Owns the registry of dynamic extension tools across the lifetime of
-  /// this context. Reused across connect/disconnect cycles so a previously
-  /// disabled tool can be revived in place — see [DynamicExtensionTools].
-  late final DynamicExtensionTools _dynamicTools;
+  /// this context. Each connection replaces its app-specific registrations.
+  DynamicExtensionTools? _dynamicTools;
+  bool _disposed = false;
+  int _connectionEpoch = 0;
 
   /// Registers all VM service related tools with the MCP server.
   ///
-  /// Every tool is registered through [LoggedMcpServer] so each call is
+  /// Every tool is wrapped with [withStepLogging] so each call is
   /// recorded to the active session's steps.md (see [StepLogger]) — except
   /// `connect`/`disconnect`, registered on the raw server: they own the
   /// version-compatibility handshake with the binding and the session
   /// lifecycle itself (`connect` clearing it before every attempt and
   /// setting it fresh on success; `disconnect` clearing it right after
   /// logging its own step, which the generic wrapper has no hook for), so
-  /// they log manually instead of going through [LoggedMcpServer].
-  /// Everything else is delegated to themed registration functions.
+  /// they log manually instead of using the generic wrapper.
+  /// All other tools come from the central typed tool registry.
   void registerTools(McpServer server) {
-    final loggedServer = LoggedMcpServer(server, _stepLogger);
     _dynamicTools = DynamicExtensionTools(
       server: server,
       connector: connector,
@@ -51,13 +46,16 @@ final class VmServiceContext {
       stepLogger: _stepLogger,
     );
     _registerConnectionTools(server);
-    registerInspectionTools(loggedServer, connector, _logger);
-    registerGestureTools(loggedServer, connector, _logger);
-    registerTextTools(loggedServer, connector, _logger);
-    registerKeyboardTools(loggedServer, connector, _logger);
-    registerDeviceTools(loggedServer, connector, _logger);
-    registerExtensionTools(loggedServer, connector, _logger);
-    registerSystemTools(loggedServer, connector, _logger);
+    for (final tool in createAllTools(
+      connector: connector,
+      logger: _logger,
+      stepLogger: _stepLogger,
+    )) {
+      server.registerBaseTool(
+        tool,
+        callback: withStepLogging(_stepLogger, tool.name, tool.execute),
+      );
+    }
   }
 
   void _registerConnectionTools(McpServer server) {
@@ -95,6 +93,7 @@ final class VmServiceContext {
           required: ['uri'],
         ),
         callback: withStepLogging(_stepLogger, 'connect', (args, extra) async {
+          final epoch = ++_connectionEpoch;
           final uri = args['uri'] as String;
           _logger.info('Connecting to app at $uri');
           // A new connect attempt immediately supersedes whatever session
@@ -103,14 +102,18 @@ final class VmServiceContext {
           // still in flight (or after it fails) would append to a session
           // that's no longer the one actually in use.
           _stepLogger.session = null;
+          _disableDynamicTools();
 
           try {
+            _ensureCurrentConnection(epoch);
             await connector.connect(uri);
+            _ensureCurrentConnection(epoch);
 
             // Version compatibility check — unwind the connection on mismatch
             // so the next call to connect can start fresh.
             try {
               final bindingVersion = await connector.getVersion();
+              _ensureCurrentConnection(epoch);
               if (bindingVersion != v.version) {
                 await connector.disconnect();
                 return CallToolResult(
@@ -126,7 +129,9 @@ final class VmServiceContext {
               }
             } catch (err) {
               _logger.warning('Failed to check binding version', err);
-              await connector.disconnect();
+              if (!_disposed && epoch == _connectionEpoch) {
+                await connector.disconnect();
+              }
               return CallToolResult(
                 isError: true,
                 content: [
@@ -144,6 +149,7 @@ final class VmServiceContext {
             // MCP tool. Failures here are logged but don't fail the connect —
             // the generic call_custom_extension fallback keeps working.
             await _registerDynamicTools();
+            _ensureCurrentConnection(epoch);
 
             // Session reports are opt-in app-side
             // (MarionetteConfiguration.enableSessionReports): with them off,
@@ -163,6 +169,7 @@ final class VmServiceContext {
                 err,
               );
             }
+            _ensureCurrentConnection(epoch);
             if (!sessionReportsEnabled) {
               _stepLogger.session = null;
               return CallToolResult(
@@ -226,6 +233,8 @@ final class VmServiceContext {
         annotations: const ToolAnnotations(title: 'Disconnect from App'),
         inputSchema: const ToolInputSchema(properties: {}),
         callback: (args, extra) async {
+          final epoch = ++_connectionEpoch;
+          final disconnectLogger = StepLogger()..session = _stepLogger.session;
           _logger.info('Disconnecting from app');
 
           try {
@@ -234,7 +243,7 @@ final class VmServiceContext {
             _disableDynamicTools();
             await connector.disconnect();
 
-            final session = _stepLogger.session;
+            final session = disconnectLogger.session;
             final nudge = session == null
                 ? ''
                 : '\nSession: ${session.directory.path}\nWrite report.md now.';
@@ -245,15 +254,11 @@ final class VmServiceContext {
                 ),
               ],
             );
-            // Registered on the raw server (not LoggedMcpServer), so this
-            // step is logged manually here — and only now, right after, is
-            // the session cleared. That order matters: clearing it first
-            // would mean disconnect's own line never lands anywhere, and a
-            // stray call made after disconnecting — or a later failed
-            // reconnect — would otherwise silently append to a session
-            // whose report may already be written.
-            _stepLogger.logStep('disconnect', args, result);
-            _stepLogger.session = null;
+            // Attribute the step to the connection being closed. A newer
+            // connect may already own a different session while cleanup waits.
+            if (!_disposed)
+              disconnectLogger.logStep('disconnect', args, result);
+            if (epoch == _connectionEpoch) _stepLogger.session = null;
             return result;
           } catch (err) {
             _logger.severe('Error during disconnect', err);
@@ -261,7 +266,8 @@ final class VmServiceContext {
               isError: true,
               content: [TextContent(text: 'Error during disconnect: $err')],
             );
-            _stepLogger.logStep('disconnect', args, result);
+            if (!_disposed)
+              disconnectLogger.logStep('disconnect', args, result);
             return result;
           }
         },
@@ -270,10 +276,27 @@ final class VmServiceContext {
 
   Future<void> _registerDynamicTools() async {
     // A reconnect without a clean disconnect would leak the previous
-    // batch — disable any leftovers before registering fresh ones.
-    _dynamicTools.disableAll();
-    await _dynamicTools.registerAll();
+    // batch — remove any leftovers before registering fresh ones.
+    _dynamicTools?.removeAll();
+    await _dynamicTools?.registerAll();
   }
 
-  void _disableDynamicTools() => _dynamicTools.disableAll();
+  void _disableDynamicTools() => _dynamicTools?.removeAll();
+
+  void _ensureCurrentConnection(int epoch) {
+    if (_disposed || epoch != _connectionEpoch) {
+      throw StateError('The app connection was closed or superseded.');
+    }
+  }
+
+  /// Releases dynamic registrations, reports, and the VM-service connection.
+  ///
+  /// Called by the server owner on transport close, startup failure, or signal.
+  Future<void> dispose() async {
+    _disposed = true;
+    ++_connectionEpoch;
+    _disableDynamicTools();
+    _stepLogger.session = null;
+    await connector.disconnect();
+  }
 }
