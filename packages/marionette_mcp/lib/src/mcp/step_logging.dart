@@ -3,16 +3,8 @@ import 'package:mcp_dart/mcp_dart.dart';
 import '../session/report_steps.dart';
 import '../session/session.dart';
 
-/// Tools whose successful result is a short, synthesized confirmation
-/// message (e.g. "Successfully tapped"), never a dump of application data —
-/// safe to echo verbatim (truncated) in steps.md. Everything else —
-/// data-listing tools (`get_interactive_elements`, `get_logs`,
-/// `call_custom_extension`, `list_custom_extensions`) and any
-/// dynamically-promoted custom extension tool, whose result may carry
-/// arbitrary app data — gets a generic outcome on success instead, so
-/// steps.md never ends up persisting a payload. Error messages are shown
-/// regardless of the tool (see [_describeOutcome]): they're diagnostic
-/// context the report contract explicitly wants, not a payload.
+// Record built-in confirmations, but summarize listing/extension payloads to
+// avoid persisting application data. Error details remain diagnostic output.
 const _shortConfirmationTools = {
   'connect',
   'disconnect',
@@ -32,23 +24,13 @@ const _shortConfirmationTools = {
   'take_screenshots',
 };
 
-/// Tools whose success message is one status line followed by session
-/// bookkeeping aimed at the agent — `connect`'s "Opened session: <path>",
-/// `disconnect`'s "Session: <path>" and its report nudge. That tail is
-/// redundant inside the very session it points at (and, being an absolute
-/// path, mostly lost to truncation), so only the first line is logged.
+// Session paths and report prompts are redundant inside the report itself.
 const _firstLineOnlyTools = {'connect', 'disconnect'};
 
-/// Appends one line per tool call to the active session's steps.md: tool,
-/// selector, outcome. No payloads. No-ops when there is no active session
-/// (nothing connected yet).
+/// Records one bounded outcome per call without persisting application payloads.
 class StepLogger {
-  /// The session tool calls are currently logged into. Set by `connect` on
-  /// success; cleared both at the very start of every `connect` attempt and
-  /// once `disconnect`'s own step has been logged (see `VmServiceContext`),
-  /// so neither a stray call made while disconnected nor one that slips in
-  /// during a reconnect attempt — successful or not — can silently append
-  /// to a session whose report may already be written.
+  /// Current report session supplied by runtime lifecycle callbacks.
+  /// In-flight calls and disconnect retain their own session snapshots.
   Session? session;
 
   void logStep(
@@ -102,14 +84,8 @@ class StepLogger {
       .firstWhere((t) => t.isNotEmpty, orElse: () => '');
 }
 
-/// Wraps [callback] so every call is recorded as one line in the active
-/// session's steps.md via [stepLogger] before the result is returned to the
-/// client — including a call [callback] itself throws out of (an
-/// unexpected, un-caught error rather than the usual `isError: true`
-/// result), so the report contract's `Tested:` line — rendered from
-/// steps.md, not the agent's own claim — never silently undercounts an
-/// attempt just because it failed in an unanticipated way. The session is
-/// captured when the call starts, so reconnects cannot reattribute its result.
+/// Records results and thrown failures against the invocation's original session.
+/// Capturing before the await prevents reconnects from reattributing results.
 ToolFunction withStepLogging(
   StepLogger stepLogger,
   String name,

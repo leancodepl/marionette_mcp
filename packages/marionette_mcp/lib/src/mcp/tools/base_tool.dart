@@ -1,18 +1,9 @@
-/// Base class for MCP tools with dependency injection.
-///
-/// Each tool implementation should extend this class and provide:
-/// - [name]: Unique tool identifier
-/// - [description]: Human-readable description of what the tool does
-/// - [inputSchema]: JSON schema for tool arguments
-/// - [outputSchema]: Optional JSON schema for tool output
-/// - [annotations]: Optional tool behavior hints (readOnly, destructive, etc.)
-/// - [meta]: Optional metadata for the tool
-/// - [execute]: Implementation of the tool logic
+/// Typed MCP tool contracts and registration.
 library;
 
 import 'package:mcp_dart/mcp_dart.dart';
 
-/// Base class for all MCP tools.
+/// Defines a tool's metadata, schemas, and execution.
 abstract class BaseTool {
   /// Unique name for this tool.
   String get name;
@@ -20,34 +11,28 @@ abstract class BaseTool {
   /// Human-readable description of what this tool does.
   String? get description;
 
-  /// JSON schema defining the input arguments.
-  /// Use [JsonSchema.object()] to create an object schema.
+  /// Object schema for tool arguments.
   ToolInputSchema get inputSchema;
 
   /// Optional JSON schema defining the output format.
   ToolOutputSchema? get outputSchema => null;
 
-  /// Optional tool annotations with hints about tool behavior.
-  /// Includes readOnlyHint, destructiveHint, idempotentHint, etc.
+  /// Optional hints about tool behavior.
   ToolAnnotations? get annotations => null;
 
   /// Optional metadata for the tool.
   Map<String, dynamic>? get meta => null;
 
-  /// Execute the tool with the given arguments.
-  ///
-  /// Returns a [CallToolResult] with either success content or an error.
+  /// Executes validated arguments and returns MCP content or a tool error.
   Future<CallToolResult> execute(
     Map<String, dynamic> args,
     RequestHandlerExtra extra,
   );
 }
 
-/// Extension to register tools with an MCP server.
+/// Registers typed tools with an MCP server.
 extension ToolRegistration on McpServer {
-  /// Register a [BaseTool] with this server.
-  ///
-  /// Use [callback] to wrap execution with shared concerns such as logging.
+  /// Registers [tool], optionally wrapping execution with [callback].
   RegisteredTool registerBaseTool(BaseTool tool, {ToolFunction? callback}) {
     return registerTool(
       tool.name,

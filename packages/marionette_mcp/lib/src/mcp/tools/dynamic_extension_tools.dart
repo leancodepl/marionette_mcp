@@ -8,26 +8,10 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'base_tool.dart';
 import 'tool_results.dart';
 
-/// Registers MCP tools at runtime for each custom extension exposed by the
-/// connected Flutter app via `registerMarionetteExtension`.
-///
-/// Registrations belong to the current app connection and are removed on
-/// disconnect. Reconnecting registers the current schemas from scratch.
-///
-/// Only extensions that ship an `inputSchema` get promoted — schema-less
-/// extensions remain reachable through the generic `call_custom_extension`
-/// tool, preserving backward compatibility with apps that haven't migrated.
-///
-/// Extension names are sanitized to a client-safe MCP tool name (see
-/// [sanitizeToolName]). The `namespace.method` convention is out of spec for
-/// the underlying tool-calling APIs — Anthropic allows `[a-zA-Z0-9_]`, OpenAI
-/// `[a-zA-Z0-9_-]`, both rejecting the `.` separator — and clients diverge on
-/// how they cope (Claude Code rewrites the name transparently; VS Code Copilot
-/// rejects anything outside `[a-z0-9_-]` and drops the tool). Sanitizing to
-/// the strictest set keeps the tool usable everywhere. The underlying
-/// extension is still invoked by its real name, so `appNavigation.goToPage` is
-/// exposed as the tool `app_navigation_go_to_page` but dispatched to
-/// `appNavigation.goToPage` on the VM service.
+/// Promotes schema-bearing app extensions for the current connection.
+/// Schema-less extensions remain available through `call_custom_extension`.
+/// Names are sanitized for clients; VM calls retain the original extension name.
+/// Disconnect removes registrations; reconnect discovers fresh schemas.
 class DynamicExtensionTools {
   DynamicExtensionTools({
     required McpServer server,
@@ -48,24 +32,14 @@ class DynamicExtensionTools {
   final Map<String, String> _extensionByTool = {};
   int _generation = 0;
 
-  /// The tools registered by the most recent [registerAll] call that have not
-  /// yet been removed. Exposed for tests.
+  /// Snapshot of active registrations.
   List<RegisteredTool> get registeredTools => List.unmodifiable(_tools.values);
 
-  /// The real extension name backing the promoted MCP tool [toolName], or
-  /// null if no such tool is registered. The promoted tool name is
-  /// sanitized (see [sanitizeToolName]); this maps it back to the name the
-  /// VM service extension is actually invoked with. Exposed for introspection
-  /// and tests.
+  /// Original VM extension name for a sanitized MCP tool name.
   String? extensionNameForTool(String toolName) => _extensionByTool[toolName];
 
-  /// Reads the connected app's custom extensions and promotes each one
-  /// with an `inputSchema` to a first-class MCP tool.
-  ///
-  /// Tools whose name collides with a built-in (or another custom) tool
-  /// are skipped with a warning — the operator sees the conflict in logs
-  /// and renames their extension. Tools whose schema fails to parse are
-  /// likewise skipped with a warning.
+  /// Discovers schema-bearing extensions, skipping malformed schemas and
+  /// conflicting names with a warning.
   Future<void> registerAll() async {
     removeAll();
     final generation = _generation;
@@ -137,10 +111,7 @@ class DynamicExtensionTools {
     );
   }
 
-  /// Removes the tools owned by the current app connection.
-  ///
-  /// mcp_dart 2.4.3 releases their registry names, so reconnects need no pool
-  /// of disabled handles and a different app can reuse a sanitized name.
+  /// Removes registrations and releases their names for the next connection.
   void removeAll() {
     ++_generation;
     for (final tool in _tools.values) {
@@ -249,19 +220,9 @@ class DynamicExtensionTools {
   }
 }
 
-/// Maps a custom-extension name to an MCP tool name accepted across clients.
-/// The target set `[a-z0-9_-]` is the strictest in common use (VS Code Copilot
-/// enforces it); it also stays within the `.`-rejecting character sets the
-/// Anthropic and OpenAI tool-calling APIs require, which the `namespace.method`
-/// convention would otherwise violate.
-///
-/// A name already within the allowed set is returned verbatim — including
-/// any leading, trailing, or repeated `_`/`-` the author chose — so valid
-/// names are never silently rewritten. Otherwise the transform lower-cases
-/// the name, inserts `_` at camelCase boundaries so `goToPage` reads as
-/// `go_to_page`, replaces every other disallowed character (e.g. the `.`
-/// namespace separator) with `_`, then collapses and trims runs of `_`. For
-/// example `appNavigation.goToPage` becomes `app_navigation_go_to_page`.
+/// Converts extension names to the client-safe `[a-z0-9_-]` set.
+/// Already-valid names stay unchanged to avoid collisions. Otherwise camel-case
+/// boundaries and punctuation become underscores: `app.goToPage` → `app_go_to_page`.
 String sanitizeToolName(String name) {
   // Already client-safe: leave it exactly as the author wrote it. Collapsing
   // or trimming here would change valid names (e.g. `__foo__` -> `foo`) and
