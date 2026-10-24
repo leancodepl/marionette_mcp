@@ -123,6 +123,20 @@ Disposing the context retires dynamic tools and closes its app connection.
 Disconnecting releases dynamic tool names, so reconnecting uses the current
 app's schemas without retaining disabled registrations.
 
+## Bootstrap and shutdown
+
+The executable parses options and delegates to `runMcpServer`. That runner owns
+logging, a shared signal owner, the app context, the protocol server, and
+the selected transport. Transport startup helpers provide completion and close
+operations; they do not each implement their own process lifecycle.
+
+The runner waits for a signal or transport completion, then closes the listener
+and active transports, disposes the app runtime, closes the protocol server,
+and cancels logging. Cleanup also covers partial startup. Stdio completion
+includes immediate stdin EOF; SSE retains its existing endpoints and explicitly
+closes active sessions. The SDK owns protocol negotiation, dispatch, validation,
+and transport framing; the application owns its process and app resources.
+
 ## Adding or changing a tool
 
 1. Put reusable workflow/state/persistence behavior in a runtime service. Keep

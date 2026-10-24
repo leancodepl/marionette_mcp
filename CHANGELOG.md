@@ -4,7 +4,7 @@
 - Upgrade `mcp_dart` to `^2.4.3` and use its fixed dynamic-tool removal on reconnect.
 - Fix MCP server shutdown leaving app connections open.
 - Keep in-flight tool steps in their original report across reconnects, and clear connection status when the app disconnects.
-- Reject invalid SSE ports in the standalone MCP executable instead of falling back to stdio, and report server startup failures with a nonzero exit code.
+- Reject invalid SSE ports in the standalone MCP executable instead of falling back to stdio, and report startup failures, including log-file setup, with a nonzero exit code.
 - Expose public server and app-connection entrypoints, with typed MCP tools separated from startup and configuration.
 - Fix `record-video --width/--height` recording only the top-left corner of the screen at full scale instead of the whole screen scaled down to that size. Web recordings were not affected ([#134](https://github.com/leancodepl/marionette_mcp/issues/134))
 

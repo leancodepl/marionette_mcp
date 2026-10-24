@@ -14,27 +14,54 @@ Future<int> runMcpServer({
   String? logFile,
   int? ssePort,
 }) async {
-  final logSubscription = setupLogging(logLevel, logFile);
+  final logger = logging.Logger('main');
+  StreamSubscription<logging.LogRecord>? logSubscription;
+  VmServiceContext? context;
+  McpServer? server;
+  ExitSignal? exitSignal;
+  _RunningTransport? transport;
 
-  final vmService = VmServiceContext();
-
-  final server = createMcpServer(context: vmService);
   try {
-    return ssePort == null
-        ? await _runStdioServer(server)
-        : await _runSseServer(server, ssePort);
-  } finally {
-    // The app connection outlives individual tool calls, so the server owns it.
-    // Closing only the MCP transport leaves its VM-service socket alive.
     try {
-      await vmService.dispose();
+      logSubscription = setupLogging(logLevel, logFile);
+      context = VmServiceContext();
+      server = createMcpServer(context: context);
+      exitSignal = ExitSignal();
+      transport = ssePort == null
+          ? await _startStdioServer(server, logger)
+          : await _startSseServer(server, ssePort, logger);
+
+      final reason = await Future.any([
+        exitSignal.wait.then((signal) => 'Received ${signal.name}'),
+        transport.done.then(
+            (_) => ssePort == null ? 'stdin closed' : 'HTTP listener closed'),
+      ]);
+      logger.info('$reason, stopping');
     } finally {
+      exitSignal?.dispose();
       try {
-        await server.close();
+        await transport?.close();
       } finally {
-        await logSubscription.cancel();
+        // The app connection outlives individual tool calls. Its owner must
+        // also cancel pending VM WebSocket upgrades during shutdown.
+        try {
+          await context?.dispose();
+        } finally {
+          await server?.close();
+        }
       }
     }
+    logger.info('Stopped');
+    return 0;
+  } catch (error, stackTrace) {
+    if (logSubscription == null) {
+      stderr.writeln('Error when starting MCP server: $error');
+    } else {
+      logger.severe('Error when running MCP server', error, stackTrace);
+    }
+    return 1;
+  } finally {
+    await logSubscription?.cancel();
   }
 }
 
@@ -72,88 +99,63 @@ String _formatTime(DateTime time) {
       '${time.second.toString().padLeft(2, '0')}';
 }
 
-Future<int> _runStdioServer(McpServer server) async {
-  final logger = logging.Logger('main');
+typedef _RunningTransport = ({
+  Future<void> done,
+  Future<void> Function() close,
+});
 
+Future<_RunningTransport> _startStdioServer(
+  McpServer server,
+  logging.Logger logger,
+) async {
   final transport = StdioServerTransport();
-  final exitSignal = ExitSignal();
   final stdinClosed = Completer<void>();
+  final previousOnClose = server.server.onclose;
 
-  // Install the close handler before connecting. An immediate stdin EOF
-  // (e.g. `</dev/null`) can close the transport during or right after
-  // connect(); registering afterwards risks missing that close and hanging
-  // until a signal. Fires when the transport closes — including stdin EOF,
-  // i.e. the MCP host went away without sending a signal. Per the stdio
-  // lifecycle the server should shut down then, not wait for SIGINT/SIGTERM.
+  // EOF may arrive during connect, so install the handler before starting.
+  // Protocol.connect owns transport.onclose; use its public server callback.
   server.server.onclose = () {
-    if (!stdinClosed.isCompleted) stdinClosed.complete();
+    try {
+      previousOnClose?.call();
+    } finally {
+      if (!stdinClosed.isCompleted) stdinClosed.complete();
+    }
   };
 
-  try {
-    logger.fine('Running MCP server on stdio');
-    await server.connect(transport);
-    logger.info('Server started');
-  } catch (e, st) {
-    logger.severe('Error when starting the Stdio transport', e, st);
-    exitSignal.dispose();
-    return 1;
-  }
-
-  // Stop on whichever happens first: an OS signal or the transport closing.
-  // Only the first cause is logged — closing the server below re-triggers
-  // `onclose`, which would otherwise log a misleading second reason.
-  var stopping = false;
-  void logStop(String reason) {
-    if (stopping) return;
-    stopping = true;
-    logger.info('$reason, stopping');
-  }
-
-  await Future.any([
-    exitSignal.wait.then((signal) => logStop('Received ${signal.name}')),
-    stdinClosed.future.then((_) => logStop('stdin closed')),
-  ]);
-
-  // Release the signal subscriptions so the event loop can drain and the
-  // process actually exits on the stdin-EOF path.
-  exitSignal.dispose();
-  await transport.close();
-  logger.info('Stopped');
-  return 0;
+  logger.fine('Running MCP server on stdio');
+  await server.connect(transport);
+  logger.info('Server started');
+  return (done: stdinClosed.future, close: transport.close);
 }
 
-Future<int> _runSseServer(McpServer server, int ssePort) async {
-  final logger = logging.Logger('main');
+Future<_RunningTransport> _startSseServer(
+  McpServer server,
+  int port,
+  logging.Logger logger,
+) async {
   final manager = SseServerManager(server);
-  final exitSignal = ExitSignal();
-  HttpServer? httpServer;
-  try {
-    final listener = await HttpServer.bind(
-      InternetAddress.loopbackIPv4,
-      ssePort,
-    );
-    httpServer = listener;
-    logger.fine('Running MCP server on SSE port $ssePort');
-    unawaited(exitSignal.wait.then((signal) async {
-      logger.info('Received ${signal.name}, stopping');
-      await listener.close(force: true);
-    }));
+  final listener = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+  logger.fine('Running MCP server on SSE port $port');
+
+  Future<void> serveRequests() async {
     await for (final request in listener) {
       unawaited(manager.handleRequest(request));
     }
-    logger.info('Stopped');
-    return 0;
-  } catch (e, st) {
-    logger.severe('Error when waiting for MCP client connection', e, st);
-    return 1;
-  } finally {
-    exitSignal.dispose();
-    await httpServer?.close(force: true);
-    await Future.wait([
-      for (final transport in manager.activeSseTransports.values.toList())
-        transport.close(),
-    ]);
   }
+
+  Future<void> close() async {
+    try {
+      await listener.close(force: true);
+    } finally {
+      // Legacy SSE has no manager.stop API; close every active session.
+      await Future.wait([
+        for (final transport in manager.activeSseTransports.values.toList())
+          transport.close(),
+      ]);
+    }
+  }
+
+  return (done: serveRequests(), close: close);
 }
 
 /// Waits for SIGINT or SIGTERM to signal graceful shutdown.
