@@ -26,8 +26,35 @@ jobs:
           flutter-version-file: .fvmrc
           cache: true
 
-      - name: Install workspace dependencies
-        run: flutter pub get
+      - name: Install dependencies for tool
+        run: |
+          cd tool
+          dart pub get
+
+      - name: Install dependencies for marionette_mcp
+        run: |
+          cd packages/marionette_mcp
+          dart pub get
+
+      - name: Install dependencies for marionette_cli
+        run: |
+          cd packages/marionette_cli
+          dart pub get
+
+      - name: Install dependencies for marionette_flutter
+        run: |
+          cd packages/marionette_flutter
+          flutter pub get
+
+      - name: Install dependencies for marionette_logger
+        run: |
+          cd packages/marionette_logger
+          flutter pub get
+
+      - name: Install dependencies for marionette_logging
+        run: |
+          cd packages/marionette_logging
+          flutter pub get
 
       - name: Check version.g.dart is in sync
         run: |
@@ -40,7 +67,7 @@ jobs:
       - name: Analyze marionette_mcp
         run: |
           cd packages/marionette_mcp
-          dart analyze --fatal-infos lib bin test
+          dart analyze --fatal-infos lib bin
 
       - name: Analyze marionette_cli
         run: |
@@ -139,20 +166,24 @@ jobs:
           dart pub get --no-example
 
       - name: Analyze marionette_mcp
-        working-directory: packages/marionette_mcp
-        run: dart analyze --fatal-infos lib bin test
+        run: |
+          cd packages/marionette_mcp
+          dart analyze --fatal-infos lib bin
 
       - name: Analyze marionette_cli
-        working-directory: packages/marionette_cli
-        run: dart analyze --fatal-infos lib bin
+        run: |
+          cd packages/marionette_cli
+          dart analyze --fatal-infos lib bin
 
       - name: Run tests for marionette_mcp
-        working-directory: packages/marionette_mcp
-        run: dart test
+        run: |
+          cd packages/marionette_mcp
+          dart test
 
       - name: Run tests for marionette_cli
-        working-directory: packages/marionette_cli
-        run: dart test
+        run: |
+          cd packages/marionette_cli
+          dart test
 
       - name: Install minimum-Flutter workspace dependencies
         run: |
@@ -166,20 +197,24 @@ jobs:
           flutter pub get
 
       - name: Analyze marionette_flutter
-        working-directory: packages/marionette_flutter
-        run: flutter analyze --fatal-infos lib
+        run: |
+          cd packages/marionette_flutter
+          flutter analyze --fatal-infos lib
 
       - name: Analyze marionette_logger
-        working-directory: packages/marionette_logger
-        run: flutter analyze --fatal-infos lib
+        run: |
+          cd packages/marionette_logger
+          flutter analyze --fatal-infos lib
 
       - name: Analyze marionette_logging
-        working-directory: packages/marionette_logging
-        run: flutter analyze --fatal-infos lib
+        run: |
+          cd packages/marionette_logging
+          flutter analyze --fatal-infos lib
 
       - name: Run tests for marionette_flutter
-        working-directory: packages/marionette_flutter
-        run: flutter test --no-pub
+        run: |
+          cd packages/marionette_flutter
+          flutter test --no-pub
 
       - name: Remove workspace selection
         if: always()

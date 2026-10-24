@@ -150,6 +150,15 @@ includes immediate stdin EOF; SSE retains its existing endpoints and explicitly
 closes active sessions. The SDK owns protocol negotiation, dispatch, validation,
 and transport framing; the application owns its process and app resources.
 
+### Future Streamable HTTP support
+
+Streamable HTTP is deferred from this refactor. In `mcp_dart` 2.4.3 the stateless
+HTTP profile creates a server for each request, while Marionette's `connect`
+workflow retains app state. A future transport must first choose explicit
+client-state ownership and cleanup semantics. The server factory and transport
+startup boundary are the extension points; no HTTP flags or state-routing
+abstraction are added in advance.
+
 ## Adding or changing a tool
 
 1. Put reusable workflow/state/persistence behavior in a runtime service. Keep

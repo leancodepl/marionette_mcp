@@ -206,6 +206,12 @@ in the app, and `dart pub global activate marionette_mcp`/`marionette_cli`
 for the bridge (or `dart pub add dev:marionette_mcp`/`dev:marionette_cli` if
 you'd rather pin it as a dev dependency instead of a global tool).
 
+For Flutter 3.27 apps using `flutter_test`, install the bridge globally:
+the test SDK's `meta` pin conflicts with `mcp_dart` 2.4.3 in the same dependency
+graph. Repository examples resolve a combined graph and should use the Flutter
+version pinned in `.fvmrc`. The binding still supports Flutter 3.27 when the
+bridge runs separately.
+
 ## When to use this
 
 Reach for Marionette any time the fastest way to know whether something works
