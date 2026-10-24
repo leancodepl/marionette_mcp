@@ -5,13 +5,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'base_tool.dart';
 import 'tool_results.dart';
 
-/// Creates the system tools with their shared dependencies.
-List<BaseTool> createSystemTools({
-  required VmServiceConnector connector,
-  required logging.Logger logger,
-}) =>
-    [HotReloadTool(connector, logger), HotRestartTool(connector, logger)];
-
 /// MCP tool `hot_reload`.
 class HotReloadTool extends BaseTool {
   HotReloadTool(this.connector, this.logger);

@@ -8,19 +8,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 
 import 'base_tool.dart';
 
-/// Creates the inspection tools with their shared dependencies.
-List<BaseTool> createInspectionTools({
-  required VmServiceConnector connector,
-  required logging.Logger logger,
-  required ScreenshotService screenshotService,
-  required Session? Function() currentSession,
-}) =>
-    [
-      GetInteractiveElementsTool(connector, logger),
-      GetLogsTool(connector, logger),
-      TakeScreenshotsTool(screenshotService, logger, currentSession),
-    ];
-
 /// MCP tool `get_interactive_elements`.
 class GetInteractiveElementsTool extends BaseTool {
   GetInteractiveElementsTool(this.connector, this.logger);
@@ -231,50 +218,27 @@ class TakeScreenshotsTool extends BaseTool {
     RequestHandlerExtra extra,
   ) async {
     logger.info('Taking screenshots');
-    return runTool(
-      logger,
-      'take screenshots',
-      () => _captureScreenshots(screenshotService, currentSession(), args),
-    );
-  }
-}
-
-/// Handles a `take_screenshots` invocation: captures via [connector], then
-/// either returns the images inline or — when `args['inline'] == false` —
-/// saves them into [session]'s screenshots directory and returns their paths.
-///
-/// Extracted from the tool callback so the inline/save-only branching can be
-/// exercised in isolation.
-Future<CallToolResult> takeScreenshots(
-  VmServiceConnector connector,
-  Session? session,
-  Map<String, dynamic> args,
-) =>
-    _captureScreenshots(ScreenshotService(connector), session, args);
-
-Future<CallToolResult> _captureScreenshots(
-  ScreenshotService screenshotService,
-  Session? session,
-  Map<String, dynamic> args,
-) async {
-  try {
-    final capture = await screenshotService.capture(
-      inline: args['inline'] != false,
-      session: session,
-    );
-    return _screenshotResult(capture);
-  } on ScreenshotSessionRequired {
-    return CallToolResult(
-      isError: true,
-      content: [
-        const TextContent(
-          text: 'inline: false requires an active session, which is '
-              'only created once connect succeeds and only when the app '
-              'enables session reports '
-              '(MarionetteConfiguration.enableSessionReports).',
-        ),
-      ],
-    );
+    return runTool(logger, 'take screenshots', () async {
+      try {
+        final capture = await screenshotService.capture(
+          inline: args['inline'] != false,
+          session: currentSession(),
+        );
+        return _screenshotResult(capture);
+      } on ScreenshotSessionRequired {
+        return CallToolResult(
+          isError: true,
+          content: [
+            const TextContent(
+              text: 'inline: false requires an active session, which is '
+                  'only created once connect succeeds and only when the app '
+                  'enables session reports '
+                  '(MarionetteConfiguration.enableSessionReports).',
+            ),
+          ],
+        );
+      }
+    });
   }
 }
 

@@ -8,13 +8,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'base_tool.dart';
 import 'tool_results.dart';
 
-/// Creates the text tools with their shared dependencies.
-List<BaseTool> createTextTools({
-  required VmServiceConnector connector,
-  required logging.Logger logger,
-}) =>
-    [EnterTextTool(connector, logger)];
-
 /// MCP tool `enter_text`.
 class EnterTextTool extends BaseTool {
   EnterTextTool(this.connector, this.logger);

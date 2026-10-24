@@ -24,24 +24,33 @@ export 'system_tools.dart';
 export 'text_tools.dart';
 
 /// Creates the complete built-in catalog with shared connection/session state.
-List<BaseTool> createAllTools({required VmServiceContext context}) => [
-      ConnectTool(context),
-      DisconnectTool(context),
-      ...createInspectionTools(
-        connector: context.connector,
-        logger: context.logger,
-        screenshotService: ScreenshotService(context.connector),
-        currentSession: () => context.connection.session,
-      ),
-      ...createGestureTools(
-          connector: context.connector, logger: context.logger),
-      ...createTextTools(connector: context.connector, logger: context.logger),
-      ...createKeyboardTools(
-          connector: context.connector, logger: context.logger),
-      ...createDeviceTools(
-          connector: context.connector, logger: context.logger),
-      ...createExtensionTools(
-          connector: context.connector, logger: context.logger),
-      ...createSystemTools(
-          connector: context.connector, logger: context.logger),
-    ];
+List<BaseTool> createAllTools({required VmServiceContext context}) {
+  final connector = context.connector;
+  final logger = context.logger;
+  return [
+    ConnectTool(context),
+    DisconnectTool(context),
+    GetInteractiveElementsTool(connector, logger),
+    GetLogsTool(connector, logger),
+    TakeScreenshotsTool(
+      ScreenshotService(connector),
+      logger,
+      () => context.connection.session,
+    ),
+    TapTool(connector, logger),
+    SecondaryTapTool(connector, logger),
+    DoubleTapTool(connector, logger),
+    LongPressTool(connector, logger),
+    SwipeTool(connector, logger),
+    PinchZoomTool(connector, logger),
+    PressBackButtonTool(connector, logger),
+    ScrollToTool(connector, logger),
+    EnterTextTool(connector, logger),
+    PressKeyTool(connector, logger),
+    SetDeviceConfigTool(connector, logger),
+    ListCustomExtensionsTool(connector, logger),
+    CallCustomExtensionTool(connector, logger),
+    HotReloadTool(connector, logger),
+    HotRestartTool(connector, logger),
+  ];
+}

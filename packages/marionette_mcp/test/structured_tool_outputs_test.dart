@@ -2,14 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/mcp/tools/base_tool.dart';
-import 'package:marionette_mcp/src/mcp/tools/device_tools.dart';
-import 'package:marionette_mcp/src/mcp/tools/extension_tools.dart';
-import 'package:marionette_mcp/src/mcp/tools/gesture_tools.dart';
-import 'package:marionette_mcp/src/mcp/tools/inspection_tools.dart';
-import 'package:marionette_mcp/src/mcp/tools/keyboard_tools.dart';
-import 'package:marionette_mcp/src/mcp/tools/system_tools.dart';
-import 'package:marionette_mcp/src/mcp/tools/text_tools.dart';
+import 'package:marionette_mcp/src/mcp/server_context.dart';
+import 'package:marionette_mcp/src/mcp/tools/tools.dart';
 import 'package:marionette_mcp/src/session/screenshot_service.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
@@ -20,6 +14,9 @@ class _Connector implements VmServiceConnector {
   Map<String, dynamic> response = {};
   bool systemSuccess = true;
   bool fails = false;
+
+  @override
+  Future<void> disconnect() async {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
@@ -44,23 +41,10 @@ void main() {
 
   setUp(() {
     connector = _Connector();
-    final logger = logging.Logger.detached('structured-results');
+    final context = VmServiceContext(connector: connector);
+    addTearDown(context.dispose);
     tools = {
-      for (final tool in [
-        ...createDeviceTools(connector: connector, logger: logger),
-        ...createExtensionTools(connector: connector, logger: logger),
-        ...createGestureTools(connector: connector, logger: logger),
-        ...createInspectionTools(
-          connector: connector,
-          logger: logger,
-          screenshotService: ScreenshotService(connector),
-          currentSession: () => null,
-        ),
-        ...createKeyboardTools(connector: connector, logger: logger),
-        ...createSystemTools(connector: connector, logger: logger),
-        ...createTextTools(connector: connector, logger: logger),
-      ])
-        tool.name: tool,
+      for (final tool in createAllTools(context: context)) tool.name: tool
     };
   });
 
@@ -89,8 +73,8 @@ void main() {
     'hot_restart': ({}, 'Hot restart completed successfully'),
   };
 
-  test('all 18 static tools have schemas with required fields', () {
-    expect(tools, hasLength(18));
+  test('all 20 built-in tools have schemas with required fields', () {
+    expect(tools, hasLength(20));
     for (final tool in tools.values) {
       expect(tool.outputSchema, isNotNull, reason: tool.name);
       expect(tool.outputSchema!.required, isNotEmpty, reason: tool.name);
@@ -250,7 +234,12 @@ void main() {
     connector.response = {
       'screenshots': ['aGVsbG8=']
     };
-    final result = await takeScreenshots(connector, session, {'inline': false});
+    final tool = TakeScreenshotsTool(
+      ScreenshotService(connector),
+      logging.Logger.detached('structured-screenshots'),
+      () => session,
+    );
+    final result = await tool.execute({'inline': false}, extra);
     validate('take_screenshots', result);
     final paths = (result.structuredContent!['paths'] as List<String>);
     expect(result.structuredContent,

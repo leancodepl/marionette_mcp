@@ -6,13 +6,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'base_tool.dart';
 import 'tool_results.dart';
 
-/// Creates the device tools with their shared dependencies.
-List<BaseTool> createDeviceTools({
-  required VmServiceConnector connector,
-  required logging.Logger logger,
-}) =>
-    [SetDeviceConfigTool(connector, logger)];
-
 /// MCP tool `set_device_config`.
 class SetDeviceConfigTool extends BaseTool {
   SetDeviceConfigTool(this.connector, this.logger);
@@ -67,60 +60,48 @@ class SetDeviceConfigTool extends BaseTool {
   Future<CallToolResult> execute(
     Map<String, dynamic> args,
     RequestHandlerExtra extra,
-  ) =>
-      setDeviceConfig(connector, logger, args);
-}
+  ) {
+    final rawTextScale = args['text_scale'] as num?;
+    final boldText = args['bold_text'] as bool?;
+    final brightness = args['platform_brightness'] as String?;
+    final reset = args['reset'] == true;
 
-/// Handles a `set_device_config` invocation: validates the args and forwards
-/// them to [connector].
-///
-/// Extracted from the tool callback so the validation branches can be
-/// exercised in isolation.
-Future<CallToolResult> setDeviceConfig(
-  VmServiceConnector connector,
-  logging.Logger logger,
-  Map<String, dynamic> args,
-) {
-  final rawTextScale = args['text_scale'] as num?;
-  final boldText = args['bold_text'] as bool?;
-  final brightness = args['platform_brightness'] as String?;
-  final reset = args['reset'] == true;
+    final setsAnyField =
+        rawTextScale != null || boldText != null || brightness != null;
 
-  final setsAnyField =
-      rawTextScale != null || boldText != null || brightness != null;
+    // A bare `reset: false` would otherwise report success having changed
+    // nothing.
+    if (!setsAnyField && !reset) {
+      return _invalid(
+        'At least one parameter is required: text_scale, bold_text, '
+        'platform_brightness, or reset=true.',
+      );
+    }
 
-  // A bare `reset: false` would otherwise report success having changed
-  // nothing.
-  if (!setsAnyField && !reset) {
-    return _invalid(
-      'At least one parameter is required: text_scale, bold_text, '
-      'platform_brightness, or reset=true.',
+    if (rawTextScale != null && (!rawTextScale.isFinite || rawTextScale <= 0)) {
+      return _invalid('text_scale must be greater than 0.');
+    }
+
+    if (invalidBrightnessError(brightness) case final error?) {
+      return _invalid(error);
+    }
+
+    logger.info(
+      'Setting device config: textScale=$rawTextScale, boldText=$boldText, '
+      'platformBrightness=$brightness, reset=$reset',
     );
+
+    return runTool(logger, 'set device config', () async {
+      final response = await connector.setDeviceConfig(
+        textScale: rawTextScale?.toDouble(),
+        boldText: boldText,
+        platformBrightness: brightness,
+        reset: reset,
+      );
+      final message = response['message'] as String?;
+      return messageResult(message ?? 'Device config updated');
+    });
   }
-
-  if (rawTextScale != null && (!rawTextScale.isFinite || rawTextScale <= 0)) {
-    return _invalid('text_scale must be greater than 0.');
-  }
-
-  if (invalidBrightnessError(brightness) case final error?) {
-    return _invalid(error);
-  }
-
-  logger.info(
-    'Setting device config: textScale=$rawTextScale, boldText=$boldText, '
-    'platformBrightness=$brightness, reset=$reset',
-  );
-
-  return runTool(logger, 'set device config', () async {
-    final response = await connector.setDeviceConfig(
-      textScale: rawTextScale?.toDouble(),
-      boldText: boldText,
-      platformBrightness: brightness,
-      reset: reset,
-    );
-    final message = response['message'] as String?;
-    return messageResult(message ?? 'Device config updated');
-  });
 }
 
 Future<CallToolResult> _invalid(String message) async =>

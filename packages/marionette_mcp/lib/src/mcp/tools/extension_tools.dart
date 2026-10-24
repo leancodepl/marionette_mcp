@@ -7,16 +7,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'base_tool.dart';
 import 'tool_results.dart';
 
-/// Creates the extension tools with their shared dependencies.
-List<BaseTool> createExtensionTools({
-  required VmServiceConnector connector,
-  required logging.Logger logger,
-}) =>
-    [
-      ListCustomExtensionsTool(connector, logger),
-      CallCustomExtensionTool(connector, logger),
-    ];
-
 /// MCP tool `list_custom_extensions`.
 class ListCustomExtensionsTool extends BaseTool {
   ListCustomExtensionsTool(this.connector, this.logger);
@@ -156,35 +146,20 @@ class CallCustomExtensionTool extends BaseTool {
   Future<CallToolResult> execute(
     Map<String, dynamic> args,
     RequestHandlerExtra extra,
-  ) =>
-      callCustomExtension(connector, logger, args);
-}
-
-/// Handles a `call_custom_extension` invocation: coerces the supplied `args`
-/// into the wire shape, forwards them to [connector], and wraps the response.
-///
-/// Extracted from the tool callback so the coercion contract can be exercised
-/// in isolation. Args go through [coerceToStringMap] — the same path the
-/// dynamically-promoted extension tools use — so both produce identical wire
-/// args: scalars are stringified and nested object/array values become valid
-/// JSON (not Dart's un-parseable `toString()` form).
-Future<CallToolResult> callCustomExtension(
-  VmServiceConnector connector,
-  logging.Logger logger,
-  Map<String, dynamic> args,
-) {
-  final extensionName = args['extension'] as String;
-  final extensionArgs = coerceToStringMap(
-    (args['args'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
-  );
-  logger.info(
-    'Calling custom extension: $extensionName with args: $extensionArgs',
-  );
-  return runTool(logger, 'call custom extension', () async {
-    final response = await connector.callCustomExtension(
-      extensionName,
-      extensionArgs,
+  ) {
+    final extensionName = args['extension'] as String;
+    final extensionArgs = coerceToStringMap(
+      (args['args'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
     );
-    return extensionResponseResult(response);
-  });
+    logger.info(
+      'Calling custom extension: $extensionName with args: $extensionArgs',
+    );
+    return runTool(logger, 'call custom extension', () async {
+      final response = await connector.callCustomExtension(
+        extensionName,
+        extensionArgs,
+      );
+      return extensionResponseResult(response);
+    });
+  }
 }

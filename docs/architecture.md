@@ -79,6 +79,17 @@ Connection tools log their own session transitions because their report owner
 changes during execution. App-defined tools have a dedicated dynamic registry,
 which retains registration handles and removes them on disconnect/reconnect.
 
+## DRY and KISS
+
+`createAllTools` is the only catalog definition; structured-output tests consume
+that same registry. Tools implement their adapter flow directly in `execute`,
+without constructor-only group factories or alternate invocation functions.
+Shared result envelopes and ancestor descriptions have one definition. Tool
+schemas stay explicit where their selectors, descriptions, or recovery messages
+differ. Connection ownership types and callbacks remain because they express
+real lifecycle rules; simple connector operations do not gain extra service
+wrappers just to share a few lines.
+
 ## Public package boundaries
 
 Embedders import `package:marionette_mcp/marionette_mcp.dart` for server
@@ -145,7 +156,7 @@ and transport framing; the application owns its process and app resources.
    the service API typed and independent of MCP.
 2. Implement a `BaseTool` adapter with its input schema, output schema, metadata,
    and result/error formatting. Inject its dependencies through the constructor.
-3. Add it to the appropriate factory and the central built-in registry. Keep
+3. Add it once to the central `createAllTools` registry. Keep
    external resource acquisition out of tool constructors and registration.
 4. Test service behavior directly, then check the adapter's structured output,
    errors, and public SDK interaction. Update consumer guidance for observable

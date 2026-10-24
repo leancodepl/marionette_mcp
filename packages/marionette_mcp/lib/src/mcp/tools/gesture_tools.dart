@@ -8,22 +8,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'base_tool.dart';
 import 'tool_results.dart';
 
-/// Creates the gesture tools with their shared dependencies.
-List<BaseTool> createGestureTools({
-  required VmServiceConnector connector,
-  required logging.Logger logger,
-}) =>
-    [
-      TapTool(connector, logger),
-      SecondaryTapTool(connector, logger),
-      DoubleTapTool(connector, logger),
-      LongPressTool(connector, logger),
-      SwipeTool(connector, logger),
-      PinchZoomTool(connector, logger),
-      PressBackButtonTool(connector, logger),
-      ScrollToTool(connector, logger),
-    ];
-
 /// MCP tool `tap`.
 class TapTool extends BaseTool {
   TapTool(this.connector, this.logger);

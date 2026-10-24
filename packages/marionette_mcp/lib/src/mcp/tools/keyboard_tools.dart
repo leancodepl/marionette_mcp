@@ -6,13 +6,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'base_tool.dart';
 import 'tool_results.dart';
 
-/// Creates the keyboard tools with their shared dependencies.
-List<BaseTool> createKeyboardTools({
-  required VmServiceConnector connector,
-  required logging.Logger logger,
-}) =>
-    [PressKeyTool(connector, logger)];
-
 /// MCP tool `press_key`.
 class PressKeyTool extends BaseTool {
   PressKeyTool(this.connector, this.logger);
