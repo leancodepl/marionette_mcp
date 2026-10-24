@@ -56,14 +56,17 @@ class PinchZoomCommand extends InstanceCommand {
     }
 
     final scaleStr = argResults?['scale'] as String;
-    final scale = double.tryParse(scaleStr);
-    if (scale == null || scale <= 0) {
+    final scale =
+        parseFiniteNumber('scale', scaleStr, usageException).toDouble();
+    if (scale <= 0) {
       usageException('--scale must be a positive number, got "$scaleStr".');
     }
 
     final distanceStr = argResults?['start-distance'] as String;
-    final startDistance = double.tryParse(distanceStr);
-    if (startDistance == null || startDistance <= 0) {
+    final startDistance =
+        parseFiniteNumber('start-distance', distanceStr, usageException)
+            .toDouble();
+    if (startDistance <= 0) {
       usageException(
         '--start-distance must be a positive number, got "$distanceStr".',
       );

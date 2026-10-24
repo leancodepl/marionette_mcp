@@ -7,6 +7,46 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('a superseded connect cannot log into a replacement session', () async {
+    final directory = Directory.systemTemp.createTempSync('connect-overlap-');
+    final connector = _DelayedVersionConnector();
+    final context = VmServiceContext(connector: connector);
+    final server = _CapturingServer();
+    context.registerTools(server);
+    Future<CallToolResult> connect(String title) async =>
+        server.callbacks['connect']!({
+          'uri': 'ws://$title/ws',
+          'session_title': title,
+          'session_dir': directory.path,
+        }, _UnusedExtra());
+    final stale = connect('old');
+    addTearDown(() async {
+      if (!connector.versionRelease.isCompleted)
+        connector.versionRelease.complete();
+      await stale;
+      await context.dispose();
+      await server.close();
+      directory.deleteSync(recursive: true);
+    });
+    await connector.versionStarted.future;
+    expect((await connect('replacement')).isError, isFalse);
+    connector.versionRelease.complete();
+    expect((await stale).isError, isTrue);
+
+    final reports = directory
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((entry) => entry.path.endsWith('steps.md'))
+        .toList();
+    expect(reports, hasLength(1));
+    final lines = reports.single
+        .readAsLinesSync()
+        .where((line) => line.contains('connect '))
+        .toList();
+    expect(lines, hasLength(1));
+    expect(lines.single, isNot(contains('error:')));
+  });
+
   test('an older disconnect preserves a replacement connection session',
       () async {
     final directory =
@@ -124,4 +164,20 @@ class _DelayedDisconnectConnector extends VmServiceConnector {
   Future<Map<String, dynamic>> takeScreenshots() async => {
         'screenshots': ['aGVsbG8='],
       };
+}
+
+class _DelayedVersionConnector extends _DelayedDisconnectConnector {
+  final versionStarted = Completer<void>();
+  final versionRelease = Completer<void>();
+  bool firstVersion = true;
+
+  @override
+  Future<String> getVersion() async {
+    if (firstVersion) {
+      firstVersion = false;
+      versionStarted.complete();
+      await versionRelease.future;
+    }
+    return version;
+  }
 }

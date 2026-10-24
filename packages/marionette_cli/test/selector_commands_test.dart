@@ -10,7 +10,7 @@ import 'package:marionette_cli/src/cli/commands/scroll_to_command.dart';
 import 'package:marionette_cli/src/cli/commands/swipe_command.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
+import 'package:marionette_mcp/runtime.dart';
 import 'package:test/test.dart';
 
 mixin _ParsedCommand on InstanceCommand {
@@ -152,6 +152,42 @@ void main() {
       });
     });
   }
+  for (final option in ['scale', 'start-distance']) {
+    for (final value in ['NaN', 'Infinity', '-Infinity']) {
+      test('pinch-zoom rejects --$option $value before calling connector',
+          () async {
+        final connector = _Connector();
+        await expectLater(
+          _PinchZoom().executeWithArgs([
+            '--key',
+            'image',
+            '--scale',
+            '2',
+            '--$option',
+            value,
+          ], connector),
+          throwsA(isA<UsageException>()),
+        );
+        expect(connector.calls, isEmpty);
+      });
+    }
+  }
+  test('pinch-zoom preserves positive finite scale and start distance',
+      () async {
+    final connector = _Connector();
+    await _PinchZoom().executeWithArgs([
+      '--key',
+      'image',
+      '--scale',
+      '0.5',
+      '--start-distance',
+      '150.5',
+    ], connector);
+    expect(connector.calls.single.namedArguments, {
+      #scale: 0.5,
+      #startDistance: 150.5,
+    });
+  });
   test('enter-text preserves focused targeting with ancestor scope', () async {
     final connector = _Connector();
     await _EnterText().executeWithArgs([

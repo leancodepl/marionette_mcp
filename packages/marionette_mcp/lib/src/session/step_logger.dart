@@ -85,8 +85,15 @@ class StepLogger {
     String toolName,
     Map<String, dynamic> args,
     CallToolResult result,
+  ) =>
+      _logStep(session, toolName, args, result);
+
+  void _logStep(
+    Session? activeSession,
+    String toolName,
+    Map<String, dynamic> args,
+    CallToolResult result,
   ) {
-    final activeSession = session;
     if (activeSession == null) return;
 
     final selector = describeStepSelector(toolName, args);
@@ -320,19 +327,22 @@ String _formatTime(DateTime time) {
 /// unexpected, un-caught error rather than the usual `isError: true`
 /// result), so the report contract's `Tested:` line — rendered from
 /// steps.md, not the agent's own claim — never silently undercounts an
-/// attempt just because it failed in an unanticipated way.
+/// attempt just because it failed in an unanticipated way. The session is
+/// captured when the call starts, so reconnects cannot reattribute its result.
 ToolFunction withStepLogging(
   StepLogger stepLogger,
   String name,
   ToolFunction callback,
 ) {
   return (args, extra) async {
+    final session = stepLogger.session;
     try {
       final result = await callback(args, extra);
-      stepLogger.logStep(name, args, result);
+      stepLogger._logStep(session, name, args, result);
       return result;
     } catch (err) {
-      stepLogger.logStep(
+      stepLogger._logStep(
+        session,
         name,
         args,
         CallToolResult(

@@ -272,8 +272,56 @@ void main() {
 
       expect(await failure.timeout(const Duration(seconds: 2)),
           isA<VmServiceExtensionException>());
-      await connector.disconnect().timeout(const Duration(seconds: 2));
       expect(connector.isConnected, isFalse);
+      await expectLater(
+          connector.getVersion(), throwsA(isA<NotConnectedException>()));
+      await connector.disconnect().timeout(const Duration(seconds: 2));
+    });
+
+    test('peer close retires service registrations and pending waiters',
+        () async {
+      final vm = await server('closed-peer');
+      vm.registerHotRestart = true;
+      await connector.connect(vm.uri);
+      expect(await connector.waitForServiceRegistration('hotRestart'),
+          's0.hotRestart');
+      final waiting = connector.waitForServiceRegistration(
+        'pending',
+        timeout: const Duration(minutes: 1),
+      );
+
+      await vm.sockets.single.close();
+
+      expect(await waiting.timeout(const Duration(seconds: 2)), isNull);
+      expect(connector.isConnected, isFalse);
+      expect(
+        await connector.waitForServiceRegistration(
+          'hotRestart',
+          timeout: Duration.zero,
+        ),
+        isNull,
+      );
+      await expectLater(
+          connector.getVersion(), throwsA(isA<NotConnectedException>()));
+    });
+
+    test('old peer closure preserves replacement registration waiters',
+        () async {
+      final old = await server('old');
+      await connector.connect(old.uri);
+      final replacement = await server('replacement');
+      replacement.registerHotRestart = true;
+
+      final connecting = connector.connect(replacement.uri);
+      final registration = connector.waitForServiceRegistration(
+        'hotRestart',
+        timeout: const Duration(seconds: 3),
+      );
+      await connecting.timeout(const Duration(seconds: 3));
+
+      expect(await registration, 's0.hotRestart');
+      expect(connector.isConnected, isTrue);
+      expect(await connector.getVersion(), 'replacement');
     });
 
     test('old disconnect cleanup cannot clear an immediate new connect',

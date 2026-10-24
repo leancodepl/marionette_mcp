@@ -189,6 +189,15 @@ class VmServiceConnector {
       final input = StreamController<dynamic>();
       final streamClosed = Completer<void>();
       void closeInput() {
+        if (connection.closed) return;
+        connection.closed = true;
+        // Retain the resource owner for deterministic disconnect/reconnect
+        // cleanup, but retire state only if this is still its connection.
+        if (identical(_connection, connection)) {
+          _service = null;
+          _isolateId = null;
+          _clearServiceRegistrations();
+        }
         if (!streamClosed.isCompleted) streamClosed.complete();
       }
 
@@ -212,7 +221,7 @@ class VmServiceConnector {
       connection.service = service;
       _service = service;
       connection.subscription = service.onServiceEvent.listen((e) {
-        if (!identical(_connection, connection)) return;
+        if (!identical(_connection, connection) || connection.closed) return;
         switch (e.kind) {
           case EventKind.kServiceRegistered:
             final serviceName = e.service!;
@@ -276,7 +285,7 @@ class VmServiceConnector {
   }
 
   void _ensureCurrentConnection(_VmServiceConnection connection) {
-    if (!identical(_connection, connection)) {
+    if (!identical(_connection, connection) || connection.closed) {
       throw StateError('VM service connection was disconnected or superseded.');
     }
   }
@@ -823,6 +832,7 @@ class _VmServiceConnection {
   final HttpClient client = HttpClient();
   VmService? service;
   StreamSubscription<Event>? subscription;
+  bool closed = false;
   Future<void>? _disposeFuture;
 
   Future<void> dispose() {

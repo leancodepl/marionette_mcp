@@ -25,6 +25,8 @@ logger. `createAllTools` composes these tools without opening sockets or
 starting a process. `createMcpServer` registers them and applies step logging
 once, at the composition boundary. Connection tools own their additional
 session-report transitions; app-defined tools are discovered dynamically.
+In-flight tool calls retain their original report session; a superseded
+connection attempt cannot add a step to its replacement's report.
 
 ## Public package boundaries
 

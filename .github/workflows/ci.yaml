@@ -26,35 +26,8 @@ jobs:
           flutter-version-file: .fvmrc
           cache: true
 
-      - name: Install dependencies for tool
-        run: |
-          cd tool
-          dart pub get
-
-      - name: Install dependencies for marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart pub get
-
-      - name: Install dependencies for marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart pub get
-
-      - name: Install dependencies for marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter pub get
-
-      - name: Install dependencies for marionette_logger
-        run: |
-          cd packages/marionette_logger
-          flutter pub get
-
-      - name: Install dependencies for marionette_logging
-        run: |
-          cd packages/marionette_logging
-          flutter pub get
+      - name: Install workspace dependencies
+        run: flutter pub get
 
       - name: Check version.g.dart is in sync
         run: |
@@ -70,12 +43,12 @@ jobs:
       - name: Analyze marionette_mcp
         run: |
           cd packages/marionette_mcp
-          dart analyze --fatal-infos lib bin
+          dart analyze --fatal-infos lib bin test
 
       - name: Analyze marionette_cli
         run: |
           cd packages/marionette_cli
-          dart analyze --fatal-infos lib bin
+          dart analyze --fatal-infos lib bin test
 
       - name: Analyze marionette_flutter
         run: |
@@ -155,30 +128,8 @@ jobs:
           flutter-version: '3.27.0'
           cache: true
 
-      - name: Install dependencies for marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart pub get
-
-      - name: Install dependencies for marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart pub get
-
-      - name: Install dependencies for marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter pub get
-
-      - name: Install dependencies for marionette_logger
-        run: |
-          cd packages/marionette_logger
-          flutter pub get
-
-      - name: Install dependencies for marionette_logging
-        run: |
-          cd packages/marionette_logging
-          flutter pub get
+      - name: Install workspace dependencies
+        run: flutter pub get
 
       - name: Check frame protocol compatibility
         run: dart tool/check_frame_protocol.dart
@@ -186,12 +137,12 @@ jobs:
       - name: Analyze marionette_mcp
         run: |
           cd packages/marionette_mcp
-          dart analyze --fatal-infos lib bin
+          dart analyze --fatal-infos lib bin test
 
       - name: Analyze marionette_cli
         run: |
           cd packages/marionette_cli
-          dart analyze --fatal-infos lib bin
+          dart analyze --fatal-infos lib bin test
 
       - name: Analyze marionette_flutter
         run: |

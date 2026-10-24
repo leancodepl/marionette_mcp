@@ -6,10 +6,7 @@ import 'package:args/args.dart';
 import 'package:marionette_cli/src/cli/adb_helper.dart';
 import 'package:marionette_cli/src/cli/commands/record_video_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/src/video/ffmpeg_process.dart';
-import 'package:marionette_mcp/src/video/recording_session.dart';
-import 'package:marionette_mcp/src/video/ws_frame_server.dart';
-import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
+import 'package:marionette_mcp/runtime.dart';
 import 'package:test/test.dart';
 
 /// Mirrors ScreencastService.computeFrameSize for mock connectors.
