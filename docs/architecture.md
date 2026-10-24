@@ -7,10 +7,10 @@ composition, configuration, and typed tools:
 packages/marionette_mcp/
   bin/marionette_mcp.dart       parse options and start the server
   lib/marionette_mcp.dart       public server API
-  lib/runtime.dart             public app/session/recording runtime API
+  lib/runtime.dart             public app connection API for embedding
   lib/mcp/
     mcp.dart                   createMcpServer and server instructions
-    server_config.dart         options shared with marionette mcp
+    server_config.dart         standalone MCP server options
     server_context.dart        shared connection/session state and ownership
     server_runner.dart         logging, transport startup, and shutdown
     step_logging.dart          MCP result/session logging adapter
@@ -36,10 +36,10 @@ connection attempt cannot add a step to its replacement's report.
 
 ## Public package boundaries
 
-CLI adapters import `package:marionette_mcp/runtime.dart` for app connections,
-selectors, reports, and recording. They import
-`package:marionette_mcp/marionette_mcp.dart` for server startup. Other packages
-should use these entrypoints rather than importing `lib/src` files. Existing
+Embedders import `package:marionette_mcp/marionette_mcp.dart` for server
+composition and startup, and `package:marionette_mcp/runtime.dart` for the app
+connector. Existing CLI adapters continue using retained internal compatibility
+exports for server startup and shared runtime access.
 MCP tools and executable options keep their names and input schemas.
 Shared report formatting and persistence live in `src/session/report_steps.dart`
 without an MCP dependency; MCP result interpretation lives in `mcp/step_logging.dart`.
@@ -74,20 +74,6 @@ Disposing the context retires dynamic tools and closes its app connection.
 Disconnecting releases dynamic tool names, so reconnecting uses the current
 app's schemas without retaining disabled registrations.
 
-Recording setup owns its WebSocket listener until a `RecordingSession` has
-been created successfully. Startup failure closes the listener; after a
-successful transfer the session owns cleanup.
-
-## CLI selection
-
-CLI coordinate selectors require both `--x` and `--y`, with finite numeric
-values. Coordinate swipes require all four start/end coordinates. Malformed
-coordinates fail before invoking the app instead of silently dropping a value.
-Coordinate, element, and focused targeting are separate modes; an element
-mode may retain combined key, identifier, text, and type filters. Ancestor
-scope keeps its existing behavior, including being ignored by coordinate and
-focused targeting.
-
 ## Verification
 
 From the workspace root, resolve dependencies with `flutter pub get`. Run
@@ -104,11 +90,6 @@ only for an intentional tool-contract change. The comparison permits the new
 output schemas while preserving every original input contract and annotation.
 Shutdown regressions use a real
 Dart VM service fixture and cover connected EOF and signals.
-
-`dart tool/check_frame_protocol.dart` checks Flutter-encoded frames against
-the MCP consumer, including fragmented delivery. CI runs this check on both
-the normal and minimum supported toolchains. This keeps the production
-packages independent while detecting drift in their shared wire format.
 
 The minimum-toolchain CI job selects separate workspace groups for the
 standalone Dart server/CLI and the Flutter binding/adapters. Flutter 3.27's

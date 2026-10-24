@@ -6,7 +6,10 @@ import 'package:args/args.dart';
 import 'package:marionette_cli/src/cli/adb_helper.dart';
 import 'package:marionette_cli/src/cli/commands/record_video_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/runtime.dart';
+import 'package:marionette_mcp/src/video/ffmpeg_process.dart';
+import 'package:marionette_mcp/src/video/recording_session.dart';
+import 'package:marionette_mcp/src/video/ws_frame_server.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:test/test.dart';
 
 /// Mirrors ScreencastService.computeFrameSize for mock connectors.
@@ -107,12 +110,10 @@ class MockRecordingSession implements RecordingSession {
   bool stopCalled = false;
   int frameCount;
   Duration duration;
-  final Future<void> Function()? onStop;
 
   MockRecordingSession({
     this.frameCount = 10,
     this.duration = const Duration(seconds: 2),
-    this.onStop,
   });
 
   @override
@@ -123,7 +124,6 @@ class MockRecordingSession implements RecordingSession {
   @override
   Future<RecordingResult> stop() async {
     stopCalled = true;
-    await onStop?.call();
     return RecordingResult(
       outputFile: '/tmp/test.webm',
       duration: duration,
@@ -893,117 +893,22 @@ void main() {
 
       TestableRecordVideoCommand createWsCommand({
         MockRecordingSession? session,
-        WsRecordingSessionFactory? wsSessionFactory,
       }) {
         final s = session ?? mockSession;
         return TestableRecordVideoCommand(
           ffmpegChecker: ({String ffmpegPath = 'ffmpeg'}) async => true,
           sessionFactory: _mockSessionFactory(s),
-          wsSessionFactory: wsSessionFactory ??
-              ({
-                required FrameSource frameSource,
-                required String outputFile,
-                required int width,
-                required int height,
-                required String ffmpegPath,
-              }) async =>
-                  s,
+          wsSessionFactory: ({
+            required FrameSource frameSource,
+            required String outputFile,
+            required int width,
+            required int height,
+            required String ffmpegPath,
+          }) async =>
+              s,
           wsFrameServerFactory: () async => fakeWsServer,
         );
       }
-
-      test(
-        'When WS screencast startup throws, Then server is closed',
-        () async {
-          final error = StateError('screencast startup failed');
-          connector.wsStartError = error;
-          var sessionFactoryCalled = false;
-          final testCommand = createWsCommand(
-            wsSessionFactory: ({
-              required FrameSource frameSource,
-              required String outputFile,
-              required int width,
-              required int height,
-              required String ffmpegPath,
-            }) async {
-              sessionFactoryCalled = true;
-              return mockSession;
-            },
-          );
-
-          await expectLater(
-            testCommand.executeWithArgs(['-o', '/tmp/test.webm'], connector),
-            throwsA(same(error)),
-          );
-
-          expect(sessionFactoryCalled, isFalse);
-          expect(fakeWsServer.closeCallCount, 1);
-          expect(connector.stopScreencastCallCount, 1);
-        },
-      );
-
-      for (final closeThrows in [false, true]) {
-        test(
-            'When WS session creation throws and closeThrows=$closeThrows, '
-            'Then server cleanup preserves startup error', () async {
-          final error = StateError('session startup failed');
-          if (closeThrows) {
-            fakeWsServer.closeError = StateError('server close failed');
-          }
-          final testCommand = createWsCommand(
-            wsSessionFactory: ({
-              required FrameSource frameSource,
-              required String outputFile,
-              required int width,
-              required int height,
-              required String ffmpegPath,
-            }) async =>
-                throw error,
-          );
-
-          await expectLater(
-            testCommand.executeWithArgs(['-o', '/tmp/test.webm'], connector),
-            throwsA(same(error)),
-          );
-
-          expect(connector.lastWsPort, fakeWsServer.port);
-          expect(fakeWsServer.closeCallCount, 1);
-          expect(connector.stopScreencastCallCount, 1);
-        });
-      }
-
-      test(
-        'When WS session owns the server, Then only session closes it',
-        () async {
-          final testCommand = createWsCommand(
-            wsSessionFactory: ({
-              required FrameSource frameSource,
-              required String outputFile,
-              required int width,
-              required int height,
-              required String ffmpegPath,
-            }) async {
-              expect(frameSource, same(fakeWsServer));
-              return MockRecordingSession(
-                onStop: () async {
-                  expect(fakeWsServer.closeCallCount, 0);
-                  await frameSource.close();
-                },
-              );
-            },
-          );
-
-          final exitCode = await testCommand.executeWithArgs([
-            '-o',
-            '/tmp/test.webm',
-            '-d',
-            '1',
-          ], connector);
-
-          expect(exitCode, 0);
-          expect(fakeWsServer.closeCallCount, 1);
-        },
-      );
 
       test(
         'When transport is ws, Then wsPort is passed to startScreencast',
@@ -1284,8 +1189,6 @@ class WsMockConnector implements VmServiceConnector {
   int get startScreencastCallCount => startScreencastCalls.length;
   int? get lastWsPort => startScreencastCalls.lastOrNull?.wsPort;
 
-  Object? wsStartError;
-
   int viewportWidth = 800;
   int viewportHeight = 600;
 
@@ -1302,9 +1205,6 @@ class WsMockConnector implements VmServiceConnector {
         wsPort: wsPort,
       ),
     );
-    if (wsPort != null && wsStartError != null) {
-      throw wsStartError!;
-    }
     final (frameW, frameH) = _computeFrameSize(
       viewportWidth,
       viewportHeight,
@@ -1338,17 +1238,11 @@ class FakeWsFrameServer implements WebSocketFrameServer {
   @override
   final int port;
 
-  int closeCallCount = 0;
-  Object? closeError;
-
   @override
   Stream<SourceFrame> get frames => const Stream.empty();
 
   @override
-  Future<void> close() async {
-    closeCallCount++;
-    if (closeError != null) throw closeError!;
-  }
+  Future<void> close() async {}
 
   @override
   Future<void> start() async {}

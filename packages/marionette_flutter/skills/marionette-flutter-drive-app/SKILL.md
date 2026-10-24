@@ -622,20 +622,14 @@ table above maps onto it one-for-one (`tap` ↔
 this side. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
 outermost first:
 `tap --key cell.joinButton --ancestor-keys session_2 --ancestor-keys grid.cell_3`.
-Coordinate targeting requires both `--x` and `--y` as finite numbers; coordinate
-swipes require all four start/end coordinates. Do not mix coordinate or focused
-targeting with element selectors. Invalid combinations fail before invoking
-the app. Ancestor scope still applies only to element targeting.
-Pinch-zoom `--scale` and `--start-distance` must be positive, finite numbers.
 Use `--uri <ws-uri>` for a one-off session
 and `register <name> <uri>` + `-i <name>` for repeated interaction with the
 same app; `marionette doctor` checks connectivity of every registered
 instance and `unregister` cleans up stale ones. Session reports work the same
-way here: each invocation creates a fresh session directory. Pass
-`--session <title>` (the CLI's equivalent of `session_title`) to label it;
-reusing a title does not resume an earlier directory. For a multi-command run,
-keep the session paths printed by each command and cite the relevant directories
-in the report — see *Reporting what you found*, above.
+way here: pass `--session <title>` (the CLI's equivalent of `session_title`)
+consistently across a script's invocations to log a multi-step run into one
+session directory instead of a fresh, untitled one per command — see
+*Reporting what you found*, above.
 
 ## Keeping this skill in sync
 

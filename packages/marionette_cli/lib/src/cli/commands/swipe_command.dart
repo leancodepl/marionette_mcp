@@ -4,7 +4,7 @@ import 'package:marionette_cli/src/cli/ancestor_keys_option.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/cli/matcher_builder.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:marionette_mcp/runtime.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class SwipeCommand extends InstanceCommand {
   SwipeCommand(this._registry) {
@@ -24,19 +24,13 @@ class SwipeCommand extends InstanceCommand {
         help: 'Swipe distance in pixels for element-based mode.',
         defaultsTo: '200',
       )
-      ..addOption(
-        'start-x',
-        help: 'Start X coordinate for coordinate-based swipe.',
-      )
-      ..addOption(
-        'start-y',
-        help: 'Start Y coordinate for coordinate-based swipe.',
-      )
+      ..addOption('start-x',
+          help: 'Start X coordinate for coordinate-based swipe.')
+      ..addOption('start-y',
+          help: 'Start Y coordinate for coordinate-based swipe.')
       ..addOption('end-x', help: 'End X coordinate for coordinate-based swipe.')
-      ..addOption(
-        'end-y',
-        help: 'End Y coordinate for coordinate-based swipe.',
-      );
+      ..addOption('end-y',
+          help: 'End Y coordinate for coordinate-based swipe.');
   }
 
   final InstanceRegistry _registry;
@@ -99,9 +93,12 @@ class SwipeCommand extends InstanceCommand {
       swipeArgs['endX'] = endX;
       swipeArgs['endY'] = endY;
     } else {
-      final matcher = buildValidatedMatcherFromArgs(
-        argResults,
-        fail: usageException,
+      final matcher = buildMatcherFromArgs(
+        key: argResults?['key'] as String?,
+        identifier: argResults?['identifier'] as String?,
+        text: argResults?['text'] as String?,
+        type: argResults?['type'] as String?,
+        ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
       );
       if (!hasSelector(matcher)) {
         usageException(
@@ -135,6 +132,8 @@ class SwipeCommand extends InstanceCommand {
   }
 
   void _ensureNumber(String flag, String value) {
-    parseFiniteNumber(flag.substring(2), value, usageException);
+    if (double.tryParse(value) == null) {
+      usageException('$flag must be a number, got "$value".');
+    }
   }
 }
