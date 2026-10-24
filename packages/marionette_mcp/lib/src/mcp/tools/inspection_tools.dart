@@ -1,14 +1,10 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
+import 'package:marionette_mcp/src/mcp/tools/tool_runner.dart';
+import 'package:marionette_mcp/src/session/screenshot_service.dart';
 import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/mcp/step_logging.dart';
-import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
-import 'package:path/path.dart' as p;
 
 import 'base_tool.dart';
 
@@ -16,12 +12,13 @@ import 'base_tool.dart';
 List<BaseTool> createInspectionTools({
   required VmServiceConnector connector,
   required logging.Logger logger,
-  required StepLogger stepLogger,
+  required ScreenshotService screenshotService,
+  required Session? Function() currentSession,
 }) =>
     [
       GetInteractiveElementsTool(connector, logger),
       GetLogsTool(connector, logger),
-      TakeScreenshotsTool(connector, logger, stepLogger),
+      TakeScreenshotsTool(screenshotService, logger, currentSession),
     ];
 
 /// MCP tool `get_interactive_elements`.
@@ -189,11 +186,11 @@ class GetLogsTool extends BaseTool {
 
 /// MCP tool `take_screenshots`.
 class TakeScreenshotsTool extends BaseTool {
-  TakeScreenshotsTool(this.connector, this.logger, this.stepLogger);
+  TakeScreenshotsTool(this.screenshotService, this.logger, this.currentSession);
 
-  final VmServiceConnector connector;
+  final ScreenshotService screenshotService;
   final logging.Logger logger;
-  final StepLogger stepLogger;
+  final Session? Function() currentSession;
 
   @override
   String get name => 'take_screenshots';
@@ -237,7 +234,7 @@ class TakeScreenshotsTool extends BaseTool {
     return runTool(
       logger,
       'take screenshots',
-      () => takeScreenshots(connector, stepLogger.session, args),
+      () => _captureScreenshots(screenshotService, currentSession(), args),
     );
   }
 }
@@ -252,31 +249,21 @@ Future<CallToolResult> takeScreenshots(
   VmServiceConnector connector,
   Session? session,
   Map<String, dynamic> args,
+) =>
+    _captureScreenshots(ScreenshotService(connector), session, args);
+
+Future<CallToolResult> _captureScreenshots(
+  ScreenshotService screenshotService,
+  Session? session,
+  Map<String, dynamic> args,
 ) async {
-  final inline = args['inline'] != false;
-  final response = await connector.takeScreenshots();
-  final screenshots = (response['screenshots'] as List<dynamic>).cast<String>();
-
-  if (screenshots.isEmpty) {
-    return CallToolResult(
-      content: [const TextContent(text: 'No screenshots captured')],
-      structuredContent: {'count': 0, 'inline': inline},
+  try {
+    final capture = await screenshotService.capture(
+      inline: args['inline'] != false,
+      session: session,
     );
-  }
-
-  if (inline) {
-    return CallToolResult(
-      structuredContent: {'count': screenshots.length, 'inline': true},
-      content: screenshots
-          .map(
-            (screenshot) =>
-                ImageContent(data: screenshot, mimeType: 'image/png'),
-          )
-          .toList(),
-    );
-  }
-
-  if (session == null) {
+    return _screenshotResult(capture);
+  } on ScreenshotSessionRequired {
     return CallToolResult(
       isError: true,
       content: [
@@ -289,50 +276,38 @@ Future<CallToolResult> takeScreenshots(
       ],
     );
   }
+}
 
-  final paths = _saveScreenshots(session.screenshotsDir, screenshots);
+CallToolResult _screenshotResult(ScreenshotCapture capture) {
+  if (capture.count == 0) {
+    return CallToolResult(
+      content: [const TextContent(text: 'No screenshots captured')],
+      structuredContent: {'count': 0, 'inline': capture.inline},
+    );
+  }
+
+  if (capture.inline) {
+    return CallToolResult(
+      structuredContent: {'count': capture.count, 'inline': true},
+      content: capture.images
+          .map((image) => ImageContent(data: image, mimeType: 'image/png'))
+          .toList(),
+    );
+  }
+
   return CallToolResult(
-    structuredContent: {'count': paths.length, 'inline': false, 'paths': paths},
+    structuredContent: {
+      'count': capture.count,
+      'inline': false,
+      'paths': capture.paths,
+    },
     content: [
       TextContent(
-        text: 'Saved ${paths.length} screenshot(s):\n${paths.join('\n')}',
+        text:
+            'Saved ${capture.count} screenshot(s):\n${capture.paths.join('\n')}',
       ),
     ],
   );
-}
-
-/// Saves each base64-encoded PNG in [screenshots] into [screenshotsDir],
-/// numbered sequentially after whatever is already there, and returns the
-/// paths written to.
-List<String> _saveScreenshots(
-  Directory screenshotsDir,
-  List<String> screenshots,
-) {
-  screenshotsDir.createSync(recursive: true);
-  // The next index is one past the highest existing numeric name, not a
-  // count of PNGs present — a gap (e.g. 01.png and 03.png after 02.png was
-  // deleted) would otherwise make a count-based index collide with, and
-  // overwrite, the existing 03.png.
-  final highestExisting = screenshotsDir
-      .listSync()
-      .whereType<File>()
-      .where((f) => p.extension(f.path) == '.png')
-      .map((f) => int.tryParse(p.basenameWithoutExtension(f.path)))
-      .whereType<int>()
-      .fold(0, (highest, n) => n > highest ? n : highest);
-  var nextIndex = highestExisting + 1;
-
-  final paths = <String>[];
-  for (final screenshot in screenshots) {
-    final path = p.join(
-      screenshotsDir.path,
-      '${nextIndex.toString().padLeft(2, '0')}.png',
-    );
-    File(path).writeAsBytesSync(base64Decode(screenshot));
-    paths.add(path);
-    nextIndex++;
-  }
-  return paths;
 }
 
 /// `ancestor_keys` as worded for `get_interactive_elements`, which lists a

@@ -1,6 +1,6 @@
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/mcp/step_logging.dart';
-import 'package:marionette_mcp/mcp/tools/tool_runner.dart';
+import 'package:marionette_mcp/src/mcp/step_logging.dart';
+import 'package:marionette_mcp/src/mcp/tools/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/tools/arg_coercion.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';

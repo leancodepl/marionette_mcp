@@ -2,16 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/mcp/tools/base_tool.dart';
-import 'package:marionette_mcp/mcp/tools/device_tools.dart';
-import 'package:marionette_mcp/mcp/tools/extension_tools.dart';
-import 'package:marionette_mcp/mcp/tools/gesture_tools.dart';
-import 'package:marionette_mcp/mcp/tools/inspection_tools.dart';
-import 'package:marionette_mcp/mcp/tools/keyboard_tools.dart';
-import 'package:marionette_mcp/mcp/tools/system_tools.dart';
-import 'package:marionette_mcp/mcp/tools/text_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/base_tool.dart';
+import 'package:marionette_mcp/src/mcp/tools/device_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/extension_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/gesture_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/inspection_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/keyboard_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/system_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/text_tools.dart';
+import 'package:marionette_mcp/src/session/screenshot_service.dart';
 import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
@@ -53,7 +53,8 @@ void main() {
         ...createInspectionTools(
           connector: connector,
           logger: logger,
-          stepLogger: StepLogger(),
+          screenshotService: ScreenshotService(connector),
+          currentSession: () => null,
         ),
         ...createKeyboardTools(connector: connector, logger: logger),
         ...createSystemTools(connector: connector, logger: logger),
@@ -271,6 +272,15 @@ void main() {
     }
   });
 
+  test('screenshot connector failures retain the standard error wrapper',
+      () async {
+    connector.fails = true;
+    final result = await tools['take_screenshots']!.execute({}, extra);
+    expect(result.isError, isTrue);
+    expect(result.structuredContent, isNull);
+    expect((result.content.single as TextContent).text, 'Bad state: offline');
+  });
+
   test('validation and system failures retain isError semantics', () async {
     connector.systemSuccess = false;
     for (final (name, args) in <(String, Map<String, dynamic>)>[
@@ -295,5 +305,12 @@ void main() {
         await tools['take_screenshots']!.execute({'inline': false}, extra);
     expect(result.isError, isTrue);
     expect(result.structuredContent, isNull);
+    expect(
+      (result.content.single as TextContent).text,
+      'inline: false requires an active session, which is '
+      'only created once connect succeeds and only when the app '
+      'enables session reports '
+      '(MarionetteConfiguration.enableSessionReports).',
+    );
   });
 }

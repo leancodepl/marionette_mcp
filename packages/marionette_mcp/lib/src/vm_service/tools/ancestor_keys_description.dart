@@ -1,2 +1,2 @@
 // Compatibility export for the former implementation path.
-export 'package:marionette_mcp/mcp/tools/ancestor_keys_description.dart';
+export 'package:marionette_mcp/src/mcp/tools/ancestor_keys_description.dart';

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/mcp/mcp.dart';
+import 'package:marionette_mcp/src/mcp/mcp.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 /// Runs the Marionette MCP server with the given configuration.

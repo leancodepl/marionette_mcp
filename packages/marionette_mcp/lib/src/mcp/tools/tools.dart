@@ -1,6 +1,7 @@
 /// Static MCP tools for inspecting and interacting with a Flutter app.
 library;
 
+import '../../session/screenshot_service.dart';
 import '../server_context.dart';
 import 'base_tool.dart';
 import 'connection_tools.dart';
@@ -29,7 +30,8 @@ List<BaseTool> createAllTools({required VmServiceContext context}) => [
       ...createInspectionTools(
         connector: context.connector,
         logger: context.logger,
-        stepLogger: context.stepLogger,
+        screenshotService: ScreenshotService(context.connector),
+        currentSession: () => context.connection.session,
       ),
       ...createGestureTools(
           connector: context.connector, logger: context.logger),

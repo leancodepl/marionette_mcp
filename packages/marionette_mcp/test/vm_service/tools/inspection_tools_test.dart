@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/mcp/tools/inspection_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/inspection_tools.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:path/path.dart' as p;

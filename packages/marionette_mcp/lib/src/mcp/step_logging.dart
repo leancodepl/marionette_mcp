@@ -1,7 +1,7 @@
 import 'package:mcp_dart/mcp_dart.dart';
 
-import '../src/session/report_steps.dart';
-import '../src/session/session.dart';
+import '../session/report_steps.dart';
+import '../session/session.dart';
 
 /// Tools whose successful result is a short, synthesized confirmation
 /// message (e.g. "Successfully tapped"), never a dump of application data —

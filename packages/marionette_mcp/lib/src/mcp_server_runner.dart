@@ -1,2 +1,2 @@
 // Compatibility export for the former implementation path.
-export 'package:marionette_mcp/mcp/server_runner.dart';
+export 'package:marionette_mcp/src/mcp/server_runner.dart';
