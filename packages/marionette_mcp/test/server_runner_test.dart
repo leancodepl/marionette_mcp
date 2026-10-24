@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/marionette_mcp.dart';
-import 'package:marionette_mcp/src/mcp_server_runner.dart' as legacy;
+import 'package:marionette_mcp/src/mcp/server_runner.dart' show ExitSignal;
 import 'package:test/test.dart';
 
 void main() {
@@ -57,9 +57,8 @@ void main() {
     expect(await errors, isNotEmpty);
   });
 
-  test('former runner import retains the entrypoint and signal helper', () {
-    expect(legacy.runMcpServer, same(runMcpServer));
-    final signal = legacy.ExitSignal();
+  test('signal owner disposal is idempotent', () {
+    final signal = ExitSignal();
     signal.dispose();
     signal.dispose();
   });

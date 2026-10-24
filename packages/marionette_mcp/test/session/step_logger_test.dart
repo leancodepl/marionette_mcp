@@ -2,8 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:marionette_mcp/src/mcp/step_logging.dart';
+import 'package:marionette_mcp/src/session/report_steps.dart';
 import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';

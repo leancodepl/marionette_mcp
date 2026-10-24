@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/dynamic_extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';

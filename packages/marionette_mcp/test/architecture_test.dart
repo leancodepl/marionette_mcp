@@ -8,9 +8,6 @@ void main() {
   const compatibilityExports = {
     'src/mcp_server_runner.dart',
     'src/session/step_logger.dart',
-    'src/vm_service/dynamic_extension_tools.dart',
-    'src/vm_service/tools/ancestor_keys_description.dart',
-    'src/vm_service/tools/tool_runner.dart',
   };
 
   test('lib exposes explicit entrypoints with implementation under src', () {
@@ -40,16 +37,9 @@ void main() {
       if (compatibilityExports.contains(relative)) {
         // Existing consumers can keep their import paths, but these bridges
         // must never become a second implementation or a runtime dependency.
-        final lines = source
-            .replaceAll(RegExp(r'//[^\n]*'), '')
-            .split('\n')
-            .map((line) => line.trim())
-            .where((line) => line.isNotEmpty);
-        expect(lines, isNotEmpty, reason: relative);
-        expect(
-            lines.every(
-                (line) => line.startsWith('export ') && line.endsWith(';')),
-            isTrue,
+        final exports = source.replaceAll(RegExp(r'//[^\n]*'), '').trim();
+        expect(exports, isNotEmpty, reason: relative);
+        expect(RegExp(r'^(?:export\s+[^;]+;\s*)+$').hasMatch(exports), isTrue,
             reason: '$relative must contain exports only');
         continue;
       }
