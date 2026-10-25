@@ -1,16 +1,28 @@
-# counter
+# Marionette counter example
 
-A new Flutter project.
+This Flutter counter app initializes `MarionetteBinding` so an MCP client can
+inspect the UI, tap the increment button, and capture screenshots.
 
-## Getting Started
+Use the Flutter version pinned in the repository's [`.fvmrc`](https://github.com/leancodepl/marionette_mcp/blob/main/.fvmrc).
+This example includes the MCP server as a dev dependency. Its combined graph
+cannot resolve on Flutter 3.27 because `flutter_test` and `mcp_dart` 2.4.3
+require incompatible `meta` versions. Flutter 3.27 apps using the binding with
+a separately installed server remain supported.
 
-This project is a starting point for a Flutter application.
+Clone the repository to include the sibling packages this example depends on:
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+git clone https://github.com/leancodepl/marionette_mcp.git
+cd marionette_mcp/packages/marionette_mcp/example
+flutter pub get
+flutter run
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Configure your MCP client to start `dart run marionette_mcp` from this directory.
+Pass the VM service URI printed by `flutter run` to `connect`, then use
+`get_interactive_elements` to discover the increment control before tapping it.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+For custom widgets, log collection, and session reports, use the richer
+[repository example](https://github.com/leancodepl/marionette_mcp/tree/main/example). See the
+[architecture guide](https://github.com/leancodepl/marionette_mcp/blob/main/docs/architecture.md) for the server's structure
+and extension points.

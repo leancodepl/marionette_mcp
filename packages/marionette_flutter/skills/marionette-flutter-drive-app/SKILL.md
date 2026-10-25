@@ -206,6 +206,12 @@ in the app, and `dart pub global activate marionette_mcp`/`marionette_cli`
 for the bridge (or `dart pub add dev:marionette_mcp`/`dev:marionette_cli` if
 you'd rather pin it as a dev dependency instead of a global tool).
 
+For Flutter 3.27 apps using `flutter_test`, install the bridge globally:
+the test SDK's `meta` pin conflicts with `mcp_dart` 2.4.3 in the same dependency
+graph. Repository examples resolve a combined graph and should use the Flutter
+version pinned in `.fvmrc`. The binding still supports Flutter 3.27 when the
+bridge runs separately.
+
 ## When to use this
 
 Reach for Marionette any time the fastest way to know whether something works
@@ -315,6 +321,12 @@ disconnecting.
 | Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens a fresh session directory (`session_title`) that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                                                                                                                                                             |
 | Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+MCP tools advertise output schemas. When your client exposes
+`structuredContent`, read the returned `elements`, `logs`, screenshot `paths`,
+or action `message` directly instead of parsing the display text. Custom
+extension results are under `response`; inline screenshot images remain in
+`content`. Check `isError` first: error results can omit structured data.
 
 ## Good practices
 

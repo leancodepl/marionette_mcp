@@ -1,5 +1,11 @@
 # Unreleased
 
+- Add output schemas and structured success results to MCP tools while preserving existing text and images.
+- Upgrade `mcp_dart` to `^2.4.3` and use its fixed dynamic-tool removal on reconnect.
+- Fix MCP server shutdown leaving app connections open.
+- Keep in-flight tool steps in their original report across reconnects, and clear connection status when the app disconnects.
+- Reject invalid SSE ports in the standalone MCP executable instead of falling back to stdio, and report startup failures, including log-file setup, with a nonzero exit code.
+- Expose public server and app-connection entrypoints, with typed MCP tools separated from startup and configuration.
 - Fix `record-video --width/--height` recording only the top-left corner of the screen at full scale instead of the whole screen scaled down to that size. Web recordings were not affected ([#134](https://github.com/leancodepl/marionette_mcp/issues/134))
 
 # 0.7.0
@@ -12,7 +18,7 @@
 - Fix `press_back_button` on a page-based `Navigator` (as produced by `go_router`) that refuses the pop while a route is still animating in — it now waits for the route transition to finish before popping (other animations, such as a loading spinner, don't hold it up) instead of tripping `navigator.dart`'s internal route-lifecycle assertion, which used to fail every navigation for the rest of the session ([#113](https://github.com/leancodepl/marionette_mcp/issues/113))
 - Fix `register`/`unregister` rejecting instance names with dots or colons, such as device IDs like `192.168.1.1:5555` — only `/`, `\`, and control characters are disallowed now, and names are encoded into portable, Windows-safe file names on disk
 - Add `marionette-flutter-drive-app`, an Agent Skill shipped inside the `marionette_flutter` package, installable via `dart run skills@ get` (Dart's [package skills](https://dart.dev/tools/pub/package-skills) convention) or `npx skills add leancodepl/marionette_mcp` — see the new "Agent Skill" section in the README
-- Add opt-in session reports: with `MarionetteConfiguration(enableSessionReports: true)`, `connect`/CLI commands log to a per-run `.marionette/sessions/` directory (`steps.md`, screenshots, and an agent-written `report.md`) — see [Session Reports](./docs/session-reports.md)
+- Add opt-in session reports: with `MarionetteConfiguration(enableSessionReports: true)`, `connect`/CLI commands log to a per-run `.marionette/sessions/` directory (`steps.md`, screenshots, and an agent-written `report.md`) — see [Session Reports](https://marionette.leancode.co/docs/reports/)
 - Add `set_device_config` tool and `set-device-config` CLI command for overriding text scale, bold text, and platform brightness in a running app — opt in by wrapping your root widget in the new `MarionetteDeviceConfig`
 - Add `ancestor_keys` to `tap`, `secondary_tap`, `double_tap`, `long_press`, `swipe`, `pinch_zoom`, `scroll_to` and `enter_text`, and a repeatable `--ancestor-keys` to the matching CLI commands, to scope a match to one subtree when the same key repeats across identical subtrees (grid cells, repeated cards, embedded app instances) — keys nest outermost first, only descendants of the last one match, and a key with no element fails the call by name instead of widening the search; `scroll_to` keeps scrolling first, so a scope inside a lazily built list works
 - Add `ancestor_keys` to `get_interactive_elements`, and `--ancestor-keys` to `get-interactive-elements`, to list only one subtree — the same chain can then be passed to the matcher tools to act inside it

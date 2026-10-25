@@ -152,30 +152,18 @@ jobs:
           flutter-version: '3.27.0'
           cache: true
 
-      - name: Install dependencies for marionette_mcp
+      # The standalone server and Flutter binding have independent consumers.
+      # Flutter 3.27's flutter_test pins meta 1.15, while mcp_dart needs 1.16.
+      # Select workspace members without overriding dependency constraints.
+      - name: Install minimum-Dart workspace dependencies
         run: |
-          cd packages/marionette_mcp
-          dart pub get
-
-      - name: Install dependencies for marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart pub get
-
-      - name: Install dependencies for marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter pub get
-
-      - name: Install dependencies for marionette_logger
-        run: |
-          cd packages/marionette_logger
-          flutter pub get
-
-      - name: Install dependencies for marionette_logging
-        run: |
-          cd packages/marionette_logging
-          flutter pub get
+          cat > pubspec_overrides.yaml <<'YAML'
+          workspace:
+            - packages/marionette_mcp
+            - packages/marionette_cli
+            - tool
+          YAML
+          dart pub get --no-example
 
       - name: Analyze marionette_mcp
         run: |
@@ -186,6 +174,27 @@ jobs:
         run: |
           cd packages/marionette_cli
           dart analyze --fatal-infos lib bin
+
+      - name: Run tests for marionette_mcp
+        run: |
+          cd packages/marionette_mcp
+          dart test
+
+      - name: Run tests for marionette_cli
+        run: |
+          cd packages/marionette_cli
+          dart test
+
+      - name: Install minimum-Flutter workspace dependencies
+        run: |
+          cat > pubspec_overrides.yaml <<'YAML'
+          workspace:
+            - packages/marionette_flutter
+            - packages/marionette_logger
+            - packages/marionette_logging
+            - example
+          YAML
+          flutter pub get
 
       - name: Analyze marionette_flutter
         run: |
@@ -202,20 +211,14 @@ jobs:
           cd packages/marionette_logging
           flutter analyze --fatal-infos lib
 
-      - name: Run tests for marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart test
-
-      - name: Run tests for marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart test
-
       - name: Run tests for marionette_flutter
         run: |
           cd packages/marionette_flutter
           flutter test --no-pub
+
+      - name: Remove workspace selection
+        if: always()
+        run: rm -f pubspec_overrides.yaml
 
   publish:
     name: Publish packages

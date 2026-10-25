@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
 import 'package:vm_service/vm_service.dart';
-import 'package:vm_service/vm_service_io.dart';
 
 /// Exception thrown when an operation is attempted without an active connection.
 class NotConnectedException implements Exception {
@@ -147,7 +147,7 @@ class VmServiceConnector {
   final logging.Logger _logger;
   VmService? _service;
   String? _isolateId;
-  StreamSubscription<Event>? _serviceEventSubscription;
+  _VmServiceConnection? _connection;
 
   final Map<String, String?> _registeredServices = {};
   final Map<String, List<Completer<String?>>> _pendingServiceRequests = {};
@@ -159,16 +159,69 @@ class VmServiceConnector {
   ///
   /// Throws an exception if connection fails.
   Future<void> connect(String uri) async {
-    if (isConnected) {
-      _logger.warning('Already connected, disconnecting first');
-      await disconnect();
-    }
+    final previous = _connection;
+    final connection = _VmServiceConnection();
+    // Claim ownership before the first await. A newer connect or disconnect
+    // supersedes this attempt, including while its HTTP upgrade is pending.
+    _connection = connection;
+    _service = null;
+    _isolateId = null;
+    _clearServiceRegistrations();
 
     _logger.info('Connecting to VM service at $uri');
 
     try {
-      _service = await vmServiceConnectUri(uri);
-      _serviceEventSubscription = _service!.onServiceEvent.listen((e) {
+      await previous?.dispose();
+      _ensureCurrentConnection(connection);
+      final socket = await WebSocket.connect(
+        uri,
+        customClient: connection.client,
+      );
+      if (!identical(_connection, connection)) {
+        await socket.close();
+        throw StateError('VM service connection attempt was superseded.');
+      }
+      // Keep the socket reader independent from VmService's input stream,
+      // as vm_service_io does. VmService.dispose cancels its input before
+      // closing the socket; canceling the socket reader at that point would
+      // prevent the peer's close frame from canceling its keep-alive timer.
+      socket.pingInterval = const Duration(seconds: 15);
+      final input = StreamController<dynamic>();
+      final streamClosed = Completer<void>();
+      void closeInput() {
+        if (connection.closed) return;
+        connection.closed = true;
+        // Retain the resource owner for deterministic disconnect/reconnect
+        // cleanup, but retire state only if this is still its connection.
+        if (identical(_connection, connection)) {
+          _service = null;
+          _isolateId = null;
+          _clearServiceRegistrations();
+        }
+        if (!streamClosed.isCompleted) streamClosed.complete();
+      }
+
+      socket.listen(
+        input.add,
+        onDone: closeInput,
+        onError: (Object error, StackTrace stackTrace) {
+          _logger.warning('VM service WebSocket error', error, stackTrace);
+          // VmService turns stream closure into disposal and rejects pending
+          // RPCs. Its input listener has no onError handler for raw IO errors.
+          closeInput();
+        },
+      );
+      final service = VmService(
+        input.stream,
+        socket.add,
+        disposeHandler: socket.close,
+        streamClosed: streamClosed.future,
+        wsUri: uri,
+      );
+      connection.service = service;
+      _service = service;
+      connection.subscription = service.onServiceEvent.listen((e) {
+        if (!identical(_connection, connection) || connection.closed) return;
         switch (e.kind) {
           case EventKind.kServiceRegistered:
             final serviceName = e.service!;
@@ -188,35 +241,63 @@ class VmServiceConnector {
         }
       });
       try {
-        await _service!
+        await service
             .streamListen(EventStreams.kService)
             .timeout(const Duration(milliseconds: 500));
       } catch (e) {
         _logger.info('streamListen(EventStreams.kService) skipped: $e');
       }
+      _ensureCurrentConnection(connection);
 
-      _isolateId = await _findIsolateWithMarionetteExtensions();
+      final isolateId = await _findIsolateWithMarionetteExtensions(
+        service,
+        connection,
+      );
+      _ensureCurrentConnection(connection);
+      _isolateId = isolateId;
       _logger.info('Connected to isolate: $_isolateId');
     } catch (err) {
       _logger.severe('Failed to connect to VM service', err);
-      await disconnect();
+      // A superseded attempt may fail after its replacement has connected.
+      // It must only release its own resources, never the new connection.
+      if (identical(_connection, connection)) {
+        await disconnect();
+      } else {
+        await connection.dispose();
+      }
       rethrow;
     }
   }
 
-  /// Disconnects from the current VM service.
+  /// Disconnects from the current VM service and cancels any pending connect.
   Future<void> disconnect() async {
-    if (_service != null) {
+    final connection = _connection;
+    // Retire ownership synchronously, before disposing asynchronous resources.
+    _connection = null;
+    _service = null;
+    _isolateId = null;
+    _clearServiceRegistrations();
+    if (connection != null) {
       _logger.info('Disconnecting from VM service');
-      await _serviceEventSubscription?.cancel();
-      _serviceEventSubscription = null;
-      await _service!.dispose();
-      _service = null;
-      _isolateId = null;
-      _registeredServices.clear();
-      _pendingServiceRequests.clear();
+      await connection.dispose();
       _logger.fine('Disconnected');
     }
+  }
+
+  void _ensureCurrentConnection(_VmServiceConnection connection) {
+    if (!identical(_connection, connection) || connection.closed) {
+      throw StateError('VM service connection was disconnected or superseded.');
+    }
+  }
+
+  void _clearServiceRegistrations() {
+    _registeredServices.clear();
+    for (final requests in _pendingServiceRequests.values) {
+      for (final completer in requests) {
+        completer.complete(null);
+      }
+    }
+    _pendingServiceRequests.clear();
   }
 
   /// Returns a future that completes with the registered method name for the
@@ -604,18 +685,22 @@ class VmServiceConnector {
   Future<bool> hotReload() async {
     _ensureConnected();
 
+    final connection = _connection!;
+    final service = _service!;
+    final isolateId = _isolateId!;
     _logger.info('Performing hot reload');
 
     try {
       final method = await waitForServiceRegistration('reloadSources');
+      _ensureCurrentConnection(connection);
       if (method == null) {
-        final report = await _service!.reloadSources(_isolateId!);
+        final report = await service.reloadSources(isolateId);
         _logger.fine('Hot reload completed: success=${report.success}');
         return report.success ?? false;
       } else {
-        final result = await _service!.callMethod(
+        final result = await service.callMethod(
           method,
-          isolateId: _isolateId!,
+          isolateId: isolateId,
         );
         _logger.fine('Hot reload completed: result=${result.json}');
         return result.json?['type'] == 'Success';
@@ -641,10 +726,14 @@ class VmServiceConnector {
   Future<bool> hotRestart() async {
     _ensureConnected();
 
+    final connection = _connection!;
+    final service = _service!;
+    final isolateId = _isolateId!;
     _logger.info('Performing hot restart');
 
     try {
       final method = await waitForServiceRegistration('hotRestart');
+      _ensureCurrentConnection(connection);
       if (method == null) {
         _logger.warning(
           'hotRestart service not registered; app must be run via flutter run',
@@ -652,17 +741,22 @@ class VmServiceConnector {
         return false;
       }
 
-      final result = await _service!.callMethod(method, isolateId: _isolateId!);
+      final result = await service.callMethod(method, isolateId: isolateId);
+      _ensureCurrentConnection(connection);
       _logger.fine('Hot restart completed: result=${result.json}');
       final success = result.json?['type'] == 'Success';
 
       if (success) {
         // The previous isolate was torn down and replaced. Re-resolve the new
         // isolate, retrying while it boots and re-registers its extensions.
-        _isolateId = await _findIsolateWithMarionetteExtensions(
+        final replacementIsolateId = await _findIsolateWithMarionetteExtensions(
+          service,
+          connection,
           attempts: 10,
           delay: const Duration(milliseconds: 500),
         );
+        _ensureCurrentConnection(connection);
+        _isolateId = replacementIsolateId;
         _logger.info('Reconnected to isolate after hot restart: $_isolateId');
       }
 
@@ -680,7 +774,9 @@ class VmServiceConnector {
   /// [delay] between tries before giving up.
   ///
   /// Throws an exception if no suitable isolate is found within the retries.
-  Future<String> _findIsolateWithMarionetteExtensions({
+  Future<String> _findIsolateWithMarionetteExtensions(
+    VmService service,
+    _VmServiceConnection connection, {
     int attempts = 1,
     Duration delay = const Duration(milliseconds: 500),
   }) async {
@@ -689,7 +785,9 @@ class VmServiceConnector {
         await Future<void>.delayed(delay);
       }
 
-      final vm = await _service!.getVM();
+      _ensureCurrentConnection(connection);
+      final vm = await service.getVM();
+      _ensureCurrentConnection(connection);
       if (vm.isolates == null || vm.isolates!.isEmpty) {
         continue;
       }
@@ -701,7 +799,8 @@ class VmServiceConnector {
         }
 
         try {
-          final isolate = await _service!.getIsolate(isolateRef.id!);
+          final isolate = await service.getIsolate(isolateRef.id!);
+          _ensureCurrentConnection(connection);
           final hasExtension = isolate.extensionRPCs?.any(
                 (ext) => ext == 'ext.flutter.marionette.getLogs',
               ) ??
@@ -711,6 +810,7 @@ class VmServiceConnector {
             return isolateRef.id!;
           }
         } catch (err) {
+          _ensureCurrentConnection(connection);
           _logger.warning(
             'Failed to check extensions for isolate ${isolateRef.id}',
             err,
@@ -724,5 +824,25 @@ class VmServiceConnector {
       'No isolate found with ext.flutter.marionette.getLogs extension. '
       'Make sure the Flutter app has marionette_flutter initialized.',
     );
+  }
+}
+
+/// Resources owned by one connection attempt, including its pending upgrade.
+class _VmServiceConnection {
+  final HttpClient client = HttpClient();
+  VmService? service;
+  StreamSubscription<Event>? subscription;
+  bool closed = false;
+  Future<void>? _disposeFuture;
+
+  Future<void> dispose() {
+    // Force-close the HTTP request even if no WebSocket/VmService exists yet.
+    client.close(force: true);
+    return _disposeFuture ??= _dispose();
+  }
+
+  Future<void> _dispose() async {
+    await subscription?.cancel();
+    await service?.dispose();
   }
 }

@@ -7,6 +7,8 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+import 'support/test_process.dart';
+
 /// End-to-end tests for the stdio MCP server.
 ///
 /// These spawn the real entrypoint ([bin/marionette_mcp.dart]) and drive it
@@ -75,6 +77,143 @@ void main() {
         expect(result['capabilities'], isA<Map>());
       },
     );
+
+    for (final signal in [false, if (!Platform.isWindows) true]) {
+      test(
+        'exits with code 0 while connected on '
+        '${signal ? 'SIGTERM' : 'stdin EOF'}',
+        () async {
+          final app = await TestProcess.start([
+            '--enable-vm-service=0',
+            '--disable-service-auth-codes',
+            'test/fixtures/vm_service_app.dart',
+          ]);
+          addTearDown(app.dispose);
+          final uri = await app.vmServiceUri();
+
+          final server = await TestProcess.start([
+            'run',
+            entrypoint,
+            '--log-level',
+            'SEVERE',
+          ]);
+          addTearDown(server.dispose);
+          server.send({
+            'jsonrpc': '2.0',
+            'id': 1,
+            'method': 'initialize',
+            'params': {
+              'protocolVersion': '2025-06-18',
+              'capabilities': <String, Object?>{},
+              'clientInfo': {'name': 'shutdown-test', 'version': '1.0.0'},
+            },
+          });
+          final initialized = await server.response(1);
+          expect(initialized['error'], isNull);
+          expect(initialized['result'], isA<Map>());
+          server.send({
+            'jsonrpc': '2.0',
+            'method': 'notifications/initialized',
+          });
+          server.send({
+            'jsonrpc': '2.0',
+            'id': 2,
+            'method': 'tools/call',
+            'params': {
+              'name': 'connect',
+              'arguments': {'uri': uri},
+            },
+          });
+          final connected = await server.response(2);
+          expect(connected['error'], isNull);
+          expect(connected['result'], isA<Map>());
+          final result = connected['result'] as Map;
+          expect(result['isError'], isNot(true), reason: '$connected');
+
+          // Keep the VM connection alive: shutdown must dispose it without
+          // requiring an explicit disconnect tool call from the client.
+          if (signal) {
+            expect(server.process.kill(ProcessSignal.sigterm), isTrue);
+          } else {
+            await server.process.stdin.close();
+          }
+          expect(
+            await server.exitCodeWithin(const Duration(seconds: 10)),
+            0,
+            reason: server.errors.toString(),
+          );
+        },
+      );
+    }
+
+    for (final signal in [false, if (!Platform.isWindows) true]) {
+      test(
+        'exits with code 0 during a pending VM WebSocket upgrade on '
+        '${signal ? 'SIGTERM' : 'stdin EOF'}',
+        () async {
+          final listener =
+              await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          final accepted = Completer<HttpRequest>();
+          final requests = listener.listen((request) {
+            if (!accepted.isCompleted) accepted.complete(request);
+          });
+          addTearDown(() async {
+            await listener.close(force: true);
+            await requests.cancel();
+          });
+          final server = await TestProcess.start([
+            'run',
+            entrypoint,
+            '--log-level',
+            'SEVERE',
+          ]);
+          addTearDown(server.dispose);
+          server.send({
+            'jsonrpc': '2.0',
+            'id': 1,
+            'method': 'initialize',
+            'params': {
+              'protocolVersion': '2025-06-18',
+              'capabilities': <String, Object?>{},
+              'clientInfo': {'name': 'pending-shutdown-test', 'version': '1'},
+            },
+          });
+          final initialized = await server.response(1);
+          expect(initialized['error'], isNull);
+          server.send({
+            'jsonrpc': '2.0',
+            'method': 'notifications/initialized',
+          });
+          server.send({
+            'jsonrpc': '2.0',
+            'id': 2,
+            'method': 'tools/call',
+            'params': {
+              'name': 'connect',
+              'arguments': {'uri': 'ws://127.0.0.1:${listener.port}/ws'},
+            },
+          });
+          final request = await accepted.future.timeout(
+            const Duration(seconds: 15),
+          );
+          expect(WebSocketTransformer.isUpgradeRequest(request), isTrue);
+
+          // Leave the HTTP upgrade unanswered until after process exit. Merely
+          // closing a late successful WebSocket does not release a still-open
+          // HttpClient request, which would otherwise keep the process alive.
+          if (signal) {
+            expect(server.process.kill(ProcessSignal.sigterm), isTrue);
+          } else {
+            await server.process.stdin.close();
+          }
+          expect(
+            await server.exitCodeWithin(const Duration(seconds: 10)),
+            0,
+            reason: server.errors.toString(),
+          );
+        },
+      );
+    }
 
     test('exits with code 0 when stdin reaches EOF', () async {
       final process = await startServer();

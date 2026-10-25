@@ -162,6 +162,11 @@ class StartPage extends StatelessComponent {
                 '`dart run marionette_mcp` as the server command.',
               ),
             ),
+            const Callout(
+              'For a Flutter 3.27 app that uses `flutter_test`, install the '
+              'server globally. The test SDK and current MCP server require '
+              'incompatible dependency versions in a shared app graph.',
+            ),
             const h3([.text('CLI')]),
             p(
               rich(
@@ -263,6 +268,13 @@ class StartPage extends StatelessComponent {
                 'risk first run.',
               ),
             ]),
+            const Callout(
+              'Use the Flutter version pinned in '
+              '[`.fvmrc`]($repoUrl/blob/main/.fvmrc) for this checkout. The '
+              'example resolves the full repository workspace. Flutter 3.27 '
+              'apps using the binding with a separately installed server '
+              'remain supported.',
+            ),
             const Terminal(transcript: _exampleCommands, title: 'terminal'),
             const CodeBlock(
               source: _examplePrompt,

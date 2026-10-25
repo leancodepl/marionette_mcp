@@ -221,7 +221,7 @@ class MarionetteConfiguration {
   /// );
   /// ```
   ///
-  /// See https://github.com/leancodepl/marionette_mcp/blob/main/docs/session-reports.md
+  /// See https://marionette.leancode.co/docs/reports/
   final bool enableSessionReports;
 
   /// Checks if an element's widget is interactive (built-in + custom).

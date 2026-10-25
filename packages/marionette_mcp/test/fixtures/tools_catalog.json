@@ -1,0 +1,765 @@
+[
+  {
+    "name": "connect",
+    "description": "Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "description": "VM service URI (e.g., ws://127.0.0.1:8181/ws). This is printed in the Flutter app console when running in debug mode.",
+          "type": "string"
+        },
+        "session_title": {
+          "description": "A short title for this run, e.g. \"profile validation\". Keep it under ~60 characters \u2014 longer is truncated. Ignored unless the app enabled session reports. Slugified and timestamped into the session directory name. Purely a human-readable label \u2014 every connect opens its own fresh session directory, even if this matches an earlier title. Falls back to \"run-<timestamp>\" when omitted.",
+          "type": "string"
+        },
+        "session_dir": {
+          "description": "Base directory .marionette/sessions/ is created under. Overrides the MARIONETTE_SESSION_DIR environment variable. Only needed when the MCP client hasn't set that variable and the process's working directory isn't the project root.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
+    "annotations": {
+      "title": "Connect to App",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "disconnect",
+    "description": "Disconnects from the currently connected Flutter app. After disconnecting, you must call connect again to use any other tools.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "Disconnect from App",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_interactive_elements",
+    "description": "Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Style, decoration and colour blobs are never reported. Set compaction to \"compact\" (the default for most apps) to also drop rendering details no interaction tool reads (textAlign, softWrap, overflow, font metrics, \u2026), report visible only when an element is not visible, round bounds to whole logical pixels, and drop a Text element's duplicated data field \u2014 much more token-efficient for agent loops. Set compaction to \"none\" to force the full payload. Omit compaction to use the app's MarionetteConfiguration.compaction default. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Lists only that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "compaction": {
+          "description": "How much to reduce the payload. \"compact\" drops rendering details, font metrics, a Text element's duplicated data, rounds bounds to whole logical pixels, and reports visible only when false. \"none\" forces the full payload. Omit to use the app's MarionetteConfiguration.compaction default.",
+          "type": "string",
+          "enum": [
+            "none",
+            "compact"
+          ]
+        }
+      }
+    },
+    "annotations": {
+      "title": "Get Interactive Elements",
+      "readOnlyHint": true,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_logs",
+    "description": "Retrieves all application logs collected from the Flutter app since app start or since the last hot reload. This includes debug messages, errors, and other log output from the running app. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "Get Application Logs",
+      "readOnlyHint": true,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "take_screenshots",
+    "description": "Takes screenshots of all views in the Flutter app. By default returns base64-encoded PNG images inline, which can be decoded and saved. Set inline: false to instead save the screenshots straight into the active session directory (only available when the app enables session reports) and get back their paths \u2014 evidence you plan to cite in a report but don't need to look at right now, since each inline screenshot costs real visual tokens. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "inline": {
+          "description": "If false, saves the screenshots into the session directory and returns their paths instead of the image data. Defaults to true.",
+          "type": "boolean"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Take Screenshots",
+      "readOnlyHint": true,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "tap",
+    "description": "Simulates a tap gesture on an element in the Flutter app that matches the given criteria. You can match elements by their key (a ValueKey<String>), by their Semantics identifier, by their text content (but not accessibility label!), by their widget type, or by screen coordinates. Only one matching method should be used: either key, identifier, text, type, or coordinates. Prefer using the key if available, as it is more reliable; the Semantics identifier is the next-best stable selector. Limit yourself to elements from get_interactive_elements only if you can. Tapping a text field gives it focus, after which you can use enter_text with focused_element to type into it. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key of the element to tap. You can get the key of an element by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the element to tap. A stable, unique, accessibility identifier set via Semantics(identifier: ...). Useful when an element has no ValueKey but does set an identifier. You can discover identifiers by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "text": {
+          "description": "The visible text content of the element to tap. Use this for elements that display text like buttons or labels.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The widget type name of the element to tap (e.g., \"ElevatedButton\", \"IconButton\"). Use this to match elements by their Flutter widget type.",
+          "type": "string"
+        },
+        "coordinates": {
+          "description": "Screen coordinates to tap at. Use this to tap at a specific position on the screen.",
+          "type": "object",
+          "properties": {
+            "x": {
+              "description": "The x coordinate (horizontal position from left).",
+              "type": "number"
+            },
+            "y": {
+              "description": "The y coordinate (vertical position from top).",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ]
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": "Tap Element",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "secondary_tap",
+    "description": "Simulates a secondary tap (right mouse button click) on an element in the Flutter app. Desktop only \u2014 dispatches a mouse pointer with the secondary button pressed, which is what Flutter recognises as onSecondaryTap (e.g. for opening context menus). You can match elements by their key (a ValueKey<String>), by their Semantics identifier, by their text content, by their widget type, or by screen coordinates. Only one matching method should be used. Prefer using the key if available, as it is more reliable. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key of the element to secondary tap. You can get the key of an element by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the element to secondary tap. A stable, unique accessibility identifier set via Semantics(identifier: ...).",
+          "type": "string"
+        },
+        "text": {
+          "description": "The visible text content of the element to secondary tap.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The widget type name of the element to secondary tap (e.g., \"ElevatedButton\", \"ListTile\").",
+          "type": "string"
+        },
+        "coordinates": {
+          "description": "Screen coordinates to secondary tap at.",
+          "type": "object",
+          "properties": {
+            "x": {
+              "description": "The x coordinate (horizontal position from left).",
+              "type": "number"
+            },
+            "y": {
+              "description": "The y coordinate (vertical position from top).",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ]
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": "Secondary Tap Element",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "double_tap",
+    "description": "Simulates a double tap gesture on an element in the Flutter app. This is useful for triggering text selection, zoom, or any widget that responds to double tap. You can match elements by their key, identifier, text, type, or coordinates. An optional delay parameter controls the time between the two taps (default: 100ms). Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key of the element to double tap. You can get the key of an element by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the element to double tap. A stable, unique accessibility identifier set via Semantics(identifier: ...).",
+          "type": "string"
+        },
+        "text": {
+          "description": "The visible text content of the element to double tap.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The widget type name of the element to double tap (e.g., \"ListTile\", \"Card\").",
+          "type": "string"
+        },
+        "coordinates": {
+          "description": "Screen coordinates to double tap at.",
+          "type": "object",
+          "properties": {
+            "x": {
+              "description": "The x coordinate (horizontal position from left).",
+              "type": "number"
+            },
+            "y": {
+              "description": "The y coordinate (vertical position from top).",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ]
+        },
+        "delay": {
+          "description": "Time between the two taps in milliseconds. Defaults to 100ms which is within Flutter's double-tap recognition window (40ms-300ms).",
+          "type": "number"
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": "Double Tap Element",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "long_press",
+    "description": "Simulates a long press gesture on an element in the Flutter app. This is useful for triggering context menus, reorderable lists, or any widget that responds to long press. You can match elements by their key, identifier, text, type, or coordinates. An optional duration parameter controls how long the press is held (default: 600ms). Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key of the element to long press. You can get the key of an element by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the element to long press. A stable, unique accessibility identifier set via Semantics(identifier: ...).",
+          "type": "string"
+        },
+        "text": {
+          "description": "The visible text content of the element to long press.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The widget type name of the element to long press (e.g., \"ListTile\", \"Card\").",
+          "type": "string"
+        },
+        "coordinates": {
+          "description": "Screen coordinates to long press at.",
+          "type": "object",
+          "properties": {
+            "x": {
+              "description": "The x coordinate (horizontal position from left).",
+              "type": "number"
+            },
+            "y": {
+              "description": "The y coordinate (vertical position from top).",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ]
+        },
+        "duration": {
+          "description": "How long to hold the press in milliseconds. Defaults to 600ms which matches Flutter's long press behavior.",
+          "type": "number"
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": "Long Press Element",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "swipe",
+    "description": "Simulates a swipe/drag gesture on the Flutter app. Supports two modes: 1. Element-based: provide key, identifier, or text to identify the element, plus a direction (left, right, up, down) and optional distance in pixels (default 200). 2. Coordinate-based: provide startX, startY, endX, endY for precise control. Useful for interacting with PageView, Dismissible, Drawer, Slider, and other swipe-based widgets. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key of the element to swipe on. Use with direction.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the element to swipe on. Use with direction. A stable, unique accessibility identifier set via Semantics(identifier: ...).",
+          "type": "string"
+        },
+        "text": {
+          "description": "The visible text content of the element to swipe on. Use with direction.",
+          "type": "string"
+        },
+        "direction": {
+          "description": "Swipe direction when using element-based mode: left, right, up, or down.",
+          "type": "string"
+        },
+        "distance": {
+          "description": "Swipe distance in pixels for element-based mode (default: 200).",
+          "type": "number"
+        },
+        "startX": {
+          "description": "Start X coordinate for coordinate-based swipe.",
+          "type": "number"
+        },
+        "startY": {
+          "description": "Start Y coordinate for coordinate-based swipe.",
+          "type": "number"
+        },
+        "endX": {
+          "description": "End X coordinate for coordinate-based swipe.",
+          "type": "number"
+        },
+        "endY": {
+          "description": "End Y coordinate for coordinate-based swipe.",
+          "type": "number"
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": "Swipe",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "pinch_zoom",
+    "description": "Simulates a pinch zoom gesture on an element in the Flutter app. Use scale > 1.0 to zoom in (fingers move apart) and scale < 1.0 to zoom out (fingers move together). You can target the element by key, identifier, text, type, or coordinates. Useful for maps, images, PDFs, and other zoomable content. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key of the element to pinch zoom on.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the element to pinch zoom on. A stable, unique accessibility identifier set via Semantics(identifier: ...).",
+          "type": "string"
+        },
+        "text": {
+          "description": "The visible text content of the element to pinch zoom on.",
+          "type": "string"
+        },
+        "type": {
+          "description": "The widget type name of the element to pinch zoom on.",
+          "type": "string"
+        },
+        "coordinates": {
+          "description": "Screen coordinates to pinch zoom at.",
+          "type": "object",
+          "properties": {
+            "x": {
+              "description": "The x coordinate.",
+              "type": "number"
+            },
+            "y": {
+              "description": "The y coordinate.",
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ]
+        },
+        "scale": {
+          "description": "Zoom scale factor. Values > 1.0 zoom in, values < 1.0 zoom out. For example, 2.0 doubles the zoom level.",
+          "type": "number"
+        },
+        "start_distance": {
+          "description": "Initial distance between the two fingers in pixels (default: 200).",
+          "type": "number"
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "scale"
+      ]
+    },
+    "annotations": {
+      "title": "Pinch Zoom",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "press_back_button",
+    "description": "Simulates a system back button press in the Flutter app. This triggers the same mechanism as the Android back button or iOS swipe-back gesture. If the app has a route to pop, it will be popped. If the app is on the root route, the system may minimize or close the app (same as real back button behavior). Works with Navigator, GoRouter, and other routing solutions. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "Press Back Button",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "scroll_to",
+    "description": "Scrolls the view until an element matching the given criteria becomes visible. You can match elements by their key (a ValueKey<String>), by their Semantics identifier, or by their visible text content. This is useful when you need to interact with elements that are not currently visible on screen. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key of the element to scroll to. You can get the key of an element by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the element to scroll to. A stable, unique accessibility identifier set via Semantics(identifier: ...).",
+          "type": "string"
+        },
+        "text": {
+          "description": "The visible text content of the element to scroll to.",
+          "type": "string"
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": "Scroll to Element",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "enter_text",
+    "description": "Enters text into a text field in the Flutter app. You can target the field in three ways: 1. By key: provide the key parameter with the ValueKey<String> of the field. You can discover available keys by calling get_interactive_elements. 2. By Semantics identifier: provide the identifier parameter with the accessibility identifier of the field. Useful when the field has no ValueKey but does set a Semantics identifier. 3. By focused element: first tap a text field to give it focus, then call enter_text with focused_element set to true. Important: when targeting by focused element, a text field must be focused before calling this (for example by using the tap tool), otherwise it will fail with an error. Exactly one of key, identifier, or focused_element must be provided. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "description": "The text to enter into the text field.",
+          "type": "string"
+        },
+        "key": {
+          "description": "The key of the text field. You can get the key of an element by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "The Semantics identifier of the text field. A stable, unique accessibility identifier set via Semantics(identifier: ...). You can discover identifiers by calling get_interactive_elements.",
+          "type": "string"
+        },
+        "focused_element": {
+          "description": "If true, enters text into the currently focused text field. A text field must be focused first (for example by using tap), otherwise this will fail.",
+          "type": "boolean"
+        },
+        "ancestor_keys": {
+          "description": "Optional wrapper keys (ValueKey<String>), outermost first; each is looked up inside the previous one. Limits the search to that subtree. Fails if a key has no element.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "input"
+      ]
+    },
+    "annotations": {
+      "title": "Enter Text",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "press_key",
+    "description": "Presses a keyboard key in the Flutter app, producing a real key event that flows through the focus system \u2014 unlike enter_text, which only replaces a field's value. Use it to submit a form (enter), move focus (tab), dismiss a dialog (escape), edit within a field (backspace, delete, arrowLeft/arrowRight/arrowUp/arrowDown, home, end), or trigger app shortcuts via modifiers (for example control+a to select all). The key is sent to whatever currently has focus, exactly like a real keyboard, so focus a target first if needed (for example with tap). Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The key to press. Named keys: enter, tab, escape, backspace, delete, space, arrowUp, arrowDown, arrowLeft, arrowRight, home, end, pageUp, pageDown. Also accepts a single character a-z or 0-9 (case-insensitive).",
+          "type": "string"
+        },
+        "modifiers": {
+          "description": "Optional comma-separated modifier keys to hold during the press: any of control, shift, alt, meta (e.g. \"control\" or \"control,shift\"). On macOS use meta for the Command key.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "annotations": {
+      "title": "Press Key",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_device_config",
+    "description": "Overrides the device configuration the running app sees \u2014 text scale, bold text, and light/dark appearance \u2014 without touching the real device settings. Use it to sweep a screen under accessibility or appearance conditions (large text, bold text, dark mode). Omitted parameters keep their current override; reset clears every override, and combining reset with values leaves exactly those values set (that is how a single override is reverted). Requires the app to wrap its root widget in MarionetteDeviceConfig \u2014 if it does not, this returns setup instructions. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text_scale": {
+          "description": "Linear text scale, as a multiplier of the platform default. Must be greater than 0. Typical sweep values are 1.0 (default), 1.5 (large) and 2.0 (very large); real devices top out around 3.0, and much larger values mostly produce overflow errors rather than useful signal. Note that some Material widgets clamp their own text scaling.",
+          "type": "number"
+        },
+        "bold_text": {
+          "description": "The system bold-text accessibility setting.",
+          "type": "boolean"
+        },
+        "platform_brightness": {
+          "description": "The system light/dark appearance. Drives MaterialApp theme resolution when themeMode is system.",
+          "type": "string",
+          "enum": [
+            "light",
+            "dark"
+          ]
+        },
+        "reset": {
+          "description": "Clear every override and revert to the platform defaults. Applied before any other parameter in the same call.",
+          "type": "boolean"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Set Device Config",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "list_custom_extensions",
+    "description": "Lists all custom VM service extensions registered by the Flutter app (outside of the built-in Marionette extensions). Each extension includes its name and an optional description. Use this to discover what app-specific extensions are available before calling them with call_custom_extension. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "List Custom Extensions",
+      "readOnlyHint": true,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "call_custom_extension",
+    "description": "Calls a custom VM service extension registered by the Flutter app. This is an escape hatch for interacting with app-specific extensions that are not part of marionette's built-in tools. For marionette features, use the dedicated tools instead. The extension name should not include the \"ext.flutter.\" prefix as it is added automatically. For example, use \"deckNavigation.goToSlide\" instead of \"ext.flutter.deckNavigation.goToSlide\". Arguments are passed as string key-value pairs. The available extensions depend on what the connected Flutter app has registered. Check the app's source code for available extensions. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "extension": {
+          "description": "The extension name without the \"ext.flutter.\" prefix (e.g., \"deckNavigation.goToSlide\").",
+          "type": "string"
+        },
+        "args": {
+          "description": "Optional key-value pairs to pass as arguments. Scalars are stringified and nested object/array values are JSON-encoded before being sent to the VM service extension.",
+          "type": "object",
+          "properties": {}
+        }
+      },
+      "required": [
+        "extension"
+      ]
+    },
+    "annotations": {
+      "title": "Call Custom Extension",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "hot_reload",
+    "description": "Performs a hot reload of the Flutter app. This reloads the Dart code without restarting the app, preserving the current state. Useful after making code changes to see them reflected in the running app. Requires an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "Hot Reload",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "hot_restart",
+    "description": "Performs a hot restart of the Flutter app. This fully restarts the app from main() and resets all state. Use it instead of hot_reload after changes a reload cannot pick up (e.g. changes to main()/bootstrap, global singletons, or state shape). Requires the app to be running via `flutter run` and an active connection established via connect.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "Hot Restart",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  }
+]

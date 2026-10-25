@@ -75,6 +75,9 @@ npx skills add leancodepl/marionette_mcp # without the Dart toolchain
 
 ## Documentation
 
+Contributors: see [Server and runtime architecture](https://github.com/leancodepl/marionette_mcp/blob/main/docs/architecture.md) for
+package boundaries, tool registration, resource ownership, and verification.
+
 | Page | What is inside |
 | --- | --- |
 | [Start](https://marionette.leancode.co/docs/) | Setup, every agent's config, the first prompt, the example app, FAQ |

@@ -1,5 +1,7 @@
+import 'dart:async';
+
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/vm_service/dynamic_extension_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/dynamic_extension_tools.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
@@ -305,8 +307,9 @@ void main() {
     });
   });
 
-  group('DynamicExtensionTools.disableAll', () {
-    test('disables every registered tool and clears the list', () async {
+  group('DynamicExtensionTools.removeAll', () {
+    test('removes every registered tool and releases its registry name',
+        () async {
       final connector = _FakeConnector(
         listExtensionsResponse: const {
           'extensions': [
@@ -328,8 +331,9 @@ void main() {
         },
       );
 
+      final server = _server();
       final dynamicTools = DynamicExtensionTools(
-        server: _server(),
+        server: server,
         connector: connector,
         logger: logging.Logger.detached('test'),
       );
@@ -337,10 +341,17 @@ void main() {
       final captured = dynamicTools.registeredTools.toList();
       expect(captured.every((t) => t.enabled), isTrue);
 
-      dynamicTools.disableAll();
+      dynamicTools.removeAll();
 
       expect(dynamicTools.registeredTools, isEmpty);
-      expect(captured.every((t) => !t.enabled), isTrue);
+      for (final tool in captured) {
+        expect(dynamicTools.extensionNameForTool(tool.name), isNull);
+        // Reusing the exact names would throw if removal left registry entries.
+        server.registerTool(
+          tool.name,
+          callback: (_, __) async => CallToolResult(content: []),
+        );
+      }
     });
 
     test('is a no-op when nothing is registered', () {
@@ -351,15 +362,14 @@ void main() {
       );
 
       // Must not throw.
-      dynamicTools.disableAll();
+      dynamicTools.removeAll();
       expect(dynamicTools.registeredTools, isEmpty);
     });
   });
 
   group('DynamicExtensionTools reconnect', () {
-    test(
-        're-registers same extension after disable without name collision '
-        'and revives the same RegisteredTool instance', () async {
+    test('re-registers the same extension with a fresh handle after removal',
+        () async {
       final connector = _FakeConnector(
         listExtensionsResponse: const {
           'extensions': [
@@ -387,26 +397,25 @@ void main() {
       final firstInstance = dynamicTools.registeredTools.single;
       expect(firstInstance.enabled, isTrue);
 
-      // Disconnect — emulates the disable-on-disconnect path.
-      dynamicTools.disableAll();
+      // Disconnect releases the old registrations.
+      dynamicTools.removeAll();
       expect(dynamicTools.registeredTools, isEmpty);
-      expect(firstInstance.enabled, isFalse);
+      expect(dynamicTools.extensionNameForTool(firstInstance.name), isNull);
 
-      // Cycle 2 with the same payload — must not throw, must revive in
-      // place.
+      // Cycle 2 with the same payload must register without a collision.
       await dynamicTools.registerAll();
 
       expect(dynamicTools.registeredTools, hasLength(1));
       final secondInstance = dynamicTools.registeredTools.single;
       expect(
         identical(firstInstance, secondInstance),
-        isTrue,
-        reason: 'reconnect should reuse the pooled RegisteredTool',
+        isFalse,
+        reason: 'reconnect registers a fresh tool after removing the old one',
       );
       expect(secondInstance.enabled, isTrue);
     });
 
-    test('reflects changed description and inputSchema on revival', () async {
+    test('reflects changed description and inputSchema on reconnect', () async {
       final connector = _FakeConnector(
         listExtensionsResponse: const {
           'extensions': [
@@ -433,7 +442,7 @@ void main() {
       expect(tool.description, 'v1');
       expect(tool.inputSchema?.properties, isEmpty);
 
-      dynamicTools.disableAll();
+      dynamicTools.removeAll();
 
       connector.listExtensionsResponse = const {
         'extensions': [
@@ -452,13 +461,13 @@ void main() {
       };
       await dynamicTools.registerAll();
 
-      expect(tool.description, 'v2');
-      expect(tool.inputSchema?.properties?.keys, ['count']);
+      final reconnected = dynamicTools.registeredTools.single;
+      expect(reconnected.description, 'v2');
+      expect(reconnected.inputSchema?.properties?.keys, ['count']);
     });
 
-    test(
-        'extensions that disappear on reconnect stay disabled and leave the '
-        'present ones enabled', () async {
+    test('extensions that disappear on reconnect release their names',
+        () async {
       final connector = _FakeConnector(
         listExtensionsResponse: const {
           'extensions': [
@@ -492,7 +501,7 @@ void main() {
       };
       expect(byName.keys, containsAll(['foo', 'bar']));
 
-      dynamicTools.disableAll();
+      dynamicTools.removeAll();
 
       // App now exposes only `foo`.
       connector.listExtensionsResponse = const {
@@ -512,7 +521,7 @@ void main() {
           dynamicTools.registeredTools.map((t) => t.name).toSet();
       expect(activeNames, {'foo'});
       expect(byName['foo']!.enabled, isTrue);
-      expect(byName['bar']!.enabled, isFalse);
+      expect(dynamicTools.extensionNameForTool('bar'), isNull);
     });
 
     test('built-in name collisions are skipped on every cycle', () async {
@@ -548,15 +557,34 @@ void main() {
       await dynamicTools.registerAll();
       expect(dynamicTools.registeredTools, isEmpty);
 
-      dynamicTools.disableAll();
+      dynamicTools.removeAll();
 
-      // Second cycle with the same colliding extension — still skipped,
-      // and we still don't fall over because the collision name is not
-      // pooled (so we re-attempt registerTool, which throws and is
-      // caught again).
+      // The built-in still owns this name across connection cycles.
       await dynamicTools.registerAll();
       expect(dynamicTools.registeredTools, isEmpty);
     });
+  });
+
+  test('disconnect retires an in-flight dynamic tool discovery', () async {
+    final connector = _DeferredConnector();
+    final tools = DynamicExtensionTools(
+      server: _server(),
+      connector: connector,
+      logger: logging.Logger.detached('test'),
+    );
+    final pending = tools.registerAll();
+    tools.removeAll();
+    connector.response.complete({
+      'extensions': [
+        {
+          'name': 'late',
+          'inputSchema': {'type': 'object', 'properties': {}}
+        },
+      ],
+    });
+    await pending;
+    expect(tools.registeredTools, isEmpty);
+    expect(tools.extensionNameForTool('late'), isNull);
   });
 
   group('sanitizeToolName', () {
@@ -584,4 +612,11 @@ void main() {
       expect(sanitizeToolName('...'), '_');
     });
   });
+}
+
+class _DeferredConnector extends _FakeConnector {
+  final response = Completer<Map<String, dynamic>>();
+
+  @override
+  Future<Map<String, dynamic>> listExtensions() => response.future;
 }

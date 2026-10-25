@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:marionette_mcp/src/mcp/step_logging.dart';
+import 'package:marionette_mcp/src/session/report_steps.dart';
 import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -633,6 +635,44 @@ void main() {
   });
 
   group('withStepLogging', () {
+    for (final initiallyConnected in [true, false]) {
+      for (final fails in [true, false]) {
+        test(
+            'keeps invocation session when initiallyConnected=$initiallyConnected '
+            'and fails=$fails across reconnect', () async {
+          final tempDir = Directory.systemTemp.createTempSync('step_overlap_');
+          addTearDown(() => tempDir.deleteSync(recursive: true));
+          final original = Session.open(Directory(p.join(tempDir.path, 'old')));
+          final replacement =
+              Session.open(Directory(p.join(tempDir.path, 'replacement')));
+          final logger = StepLogger()
+            ..session = initiallyConnected ? original : null;
+          final release = Completer<void>();
+          final wrapped = withStepLogging(logger, 'hot_reload', (_, __) async {
+            await release.future;
+            if (fails) throw StateError('old call failed');
+            return const CallToolResult(
+                content: [TextContent(text: 'reloaded')]);
+          });
+          final pending = Future<CallToolResult>.sync(
+            () => wrapped(const {}, _fakeExtra()),
+          );
+          final expectation = fails
+              ? expectLater(pending, throwsStateError)
+              : expectLater(pending, completion(isA<CallToolResult>()));
+          logger.session = replacement;
+          release.complete();
+          await expectation;
+
+          String contents(Session session) => session.stepsFile.existsSync()
+              ? session.stepsFile.readAsStringSync()
+              : '';
+          expect(contents(original).contains('hot_reload'), initiallyConnected);
+          expect(contents(replacement), isNot(contains('hot_reload')));
+        });
+      }
+    }
+
     test('logs after the wrapped callback resolves', () async {
       final tempDir = Directory.systemTemp.createTempSync('with_step_logging_');
       addTearDown(() {
@@ -654,7 +694,8 @@ void main() {
       expect(session.stepsFile.readAsStringSync(), contains('hot_reload'));
     });
 
-    test('still logs a step when the wrapped callback throws, then '
+    test(
+        'still logs a step when the wrapped callback throws, then '
         'rethrows', () async {
       // Regression test: an unexpected, uncaught throw (not the usual
       // isError: true result) must still be recorded — otherwise a report's

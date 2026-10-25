@@ -1,5 +1,5 @@
 import 'package:logging/logging.dart' as logging;
-import 'package:marionette_mcp/src/vm_service/tools/device_tools.dart';
+import 'package:marionette_mcp/src/mcp/tools/device_tools.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
@@ -36,25 +36,31 @@ class _CapturingConnector implements VmServiceConnector {
       throw UnimplementedError('${invocation.memberName}');
 }
 
+class _Extra implements RequestHandlerExtra {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 void main() {
+  final extra = _Extra();
   group('set_device_config', () {
     late _CapturingConnector connector;
-    late logging.Logger logger;
+    late SetDeviceConfigTool tool;
 
     setUp(() {
       connector = _CapturingConnector();
-      logger = logging.Logger.detached('test');
+      tool = SetDeviceConfigTool(connector, logging.Logger.detached('test'));
     });
 
     String textOf(CallToolResult result) =>
         (result.content.single as TextContent).text;
 
     test('forwards every field', () async {
-      await setDeviceConfig(connector, logger, {
+      await tool.execute({
         'text_scale': 1.5,
         'bold_text': true,
         'platform_brightness': 'dark',
-      });
+      }, extra);
 
       expect(connector.calls.single, {
         'textScale': 1.5,
@@ -65,13 +71,13 @@ void main() {
     });
 
     test('widens an integer text scale to a double', () async {
-      await setDeviceConfig(connector, logger, {'text_scale': 2});
+      await tool.execute({'text_scale': 2}, extra);
 
       expect(connector.calls.single['textScale'], 2.0);
     });
 
     test('forwards reset on its own', () async {
-      await setDeviceConfig(connector, logger, {'reset': true});
+      await tool.execute({'reset': true}, extra);
 
       expect(connector.calls.single['reset'], isTrue);
     });
@@ -79,14 +85,14 @@ void main() {
     test('relays the message from the app', () async {
       connector.nextResponse = const {'message': 'Device config reset'};
 
-      final result = await setDeviceConfig(connector, logger, {'reset': true});
+      final result = await tool.execute({'reset': true}, extra);
 
       expect(textOf(result), 'Device config reset');
       expect(result.isError, isNot(true));
     });
 
     test('rejects a call that sets nothing', () async {
-      final result = await setDeviceConfig(connector, logger, const {});
+      final result = await tool.execute(const {}, extra);
 
       expect(result.isError, isTrue);
       expect(textOf(result), contains('At least one parameter'));
@@ -94,16 +100,16 @@ void main() {
     });
 
     test('rejects reset=false with no other parameter', () async {
-      final result = await setDeviceConfig(connector, logger, {'reset': false});
+      final result = await tool.execute({'reset': false}, extra);
 
       expect(result.isError, isTrue);
       expect(connector.calls, isEmpty);
     });
 
     test('rejects a non-positive text scale', () async {
-      final result = await setDeviceConfig(connector, logger, {
+      final result = await tool.execute({
         'text_scale': 0,
-      });
+      }, extra);
 
       expect(result.isError, isTrue);
       expect(textOf(result), contains('greater than 0'));
@@ -111,9 +117,9 @@ void main() {
     });
 
     test('rejects a non-finite text scale', () async {
-      final result = await setDeviceConfig(connector, logger, {
+      final result = await tool.execute({
         'text_scale': double.nan,
-      });
+      }, extra);
 
       expect(result.isError, isTrue);
       expect(textOf(result), contains('greater than 0'));
@@ -121,9 +127,9 @@ void main() {
     });
 
     test('rejects an unknown brightness', () async {
-      final result = await setDeviceConfig(connector, logger, {
+      final result = await tool.execute({
         'platform_brightness': 'sepia',
-      });
+      }, extra);
 
       expect(result.isError, isTrue);
       expect(textOf(result), contains('Unsupported brightness: sepia'));
@@ -138,9 +144,9 @@ void main() {
         error: 'Device config overrides are not available in this app.',
       );
 
-      final result = await setDeviceConfig(connector, logger, {
+      final result = await tool.execute({
         'text_scale': 2,
-      });
+      }, extra);
 
       expect(result.isError, isTrue);
       expect(textOf(result), contains('not available in this app'));
