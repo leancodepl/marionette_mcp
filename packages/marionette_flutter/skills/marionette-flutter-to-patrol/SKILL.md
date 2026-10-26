@@ -20,16 +20,14 @@ comes from Patrol's own skills.
 - `patrol-test-architecture`: the `testApp` wrapper, Modules, System
   (`extends PlatformAutomator`), ApiClients, and the `keys.dart` conventions.
 
-If they are not installed, take them from one of these:
+If they are not installed, take them, with `patrol-setup`, from one of these:
 
 - Patrol's repository, with the npm `skills` CLI:
-  `npx skills add leancodepl/patrol/skills -s '*' -a claude-code -y`. This
-  also brings `patrol-setup`.
+  `npx skills add leancodepl/patrol/skills -s '*' -a claude-code -y`.
 - The `patrol` dependency, once a release ships a `skills/` folder (4.10.0
   and older do not):
-  `dart run skills@ get -p patrol -s patrol-write-test -s patrol-test-architecture`.
-- In Claude Code: `/plugin install flutter-patrol@leancode-ai-plugins`. It
-  carries those two skills, not `patrol-setup`.
+  `dart run skills@ get -p patrol -s patrol-setup -s patrol-write-test -s patrol-test-architecture`.
+- In Claude Code: `/plugin install flutter-patrol@leancode-ai-plugins`.
 
 If the project has no `patrol_test/` yet, set Patrol up first with
 `patrol-setup` or https://patrol.leancode.co/documentation. Where this skill
@@ -447,24 +445,12 @@ Marionette evidence. State in `patrol_test/README.md` which OS versions show
 the prompt: Android asks for notifications from Android 13, iOS the first time
 the app requests them.
 
-## 8. Review before hand-over
+## 8. Before hand-over
 
-Walk this list against the code, not from memory:
-
-- [ ] Reverting the change under test makes a test fail.
-- [ ] Every `Tested:` flow and `Checks:` item is asserted; no `[bug]` finding
-      and no `Not covered` item is encoded.
-- [ ] Every action line is encoded, or its merge or drop is declared.
-- [ ] End assertions follow a loaded-state wait and name the positive state.
-- [ ] Lists are compared as the exact key sequence from the backend rows.
-- [ ] Expected values and preconditions come from the backend as the test user.
-- [ ] The consuming test restores its rows; the admin client refuses non-local
-      hosts.
-- [ ] Native prompts are handled after the triggering screen, with a timeout.
-- [ ] Each test passes alone and in the suite.
-- [ ] Mid-test assertions, key deviations and pull-to-refresh risks are
-      declared.
-- [ ] No `MarionetteBinding`, secrets or personal data in the test code.
+Check the code against sections 2 to 7 one by one, not from memory: a green
+suite does not show a skipped rule. Run the mutation check, each test alone
+and the whole suite, and `dart analyze`. Keep secrets and personal data out of
+the test code.
 
 Hand over: each test with its step range, the keys added and their deviations,
 the mid-test assertions, the seed rows consumed and restored, what was not
