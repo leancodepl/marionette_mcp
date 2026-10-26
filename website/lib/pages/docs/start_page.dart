@@ -33,7 +33,7 @@ const _toc = [
   ('how', 'How it fits together'),
   ('add', 'Add the package'),
   ('bridge', 'Give your agent the tools'),
-  ('skill', 'Add the Agent Skill'),
+  ('skill', 'Add the Agent Skills'),
   ('run', 'Run the app'),
   ('prompt', 'The first prompt'),
   ('example', 'Try the example app'),
@@ -56,7 +56,7 @@ class StartPage extends StatelessComponent {
       description:
           'Set up Marionette in a Flutter app and give your AI agent its '
           'tools: the package, the binding, the MCP server or CLI, the '
-          'Agent Skill and the first prompt.',
+          'Agent Skills and the first prompt.',
       lead:
           'Five minutes from a plain Flutter app to an agent that taps '
           'through it. This page covers apps built from Material widgets; '
@@ -166,7 +166,7 @@ class StartPage extends StatelessComponent {
             p(
               rich(
                 'Your agent runs `marionette` commands in its shell. Install '
-                'the CLI once; the Agent Skill below teaches the agent its '
+                'the CLI once; the Agent Skills below teach the agent its '
                 'commands.',
               ),
             ),
@@ -179,27 +179,27 @@ class StartPage extends StatelessComponent {
         ),
         DocSection(
           id: 'skill',
-          heading: 'Add the Agent Skill',
+          heading: 'Add the Agent Skills',
           children: [
             p([
               const code([.text('marionette_flutter')]),
-              const .text(' ships an '),
+              const .text(' ships three '),
               externalLink('https://agentskills.io', [
-                const .text('Agent Skill'),
+                const .text('Agent Skills'),
               ]),
               ...rich(
-                ': a `SKILL.md` that teaches an agent to prepare an app for '
-                'Marionette and drive it, with either bridge. This '
-                'documentation then does not have to be in its context. '
-                'Dart’s package skills tooling installs it into the folder '
-                'your agent reads.',
+                ': one prepares an app for Marionette, one drives it with '
+                'either bridge and writes the report, and one turns a '
+                'verified run into Patrol tests. This documentation then does '
+                'not have to be in its context. Dart’s package skills tooling '
+                'installs them into the folder your agent reads.',
               ),
             ]),
             const Terminal(transcript: _skillInstall, title: 'terminal'),
             p(
               rich(
                 'Without the Dart toolchain, `npx skills add '
-                'leancodepl/marionette_mcp` reads it straight from GitHub. '
+                'leancodepl/marionette_mcp` reads them straight from GitHub. '
                 'Run the install again after upgrading the package.',
               ),
             ),

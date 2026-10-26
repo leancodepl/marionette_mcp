@@ -64,9 +64,15 @@ With `MarionetteConfiguration(enableSessionReports: true)`, every run leaves a f
 
 The `marionette` CLI drives the app with the same actions as shell commands: see [Drive](https://marionette.leancode.co/docs/drive/#cli).
 
-## Agent Skill
+## Agent Skills
 
-`marionette_flutter` ships an [Agent Skill](https://github.com/leancodepl/marionette_mcp/blob/main/packages/marionette_flutter/skills/marionette-flutter-drive-app/SKILL.md) that teaches an agent to set up an app for Marionette, drive it and write the report:
+`marionette_flutter` ships three [Agent Skills](https://github.com/leancodepl/marionette_mcp/tree/main/packages/marionette_flutter/skills):
+
+| Skill | Teaches the agent to |
+| --- | --- |
+| `marionette-flutter-setup` | Add the binding, configure a custom design system, logs and device config |
+| `marionette-flutter-drive-app` | Drive the app with the MCP tools or the CLI, and write the report |
+| `marionette-flutter-to-patrol` | Turn a verified run into Patrol tests |
 
 ```bash
 dart run skills@ get                     # in an app that depends on marionette_flutter
