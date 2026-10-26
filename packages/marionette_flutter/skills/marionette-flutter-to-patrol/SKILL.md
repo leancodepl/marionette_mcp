@@ -20,14 +20,16 @@ comes from Patrol's own skills.
 - `patrol-test-architecture`: the `testApp` wrapper, Modules, System
   (`extends PlatformAutomator`), ApiClients, and the `keys.dart` conventions.
 
-If they are not installed, take them, with `patrol-setup`, from one of these:
+If they are not installed, take them from one of these:
 
 - Patrol's repository, with the npm `skills` CLI:
-  `npx skills add leancodepl/patrol/skills -s '*' -a claude-code -y`.
+  `npx skills add leancodepl/patrol/skills -s '*' -a claude-code -y`. This
+  also brings `patrol-setup`.
 - The `patrol` dependency, once a release ships a `skills/` folder (4.10.0
   and older do not):
-  `dart run skills@ get -p patrol -s patrol-setup -s patrol-write-test -s patrol-test-architecture`.
-- In Claude Code: `/plugin install flutter-patrol@leancode-ai-plugins`.
+  `dart run skills@ get -p patrol -s patrol-write-test -s patrol-test-architecture`.
+- In Claude Code: `/plugin install flutter-patrol@leancode-ai-plugins`. It
+  carries those two skills, not `patrol-setup`.
 
 If the project has no `patrol_test/` yet, set Patrol up first with
 `patrol-setup` or https://patrol.leancode.co/documentation. Where this skill
