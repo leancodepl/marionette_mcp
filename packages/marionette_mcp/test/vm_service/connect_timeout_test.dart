@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
+import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
 
 /// A local stand-in for an app's VM service whose replies the test controls.
@@ -17,6 +19,10 @@ class _FakeVmService {
 
   /// Whether the server answers JSON-RPC requests once connected.
   bool answerRequests = true;
+
+  /// Whether the app answers service extension calls, which it doesn't
+  /// while it is paused in the debugger.
+  bool answerExtensions = true;
 
   /// Extensions the single fake isolate reports.
   List<String> extensionRPCs = ['ext.flutter.marionette.getLogs'];
@@ -45,12 +51,14 @@ class _FakeVmService {
     _sockets.add(socket);
     socket.listen((data) {
       final request = jsonDecode(data as String) as Map<String, dynamic>;
-      requests.add(request['method'] as String);
+      final method = request['method'] as String;
+      requests.add(method);
       if (!answerRequests) return;
+      if (!answerExtensions && method.startsWith('ext.')) return;
       socket.add(jsonEncode({
         'jsonrpc': '2.0',
         'id': request['id'],
-        'result': _result(request['method'] as String),
+        'result': _result(method),
       }));
     });
   }
@@ -304,6 +312,54 @@ void main() {
     );
 
     expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+  });
+
+  test('connect tool gives up when the app does not answer extensions',
+      () async {
+    vmService.answerExtensions = false;
+    final context = VmServiceContext(
+      connectTimeout: const Duration(milliseconds: 300),
+    );
+    final server = McpServer(
+      const Implementation(name: 'test-server', version: '0.0.0'),
+      options: const McpServerOptions(
+        capabilities: ServerCapabilities(
+          tools: ServerCapabilitiesTools(listChanged: true),
+        ),
+      ),
+    );
+    context.registerTools(server);
+    final toServer = StreamController<List<int>>();
+    final toClient = StreamController<List<int>>();
+    await server.connect(
+      IOStreamTransport(stream: toServer.stream, sink: toClient.sink),
+    );
+    final client = McpClient(
+      const Implementation(name: 'test-client', version: '0.0.0'),
+    );
+    await client.connect(
+      IOStreamTransport(stream: toClient.stream, sink: toServer.sink),
+    );
+    addTearDown(() async {
+      await client.close();
+      await server.close();
+      await context.connector.disconnect();
+    });
+
+    final stopwatch = Stopwatch()..start();
+    final result = await client
+        .callTool(
+          CallToolRequest(name: 'connect', arguments: {'uri': vmService.uri}),
+        )
+        .timeout(const Duration(seconds: 5));
+
+    expect(result.isError, isTrue);
+    expect(
+      (result.content.single as TextContent).text,
+      contains('is not paused in the debugger'),
+    );
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+    expect(context.connector.isConnected, isFalse);
   });
 
   test('still reports a missing marionette binding without waiting', () async {

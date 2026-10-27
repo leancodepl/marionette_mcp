@@ -1,7 +1,7 @@
 # Unreleased
 
 - Fix `record-video --width/--height` recording only the top-left corner of the screen at full scale instead of the whole screen scaled down to that size. Web recordings were not affected ([#134](https://github.com/leancodepl/marionette_mcp/issues/134))
-- Fix `connect` waiting indefinitely when the app's VM service accepts the connection but stops answering, for example while the device is asleep: it now fails after 30 seconds with an error that says what to check, and stops waiting for a previously connected app that no longer responds to close its connection ([#131](https://github.com/leancodepl/marionette_mcp/issues/131))
+- Fix `connect` waiting indefinitely when the app stops answering, for example while its device is asleep or the app is paused in the debugger: it now fails after 30 seconds with an error that says what to check, and no longer waits for a previously connected app that stopped responding to close its connection ([#131](https://github.com/leancodepl/marionette_mcp/issues/131))
 
 # 0.7.0
 

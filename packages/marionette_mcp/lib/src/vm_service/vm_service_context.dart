@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/session/session_manager.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
@@ -15,13 +17,24 @@ import 'package:mcp_dart/mcp_dart.dart';
 
 /// Context for managing VM service connection and registering MCP tools.
 final class VmServiceContext {
-  VmServiceContext()
-      : connector = VmServiceConnector(),
+  VmServiceContext({
+    Duration connectTimeout = VmServiceConnector.defaultConnectTimeout,
+  })  : connector = VmServiceConnector(),
+        _connectTimeout = connectTimeout,
         _logger = logging.Logger('VmServiceContext'),
         _sessionManager = SessionManager(),
         _stepLogger = StepLogger();
 
   final VmServiceConnector connector;
+
+  /// How long the `connect` tool waits for the app, from opening the
+  /// connection to the last setup call.
+  final Duration _connectTimeout;
+
+  /// Bumped by every `connect` call and when one times out, so a call that
+  /// was timed out or replaced can tell it must stop changing state.
+  var _connectCalls = 0;
+
   final logging.Logger _logger;
   final SessionManager _sessionManager;
   final StepLogger _stepLogger;
@@ -104,117 +117,27 @@ final class VmServiceContext {
           // that's no longer the one actually in use.
           _stepLogger.session = null;
 
+          final call = ++_connectCalls;
+          bool isCurrent() => call == _connectCalls;
           try {
-            await connector.connect(uri);
-
-            // Version compatibility check — unwind the connection on mismatch
-            // so the next call to connect can start fresh.
-            try {
-              final bindingVersion = await connector.getVersion();
-              if (bindingVersion != v.version) {
-                await connector.disconnect();
-                return CallToolResult(
-                  isError: true,
-                  content: [
-                    TextContent(
-                      text: 'Version mismatch: marionette_mcp is ${v.version}, '
-                          'but marionette_flutter binding is $bindingVersion. '
-                          'Please ensure both packages are the same version.',
-                    ),
-                  ],
-                );
-              }
-            } catch (err) {
-              _logger.warning('Failed to check binding version', err);
-              await connector.disconnect();
-              return CallToolResult(
-                isError: true,
-                content: [
-                  TextContent(
-                    text:
-                        'Failed to verify marionette_flutter binding version. '
-                        'Please ensure marionette_flutter is up to date. '
-                        'Error: $err',
-                  ),
-                ],
-              );
+            return await _connect(args, isCurrent).timeout(_connectTimeout);
+          } on TimeoutException {
+            _logger.severe('Timed out connecting to app at $uri');
+            if (isCurrent()) {
+              _connectCalls++;
+              _disableDynamicTools();
+              unawaited(connector.disconnect());
             }
-
-            // Promote each schema-bearing custom extension into a first-class
-            // MCP tool. Failures here are logged but don't fail the connect —
-            // the generic call_custom_extension fallback keeps working.
-            await _registerDynamicTools();
-
-            // Session reports are opt-in app-side
-            // (MarionetteConfiguration.enableSessionReports): with them off,
-            // connect writes nothing to disk and steps go unlogged. Failing
-            // to even determine that counts as off too, same as a session
-            // directory that fails to open below — the app connection and
-            // every other tool already work fine either way, so neither is
-            // worth dropping an otherwise-working connection over.
-            var sessionReportsEnabled = false;
-            try {
-              sessionReportsEnabled =
-                  await connector.getSessionReportsEnabled();
-            } catch (err) {
-              _logger.warning(
-                'Failed to read binding configuration; continuing without '
-                'session reports',
-                err,
-              );
-            }
-            if (!sessionReportsEnabled) {
-              _stepLogger.session = null;
-              return CallToolResult(
-                content: [
-                  TextContent(text: 'Successfully connected to app at $uri'),
-                ],
-              );
-            }
-
-            try {
-              final session = _sessionManager.create(
-                title: args['session_title'] as String?,
-                baseDirOverride: args['session_dir'] as String?,
-              );
-              _stepLogger.session = session;
-
-              return CallToolResult(
-                content: [
-                  TextContent(
-                    text: 'Successfully connected to app at $uri\n'
-                        'Opened session: ${session.directory.path}',
-                  ),
-                ],
-              );
-            } catch (err) {
-              // Session setup is best-effort: the app connection and every
-              // other tool already work fine without it, so a directory
-              // creation failure (e.g. an unwritable session_dir) shouldn't
-              // drop an otherwise-working connection. Degrade the same way
-              // an app that opted out of session reports already does —
-              // connect succeeds, just without step logging.
-              _logger.warning(
-                'Failed to open session directory; continuing without '
-                'session reports',
-                err,
-              );
-              _stepLogger.session = null;
-              return CallToolResult(
-                content: [
-                  TextContent(
-                    text: 'Successfully connected to app at $uri\n'
-                        'Could not open a session directory, so this run '
-                        'will not be logged: $err',
-                  ),
-                ],
-              );
-            }
-          } catch (err) {
-            _logger.severe('Failed to connect to app', err);
             return CallToolResult(
               isError: true,
-              content: [TextContent(text: 'Failed to connect to app: $err')],
+              content: [
+                TextContent(
+                  text: 'Failed to connect to app at $uri: it did not answer '
+                      'within ${_connectTimeout.inSeconds}s. Make sure the '
+                      'app is still running, is not paused in the debugger, '
+                      'and its device is awake, then call connect again.',
+                ),
+              ],
             );
           }
         }),
@@ -267,6 +190,147 @@ final class VmServiceContext {
         },
       );
   }
+
+  /// Connects to the app at the `connect` tool's [args] and sets up the
+  /// dynamic tools and the session.
+  ///
+  /// Runs under the tool's deadline, and keeps running in the background
+  /// when it fires, so it changes the connection, the tools and the session
+  /// only while [isCurrent] says this call wasn't timed out or replaced.
+  Future<CallToolResult> _connect(
+    Map<String, dynamic> args,
+    bool Function() isCurrent,
+  ) async {
+    final uri = args['uri'] as String;
+    try {
+      await connector.connect(uri, timeout: _connectTimeout);
+
+      // Version compatibility check — unwind the connection on mismatch
+      // so the next call to connect can start fresh.
+      try {
+        final bindingVersion = await connector.getVersion();
+        if (bindingVersion != v.version) {
+          if (isCurrent()) {
+            await connector.disconnect();
+          }
+          return CallToolResult(
+            isError: true,
+            content: [
+              TextContent(
+                text: 'Version mismatch: marionette_mcp is ${v.version}, '
+                    'but marionette_flutter binding is $bindingVersion. '
+                    'Please ensure both packages are the same version.',
+              ),
+            ],
+          );
+        }
+      } catch (err) {
+        _logger.warning('Failed to check binding version', err);
+        if (isCurrent()) {
+          await connector.disconnect();
+        }
+        return CallToolResult(
+          isError: true,
+          content: [
+            TextContent(
+              text: 'Failed to verify marionette_flutter binding version. '
+                  'Please ensure marionette_flutter is up to date. '
+                  'Error: $err',
+            ),
+          ],
+        );
+      }
+
+      if (!isCurrent()) return _replacedResult;
+
+      // Promote each schema-bearing custom extension into a first-class
+      // MCP tool. Failures here are logged but don't fail the connect —
+      // the generic call_custom_extension fallback keeps working.
+      await _registerDynamicTools();
+
+      // Session reports are opt-in app-side
+      // (MarionetteConfiguration.enableSessionReports): with them off,
+      // connect writes nothing to disk and steps go unlogged. Failing
+      // to even determine that counts as off too, same as a session
+      // directory that fails to open below — the app connection and
+      // every other tool already work fine either way, so neither is
+      // worth dropping an otherwise-working connection over.
+      var sessionReportsEnabled = false;
+      try {
+        sessionReportsEnabled = await connector.getSessionReportsEnabled();
+      } catch (err) {
+        _logger.warning(
+          'Failed to read binding configuration; continuing without '
+          'session reports',
+          err,
+        );
+      }
+      if (!isCurrent()) return _replacedResult;
+      if (!sessionReportsEnabled) {
+        _stepLogger.session = null;
+        return CallToolResult(
+          content: [
+            TextContent(text: 'Successfully connected to app at $uri'),
+          ],
+        );
+      }
+
+      try {
+        final session = _sessionManager.create(
+          title: args['session_title'] as String?,
+          baseDirOverride: args['session_dir'] as String?,
+        );
+        _stepLogger.session = session;
+
+        return CallToolResult(
+          content: [
+            TextContent(
+              text: 'Successfully connected to app at $uri\n'
+                  'Opened session: ${session.directory.path}',
+            ),
+          ],
+        );
+      } catch (err) {
+        // Session setup is best-effort: the app connection and every
+        // other tool already work fine without it, so a directory
+        // creation failure (e.g. an unwritable session_dir) shouldn't
+        // drop an otherwise-working connection. Degrade the same way
+        // an app that opted out of session reports already does —
+        // connect succeeds, just without step logging.
+        _logger.warning(
+          'Failed to open session directory; continuing without '
+          'session reports',
+          err,
+        );
+        _stepLogger.session = null;
+        return CallToolResult(
+          content: [
+            TextContent(
+              text: 'Successfully connected to app at $uri\n'
+                  'Could not open a session directory, so this run '
+                  'will not be logged: $err',
+            ),
+          ],
+        );
+      }
+    } catch (err) {
+      _logger.severe('Failed to connect to app', err);
+      return CallToolResult(
+        isError: true,
+        content: [TextContent(text: 'Failed to connect to app: $err')],
+      );
+    }
+  }
+
+  static final _replacedResult = CallToolResult(
+    isError: true,
+    content: [
+      TextContent(
+        text: 'Failed to connect to app: a newer connect call replaced this '
+            'one',
+      ),
+    ],
+  );
 
   Future<void> _registerDynamicTools() async {
     // A reconnect without a clean disconnect would leak the previous
