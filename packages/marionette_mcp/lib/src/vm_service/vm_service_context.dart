@@ -107,7 +107,7 @@ final class VmServiceContext {
           },
           required: ['uri'],
         ),
-        callback: withStepLogging(_stepLogger, 'connect', (args, extra) async {
+        callback: (args, extra) async {
           final uri = args['uri'] as String;
           _logger.info('Connecting to app at $uri');
           // A new connect attempt immediately supersedes whatever session
@@ -119,8 +119,9 @@ final class VmServiceContext {
 
           final call = ++_connectCalls;
           bool isCurrent() => call == _connectCalls;
+          CallToolResult result;
           try {
-            return await _connect(args, isCurrent).timeout(_connectTimeout);
+            result = await _connect(args, isCurrent).timeout(_connectTimeout);
           } on TimeoutException {
             _logger.severe('Timed out connecting to app at $uri');
             if (isCurrent()) {
@@ -128,7 +129,7 @@ final class VmServiceContext {
               _disableDynamicTools();
               unawaited(connector.disconnect());
             }
-            return CallToolResult(
+            result = CallToolResult(
               isError: true,
               content: [
                 TextContent(
@@ -140,7 +141,11 @@ final class VmServiceContext {
               ],
             );
           }
-        }),
+          // Logged here, not through withStepLogging: a call that timed out
+          // or was replaced must not write into a newer call's session.
+          if (isCurrent()) _stepLogger.logStep('connect', args, result);
+          return result;
+        },
       )
       ..registerTool(
         'disconnect',

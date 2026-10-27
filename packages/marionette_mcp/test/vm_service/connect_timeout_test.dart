@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:marionette_mcp/src/version.g.dart' as v;
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -27,6 +28,9 @@ class _FakeVmService {
   /// Extensions the single fake isolate reports.
   List<String> extensionRPCs = ['ext.flutter.marionette.getLogs'];
 
+  /// When set, replies wait until it completes.
+  Completer<void>? hold;
+
   /// The method of every request the server receives.
   final requests = StreamController<String>.broadcast();
 
@@ -49,12 +53,13 @@ class _FakeVmService {
       compression: CompressionOptions.compressionOff,
     );
     _sockets.add(socket);
-    socket.listen((data) {
+    socket.listen((data) async {
       final request = jsonDecode(data as String) as Map<String, dynamic>;
       final method = request['method'] as String;
       requests.add(method);
       if (!answerRequests) return;
       if (!answerExtensions && method.startsWith('ext.')) return;
+      await hold?.future;
       socket.add(jsonEncode({
         'jsonrpc': '2.0',
         'id': request['id'],
@@ -100,6 +105,18 @@ class _FakeVmService {
           'breakpoints': <Object>[],
           'exceptionPauseMode': 'None',
           'extensionRPCs': extensionRPCs,
+        },
+      'ext.flutter.marionette.getVersion' => {
+          'type': '_ext',
+          'version': v.version,
+        },
+      'ext.flutter.marionette.getConfiguration' => {
+          'type': '_ext',
+          'enableSessionReports': true,
+        },
+      'ext.flutter.marionette.listExtensions' => {
+          'type': '_ext',
+          'extensions': <Object>[],
         },
       _ => {'type': 'Success'},
     };
@@ -185,6 +202,51 @@ class _FreezableProxy {
     await _server.close();
   }
 }
+
+/// Serves [context]'s tools to an in-process MCP client.
+Future<McpClient> _startTools(VmServiceContext context) async {
+  final server = McpServer(
+    const Implementation(name: 'test-server', version: '0.0.0'),
+    options: const McpServerOptions(
+      capabilities: ServerCapabilities(
+        tools: ServerCapabilitiesTools(listChanged: true),
+      ),
+    ),
+  );
+  context.registerTools(server);
+  final toServer = StreamController<List<int>>();
+  final toClient = StreamController<List<int>>();
+  await server.connect(
+    IOStreamTransport(stream: toServer.stream, sink: toClient.sink),
+  );
+  final client = McpClient(
+    const Implementation(name: 'test-client', version: '0.0.0'),
+  );
+  await client.connect(
+    IOStreamTransport(stream: toClient.stream, sink: toServer.sink),
+  );
+  addTearDown(() async {
+    await client.close();
+    await server.close();
+    await context.connector.disconnect();
+  });
+  return client;
+}
+
+Future<CallToolResult> _connectTool(
+  McpClient client,
+  String uri, {
+  String? sessionDir,
+}) =>
+    client.callTool(
+      CallToolRequest(
+        name: 'connect',
+        arguments: {
+          'uri': uri,
+          if (sessionDir != null) 'session_dir': sessionDir,
+        },
+      ),
+    );
 
 void main() {
   late _FakeVmService vmService;
@@ -277,12 +339,17 @@ void main() {
     addTearDown(other.close);
 
     final timedOut = expectLater(
-      connector.connect(vmService.uri, timeout: const Duration(seconds: 1)),
+      connector.connect(vmService.uri, timeout: const Duration(seconds: 3)),
       throwsA(isA<TimeoutException>()),
     );
     await vmService.requests.stream.firstWhere((method) => method == 'getVM');
     await connector.connect(other.uri);
+    final pending = connector.waitForServiceRegistration(
+      'reloadSources',
+      timeout: const Duration(milliseconds: 500),
+    );
     vmService.registerService('reloadSources', 's_stale.reloadSources');
+    expect(await pending, isNull);
     await timedOut;
 
     expect(
@@ -292,6 +359,24 @@ void main() {
       ),
       isNull,
     );
+    await vmService._sockets.single.done.timeout(const Duration(seconds: 2));
+    expect(connector.isConnected, isTrue);
+  });
+
+  test('an attempt overtaken by a newer connect closes itself', () async {
+    vmService.hold = Completer<void>();
+    final other = await _FakeVmService.start();
+    addTearDown(other.close);
+
+    final overtaken = expectLater(
+      connector.connect(vmService.uri),
+      throwsA(isA<StateError>()),
+    );
+    await vmService.requests.stream.firstWhere((method) => method == 'getVM');
+    await connector.connect(other.uri);
+    vmService.hold!.complete();
+    await overtaken;
+
     await vmService._sockets.single.done.timeout(const Duration(seconds: 2));
     expect(connector.isConnected, isTrue);
   });
@@ -318,39 +403,12 @@ void main() {
       () async {
     vmService.answerExtensions = false;
     final context = VmServiceContext(
-      connectTimeout: const Duration(milliseconds: 300),
+      connectTimeout: const Duration(seconds: 1),
     );
-    final server = McpServer(
-      const Implementation(name: 'test-server', version: '0.0.0'),
-      options: const McpServerOptions(
-        capabilities: ServerCapabilities(
-          tools: ServerCapabilitiesTools(listChanged: true),
-        ),
-      ),
-    );
-    context.registerTools(server);
-    final toServer = StreamController<List<int>>();
-    final toClient = StreamController<List<int>>();
-    await server.connect(
-      IOStreamTransport(stream: toServer.stream, sink: toClient.sink),
-    );
-    final client = McpClient(
-      const Implementation(name: 'test-client', version: '0.0.0'),
-    );
-    await client.connect(
-      IOStreamTransport(stream: toClient.stream, sink: toServer.sink),
-    );
-    addTearDown(() async {
-      await client.close();
-      await server.close();
-      await context.connector.disconnect();
-    });
+    final client = await _startTools(context);
 
     final stopwatch = Stopwatch()..start();
-    final result = await client
-        .callTool(
-          CallToolRequest(name: 'connect', arguments: {'uri': vmService.uri}),
-        )
+    final result = await _connectTool(client, vmService.uri)
         .timeout(const Duration(seconds: 5));
 
     expect(result.isError, isTrue);
@@ -358,8 +416,49 @@ void main() {
       (result.content.single as TextContent).text,
       contains('is not paused in the debugger'),
     );
-    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 3)));
     expect(context.connector.isConnected, isFalse);
+  });
+
+  test('a replaced connect call leaves the newer connection alone', () async {
+    vmService.answerExtensions = false;
+    final other = await _FakeVmService.start();
+    addTearDown(other.close);
+    final client = await _startTools(VmServiceContext());
+
+    final replaced = _connectTool(client, vmService.uri);
+    await vmService.requests.stream
+        .firstWhere((method) => method == 'ext.flutter.marionette.getVersion');
+    final newer = await _connectTool(client, other.uri);
+
+    expect(newer.isError, isFalse);
+    expect((await replaced).isError, isTrue);
+  });
+
+  test('a timed-out connect call does not log into a newer session', () async {
+    vmService.answerRequests = false;
+    final other = await _FakeVmService.start();
+    addTearDown(other.close);
+    final sessions = await Directory.systemTemp.createTemp('marionette_test');
+    addTearDown(() => sessions.delete(recursive: true));
+    final client = await _startTools(
+      VmServiceContext(connectTimeout: const Duration(seconds: 3)),
+    );
+
+    final timedOut = _connectTool(client, vmService.uri);
+    await vmService.requests.stream.firstWhere((method) => method == 'getVM');
+    final newer =
+        await _connectTool(client, other.uri, sessionDir: sessions.path);
+    expect(newer.isError, isFalse);
+    expect((await timedOut).isError, isTrue);
+
+    final steps = sessions
+        .listSync(recursive: true)
+        .whereType<File>()
+        .singleWhere((file) => file.path.endsWith('steps.md'))
+        .readAsStringSync();
+    expect(steps, contains('127.0.0.1:${other._server.port}'));
+    expect(steps, isNot(contains('127.0.0.1:${vmService._server.port}')));
   });
 
   test('still reports a missing marionette binding without waiting', () async {
