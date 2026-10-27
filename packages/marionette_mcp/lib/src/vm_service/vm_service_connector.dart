@@ -168,8 +168,9 @@ class VmServiceConnector {
   /// Connects to a VM service at the given URI.
   ///
   /// Gives up with a [TimeoutException] when the VM service doesn't finish
-  /// the handshake within [timeout], for example because the app is paused
-  /// or its device went to sleep, and leaves the connector disconnected.
+  /// the handshake within [timeout], for example because the app's process
+  /// is stopped or its device went to sleep, and leaves the connector
+  /// disconnected. An app paused in the debugger still finishes it.
   ///
   /// Never waits for a connection to close, neither the previous one nor its
   /// own after a failure, so it ends at [timeout] at the latest.
@@ -234,9 +235,8 @@ class VmServiceConnector {
           abandoned = true;
           throw TimeoutException(
             'Timed out connecting to the VM service at $uri after '
-            '${timeout.inSeconds}s. Make sure the app is still running, '
-            'is not paused in the debugger, and its device is awake, '
-            'then call connect again.',
+            '${timeout.inSeconds}s. Make sure the app is still running '
+            'and its device is awake.',
             timeout,
           );
         },

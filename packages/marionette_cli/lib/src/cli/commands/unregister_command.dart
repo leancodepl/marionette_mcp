@@ -93,9 +93,10 @@ class UnregisterCommand extends Command<int> {
       final connector = VmServiceConnector();
 
       try {
-        await connector
-            .connect(info.uri)
-            .timeout(Duration(seconds: timeoutSeconds));
+        await connector.connect(
+          info.uri,
+          timeout: Duration(seconds: timeoutSeconds),
+        );
         stdout.writeln('OK');
       } catch (_) {
         _registry.unregister(info.name);
