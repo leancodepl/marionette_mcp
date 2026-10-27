@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
@@ -616,6 +617,232 @@ void main() {
               'CompactionMode.none');
       expect(field['label'], 'Email',
           reason: 'without the label an empty keyless field has no handle');
+    });
+
+    testWidgets('reports a TextFormField label read off its inner TextField',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TextFormField(
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+          ),
+        ),
+      );
+
+      final field = _finder
+          .findInteractiveElements()
+          .firstWhere((e) => e['type'] == 'TextFormField');
+
+      expect(field['label'], 'Title');
+    });
+
+    for (final (name, field) in [
+      ('TextField', TextField()),
+      ('TextFormField', TextFormField()),
+    ]) {
+      testWidgets('reports the typed value of a $name without a controller',
+          (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: field)),
+        );
+        await tester.enterText(find.byType(EditableText), 'Groceries');
+        await tester.pump();
+
+        final element = _finder
+            .findInteractiveElements()
+            .firstWhere((e) => e['type'] == name);
+
+        expect(element['text'], 'Groceries',
+            reason: 'the value lives only in the internal controller');
+      });
+    }
+
+    for (final value in [true, false, null]) {
+      testWidgets('reports Checkbox value $value', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Checkbox(value: value, tristate: true, onChanged: (_) {}),
+          ),
+        ));
+        final elements = _finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+          '$value',
+        );
+      });
+    }
+
+    testWidgets('reports CheckboxListTile value', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: CheckboxListTile(
+            value: true,
+            title: const Text('Brushed Teeth'),
+            onChanged: (_) {},
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements.firstWhere((e) => e['type'] == 'CheckboxListTile')['value'],
+        'true',
+      );
+    });
+
+    for (final value in [true, false]) {
+      testWidgets('reports SwitchListTile value $value', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: SwitchListTile(
+              value: value,
+              title: const Text('Wi-Fi'),
+              onChanged: (_) {},
+            ),
+          ),
+        ));
+        final elements = _finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == 'SwitchListTile')['value'],
+          '$value',
+        );
+      });
+    }
+
+    for (final (name, toggle, expected) in [
+      (
+        'CupertinoSwitch',
+        CupertinoSwitch(value: true, onChanged: (_) {}),
+        'true',
+      ),
+      (
+        'CupertinoCheckbox',
+        CupertinoCheckbox(value: null, tristate: true, onChanged: (_) {}),
+        'null',
+      ),
+    ]) {
+      testWidgets('reports $name value', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: toggle))),
+        );
+        final elements = _finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == name)['value'],
+          expected,
+        );
+      });
+    }
+
+    for (final groupValue in [1, 2]) {
+      testWidgets(
+          'reports whether a Radio is selected (groupValue $groupValue)',
+          (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Radio<int>(
+              value: 1,
+              // RadioGroup replaces these only in newer Flutter versions.
+              // ignore: deprecated_member_use
+              groupValue: groupValue,
+              // ignore: deprecated_member_use
+              onChanged: (_) {},
+            ),
+          ),
+        ));
+        final radio = _finder
+            .findInteractiveElements()
+            .firstWhere((e) => e['type'] == 'Radio<int>');
+
+        expect(radio['selected'], '${groupValue == 1}');
+        expect(radio.containsKey('value'), isFalse,
+            reason: "a radio's value is its option, not its state");
+      });
+    }
+
+    testWidgets('reports whether a RadioListTile and its Radio are selected',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: RadioListTile<int>(
+            value: 1,
+            // RadioGroup replaces these only in newer Flutter versions.
+            // ignore: deprecated_member_use
+            groupValue: 1,
+            // ignore: deprecated_member_use
+            onChanged: (_) {},
+            title: const Text('One'),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements
+            .firstWhere((e) => e['type'] == 'RadioListTile<int>')['selected'],
+        'true',
+      );
+      expect(
+        elements.firstWhere((e) => e['type'] == 'Radio<int>')['selected'],
+        'true',
+      );
+    });
+
+    testWidgets('reports whether a CupertinoRadio is selected', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CupertinoRadio<int>(
+              value: 1,
+              // RadioGroup replaces these only in newer Flutter versions.
+              // ignore: deprecated_member_use
+              groupValue: 2,
+              // ignore: deprecated_member_use
+              onChanged: (_) {},
+            ),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements
+            .firstWhere((e) => e['type'] == 'CupertinoRadio<int>')['selected'],
+        'false',
+      );
+    });
+
+    testWidgets('a GestureDetector does not claim the state of a toggle in it',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: GestureDetector(
+            // So the row's empty middle, where hittability is probed, hits.
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: Row(
+              children: [
+                Checkbox(value: true, onChanged: (_) {}),
+                const Text('Remember me'),
+              ],
+            ),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements.firstWhere((e) => e['type'] == 'GestureDetector'),
+        isNot(contains('value')),
+      );
+      expect(
+        elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+        'true',
+      );
     });
   });
 

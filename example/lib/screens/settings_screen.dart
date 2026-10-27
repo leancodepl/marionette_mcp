@@ -77,6 +77,14 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => context.go('/settings/custom-widgets'),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.toggle_on_outlined),
+            title: const Text('Toggles'),
+            subtitle: const Text('Checkboxes, switches and radios'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/toggles'),
+          ),
+          const Divider(),
           const ListTile(
             leading: Icon(Icons.palette_outlined),
             title: Text('Appearance'),

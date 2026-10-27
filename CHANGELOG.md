@@ -1,5 +1,6 @@
 # Unreleased
 
+- Fix `get_interactive_elements` not reporting form state: checkboxes and switches report `value` (`null` for the tristate mixed state), radios report `selected`, and text fields built without a `controller` report the typed text. `CupertinoCheckbox`, `CupertinoRadio` and `CupertinoSwitch` are now recognized as interactive
 - Fix `record-video --width/--height` recording only the top-left corner of the screen at full scale instead of the whole screen scaled down to that size. Web recordings were not affected ([#134](https://github.com/leancodepl/marionette_mcp/issues/134))
 
 # 0.7.0
