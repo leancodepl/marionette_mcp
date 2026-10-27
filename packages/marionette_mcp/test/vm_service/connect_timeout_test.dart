@@ -21,6 +21,9 @@ class _FakeVmService {
   /// Extensions the single fake isolate reports.
   List<String> extensionRPCs = ['ext.flutter.marionette.getLogs'];
 
+  /// The method of every request the server receives.
+  final requests = StreamController<String>.broadcast();
+
   static Future<_FakeVmService> start() async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final fake = _FakeVmService._(server);
@@ -37,8 +40,9 @@ class _FakeVmService {
     final socket = await WebSocketTransformer.upgrade(request);
     _sockets.add(socket);
     socket.listen((data) {
-      if (!answerRequests) return;
       final request = jsonDecode(data as String) as Map<String, dynamic>;
+      requests.add(request['method'] as String);
+      if (!answerRequests) return;
       socket.add(jsonEncode({
         'jsonrpc': '2.0',
         'id': request['id'],
@@ -87,6 +91,25 @@ class _FakeVmService {
         },
       _ => {'type': 'Success'},
     };
+  }
+
+  /// Announces a service registration, as Flutter tools do over DDS.
+  void registerService(String service, String method) {
+    _sockets.single.add(jsonEncode({
+      'jsonrpc': '2.0',
+      'method': 'streamNotify',
+      'params': {
+        'streamId': 'Service',
+        'event': {
+          'type': 'Event',
+          'kind': 'ServiceRegistered',
+          'service': service,
+          'method': method,
+          'alias': 'Flutter Tools',
+          'timestamp': 0,
+        },
+      },
+    }));
   }
 
   Future<void> close() async {
@@ -167,6 +190,32 @@ void main() {
     vmService.answerRequests = true;
     await connector.connect(vmService.uri);
 
+    expect(connector.isConnected, isTrue);
+  });
+
+  test('a timed-out attempt closes its connection and leaves the next alone',
+      () async {
+    vmService.answerRequests = false;
+    final other = await _FakeVmService.start();
+    addTearDown(other.close);
+
+    final timedOut = expectLater(
+      connector.connect(vmService.uri, timeout: const Duration(seconds: 1)),
+      throwsA(isA<TimeoutException>()),
+    );
+    await vmService.requests.stream.firstWhere((method) => method == 'getVM');
+    await connector.connect(other.uri);
+    vmService.registerService('reloadSources', 's_stale.reloadSources');
+    await timedOut;
+
+    expect(
+      await connector.waitForServiceRegistration(
+        'reloadSources',
+        timeout: const Duration(milliseconds: 100),
+      ),
+      isNull,
+    );
+    await vmService._sockets.single.done.timeout(const Duration(seconds: 2));
     expect(connector.isConnected, isTrue);
   });
 
