@@ -323,17 +323,13 @@ void main() {
     expect(connector.isConnected, isFalse);
   });
 
-  test('reconnects when the previous VM service stopped answering', () async {
-    await connector.connect(vmService.uri);
-    vmService.answerRequests = false;
-
-    final other = await _FakeVmService.start();
-    addTearDown(other.close);
+  test('stops waiting for a frozen VM service to close after 5 s', () async {
+    await connectToFrozenApp();
 
     final stopwatch = Stopwatch()..start();
-    await connector.connect(other.uri);
+    await connector.disconnect().timeout(const Duration(seconds: 10));
 
-    expect(connector.isConnected, isTrue);
-    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 10)));
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 7)));
+    expect(connector.isConnected, isFalse);
   });
 }
