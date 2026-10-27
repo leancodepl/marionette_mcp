@@ -171,6 +171,9 @@ class VmServiceConnector {
   /// the handshake within [timeout], for example because the app is paused
   /// or its device went to sleep, and leaves the connector disconnected.
   ///
+  /// Never waits for a connection to close, neither the previous one nor its
+  /// own after a failure, so it ends at [timeout] at the latest.
+  ///
   /// Throws an exception if connection fails.
   Future<void> connect(
     String uri, {
@@ -178,7 +181,7 @@ class VmServiceConnector {
   }) async {
     if (isConnected) {
       _logger.warning('Already connected, disconnecting first');
-      await disconnect();
+      unawaited(disconnect());
     }
     final attempt = ++_connectAttempts;
 
@@ -242,7 +245,7 @@ class VmServiceConnector {
     } catch (err) {
       _logger.severe('Failed to connect to VM service', err);
       abandoned = true;
-      await _close(service, subscription);
+      unawaited(_close(service, subscription));
       rethrow;
     }
   }
@@ -272,7 +275,7 @@ class VmServiceConnector {
   /// Disconnects from the current VM service.
   ///
   /// Doesn't wait more than a few seconds for an unresponsive VM service to
-  /// close its connection, so a hung app can't block the next [connect].
+  /// close its connection, so a hung app can't block the caller.
   Future<void> disconnect() async {
     _connectAttempts++;
     final service = _service;
@@ -303,6 +306,9 @@ class VmServiceConnector {
         'VM service did not close within ${_disposeTimeout.inSeconds}s; '
         'dropping the connection',
       );
+    } catch (err) {
+      // [connect] doesn't await this, so an error here would go unhandled.
+      _logger.warning('Failed to close the VM service connection', err);
     }
   }
 

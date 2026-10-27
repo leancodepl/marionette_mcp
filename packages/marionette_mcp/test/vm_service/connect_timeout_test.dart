@@ -37,7 +37,11 @@ class _FakeVmService {
     // Leaving the request open simulates a VM service that accepted the
     // TCP connection but never finishes the handshake.
     if (!acceptUpgrade) return;
-    final socket = await WebSocketTransformer.upgrade(request);
+    // Uncompressed, so a large request fills the socket buffers.
+    final socket = await WebSocketTransformer.upgrade(
+      request,
+      compression: CompressionOptions.compressionOff,
+    );
     _sockets.add(socket);
     socket.listen((data) {
       final request = jsonDecode(data as String) as Map<String, dynamic>;
@@ -120,6 +124,60 @@ class _FakeVmService {
   }
 }
 
+/// Forwards TCP traffic to a VM service until it freezes: then it stops
+/// reading from the client, as the VM service of a stopped app process does.
+class _FreezableProxy {
+  _FreezableProxy._(this._server);
+
+  final ServerSocket _server;
+  final _sockets = <Socket>[];
+  late StreamSubscription<List<int>> _clientRead;
+  var _received = 0;
+  int? _freezeAt;
+  final _frozen = Completer<void>();
+
+  static Future<_FreezableProxy> start(_FakeVmService target) async {
+    final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final proxy = _FreezableProxy._(server);
+    server.listen((client) async {
+      final upstream = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        target._server.port,
+      );
+      proxy._sockets.addAll([client, upstream]);
+      upstream.listen(client.add, onDone: client.destroy);
+      proxy._clientRead = client.listen(
+        (data) {
+          upstream.add(data);
+          proxy._received += data.length;
+          final freezeAt = proxy._freezeAt;
+          if (freezeAt != null && proxy._received >= freezeAt) {
+            proxy._clientRead.pause();
+            proxy._frozen.complete();
+          }
+        },
+        onDone: upstream.destroy,
+      );
+    });
+    return proxy;
+  }
+
+  String get uri => 'ws://127.0.0.1:${_server.port}/ws';
+
+  /// Freezes once the client has sent [bytes] more bytes.
+  Future<void> freezeAfter(int bytes) {
+    _freezeAt = _received + bytes;
+    return _frozen.future;
+  }
+
+  Future<void> close() async {
+    for (final socket in _sockets) {
+      socket.destroy();
+    }
+    await _server.close();
+  }
+}
+
 void main() {
   late _FakeVmService vmService;
   late VmServiceConnector connector;
@@ -133,6 +191,17 @@ void main() {
     await connector.disconnect();
     await vmService.close();
   });
+
+  /// Connects to [vmService] through a proxy that freezes in the middle of
+  /// a large request, so closing the connection can't flush it and finish.
+  Future<void> connectToFrozenApp() async {
+    final proxy = await _FreezableProxy.start(vmService);
+    addTearDown(proxy.close);
+    await connector.connect(proxy.uri);
+    final frozen = proxy.freezeAfter(1 << 20);
+    connector.callCustomExtension('flood', {'data': 'x' * (32 << 20)}).ignore();
+    await frozen;
+  }
 
   test('connects to a responsive VM service', () async {
     await connector.connect(vmService.uri);
@@ -217,6 +286,24 @@ void main() {
     );
     await vmService._sockets.single.done.timeout(const Duration(seconds: 2));
     expect(connector.isConnected, isTrue);
+  });
+
+  test('gives up at its deadline even when the previous app froze', () async {
+    await connectToFrozenApp();
+    final silent = await _FakeVmService.start();
+    addTearDown(silent.close);
+    silent.answerRequests = false;
+
+    final stopwatch = Stopwatch()..start();
+    await expectLater(
+      connector.connect(
+        silent.uri,
+        timeout: const Duration(milliseconds: 300),
+      ),
+      throwsA(isA<TimeoutException>()),
+    );
+
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
   });
 
   test('still reports a missing marionette binding without waiting', () async {
