@@ -47,9 +47,7 @@ const changelogUrl = '$repoUrl/blob/main/CHANGELOG.md';
 const issuesUrl = '$repoUrl/issues';
 const licenseUrl = '$repoUrl/blob/main/LICENSE';
 const exampleUrl = '$repoUrl/tree/main/example';
-const skillUrl =
-    '$repoUrl/blob/main/packages/marionette_flutter/skills/'
-    'marionette-flutter-drive-app/SKILL.md';
+const skillsUrl = '$repoUrl/tree/main/packages/marionette_flutter/skills';
 
 const _utm =
     'utm_source=marionette-website&utm_medium=referral&utm_campaign=marionette';

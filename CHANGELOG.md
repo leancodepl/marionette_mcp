@@ -1,5 +1,6 @@
 # Unreleased
 
+- Split the `marionette-flutter-drive-app` Agent Skill: app setup moves to the new `marionette-flutter-setup`, so a run that only drives the app no longer loads it. Add `marionette-flutter-to-patrol`, which turns a verified session (`steps.md`, `report.md`, screenshots) into Patrol tests. Run `dart run skills@ get` again to install them
 - Fix `record-video --width/--height` recording only the top-left corner of the screen at full scale instead of the whole screen scaled down to that size. Web recordings were not affected ([#134](https://github.com/leancodepl/marionette_mcp/issues/134))
 
 # 0.7.0

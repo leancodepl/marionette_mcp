@@ -745,11 +745,12 @@ class MoreThanTests extends StatelessComponent {
           ),
           Feature(
             .sparkle,
-            'An Agent Skill in the package',
-            '`dart run skills@ get` installs a skill that teaches the agent '
-                'to set up your app and drive it well.',
+            'Agent Skills in the package',
+            '`dart run skills@ get` installs skills that teach the agent to '
+                'set up your app, drive it well and turn a run into a Patrol '
+                'test.',
             href: '/docs/#skill',
-            linkLabel: 'Install the skill →',
+            linkLabel: 'Install the skills →',
           ),
           Feature(
             .file,

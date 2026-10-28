@@ -170,8 +170,8 @@ class DrivePage extends StatelessComponent {
           children: [
             p(
               rich(
-                'The [Agent Skill](/docs/#skill) teaches these; they are also '
-                'the checklist for reading a run.',
+                'The drive [Agent Skill](/docs/#skill) teaches these; they '
+                'are also the checklist for reading a run.',
               ),
             ),
             ul(classes: Prose.checklist.name, [

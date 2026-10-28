@@ -267,7 +267,7 @@ class DocsLayout extends StatelessComponent {
               ]),
               p(classes: _sideFoot.name, [
                 const .text('The agent-facing reference is the '),
-                externalLink(skillUrl, [const .text('Agent Skill')]),
+                externalLink(skillsUrl, [const .text('Agent Skills')]),
                 const .text(' in the package.'),
               ]),
             ],

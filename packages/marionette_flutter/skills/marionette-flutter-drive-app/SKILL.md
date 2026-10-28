@@ -1,6 +1,6 @@
 ---
 name: marionette-flutter-drive-app
-description: Set up and drive a running Flutter app (debug or profile) with Marionette — an AI agent's hands and eyes for the app. Covers adding marionette_flutter, MarionetteBinding, MarionetteConfiguration for custom widgets, a LogCollector, and MarionetteDeviceConfig — then tapping/typing/scrolling, screenshots, logs, hot reload/restart, device sweeps, and custom extensions, via marionette_mcp or the marionette CLI. Use whenever asked to test, click through, smoke-test, automate, QA, or interact with a Flutter app; when integrating marionette_flutter or registering a custom extension; after a feature or UI/design-system change; to reproduce or verify a bug; to walk a behaviour-neutral refactor; to sweep for accessibility; to exercise form validation; or to capture before/after evidence for a PR. Also load whenever a Marionette call fails, can't see a widget, reports not connected or a version mismatch, or hits a single-binding assertion. Not for CI suites, release builds, or performance work — see When not to use.
+description: Drive a running Flutter app (debug or profile) with Marionette — an AI agent's hands and eyes for the app — tapping/typing/scrolling, screenshots, logs, hot reload/restart, device sweeps, custom extensions, and the session report, via marionette_mcp or the marionette CLI. Use whenever asked to test, click through, smoke-test, automate, QA, or interact with a Flutter app; after a feature or UI/design-system change; to reproduce or verify a bug; to walk a behaviour-neutral refactor; to sweep for accessibility; to exercise form validation; to call or register a custom extension; or to capture before/after evidence for a PR. Also load whenever a Marionette call fails or reports not connected. If the app has no MarionetteBinding yet, connect reports a version mismatch, startup hits a binding assertion or hangs, or Marionette can't see the app's custom widgets, use marionette-flutter-setup. Not for CI suites, release builds, or performance work — see When not to use.
 ---
 
 # marionette_flutter: drive an app
@@ -24,187 +24,16 @@ Everything shared between the two applies to either transport — action names
 differ only in casing (`get_interactive_elements` vs
 `get-interactive-elements`).
 
-## Preparing the app
+## Before you start
 
 `connect` (or any CLI command) only works if the target app initialized
 `MarionetteBinding`. If you're not sure whether it has, check `main.dart` (or
-ask) — skip the rest of this section if it's already there and you just need
-to drive the app, and jump to *When to use this*.
-
-```bash
-flutter pub add marionette_flutter
-```
-
-```dart
-void main() {
-  if (kDebugMode) {
-    MarionetteBinding.ensureInitialized();
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-  }
-  runApp(const MyApp());
-}
-```
-
-This is all a standard Material-widgets app needs. It runs inside `main()`, so
-any time you add or change it, **hot restart** — a hot reload doesn't
-re-execute `main()`, so the change will look like it did nothing. Gate every
-piece of Marionette wiring behind `kDebugMode` (or `!kReleaseMode` — see
-*Device-config sweeps*, below) so none of it ships in a release build: both
-are compile-time constants the release branch survives cleanly.
-
-### Custom design system? Teach Marionette about it
-
-Zero-config setup only recognizes stock Material widgets (`ElevatedButton`,
-`TextField`, `Switch`, …) and extracts text only from `Text`, `RichText`,
-`EditableText`, `TextField`, and `TextFormField`. If the app wraps its own
-buttons, fields, or text — true of most production apps — `get_interactive_elements`
-will look sparse and `tap(text: ...)` will fail to find things that are
-clearly on screen. That's not a Marionette bug; it just doesn't know your
-widgets yet:
-
-```dart
-MarionetteConfiguration(
-  // Recognize your custom interactive widgets.
-  isInteractiveElement: (element) => switch (element.widget) {
-    MyButton() || MyTextField() => true,
-    _ => false,
-  },
-  // Extract their visible text for text-based matching and discovery.
-  extractText: (element) {
-    final widget = element.widget;
-    if (widget is MyText) return widget.data;
-    return null;
-  },
-)
-```
-
-Pass it as `MarionetteBinding.ensureInitialized(MarionetteConfiguration(...))`.
-For a non-trivial design system, extract the configuration to its own file
-(e.g. `lib/debug/marionette_config.dart`) imported only behind `kDebugMode`,
-rather than growing it inline in `main.dart` — that keeps release builds free
-of design-system introspection helpers even before the compiler strips them.
-
-`isInteractiveElement` and `extractText` receive the `Element`, not just the
-`Widget`. Match with an `is` check or pattern on `element.widget` — that
-covers generic widgets (`MySelect()` matches `MySelect<String>`) and
-subclasses (`MyButton()` matches `MyPrimaryButton extends MyButton`), and can
-read the widget's fields to decide per instance. `extractText` can also walk
-the subtree when a label is itself a widget rather than a plain string.
-If the app still uses the deprecated `isInteractiveWidget: (type) => ...` or
-`shouldStopTraversal: (type) => ...`, move it to `isInteractiveElement` /
-`shouldStopTraversalAtElement`: a `Type` only compares with exact `==`, so it
-silently misses generic and subclassed widgets. While both are set, their
-results are combined with OR.
-Custom-painted text and badges reach no `Text` widget at all, and a
-`WidgetSpan` is only a problem when its embedded content isn't itself built
-from `Text`/`RichText` (an icon, a custom-painted chip) — plain text nested
-inside one is still its own discoverable element. For genuinely non-text
-content, annotate with `Semantics(label: ..., value: ...)` instead; Marionette surfaces that as a
-`Semantics` element with the joined `'label: value'` string, and it costs
-nothing if `label`/`value` are absent (unlabeled `Semantics` nodes are
-silently skipped).
-
-Not every custom widget needs an entry: add one when it's a primary
-interactive primitive (button, field, toggle, tab, chip) or when
-`get_interactive_elements` is noticeably missing it; skip widgets that are
-only ever decorative, or ones that already wrap a primitive Marionette sees
-(a `MyCard` built on `GestureDetector` is already covered). The list doesn't
-need to be exhaustive up front — extend it as real use surfaces a missing
-target.
-
-One more `MarionetteConfiguration` field, `shouldStopTraversalAtElement`, is
-worth naming only to warn against it: it's tempting to add a scroll container
-there to "reduce traversal cost," but on a real production app that measurably
-*dropped* widget coverage from 25.8% to 17.8% — the agent lost visibility into
-everything nested below the cut, including the content it needed to reach.
-Leave it `null` unless a profiler has shown a real, measured cost, and never
-point it at a scrolling container.
-
-### Logs for `get_logs`
-
-Without a `LogCollector`, `get_logs` returns a message explaining how to add
-one rather than actual logs. Pick whichever matches how the app already logs:
-
-- Uses the `logging` package → `flutter pub add marionette_logging`, pass
-  `LoggingLogCollector()` as `logCollector`.
-- Uses the `logger` package → `flutter pub add marionette_logger`, pass
-  `LoggerLogCollector()` (it doubles as a `LogOutput` for that package too).
-- Anything else → `PrintLogCollector` (ships in `marionette_flutter`) exposes
-  a manual `addLog(message)` to call from wherever logs already flow —
-  routing Flutter's own `debugPrint` through it is a common choice, tee'd
-  into the existing implementation rather than replacing it, to keep
-  `debugPrintThrottled`'s throttling.
-
-### Screenshot size
-
-`take_screenshots` downscales captures to fit within 2000×2000 physical
-pixels by default, to keep base64 payloads manageable. Override
-`maxScreenshotSize` on `MarionetteConfiguration` if a screen needs more
-detail (`Size(3000, 3000)`, say), or set it to `null` to disable resizing
-entirely — but keep the default unless there's a concrete reason to raise it,
-since larger screenshots mean larger payloads on every call.
-
-### Device-config sweeps
-
-`set_device_config` — sweeping text scale, bold text, or light/dark
-appearance without touching real OS settings — is the one capability that
-needs a widget in the tree, since Marionette won't insert one into an app
-behind its back:
-
-```dart
-void main() {
-  if (!kReleaseMode) {
-    MarionetteBinding.ensureInitialized();
-    runApp(const MarionetteDeviceConfig(child: MyApp()));
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-    runApp(const MyApp());
-  }
-}
-```
-
-Without it, `set_device_config` responds with these setup instructions
-instead of succeeding. Because it lives in `main()`, adding it also needs a
-hot **restart**. `!kReleaseMode` (rather than `kDebugMode`) is the better gate
-here because it additionally covers profile builds, where the VM service is
-still reachable — use the same gate for both the binding and this widget,
-since gating the widget more loosely than the binding gains nothing (it
-degrades to a no-op child-passthrough if the binding isn't there, so a missed
-gate costs one inert element, never a crash).
-
-### The single-binding rule
-
-Flutter allows exactly one `WidgetsBinding` per process. If something else
-claims it first, `MarionetteBinding.ensureInitialized()` throws a clear
-error — except with one real offender, where it doesn't:
-
-- **`flutter test`** running `main()` under `kDebugMode` collides with
-  `AutomatedTestWidgetsFlutterBinding`. Guard against it —
-  `Platform.environment.containsKey('FLUTTER_TEST')` — or give tests a
-  separate entrypoint that skips `MarionetteBinding` entirely.
-- **Sentry** is the known silent offender: `SentryFlutter.init()` always calls
-  `WidgetsBinding.ensureInitialized()` inside its own `appRunner`-wrapping
-  zone before your code runs, and it swallows the resulting binding error as
-  if it were a reportable crash — so the app just hangs on the splash screen
-  forever with no exception, no crash, and no log output. The fix is
-  initialization order: call `MarionetteBinding.ensureInitialized()`
-  **before** `SentryFlutter.init()`, not inside its `appRunner`. Sentry checks
-  for an existing binding first and reuses it, so going first avoids the
-  conflict entirely. The same ordering fix applies to any other plugin whose
-  `init()` touches `WidgetsBinding` ahead of your `appRunner`.
-
-### Version alignment
-
-The MCP `connect` tool checks that `marionette_mcp` and the app's
-`marionette_flutter` are on the same version, and fails with a clear message
-rather than a confusing runtime error if they aren't. The CLI does not
-perform this check — a stale `marionette_flutter` there can fail in less
-obvious ways instead of a clear mismatch error. Either way, don't chase a
-mismatch by retrying — align the versions: `flutter pub add marionette_flutter`
-in the app, and `dart pub global activate marionette_mcp`/`marionette_cli`
-for the bridge (or `dart pub add dev:marionette_mcp`/`dev:marionette_cli` if
-you'd rather pin it as a dev dependency instead of a global tool).
+ask). If it hasn't, or the agent can't see the app's own buttons and fields,
+set the app up first with `marionette-flutter-setup`: the binding, a custom
+design system, a `LogCollector`, `MarionetteDeviceConfig`, the single-binding
+rule and version alignment all live there. If that skill is not installed, run
+`dart run skills@ get -s marionette-flutter-setup`, or follow
+https://marionette.leancode.co/docs/configure/.
 
 ## When to use this
 
@@ -229,7 +58,7 @@ is to actually run the app and look, rather than reason about the code:
   around 2.0–3.0 (real devices top out near 3.0) and `bold_text: true` on the
   screen in question, then check `get_logs` for overflow errors — that
   combination is where cramped layouts usually break first. (Needs the app to
-  have opted in via `MarionetteDeviceConfig` — see *Device-config sweeps*.)
+  have opted in via `MarionetteDeviceConfig` — see `marionette-flutter-setup`.)
 - **Form and validation work.** Enter deliberately invalid input and read the
   error strings back via `get_interactive_elements`/`take_screenshots` — it's
   the only way to confirm the *user-visible* message is right, not just that
@@ -248,7 +77,8 @@ is to actually run the app and look, rather than reason about the code:
   best-effort simulations of user input, not deterministic instrumentation —
   results can vary across platforms, custom widgets, and overlays. For a
   suite that needs to pass or fail the same way every time, use
-  [Patrol](https://patrol.leancode.co) instead.
+  [Patrol](https://patrol.leancode.co) instead; `marionette-flutter-to-patrol`
+  turns a verified run into Patrol tests.
 - **Release builds.** Not a limitation to work around — Marionette relies on
   the Dart VM Service, which doesn't exist in a release binary. Debug and
   profile only.
@@ -307,10 +137,10 @@ disconnecting.
 
 | Category          | Actions                                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 |-------------------|--------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `take_screenshots` returns images inline by default; pass `inline: false` once a screenshot is evidence to cite rather than something you need to look at now — see *Reporting what you found*. `get_logs` needs a `LogCollector` wired up app-side (see *Logs for `get_logs`*, above); otherwise it returns setup instructions instead of an error. On a screen that repeats the same subtree, pass `ancestor_keys` to list just one copy of it (see *Repeated keys*, below). |
+| Inspection        | `get_interactive_elements`, `take_screenshots`, `get_logs`                                                   | `get_interactive_elements` is how you "see" the screen — call it before guessing at a target, and again after any navigation you didn't drive step by step. `take_screenshots` returns images inline by default; pass `inline: false` once a screenshot is evidence to cite rather than something you need to look at now — see *Reporting what you found*. `get_logs` needs a `LogCollector` wired up app-side (see `marionette-flutter-setup`); otherwise it returns setup instructions instead of an error. On a screen that repeats the same subtree, pass `ancestor_keys` to list just one copy of it (see *Repeated keys*, below).   |
 | Gestures          | `tap`, `secondary_tap`, `double_tap`, `long_press`, `swipe`, `pinch_zoom`, `scroll_to`, `press_back_button`  | Match by `key` › `identifier` › `text` › `type` › coordinates, in that preference order — see *Good practices*. When the same key repeats in several identical subtrees, add `ancestor_keys` — see *Repeated keys*, below. `secondary_tap` is desktop-only.                                                                                                                                                                                                                                                                                                                                                                                |
 | Text input        | `enter_text`, `press_key`                                                                                    | `enter_text` overwrites a field's value directly, and takes `ancestor_keys` like the gestures do. `press_key` sends a real key event (submit on `enter`, shortcuts via `modifiers`) but only edits in-place on desktop/web — on mobile, field editing still needs `enter_text`.                                                                                                                                                                                                                                                                                                                                                            |
-| Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see *Device-config sweeps*, above — otherwise it returns setup instructions rather than failing.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Device config     | `set_device_config`                                                                                          | Sweeps text scale / bold text / light-dark under the app's *current* screen, without touching OS settings. Needs the app to opt in — see `marionette-flutter-setup` — otherwise it returns setup instructions rather than failing.                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens a fresh session directory (`session_title`) that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -366,13 +196,13 @@ disconnecting.
 - **An element "not found" is usually a setup gap, not a bug.** Before
   concluding a widget can't be reached, suspect it's a custom widget type
   Marionette doesn't recognize yet, or custom-painted content with no
-  `Semantics` annotation — both fixed under *Preparing the app*, above, not
+  `Semantics` annotation — both fixed in `marionette-flutter-setup`, not
   something to work around here.
 - **If coverage looks low across a whole screen rather than one missing
   element, don't reach for `shouldStopTraversalAtElement`.** It's tempting to suggest
   filtering a scroll container out of traversal to "reduce noise," but that's
   the one config change measured to make things worse (25.8% → 17.8% widget
-  coverage on a real app) — see *Custom design system?*, above.
+  coverage on a real app) — see `marionette-flutter-setup`.
 - **Confirm side effects with `get_logs`, not just UI state.** A tap that
   looks like it worked isn't the same as the network call actually firing.
 - **Give the app's flows explicit context.** Marionette can see the widget
@@ -597,13 +427,13 @@ args.
 | Symptom                                                                                            | Likely cause                                                                                        | Fix                                                                                                                              |
 |----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
 | "Not connected to any app"                                                                         | No successful `connect` yet in this session                                                         | `connect` before anything else — see *Connecting*, above                                                                         |
-| MCP `connect` fails with a version mismatch                                                        | `marionette_mcp` and `marionette_flutter` are different versions (the CLI doesn't check this)       | See *Version alignment*, above                                                                                                   |
-| Custom buttons/fields don't show up, or `tap(text:)`/`scroll_to(text:)` can't find a visible label | Widget type or text isn't recognized                                                                | See *Custom design system?*, above                                                                                               |
+| MCP `connect` fails with a version mismatch                                                        | `marionette_mcp` and `marionette_flutter` are different versions (the CLI doesn't check this)       | See *Version alignment* in `marionette-flutter-setup`                                                                            |
+| Custom buttons/fields don't show up, or `tap(text:)`/`scroll_to(text:)` can't find a visible label | Widget type or text isn't recognized                                                                | See *Custom design system?* in `marionette-flutter-setup`                                                                        |
 | A gesture or `enter_text` hits the wrong copy of a repeated widget                                 | The key repeats across identical subtrees; the first match wins                                     | Add `ancestor_keys` — see *Repeated keys*, above                                                                                 |
 | `Scope element with key "…" (ancestor_keys[N]) not found`                                          | That wrapper key is misspelled, not built yet, or not inside the previous one                       | Check with `get_interactive_elements(ancestor_keys: [...])`; off-screen rows need `scroll_to` first — see *Repeated keys*, above |
-| `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                                          | See *Logs for `get_logs`*, above                                                                                                 |
-| `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                                                 | See *Device-config sweeps*, above, then hot restart                                                                              |
-| Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                                   | See *The single-binding rule*, above                                                                                             |
+| `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                                          | See *Logs for `get_logs`* in `marionette-flutter-setup`                                                                          |
+| `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                                                 | See *Device-config sweeps* in `marionette-flutter-setup`, then hot restart                                                       |
+| Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                                   | See *The single-binding rule* in `marionette-flutter-setup`                                                                      |
 | Session directory lands somewhere unexpected (e.g. not the project root)                           | No `MARIONETTE_SESSION_DIR` set and the server's own working directory isn't reliably the repo root | Pass `session_dir` to `connect` (`--session-dir` on the CLI) explicitly — see *Reporting what you found*, above                  |
 | Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                                     | Not supported by design — see *When not to use*                                                                                  |
 
@@ -639,7 +469,10 @@ server keeps one per connection — see *Reporting what you found*, above.
 
 ## Keeping this skill in sync
 
-This file must track the package release it ships with, and the
+This file, `marionette-flutter-setup` and `marionette-flutter-to-patrol` must
+track the package release they ship with: setup follows the
+`MarionetteConfiguration` API, and to-patrol reads the `steps.md` format and
+*The report contract*, above, so a change to either updates it too. The
 capability table above should never disagree with `marionette help-ai`'s own
 output — both are generated from the same command set. If a tool or CLI
 command is added, renamed, or changes behavior, update the table and any
