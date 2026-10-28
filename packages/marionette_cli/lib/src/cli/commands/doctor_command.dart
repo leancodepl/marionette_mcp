@@ -40,9 +40,10 @@ class DoctorCommand extends Command<int> {
       final connector = VmServiceConnector();
 
       try {
-        await connector
-            .connect(info.uri)
-            .timeout(Duration(seconds: timeoutSeconds));
+        await connector.connect(
+          info.uri,
+          timeout: Duration(seconds: timeoutSeconds),
+        );
         stdout.writeln('OK');
       } catch (e) {
         stdout.writeln('FAILED');

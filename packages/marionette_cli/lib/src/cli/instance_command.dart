@@ -71,9 +71,10 @@ abstract class InstanceCommand extends Command<int> {
 
     Session? session;
     try {
-      await connector.connect(uri).timeout(
-            Duration(seconds: timeoutSeconds),
-            onTimeout: () => throw TimeoutException(
+      await connector
+          .connect(uri, timeout: Duration(seconds: timeoutSeconds))
+          .onError<TimeoutException>(
+            (_, __) => throw TimeoutException(
               'Connection to "$displayName" at $uri timed out '
               'after ${timeoutSeconds}s. Is the app still running?',
             ),

@@ -149,73 +149,166 @@ class VmServiceConnector {
   String? _isolateId;
   StreamSubscription<Event>? _serviceEventSubscription;
 
-  final Map<String, String?> _registeredServices = {};
+  var _registeredServices = <String, String?>{};
   final Map<String, List<Completer<String?>>> _pendingServiceRequests = {};
+
+  /// Bumped by every [connect] and [disconnect], so an attempt still in
+  /// flight can tell it must not publish its connection.
+  var _connectAttempts = 0;
 
   /// Returns true if currently connected to a VM service.
   bool get isConnected => _service != null && _isolateId != null;
 
+  /// How long [connect] waits for the app's VM service by default.
+  static const defaultConnectTimeout = Duration(seconds: 30);
+
+  /// How long [disconnect] waits for the old VM service to close.
+  static const _disposeTimeout = Duration(seconds: 5);
+
   /// Connects to a VM service at the given URI.
   ///
+  /// Gives up with a [TimeoutException] when the VM service doesn't finish
+  /// the handshake within [timeout], for example because the app's process
+  /// is stopped or its device went to sleep, and leaves the connector
+  /// disconnected. An app paused in the debugger still finishes it.
+  ///
+  /// Never waits for a connection to close, neither the previous one nor its
+  /// own after a failure, so it ends at [timeout] at the latest.
+  ///
   /// Throws an exception if connection fails.
-  Future<void> connect(String uri) async {
+  Future<void> connect(
+    String uri, {
+    Duration timeout = defaultConnectTimeout,
+  }) async {
     if (isConnected) {
       _logger.warning('Already connected, disconnecting first');
-      await disconnect();
+      unawaited(disconnect());
     }
+    final attempt = ++_connectAttempts;
 
     _logger.info('Connecting to VM service at $uri');
 
-    try {
-      _service = await vmServiceConnectUri(uri);
-      _serviceEventSubscription = _service!.onServiceEvent.listen((e) {
-        switch (e.kind) {
-          case EventKind.kServiceRegistered:
-            final serviceName = e.service!;
-            _registeredServices[serviceName] = e.method;
-            _logger.info('Service registered: $serviceName -> ${e.method}');
-            if (_pendingServiceRequests.containsKey(serviceName)) {
-              for (final completer in _pendingServiceRequests[serviceName]!) {
-                completer.complete(e.method);
-              }
-              _pendingServiceRequests.remove(serviceName);
-            }
-          case EventKind.kServiceUnregistered:
-            _registeredServices.remove(e.service!);
-            _logger.info('Service unregistered: ${e.service}');
-          default:
-            _logger.info('Service event: $e');
-        }
-      });
+    // The attempt keeps its connection to itself until it succeeds: one that
+    // times out keeps running in the background, and a newer connect may
+    // start meanwhile, so it must neither publish nor leak its connection.
+    var abandoned = false;
+    VmService? service;
+    StreamSubscription<Event>? subscription;
+
+    Future<void> handshake() async {
+      final connected = await vmServiceConnectUri(uri);
+      if (abandoned) {
+        await connected.dispose();
+        throw StateError('Abandoned connection to $uri');
+      }
+      service = connected;
+      final registeredServices = <String, String?>{};
+      subscription = connected.onServiceEvent
+          .listen((event) => _onServiceEvent(event, registeredServices));
       try {
-        await _service!
+        await connected
             .streamListen(EventStreams.kService)
             .timeout(const Duration(milliseconds: 500));
       } catch (e) {
         _logger.info('streamListen(EventStreams.kService) skipped: $e');
       }
 
-      _isolateId = await _findIsolateWithMarionetteExtensions();
+      final isolateId = await _findIsolateWithMarionetteExtensions(connected);
+      if (abandoned) {
+        throw StateError('Abandoned connection to $uri');
+      }
+      if (attempt != _connectAttempts) {
+        throw StateError(
+          'Stopped connecting to $uri: a newer connect or disconnect started',
+        );
+      }
+      _service = connected;
+      _serviceEventSubscription = subscription;
+      _registeredServices = registeredServices;
+      _isolateId = isolateId;
+    }
+
+    try {
+      await handshake().timeout(
+        timeout,
+        onTimeout: () {
+          abandoned = true;
+          throw TimeoutException(
+            'Timed out connecting to the VM service at $uri after '
+            '${timeout.inSeconds}s. Make sure the app is still running '
+            'and its device is awake.',
+            timeout,
+          );
+        },
+      );
       _logger.info('Connected to isolate: $_isolateId');
     } catch (err) {
       _logger.severe('Failed to connect to VM service', err);
-      await disconnect();
+      abandoned = true;
+      unawaited(_close(service, subscription));
       rethrow;
     }
   }
 
+  void _onServiceEvent(Event event, Map<String, String?> registeredServices) {
+    switch (event.kind) {
+      case EventKind.kServiceRegistered:
+        final serviceName = event.service!;
+        registeredServices[serviceName] = event.method;
+        _logger.info('Service registered: $serviceName -> ${event.method}');
+        // Pending requests belong to the published connection only.
+        if (identical(registeredServices, _registeredServices) &&
+            _pendingServiceRequests.containsKey(serviceName)) {
+          for (final completer in _pendingServiceRequests[serviceName]!) {
+            completer.complete(event.method);
+          }
+          _pendingServiceRequests.remove(serviceName);
+        }
+      case EventKind.kServiceUnregistered:
+        registeredServices.remove(event.service!);
+        _logger.info('Service unregistered: ${event.service}');
+      default:
+        _logger.info('Service event: $event');
+    }
+  }
+
   /// Disconnects from the current VM service.
+  ///
+  /// Doesn't wait more than a few seconds for an unresponsive VM service to
+  /// close its connection, so a hung app can't block the caller.
   Future<void> disconnect() async {
-    if (_service != null) {
+    _connectAttempts++;
+    final service = _service;
+    if (service != null) {
       _logger.info('Disconnecting from VM service');
-      await _serviceEventSubscription?.cancel();
-      _serviceEventSubscription = null;
-      await _service!.dispose();
+      final subscription = _serviceEventSubscription;
       _service = null;
       _isolateId = null;
-      _registeredServices.clear();
+      _serviceEventSubscription = null;
+      _registeredServices = {};
       _pendingServiceRequests.clear();
+      await _close(service, subscription);
       _logger.fine('Disconnected');
+    }
+  }
+
+  Future<void> _close(
+    VmService? service,
+    StreamSubscription<Event>? subscription,
+  ) async {
+    try {
+      await Future.wait([
+        if (subscription != null) subscription.cancel(),
+        if (service != null) service.dispose(),
+      ]).timeout(_disposeTimeout);
+    } on TimeoutException {
+      _logger.warning(
+        'VM service did not close within ${_disposeTimeout.inSeconds}s; '
+        'dropping the connection',
+      );
+    } catch (err) {
+      // [connect] doesn't await this, so an error here would go unhandled.
+      _logger.warning('Failed to close the VM service connection', err);
     }
   }
 
@@ -660,6 +753,7 @@ class VmServiceConnector {
         // The previous isolate was torn down and replaced. Re-resolve the new
         // isolate, retrying while it boots and re-registers its extensions.
         _isolateId = await _findIsolateWithMarionetteExtensions(
+          _service!,
           attempts: 10,
           delay: const Duration(milliseconds: 500),
         );
@@ -673,14 +767,15 @@ class VmServiceConnector {
     }
   }
 
-  /// Finds the first isolate that has the marionette extensions.
+  /// Finds the first isolate of [service] that has the marionette extensions.
   ///
   /// After a hot restart the root isolate is replaced and registers its
   /// extensions asynchronously, so this polls up to [attempts] times with a
   /// [delay] between tries before giving up.
   ///
   /// Throws an exception if no suitable isolate is found within the retries.
-  Future<String> _findIsolateWithMarionetteExtensions({
+  Future<String> _findIsolateWithMarionetteExtensions(
+    VmService service, {
     int attempts = 1,
     Duration delay = const Duration(milliseconds: 500),
   }) async {
@@ -689,7 +784,7 @@ class VmServiceConnector {
         await Future<void>.delayed(delay);
       }
 
-      final vm = await _service!.getVM();
+      final vm = await service.getVM();
       if (vm.isolates == null || vm.isolates!.isEmpty) {
         continue;
       }
@@ -701,7 +796,7 @@ class VmServiceConnector {
         }
 
         try {
-          final isolate = await _service!.getIsolate(isolateRef.id!);
+          final isolate = await service.getIsolate(isolateRef.id!);
           final hasExtension = isolate.extensionRPCs?.any(
                 (ext) => ext == 'ext.flutter.marionette.getLogs',
               ) ??
