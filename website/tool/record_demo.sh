@@ -20,6 +20,9 @@
 # builder below. If you change the calls, rewrite them, following "The
 # report contract" in
 # packages/marionette_flutter/skills/marionette-flutter-drive-app/SKILL.md.
+# If you change how the example app is set up (its MarionetteBinding, session
+# reports), follow
+# packages/marionette_flutter/skills/marionette-flutter-setup/SKILL.md.
 # The builder asserts that every call succeeded and that steps.md has one
 # line per call, so a broken run fails instead of publishing.
 #
