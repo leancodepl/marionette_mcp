@@ -120,13 +120,14 @@ class MarionetteBinding extends WidgetsFlutterBinding
 /// compete with [MarionetteBinding] for the single binding slot:
 ///
 /// ```dart
-/// class DebugBinding extends DevicePreview with MarionetteBindingMixin {}
+/// class AppBinding extends WidgetsFlutterBinding
+///     with OtherBindingMixin, MarionetteBindingMixin {}
 ///
 /// void main() {
 ///   MarionetteBindingMixin.latchConfiguration(
 ///     const MarionetteConfiguration(),
 ///   );
-///   DebugBinding();
+///   AppBinding();
 ///   runApp(const MyApp());
 /// }
 /// ```
