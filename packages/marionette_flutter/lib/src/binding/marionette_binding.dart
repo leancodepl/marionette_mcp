@@ -1,4 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/extensions/device_config_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/gesture_extensions.dart';
@@ -23,7 +27,11 @@ import 'package:marionette_flutter/src/services/widget_finder.dart';
 
 /// A custom binding that extends Flutter's default binding to provide
 /// integration points for the Marionette MCP.
-class MarionetteBinding extends WidgetsFlutterBinding {
+///
+/// To combine Marionette with another binding, use [MarionetteBindingMixin]
+/// instead.
+class MarionetteBinding extends WidgetsFlutterBinding
+    with MarionetteBindingMixin {
   /// Creates and initializes the binding with the given configuration.
   ///
   /// Returns the singleton instance of [MarionetteBinding].
@@ -49,7 +57,7 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   static MarionetteBinding ensureInitialized([
     MarionetteConfiguration configuration = const MarionetteConfiguration(),
   ]) {
-    if (_instance == null) {
+    if (MarionetteBindingMixin._instance == null) {
       final existing = _existingWidgetsBinding();
       if (existing != null) {
         throw FlutterError.fromParts([
@@ -74,7 +82,8 @@ class MarionetteBinding extends WidgetsFlutterBinding {
           ),
         ]);
       }
-      MarionetteBinding._(configuration);
+      MarionetteBindingMixin.latchConfiguration(configuration);
+      MarionetteBinding._();
     }
     return instance;
   }
@@ -90,8 +99,66 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   }
 
   /// The singleton instance of [MarionetteBinding].
-  static MarionetteBinding get instance => BindingBase.checkInstance(_instance);
-  static MarionetteBinding? _instance;
+  ///
+  /// Throws if the installed binding is not a [MarionetteBinding]. Use
+  /// [MarionetteBindingMixin.instance] to also reach a custom binding that
+  /// mixes in [MarionetteBindingMixin].
+  static MarionetteBinding get instance => BindingBase.checkInstance(
+        MarionetteBindingMixin._instance as MarionetteBinding?,
+      );
+
+  /// See [MarionetteBindingMixin.maybeDeviceConfigService].
+  static DeviceConfigService? get maybeDeviceConfigService =>
+      MarionetteBindingMixin.maybeDeviceConfigService;
+
+  MarionetteBinding._();
+}
+
+/// Adds the Marionette MCP integration points to a [WidgetsBinding].
+///
+/// Use this to combine Marionette with another binding that would otherwise
+/// compete with [MarionetteBinding] for the single binding slot:
+///
+/// ```dart
+/// class AppBinding extends WidgetsFlutterBinding
+///     with OtherBindingMixin, MarionetteBindingMixin {}
+///
+/// void main() {
+///   MarionetteBindingMixin.latchConfiguration(
+///     const MarionetteConfiguration(),
+///   );
+///   AppBinding();
+///   runApp(const MyApp());
+/// }
+/// ```
+///
+/// Like [MarionetteBinding.ensureInitialized], the binding must be created
+/// early in `main()`, before any other plugin touches [WidgetsBinding].
+mixin MarionetteBindingMixin
+    on
+        BindingBase,
+        GestureBinding,
+        SchedulerBinding,
+        ServicesBinding,
+        PaintingBinding,
+        SemanticsBinding,
+        RendererBinding,
+        WidgetsBinding {
+  /// Sets the configuration the next binding using this mixin is created
+  /// with.
+  ///
+  /// Call this before creating the binding; [MarionetteConfiguration]'s
+  /// defaults are used otherwise.
+  static void latchConfiguration(MarionetteConfiguration configuration) {
+    _latchedConfiguration = configuration;
+  }
+
+  static MarionetteConfiguration? _latchedConfiguration;
+
+  /// The singleton instance of [MarionetteBindingMixin].
+  static MarionetteBindingMixin get instance =>
+      BindingBase.checkInstance(_instance);
+  static MarionetteBindingMixin? _instance;
 
   /// The device config service, or `null` when the binding was never
   /// installed — a release build, or an app that doesn't use Marionette.
@@ -101,10 +168,8 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   static DeviceConfigService? get maybeDeviceConfigService =>
       _instance?._deviceConfigService;
 
-  MarionetteBinding._(this.configuration);
-
   /// Configuration for the Marionette extensions.
-  final MarionetteConfiguration configuration;
+  late final MarionetteConfiguration configuration;
 
   // Service instances
   late final DeviceConfigService _deviceConfigService;
@@ -122,6 +187,8 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   void initInstances() {
     super.initInstances();
     _instance = this;
+    configuration = _latchedConfiguration ?? const MarionetteConfiguration();
+    _latchedConfiguration = null;
 
     _deviceConfigService = DeviceConfigService();
     _widgetFinder = WidgetFinder();
@@ -170,16 +237,12 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       textInputSimulator: _textInputSimulator,
       configuration: configuration,
     );
-    registerKeyboardExtensions(
-      keyboardSimulator: _keyboardSimulator,
-    );
+    registerKeyboardExtensions(keyboardSimulator: _keyboardSimulator);
     registerMediaExtensions(
       screenshotService: _screenshotService,
       screencastServer: _screencastServer,
     );
-    registerDeviceConfigExtensions(
-      deviceConfigService: _deviceConfigService,
-    );
+    registerDeviceConfigExtensions(deviceConfigService: _deviceConfigService);
     // This acts like a normal, non-predictive back. For details, see
     // https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
     registerNavigationExtensions(handlePopRoute: handlePopRoute);
