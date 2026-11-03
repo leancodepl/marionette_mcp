@@ -11,7 +11,8 @@ class ElementsCommand extends InstanceCommand {
     argParser.addOption(
       'compaction',
       help: 'How much to reduce the payload. "compact" drops rendering '
-          'details and font metrics, rounds bounds to whole pixels, and '
+          'details, font metrics and icon glyphs, rounds bounds to whole '
+          'pixels, and '
           'reports visible only when false. "none" forces the full payload. '
           "Omit to use the app's configured default.",
       allowed: supportedCompactionModes.toList(),

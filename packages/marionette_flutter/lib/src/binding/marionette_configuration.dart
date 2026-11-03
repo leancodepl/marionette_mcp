@@ -18,9 +18,9 @@ enum CompactionMode {
 
   /// Additionally drop rendering details no interaction tool reads
   /// (`textAlign`, `softWrap`, `overflow`, …) and the text-style primitives a
-  /// `Text` inlines, drop `Text`'s `data` when it repeats `text`, round
-  /// `bounds` to whole logical pixels, and report `visible` only when an
-  /// element is not visible.
+  /// `Text` inlines, drop `Text`'s `data` when it repeats `text`, drop
+  /// icon-font glyphs, round `bounds` to whole logical pixels, and report
+  /// `visible` only when an element is not visible.
   compact,
 }
 
