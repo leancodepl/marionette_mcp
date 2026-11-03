@@ -780,6 +780,57 @@ void main() {
       }
       expect(compactBounds['x'], (verboseBounds['x']! as double).round());
     });
+
+    testWidgets('drops icon glyphs and keeps the icon semantic label',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Icon(Icons.home),
+                Icon(Icons.search, semanticLabel: 'Search'),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final verbose =
+          _finder.findInteractiveElements(compaction: CompactionMode.none);
+      expect(verbose.where((e) => e['type'] == 'RichText'), hasLength(2),
+          reason: 'CompactionMode.none keeps the glyphs');
+
+      final compact =
+          _finder.findInteractiveElements(compaction: CompactionMode.compact);
+      expect(compact.map((e) => e['text']), ['Search'],
+          reason: 'a private-use glyph is unreadable and unmatchable');
+    });
+
+    testWidgets('drops an icon glyph from a kept element\'s properties',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Text('\uE88A', key: ValueKey('glyph')),
+                Text('Home', key: ValueKey('label')),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final compact =
+          _finder.findInteractiveElements(compaction: CompactionMode.compact);
+      expect(
+        compact.firstWhere((e) => e['key'] == 'glyph'),
+        isNot(anyOf(contains('data'), contains('text'))),
+        reason: 'Text also declares its glyph as `data`',
+      );
+      expect(compact.firstWhere((e) => e['key'] == 'label')['text'], 'Home');
+    });
   });
 
   group('ElementTreeFinder compaction configuration', () {
