@@ -45,14 +45,19 @@ class ElementTreeFinder {
     required CompactionMode compaction,
   }) {
     final widget = element.widget;
-    final elementData =
-        _extractElementData(element, widget, compaction: compaction);
+    final stops = configuration.shouldStopAtElement(element);
+    final elementData = _extractElementData(
+      element,
+      widget,
+      compaction: compaction,
+      collapsesSubtree: stops,
+    );
 
     if (elementData != null) {
       result.add(elementData);
     }
 
-    if (configuration.shouldStopAtElement(element)) {
+    if (stops) {
       return;
     }
 
@@ -65,6 +70,7 @@ class ElementTreeFinder {
     Element element,
     Widget widget, {
     required CompactionMode compaction,
+    required bool collapsesSubtree,
   }) {
     // Only process elements with render objects
     final renderObject = element.renderObject;
@@ -82,7 +88,11 @@ class ElementTreeFinder {
     // TextMatcher (tap/scroll_to/enter_text) is not affected — otherwise a
     // Semantics(label: 'Save', child: ElevatedButton(...)) wrapper would
     // shadow the inner button.
-    final discoverableText = text ?? _extractSemanticsText(widget);
+    final discoverableText = text ??
+        _extractSemanticsText(widget) ??
+        (isInteractive && collapsesSubtree
+            ? _extractMergedLabel(element)
+            : null);
     final keyValue = _extractKeyValue(widget.key);
     final identifierValue = _extractIdentifier(widget);
 
@@ -269,6 +279,44 @@ class ElementTreeFinder {
     if (hasLabel) return label;
     if (hasValue) return value;
     return null;
+  }
+
+  /// The label a control announces for its subtree, merged the way Flutter's
+  /// accessibility tree merges the labels under a `MergeSemantics`: in tree
+  /// order, joined line by line, skipping what `ExcludeSemantics` hides (such
+  /// as an `Icon`'s glyph) and taking a `Semantics` label (such as an `Icon`'s
+  /// `semanticLabel`).
+  ///
+  /// A control traversal stops at is listed as one element, so it reports
+  /// what its children show; `tap(text:)` still matches each `Text` on its own.
+  /// A control holding an [EditableText] is a field, whose `text` is its value
+  /// rather than the label around it, so it gets none.
+  String? _extractMergedLabel(Element element) {
+    final labels = <String>[];
+    var isField = false;
+    void visit(Element child) {
+      if (isField) return;
+      switch (child.widget) {
+        case ExcludeSemantics(excluding: true):
+          return;
+        case EditableText():
+          isField = true;
+          return;
+        case Semantics(:final properties, :final excludeSemantics):
+          final label = properties.label;
+          if (label != null && label.isNotEmpty) labels.add(label);
+          if (excludeSemantics) return;
+      }
+      final text = configuration.extractTextFromWidget(child);
+      if (text == null) {
+        child.visitChildren(visit);
+      } else if (text.isNotEmpty) {
+        labels.add(text);
+      }
+    }
+
+    element.visitChildren(visit);
+    return isField || labels.isEmpty ? null : labels.join('\n');
   }
 
   /// Checks if the element is currently visible in the view it is mounted in.
