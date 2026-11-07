@@ -370,17 +370,17 @@ void main() {
         ),
       );
 
-      final textByType = {
-        for (final e in _finder.findInteractiveElements())
-          e['type'] as String: e['text'],
-      };
-      expect(textByType, {
-        'FilledButton': 'Save',
-        'TextButton': 'Cancel',
-        'ElevatedButton': 'Add',
-        'SwitchListTile': 'Dark mode',
-        'FloatingActionButton': 'Compose',
-      });
+      final elements = _finder.findInteractiveElements();
+      // ElevatedButton.icon builds a private subclass on older Flutter.
+      Object? textOf(String type) => elements
+          .singleWhere((e) => (e['type'] as String).contains(type))['text'];
+
+      expect(elements, hasLength(5));
+      expect(textOf('FilledButton'), 'Save');
+      expect(textOf('TextButton'), 'Cancel');
+      expect(textOf('ElevatedButton'), 'Add');
+      expect(textOf('SwitchListTile'), 'Dark mode');
+      expect(textOf('FloatingActionButton'), 'Compose');
     });
 
     testWidgets('several labels are joined line by line', (tester) async {
@@ -523,6 +523,68 @@ void main() {
           .singleWhere((e) => e['type'] == 'TextField');
       expect(field.containsKey('text'), isFalse);
       expect(field['label'], 'Email');
+    });
+
+    testWidgets(
+        'an app control wrapping a field with a controller reports '
+        'no label as text', (tester) async {
+      final controller = TextEditingController(text: 'ana@example.com');
+      addTearDown(controller.dispose);
+      bool isField(Element element) => element.widget is _DsField;
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: isField,
+          shouldStopTraversalAtElement: isField,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: _DsField(label: 'Email', controller: controller),
+          ),
+        ),
+      );
+
+      expect(
+          finder.findInteractiveElements().single.containsKey('text'), isFalse);
+    });
+
+    testWidgets('text in an offstage subtree is left out', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [Offstage(child: Text('Old')), Text('Save')],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Save');
+    });
+
+    testWidgets('only the shown child of an IndexedStack is read',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const IndexedStack(
+                index: 1,
+                children: [Text('Play'), Text('Pause')],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Pause');
     });
   });
 
@@ -1124,4 +1186,19 @@ class _AppButton extends ElevatedButton {
   const _AppButton() : super(onPressed: _noop, child: const Text('App'));
 
   static void _noop() {}
+}
+
+class _DsField extends StatelessWidget {
+  const _DsField({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [Text(label), TextField(controller: controller)],
+    );
+  }
 }

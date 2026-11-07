@@ -283,29 +283,49 @@ class ElementTreeFinder {
 
   /// The label a control announces for its subtree, merged the way Flutter's
   /// accessibility tree merges the labels under a `MergeSemantics`: in tree
-  /// order, joined line by line, skipping what `ExcludeSemantics` hides (such
-  /// as an `Icon`'s glyph) and taking a `Semantics` label (such as an `Icon`'s
-  /// `semanticLabel`).
+  /// order, joined line by line, taking a `Semantics` label (such as an
+  /// `Icon`'s `semanticLabel`) and reading only what
+  /// [RenderObject.visitChildrenForSemantics] reaches, which leaves out
+  /// `ExcludeSemantics` (an `Icon`'s glyph), `Offstage`, the hidden children
+  /// of an `IndexedStack` and the like.
   ///
   /// A control traversal stops at is listed as one element, so it reports
   /// what its children show; `tap(text:)` still matches each `Text` on its own.
   /// A control holding an [EditableText] is a field, whose `text` is its value
   /// rather than the label around it, so it gets none.
   String? _extractMergedLabel(Element element) {
-    final labels = <String>[];
+    final root = element.renderObject;
+    if (root == null) return null;
+
+    final announced = <RenderObject>{root};
+    void collect(RenderObject child) {
+      if (announced.add(child)) child.visitChildrenForSemantics(collect);
+    }
+
+    root.visitChildrenForSemantics(collect);
+    bool isAnnounced(Element child) => announced.contains(child.renderObject);
+
     var isField = false;
+    void findField(Element child) {
+      if (isField || !isAnnounced(child)) return;
+      if (child.widget is EditableText) {
+        isField = true;
+      } else {
+        child.visitChildren(findField);
+      }
+    }
+
+    element.visitChildren(findField);
+    if (isField) return null;
+
+    final labels = <String>[];
     void visit(Element child) {
-      if (isField) return;
-      switch (child.widget) {
-        case ExcludeSemantics(excluding: true):
-          return;
-        case EditableText():
-          isField = true;
-          return;
-        case Semantics(:final properties, :final excludeSemantics):
-          final label = properties.label;
-          if (label != null && label.isNotEmpty) labels.add(label);
-          if (excludeSemantics) return;
+      if (!isAnnounced(child)) return;
+      if (child.widget
+          case Semantics(:final properties, :final excludeSemantics)) {
+        final label = properties.label;
+        if (label != null && label.isNotEmpty) labels.add(label);
+        if (excludeSemantics) return;
       }
       final text = configuration.extractTextFromWidget(child);
       if (text == null) {
@@ -316,7 +336,7 @@ class ElementTreeFinder {
     }
 
     element.visitChildren(visit);
-    return isField || labels.isEmpty ? null : labels.join('\n');
+    return labels.isEmpty ? null : labels.join('\n');
   }
 
   /// Checks if the element is currently visible in the view it is mounted in.
