@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
+import 'package:marionette_flutter/src/services/widget_finder.dart';
 
 import 'multi_view_test_helpers.dart';
 
@@ -338,6 +339,255 @@ void main() {
     });
   });
 
+  group('ElementTreeFinder labels of controls that stop traversal', () {
+    testWidgets('a control reports the label its children show as text',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () {},
+              icon: const Icon(Icons.edit),
+              label: const Text('Compose'),
+            ),
+            body: ListView(
+              children: [
+                FilledButton(onPressed: () {}, child: const Text('Save')),
+                TextButton(onPressed: () {}, child: const Text('Cancel')),
+                ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+                SwitchListTile(
+                  value: false,
+                  onChanged: (_) {},
+                  title: const Text('Dark mode'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final elements = _finder.findInteractiveElements();
+      // ElevatedButton.icon builds a private subclass on older Flutter.
+      Object? textOf(String type) => elements
+          .singleWhere((e) => (e['type'] as String).contains(type))['text'];
+
+      expect(elements, hasLength(5));
+      expect(textOf('FilledButton'), 'Save');
+      expect(textOf('TextButton'), 'Cancel');
+      expect(textOf('ElevatedButton'), 'Add');
+      expect(textOf('SwitchListTile'), 'Dark mode');
+      expect(textOf('FloatingActionButton'), 'Compose');
+    });
+
+    testWidgets('several labels are joined line by line', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CheckboxListTile(
+              value: true,
+              onChanged: (_) {},
+              title: const Text('Accept terms'),
+              subtitle: const Text('Required'),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        _finder.findInteractiveElements().single['text'],
+        'Accept terms\nRequired',
+      );
+    });
+
+    testWidgets('the reported label finds the button with tap(text:)',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(onPressed: () {}, child: const Text('Save')),
+          ),
+        ),
+      );
+
+      final label = _finder.findInteractiveElements().single['text'] as String;
+      final match = WidgetFinder().findHittableElement(
+        TextMatcher(label),
+        _configuration,
+      );
+
+      expect(match, isNotNull);
+      var insideButton = false;
+      match!.visitAncestorElements((ancestor) {
+        insideButton = ancestor.widget is FilledButton;
+        return !insideButton;
+      });
+      expect(insideButton, isTrue);
+    });
+
+    testWidgets('an icon-only control reports no text', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FloatingActionButton(
+              onPressed: () {},
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        _finder.findInteractiveElements().single.containsKey('text'),
+        isFalse,
+      );
+    });
+
+    testWidgets('an icon reports its semanticLabel, not its glyph',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FloatingActionButton(
+              onPressed: () {},
+              child: const Icon(Icons.add, semanticLabel: 'New invoice'),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'New invoice');
+    });
+
+    testWidgets('text hidden by ExcludeSemantics is left out', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ExcludeSemantics(child: Text('•')),
+                  Text('Pay'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Pay');
+    });
+
+    testWidgets('an app control that stops traversal reports its label',
+        (tester) async {
+      bool isTile(Element element) => element.widget is _DsTile;
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: isTile,
+          shouldStopTraversalAtElement: isTile,
+        ),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: _DsTile(enabled: true, child: Text('Archive')),
+          ),
+        ),
+      );
+
+      final elements = finder.findInteractiveElements();
+      expect(elements, hasLength(1));
+      expect(elements.single['type'], '_DsTile');
+      expect(elements.single['text'], 'Archive');
+    });
+
+    testWidgets(
+        'a field without a controller does not report its label as text',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: TextField(decoration: InputDecoration(labelText: 'Email')),
+          ),
+        ),
+      );
+
+      final field = _finder
+          .findInteractiveElements()
+          .singleWhere((e) => e['type'] == 'TextField');
+      expect(field.containsKey('text'), isFalse);
+      expect(field['label'], 'Email');
+    });
+
+    testWidgets(
+        'an app control wrapping a field with a controller reports '
+        'no label as text', (tester) async {
+      final controller = TextEditingController(text: 'ana@example.com');
+      addTearDown(controller.dispose);
+      bool isField(Element element) => element.widget is _DsField;
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: isField,
+          shouldStopTraversalAtElement: isField,
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: _DsField(label: 'Email', controller: controller),
+          ),
+        ),
+      );
+
+      expect(
+          finder.findInteractiveElements().single.containsKey('text'), isFalse);
+    });
+
+    testWidgets('text in an offstage subtree is left out', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [Offstage(child: Text('Old')), Text('Save')],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Save');
+    });
+
+    testWidgets('only the shown child of an IndexedStack is read',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const IndexedStack(
+                index: 1,
+                children: [Text('Play'), Text('Pause')],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Pause');
+    });
+  });
+
   group('ElementTreeFinder isInteractiveElement', () {
     testWidgets('matches generic widgets and subclasses with an is check',
         (tester) async {
@@ -468,7 +718,9 @@ void main() {
       final elements = finder.findInteractiveElements();
       expect(_types(elements), contains('_DsCard<String>'),
           reason: 'The element where traversal stops is still discovered');
-      expect(elements.any((e) => e['text'] == 'inside'), isFalse);
+      expect(_types(elements), isNot(contains('Text')));
+      expect(elements.single['text'], 'inside',
+          reason: 'The card reports the label it shows instead');
     });
 
     testWidgets('descends into everything when null', (tester) async {
@@ -934,4 +1186,19 @@ class _AppButton extends ElevatedButton {
   const _AppButton() : super(onPressed: _noop, child: const Text('App'));
 
   static void _noop() {}
+}
+
+class _DsField extends StatelessWidget {
+  const _DsField({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [Text(label), TextField(controller: controller)],
+    );
+  }
 }
