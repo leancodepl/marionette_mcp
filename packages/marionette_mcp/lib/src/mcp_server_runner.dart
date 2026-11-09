@@ -2,11 +2,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/version.g.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
-const _instructions = '''
+/// Instructions the server sends to the agent. Claude Code keeps only the
+/// first 4096 characters, so they must stay within that; details belong in
+/// the tool descriptions.
+const serverInstructions = '''
 Marionette MCP enables AI agents to interact with Flutter apps running in debug mode. It provides tools to inspect UI elements, tap buttons, enter text, scroll, take screenshots, retrieve logs, and perform hot reloads and hot restarts.
 
 Usage:
@@ -21,6 +25,12 @@ Usage:
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 
 When the same key exists in several identical subtrees (grid cells, repeated cards, embedded app instances), a plain match always hits the first one. Pass "ancestor_keys" alongside the selector to scope the search to one subtree, e.g. `{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}`. The keys nest, outermost first — each is looked up inside the previous one's subtree — so `["session_2", "grid.cell_3"]` reaches a cell whose own key also repeats in the other sessions. Only descendants of the last key match, never that element itself. If a key has no element the call fails naming it, instead of searching the whole tree; scroll_to keeps scrolling first, because the scope may not be built yet. ancestor_keys is ignored when targeting by coordinates or focused_element. "get_interactive_elements" accepts "ancestor_keys" as well, to list only that subtree — use it to find the right scope keys and to keep the listing small on busy screens.
+
+Native lane — UI outside the Flutter tree (permission dialogs, system alerts, pickers and sheets, notifications, browser sign-in, native screens, WebView content): use the native_* tools; prefer Flutter tools for in-app widgets.
+- get_interactive_elements warns when the app is not in front (an alert the app itself shows on iOS gives no warning — if a Flutter action has no effect, check native_get_elements). The warning lags a moment: after system UI opens or closes, native_wait_for the expected screen first.
+- Call native_connect before the flow opens system UI (starting WebDriverAgent can dismiss an alert already on screen); call it again if a native call says the session or server is gone. One client per Android device.
+- Read screens with native_get_elements; take native_take_screenshot only for what the tree lacks (heads-up banners, toasts, camera preview). Native x/y and bounds are screen pixels, never Flutter coordinates; a downscaled screenshot reports the factor to them.
+- Wait with native_wait_for, not delays. Permission dialogs: answer them with native_wait_for + native_tap; to see one again, reset the permission outside Marionette (adb shell pm revoke, xcrun simctl privacy … reset), which ends the Flutter connection.
 ''';
 
 /// Runs the Marionette MCP server with the given configuration.
@@ -35,6 +45,7 @@ Future<int> runMcpServer({
   setupLogging(logLevel, logFile);
 
   final vmService = VmServiceContext();
+  final native = NativeServiceContext();
 
   final server = McpServer(
     const Implementation(name: 'marionette-mcp', version: version),
@@ -46,16 +57,25 @@ Future<int> runMcpServer({
       capabilities: ServerCapabilities(
         tools: ServerCapabilitiesTools(listChanged: true),
       ),
-      instructions: _instructions,
+      instructions: serverInstructions,
     ),
   );
 
   vmService.registerTools(server);
+  native.registerTools(server, stepLogger: vmService.stepLogger);
+
+  // Both lanes hold connections that keep the process alive: a native
+  // session and the VM service WebSocket (without disconnecting it the
+  // server never exits on stdin EOF while an app is connected).
+  Future<void> disposeLanes() async {
+    await native.dispose();
+    await vmService.connector.disconnect();
+  }
 
   if (ssePort != null) {
-    return _runSseServer(server, ssePort);
+    return _runSseServer(server, ssePort, disposeLanes);
   } else {
-    return _runStdioServer(server);
+    return _runStdioServer(server, disposeLanes);
   }
 }
 
@@ -71,17 +91,26 @@ void setupLogging(String logLevelName, String? logFile) {
     final file = File(logFile)..createSync(recursive: true);
     logging.Logger.root.onRecord.listen((record) {
       file.writeAsStringSync(
-        '[${record.level.name}][${record.loggerName}][${_formatTime(record.time)}] ${record.message}\n',
+        '${formatLogRecord(record)}\n',
         mode: FileMode.append,
       );
     });
   } else {
     logging.Logger.root.onRecord.listen((record) {
       stderr.writeln(
-        '[${record.level.name}][${record.loggerName}][${_formatTime(record.time)}] ${record.message}',
+        formatLogRecord(record),
       );
     });
   }
+}
+
+/// One log line; the error of a record (e.g. a failed tool call) is
+/// appended so the log says why it failed. Public for tests.
+String formatLogRecord(logging.LogRecord record) {
+  final error = record.error;
+  return '[${record.level.name}][${record.loggerName}]'
+      '[${_formatTime(record.time)}] ${record.message}'
+      '${error == null ? '' : ': $error'}';
 }
 
 String _formatTime(DateTime time) {
@@ -90,7 +119,10 @@ String _formatTime(DateTime time) {
       '${time.second.toString().padLeft(2, '0')}';
 }
 
-Future<int> _runStdioServer(McpServer server) async {
+Future<int> _runStdioServer(
+  McpServer server,
+  Future<void> Function() disposeLanes,
+) async {
   final logger = logging.Logger('main');
 
   final transport = StdioServerTransport();
@@ -114,6 +146,7 @@ Future<int> _runStdioServer(McpServer server) async {
   } catch (e, st) {
     logger.severe('Error when starting the Stdio transport', e, st);
     exitSignal.dispose();
+    await disposeLanes();
     return 1;
   }
 
@@ -135,13 +168,18 @@ Future<int> _runStdioServer(McpServer server) async {
   // Release the signal subscriptions so the event loop can drain and the
   // process actually exits on the stdin-EOF path.
   exitSignal.dispose();
+  await disposeLanes();
   await server.close();
   await transport.close();
   logger.info('Stopped');
   return 0;
 }
 
-Future<int> _runSseServer(McpServer server, int ssePort) async {
+Future<int> _runSseServer(
+  McpServer server,
+  int ssePort,
+  Future<void> Function() disposeLanes,
+) async {
   final logger = logging.Logger('main');
   final sseServerManager = SseServerManager(server);
   try {
@@ -166,6 +204,8 @@ Future<int> _runSseServer(McpServer server, int ssePort) async {
   } catch (e, st) {
     logger.severe('Error when waiting for MCP client connection', e, st);
     return 1;
+  } finally {
+    await disposeLanes();
   }
 
   logger.info('Stopped');

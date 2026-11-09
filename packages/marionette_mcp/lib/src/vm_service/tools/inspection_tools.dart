@@ -1,14 +1,10 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
-import 'package:marionette_mcp/src/vm_service/tools/tool_runner.dart';
+import 'package:marionette_mcp/src/tool_runner.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
-import 'package:path/path.dart' as p;
 
 /// Registers read-only MCP tools that inspect the running app:
 /// `get_interactive_elements`, `get_logs`, `take_screenshots`.
@@ -21,7 +17,7 @@ void registerInspectionTools(
     ..registerTool(
       'get_interactive_elements',
       description:
-          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Style, decoration and colour blobs are never reported. Set compaction to "compact" (the default for most apps) to also drop rendering details no interaction tool reads (textAlign, softWrap, overflow, font metrics, …), report visible only when an element is not visible, round bounds to whole logical pixels, and drop a Text element\'s duplicated data field — much more token-efficient for agent loops. Set compaction to "none" to force the full payload. Omit compaction to use the app\'s MarionetteConfiguration.compaction default. Requires an active connection established via connect.',
+          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Style, decoration and colour blobs are never reported. Set compaction to "compact" (the default for most apps) to also drop rendering details no interaction tool reads (textAlign, softWrap, overflow, font metrics, …), report visible only when an element is not visible, round bounds to whole logical pixels, and drop a Text element\'s duplicated data field — much more token-efficient for agent loops. Set compaction to "none" to force the full payload. Omit compaction to use the app\'s MarionetteConfiguration.compaction default. When the app is not in front (a system dialog, the notification shade, a biometric prompt, a browser or a native screen covers it) the result starts with a warning: the listed widgets may not be reachable — use native_get_elements. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Get Interactive Elements',
         readOnlyHint: true,
@@ -59,8 +55,11 @@ void registerInspectionTools(
           );
           final elements = response['elements'] as List<dynamic>;
 
-          final buffer = StringBuffer()
-            ..writeln('Found ${elements.length} interactive element(s):\n');
+          final buffer = StringBuffer();
+          if (coveredAppWarning(response) case final warning?) {
+            buffer.writeln('$warning\n');
+          }
+          buffer.writeln('Found ${elements.length} interactive element(s):\n');
 
           for (final element in elements) {
             buffer.writeln(formatElement(element as Map<String, dynamic>));
@@ -199,7 +198,7 @@ Future<CallToolResult> takeScreenshots(
     );
   }
 
-  final paths = _saveScreenshots(session.screenshotsDir, screenshots);
+  final paths = session.saveScreenshots(screenshots);
   return CallToolResult(
     content: [
       TextContent(
@@ -207,40 +206,6 @@ Future<CallToolResult> takeScreenshots(
       ),
     ],
   );
-}
-
-/// Saves each base64-encoded PNG in [screenshots] into [screenshotsDir],
-/// numbered sequentially after whatever is already there, and returns the
-/// paths written to.
-List<String> _saveScreenshots(
-  Directory screenshotsDir,
-  List<String> screenshots,
-) {
-  screenshotsDir.createSync(recursive: true);
-  // The next index is one past the highest existing numeric name, not a
-  // count of PNGs present — a gap (e.g. 01.png and 03.png after 02.png was
-  // deleted) would otherwise make a count-based index collide with, and
-  // overwrite, the existing 03.png.
-  final highestExisting = screenshotsDir
-      .listSync()
-      .whereType<File>()
-      .where((f) => p.extension(f.path) == '.png')
-      .map((f) => int.tryParse(p.basenameWithoutExtension(f.path)))
-      .whereType<int>()
-      .fold(0, (highest, n) => n > highest ? n : highest);
-  var nextIndex = highestExisting + 1;
-
-  final paths = <String>[];
-  for (final screenshot in screenshots) {
-    final path = p.join(
-      screenshotsDir.path,
-      '${nextIndex.toString().padLeft(2, '0')}.png',
-    );
-    File(path).writeAsBytesSync(base64Decode(screenshot));
-    paths.add(path);
-    nextIndex++;
-  }
-  return paths;
 }
 
 /// `ancestor_keys` as worded for `get_interactive_elements`, which lists a

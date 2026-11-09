@@ -1,6 +1,6 @@
 ---
 name: marionette-flutter-drive-app
-description: Drive a running Flutter app (debug or profile) with Marionette — an AI agent's hands and eyes for the app — tapping/typing/scrolling, screenshots, logs, hot reload/restart, device sweeps, custom extensions, and the session report, via marionette_mcp or the marionette CLI. Use whenever asked to test, click through, smoke-test, automate, QA, or interact with a Flutter app; after a feature or UI/design-system change; to reproduce or verify a bug; to walk a behaviour-neutral refactor; to sweep for accessibility; to exercise form validation; to call or register a custom extension; or to capture before/after evidence for a PR. Also load whenever a Marionette call fails or reports not connected. If the app has no MarionetteBinding yet, connect reports a version mismatch, startup hits a binding assertion or hangs, or Marionette can't see the app's custom widgets, use marionette-flutter-setup. Not for CI suites, release builds, or performance work — see When not to use.
+description: Drive a running Flutter app (debug or profile) with Marionette — an AI agent's hands and eyes for the app — tapping/typing/scrolling, screenshots, logs, hot reload/restart, device sweeps, custom extensions, the session report, and the native lane for system UI (dialogs, pickers, WebViews, notifications), via marionette_mcp or the marionette CLI. Use whenever asked to test, click through, smoke-test, automate, QA, or interact with a Flutter app; after a feature or UI/design-system change; to reproduce or verify a bug; to walk a refactor; to sweep for accessibility; to exercise form validation; to call or register a custom extension; or to capture before/after evidence for a PR. Also load whenever a Marionette call fails or reports not connected. If the app has no MarionetteBinding yet, connect reports a version mismatch, startup hits a binding assertion or hangs, or Marionette can't see the app's custom widgets, use marionette-flutter-setup. Not for CI suites, release builds, or performance work.
 ---
 
 # marionette_flutter: drive an app
@@ -23,6 +23,13 @@ screenshot, read logs, hot reload. It has two halves:
 Everything shared between the two applies to either transport — action names
 differ only in casing (`get_interactive_elements` vs
 `get-interactive-elements`).
+
+Those tools form the **Flutter lane**: they see only the app's widget tree.
+UI the platform draws — permission dialogs, system alerts, pickers and share
+sheets, WebView content, native views and screens, notifications — is
+reached through the **native lane** (`native_*` tools, `native-*` CLI
+commands), which drives the device's own UI automation server. See *System UI
+outside Flutter: the native lane*, below.
 
 ## Before you start
 
@@ -144,6 +151,7 @@ disconnecting.
 | Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens a fresh session directory (`session_title`) that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                                                                                                                                                             |
+| Native lane       | `native_connect`, `native_disconnect`, `native_get_elements`, `native_wait_for`, `native_tap`, `native_enter_text`, `native_scroll`, `native_swipe`, `native_press_key`, `native_hide_keyboard`, `native_take_screenshot`, `native_notifications` | System UI outside the Flutter tree, on an Android device / emulator or the iOS Simulator. Needs its own `native_connect`, independent of `connect` — see *System UI outside Flutter: the native lane*, below. |
 | Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## Good practices
@@ -217,6 +225,107 @@ disconnecting.
   occasionally) is a signal to expose a clearer key/identifier, flatten a
   deeply nested `GestureDetector` hit target, or extend
   `MarionetteConfiguration` — not to retry harder.
+
+## System UI outside Flutter: the native lane
+
+The Flutter lane can't see what the platform draws over or inside the app:
+permission dialogs, system alerts (including ones a plugin shows), photo and
+file pickers, share sheets, the camera UI, WebView content, native controls
+in a platform view, native screens, the notification shade. While such UI is
+open, `get_interactive_elements` still lists the Flutter widgets underneath
+as if they were reachable — and a tap on them does nothing. Switch to the
+native lane whenever the target isn't in the Flutter tree, and back as soon
+as the app is in front again: in-app widgets are always better driven by the
+Flutter lane.
+
+`get_interactive_elements` starts with a warning ("the app is not in front")
+when system UI covers the app — trust it when it's there. It can't be there
+for an alert or sheet the app itself shows on iOS, so if a Flutter action
+has no visible effect, check `native_get_elements`. The warning follows the
+app's lifecycle, which changes a moment after system UI opens or closes:
+after either, `native_wait_for` the expected screen before trusting the
+Flutter listing.
+
+**Setup.** Android needs `adb` on `PATH` and a device or emulator; Marionette
+downloads and installs UIAutomator2 itself on the first connect. iOS works on
+the **Simulator only** (not physical iPhones yet) and needs a one-time
+WebDriverAgent build — the steps are on the
+[Native lane](https://marionette.leancode.co/docs/native/#setup) docs page. Nothing changes in the app: the native lane doesn't
+need `MarionetteBinding`, but every flow you drive with it still starts in
+an app you reach with `connect`.
+
+**Connecting.** Call `native_connect` with `platform: android | ios` (plus
+`serial` / `udid` when several devices are attached) — separately from
+`connect`; the two lanes are independent and you usually want both. Call it
+before the flow opens system UI — starting WebDriverAgent can dismiss an
+alert already on screen. If a
+native call later says the device-side server or session is gone, call
+`native_connect` again. Prefer one client per Android device: an MCP server
+and a CLI session on the same device take UIAutomator2's single session
+from each other. Call `native_disconnect` when you're done.
+
+**Working with it:**
+
+- **Look first.** `native_get_elements` lists what's on screen (type, text,
+  id, bounds and state — `value` is a text field's typed content, its `text`
+  stays the label) and `foregroundApp`, which tells you whose UI is in front.
+  `native_take_screenshot` captures everything on screen, system UI
+  included — `take_screenshots` shows only Flutter.
+- **Selectors** are `text`, `textContains`, `id`, `type` and `index` (a field
+  in `native_enter_text` is chosen by `label`). An ambiguous selector fails
+  and lists the candidates — add `index` or a more specific `type` / `id`
+  rather than guessing. A disabled element (`enabled: false`) is refused,
+  not touched. On iOS the app's elements stay listed under a sheet or an
+  alert, and not all of them are disabled (the app's own alerts disable
+  none): when an `XCUIElementTypeAlert` or a sheet is listed, act on it
+  first.
+- **Coordinates** (`x`/`y`, `bounds`, swipe points) are screen pixels on
+  every platform. Never reuse Flutter coordinates in the native lane or the
+  other way round. `native_take_screenshot` fits the image in 2000×2000
+  like `take_screenshots`; when it shrinks it, the result gives the factor —
+  multiply a point read off the image by it to get native `x`/`y`.
+- **Read before you look.** `native_get_elements` costs a few hundred
+  tokens on a typical system screen; a screenshot costs about 1.5k. Take one
+  only for what the tree doesn't show (heads-up banners, toasts, a camera
+  preview), and with `inline: false` for evidence.
+- **Wait, don't sleep.** `native_wait_for` (state `visible` or `gone`, hard
+  `timeoutMs`) for a dialog, the next screen or a disappearing toast. Wait
+  for an element you expect on that screen, not for a package name.
+- **Scroll** with `native_scroll`: with a target it stops once the target is
+  visible or the list ends; `within` scrolls a nested list or a picker wheel.
+  `native_swipe` is a raw gesture that doesn't wait for the content to
+  settle.
+- **Keyboard.** `native_hide_keyboard` when the keyboard covers what you
+  need; `native_press_key` for `back`, `home`, `enter` and friends
+  (`back` is Android-only). `native_enter_text` without a selector types into
+  the focused field — also a Flutter field Android doesn't list natively.
+  On iOS, once the keyboard has scrolled a WebView, WebKit can report its
+  elements shifted until the WebView is opened again: if a tap there hits
+  the wrong thing, compare with `native_take_screenshot` and tap by
+  coordinates.
+- **Permissions.** Answer the system dialog with `native_wait_for` +
+  `native_tap` (e.g. text "Allow"). A dialog appears only while the
+  permission is undecided; to see it again, reset the permission outside
+  Marionette (`adb shell pm revoke <package> <permission>`,
+  `xcrun simctl privacy <udid> reset all <bundle id>`) — this ends the app's
+  Flutter connection, so `connect` again afterwards.
+- **Notifications.** `native_notifications` opens / closes the shade
+  (Android) or the Notification Center (iOS); read them with
+  `native_get_elements` and open one with `native_tap`. On iOS the first tap
+  on a group of one app's notifications (or on a collapsed "N Notifications"
+  button) expands it, and a notification opens with a swipe right across
+  its full width (`native_swipe` at its vertical center) — a tap does not
+  open it. Send the app to the background (`native_press_key` `home`) and
+  wait until the banner is gone before opening the Notification Center.
+  Android heads-up banners, and toasts on recent versions, show only on
+  `native_take_screenshot`.
+
+**Reports.** Native-lane calls are logged to the same `steps.md` as the
+Flutter ones once `connect` has opened a session, so `Tested:` covers both
+lanes. `native_take_screenshot` takes `inline: false` like
+`take_screenshots`, saving into the session's `screenshots/`. In the CLI a
+`native-*` command logs its step only when `--session` or `--session-dir` is
+given — it has no Flutter connection to ask whether reports are enabled.
 
 ## Reporting what you found
 
@@ -435,6 +544,10 @@ args.
 | `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                                                 | See *Device-config sweeps* in `marionette-flutter-setup`, then hot restart                                                       |
 | Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                                   | See *The single-binding rule* in `marionette-flutter-setup`                                                                      |
 | Session directory lands somewhere unexpected (e.g. not the project root)                           | No `MARIONETTE_SESSION_DIR` set and the server's own working directory isn't reliably the repo root | Pass `session_dir` to `connect` (`--session-dir` on the CLI) explicitly — see *Reporting what you found*, above                  |
+| A Flutter tap does nothing while a dialog, sheet or picker is open                                 | System UI covers the app; the Flutter tree still lists the widgets underneath                       | Switch to the native lane — see *System UI outside Flutter*, above                                                               |
+| `native_connect` fails                                                                             | No device / `adb` (Android), no booted simulator or no WebDriverAgent build (iOS)                   | Follow the hint in the error; setup is on the [Native lane](https://marionette.leancode.co/docs/native/#setup) docs page                                     |
+| A native call says several elements match                                                          | Ambiguous native selector                                                                           | Add `index` or a more specific `type` / `id` — the error lists the candidates                                                    |
+| A native call says the session or server is gone                                                   | The device-side server stopped, or another client took the Android session                          | `native_connect` again; use one client per Android device                                                                        |
 | Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                                     | Not supported by design — see *When not to use*                                                                                  |
 
 ## CLI fallback
@@ -466,6 +579,14 @@ own session directory. `--session <title>` (the CLI's equivalent of
 `session_title`) names that directory; it does not join invocations into one
 run, so a multi-step CLI run leaves one directory per command, where the MCP
 server keeps one per connection — see *Reporting what you found*, above.
+
+The native lane is there too, as `native-*` commands (`native_tap` ↔
+`native-tap --text Allow`). `marionette native-connect --platform
+android|ios` starts the device-side server detached from the CLI, so later
+`native-*` commands reuse it without setup; `native-disconnect` stops it.
+`--native-device <name>` (before the command) names the connection, to
+drive several devices at once — it's unrelated to `--session`, which titles
+the report directory.
 
 ## Keeping this skill in sync
 

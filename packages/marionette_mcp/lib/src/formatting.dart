@@ -94,3 +94,20 @@ String formatValue(dynamic value) {
   }
   return value.toString();
 }
+
+/// A warning for a `marionette.interactiveElements` [response] taken while
+/// the app is not in front (`appLifecycleState` other than `resumed`):
+/// system UI or another screen covers it, and the listed widgets may not be
+/// reachable. Null when the app is in front or the binding does not report
+/// it. [nativeElements] names the tool / command that reads the screen.
+String? coveredAppWarning(
+  Map<String, dynamic> response, {
+  String nativeElements = 'native_get_elements',
+}) {
+  final state = response['appLifecycleState'];
+  if (state is! String || state == 'resumed') return null;
+  return 'Warning: the app is not in front (lifecycle: $state) — system UI '
+      '(a dialog, the notification shade, a biometric prompt, a browser) or '
+      'another screen covers it. The widgets below may be hidden and not '
+      'reachable; check $nativeElements.';
+}

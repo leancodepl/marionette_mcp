@@ -39,6 +39,13 @@ const faqEntries = [
         'agent a stable target.',
   ),
   FaqEntry(
+    'Can it handle permission dialogs, pickers and WebViews?',
+    'Yes, through the native lane: the `native_*` tools drive UI that the '
+        'platform draws, such as permission dialogs, pickers, WebView '
+        'content, native views and notifications, on an Android device or '
+        'emulator and the iOS Simulator.',
+  ),
+  FaqEntry(
     'Does it replace integration tests or Patrol?',
     'No. Its gestures simulate a user on a best-effort basis, which is right '
         'for an agent checking its own work. For a suite that must pass or '

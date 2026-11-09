@@ -13,6 +13,11 @@ import 'package:marionette_cli/src/cli/commands/hot_restart_command.dart';
 import 'package:marionette_cli/src/cli/commands/long_press_command.dart';
 import 'package:marionette_cli/src/cli/commands/list_command.dart';
 import 'package:marionette_cli/src/cli/commands/mcp_command.dart';
+import 'package:marionette_cli/src/cli/commands/native_gesture_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_inspection_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_notification_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_session_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_text_commands.dart';
 import 'package:marionette_cli/src/cli/commands/pinch_zoom_command.dart';
 import 'package:marionette_cli/src/cli/commands/record_video_command.dart';
 import 'package:marionette_cli/src/cli/commands/press_back_button_command.dart';
@@ -26,10 +31,14 @@ import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/unregister_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_cli/src/native_session_registry.dart';
 
 class MarionetteCommandRunner extends CommandRunner<int> {
-  MarionetteCommandRunner()
-      : _registry = InstanceRegistry(),
+  MarionetteCommandRunner({
+    InstanceRegistry? registry,
+    NativeSessionRegistry? nativeRegistry,
+  })  : _registry = registry ?? InstanceRegistry(),
+        _nativeRegistry = nativeRegistry ?? NativeSessionRegistry(),
         super(
           'marionette',
           'CLI for multi-instance Flutter app interaction via Marionette.',
@@ -49,6 +58,12 @@ class MarionetteCommandRunner extends CommandRunner<int> {
         'timeout',
         help: 'Connection timeout in seconds.',
         defaultsTo: '5',
+      )
+      ..addOption(
+        'native-device',
+        help: 'Name of the native-lane device connection (from '
+            'native-connect) for native-* commands.',
+        defaultsTo: 'default',
       )
       ..addOption(
         'session',
@@ -86,11 +101,25 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(HotReloadCommand(_registry));
     addCommand(HotRestartCommand(_registry));
     addCommand(DoctorCommand(_registry));
+    addCommand(NativeConnectCommand(_nativeRegistry));
+    addCommand(NativeDisconnectCommand(_nativeRegistry));
+    addCommand(NativeSessionsCommand(_nativeRegistry));
+    addCommand(NativeGetElementsCommand(_nativeRegistry));
+    addCommand(NativeWaitForCommand(_nativeRegistry));
+    addCommand(NativeTakeScreenshotCommand(_nativeRegistry));
+    addCommand(NativeTapCommand(_nativeRegistry));
+    addCommand(NativeSwipeCommand(_nativeRegistry));
+    addCommand(NativeScrollCommand(_nativeRegistry));
+    addCommand(NativeEnterTextCommand(_nativeRegistry));
+    addCommand(NativePressKeyCommand(_nativeRegistry));
+    addCommand(NativeHideKeyboardCommand(_nativeRegistry));
+    addCommand(NativeNotificationsCommand(_nativeRegistry));
     addCommand(HelpAiCommand());
     addCommand(McpCommand());
   }
 
   final InstanceRegistry _registry;
+  final NativeSessionRegistry _nativeRegistry;
 
   @override
   Future<int> run(Iterable<String> args) async {
