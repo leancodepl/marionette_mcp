@@ -1,0 +1,10 @@
+{
+  "platform": "android",
+  "os": "Android 9 (API 28)",
+  "screen": {
+    "width": 1080,
+    "height": 2160,
+    "scale": 1.0
+  },
+  "foregroundApp": "com.example.counter"
+}
