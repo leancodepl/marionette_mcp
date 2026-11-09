@@ -227,8 +227,8 @@ class ReportsPage extends StatelessComponent {
               rich(
                 'The agent writes `report.md` once, at the end, or when it '
                 'stops early and says why. `disconnect` reminds it, with the '
-                'folder’s path. The format is a contract the Agent Skill '
-                'teaches:',
+                'folder’s path. The format is a contract the drive Agent '
+                'Skill teaches:',
               ),
             ),
             ul(classes: Prose.checklist.name, [
@@ -384,6 +384,14 @@ class ReportsPage extends StatelessComponent {
                 'explores the app; Patrol keeps the result in CI.',
               ),
             ]),
+            p(
+              rich(
+                'The `marionette-flutter-to-patrol` skill, from '
+                '[Add the Agent Skills](/docs/#skill), teaches the agent the '
+                'rest: which widgets need keys, how each step maps to Patrol, '
+                'and which assertions the report implies.',
+              ),
+            ),
             const CodeBlock(
               source: _patrolPrompt,
               language: .console,
