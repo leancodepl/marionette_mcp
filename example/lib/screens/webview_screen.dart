@@ -48,7 +48,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _setLoading(bool loading) {
-    if (_isLoading == loading) return;
+    // The delegate can still report a page after the screen was left.
+    if (!mounted || _isLoading == loading) return;
     setState(() => _isLoading = loading);
   }
 

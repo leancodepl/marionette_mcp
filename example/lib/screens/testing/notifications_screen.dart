@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -15,6 +15,14 @@ final ValueNotifier<String?> _openedFrom = ValueNotifier(null);
 final FlutterLocalNotificationsPlugin _notifications =
     FlutterLocalNotificationsPlugin();
 Future<void>? _initialized;
+
+bool get _isAndroid =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+bool get _isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+/// The plugin is set up for Android and iOS only; the screen says so on
+/// other platforms instead of failing.
+bool get _isSupported => _isAndroid || _isIOS;
 
 Future<void> _initialize() => _initialized ??= () async {
       await _notifications.initialize(
@@ -51,12 +59,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    _initialize();
+    if (_isSupported) _initialize();
   }
 
   Future<void> _notifyLater() async {
     await _initialize();
-    final allowed = Platform.isAndroid
+    final allowed = _isAndroid
         ? await _notifications
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>()
@@ -81,7 +89,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       iOS: DarwinNotificationDetails(presentAlert: true, presentBanner: true),
     );
-    if (Platform.isIOS) {
+    if (_isIOS) {
       // iOS suspends the app in the background, so a Dart timer would only
       // fire after it comes back; the system delivers a scheduled one.
       tz_data.initializeTimeZones();
@@ -124,34 +132,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: const Text('Notifications'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            'Post a notification in 3 s (send the app to the background '
-            'with native_press_key key=home to see a banner), read it '
-            'with native_notifications action=open and open it to come back '
-            '(Android: tap it; iOS: swipe it right).',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _notifyLater,
-            child: const Text('Notify in 3 s'),
-          ),
-          if (Platform.isAndroid)
-            OutlinedButton(
-              onPressed: _toast,
-              child: const Text('Show Android toast'),
+      body: !_isSupported
+          ? const Center(
+              child: Text('Notifications are available on Android and iOS.'),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(
+                  'Post a notification in 3 s (send the app to the background '
+                  'with native_press_key key=home to see a banner), read it '
+                  'with native_notifications action=open and open it to come back '
+                  '(Android: tap it; iOS: swipe it right).',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _notifyLater,
+                  child: const Text('Notify in 3 s'),
+                ),
+                if (_isAndroid)
+                  OutlinedButton(
+                    onPressed: _toast,
+                    child: const Text('Show Android toast'),
+                  ),
+                Text('Status: $_status'),
+                ValueListenableBuilder(
+                  valueListenable: _openedFrom,
+                  builder: (context, payload, _) =>
+                      Text('Opened from notification: ${payload ?? 'no'}'),
+                ),
+              ],
             ),
-          Text('Status: $_status'),
-          ValueListenableBuilder(
-            valueListenable: _openedFrom,
-            builder: (context, payload, _) =>
-                Text('Opened from notification: ${payload ?? 'no'}'),
-          ),
-        ],
-      ),
     );
   }
 }

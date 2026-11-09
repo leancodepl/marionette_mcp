@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:image/image.dart' as img;
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
@@ -750,6 +751,30 @@ void main() {
 
         expect(result, _isToolError(contains('kept changing')));
         expect(connector.enteredText, isEmpty);
+      });
+
+      test('the typed value stays out of the log and the error', () async {
+        // UIAutomator2 quotes the value it could not set, e.g. a password.
+        const changed = WebDriverException(
+          "Cannot set the element to 'S3cret!'",
+          error: 'invalid element state',
+        );
+        final connector = FakeNativeConnector.single([field])
+          ..enterTextErrors.addAll([changed, changed]);
+        final logs = <String>[];
+        final subscription =
+            logging.Logger.root.onRecord.listen((r) => logs.add(r.message));
+        addTearDown(subscription.cancel);
+
+        final result = await handleNativeEnterText(
+          _contextWith(connector),
+          {'id': 'f', 'text': 'S3cret!'},
+        );
+
+        expect(result, _isToolError(contains('invalid element state')));
+        expect(result, _isToolError(isNot(contains('S3cret!'))));
+        expect(logs, isNotEmpty);
+        expect(logs.join('\n'), isNot(contains('S3cret!')));
       });
 
       test('other WebDriver errors are not retried', () async {

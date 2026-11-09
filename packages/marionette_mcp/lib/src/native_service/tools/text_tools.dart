@@ -57,6 +57,13 @@ bool isChangedFieldError(WebDriverException error) =>
     error.error == 'invalid element state' ||
     error.message.contains('is not present in the current view');
 
+/// Why the field counts as changed, for the log and the error: the W3C
+/// code, never the message — UIAutomator2's `invalid element state` message
+/// quotes the typed value (`Cannot set the element to '…'`), which can be a
+/// password.
+String _changeReason(WebDriverException error) =>
+    error.error ?? 'no longer in the view';
+
 /// Handles `native_enter_text`.
 Future<CallToolResult> handleNativeEnterText(
   NativeServiceContext context,
@@ -94,7 +101,10 @@ Future<CallToolResult> handleNativeEnterText(
         if (!isChangedFieldError(error)) rethrow;
         // The field was replaced or was still moving (a screen transition)
         // and nothing was typed; find it again once.
-        logger.info('Field changed before typing ($error); finding it again');
+        logger.info(
+          'Field changed before typing (${_changeReason(error)}); finding '
+          'it again',
+        );
         await Future<void>.delayed(changedFieldRetryDelay);
         final again = requireEnabled(
           selectElement(await connector.getNativeElements(), selector),
@@ -106,7 +116,7 @@ Future<CallToolResult> handleNativeEnterText(
           if (!isChangedFieldError(retryError)) rethrow;
           throw NativeOperationFailedException(
             'The field ${selector.describe()} kept changing; nothing was '
-            'typed. ($retryError)',
+            'typed (${_changeReason(retryError)}).',
             hint: 'Wait until the screen has settled (native_wait_for on an '
                 'element of the new screen), then retry.',
           );
