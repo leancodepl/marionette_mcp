@@ -9,6 +9,7 @@ import 'package:jaspr/dom.dart';
 import 'package:jaspr/jaspr.dart';
 import 'package:marionette_website/palette.dart';
 import 'package:marionette_website/site.dart';
+import 'package:marionette_website/tracking.dart';
 
 /// Site-wide `<meta name>` tags rendered by the `Document`.
 final siteMeta = {
@@ -54,6 +55,7 @@ const fontFaces = '''
 /// `<head>` children shared by every page: icons, fonts, the social
 /// card image and the structured data describing the package itself.
 List<Component> siteHead({required String version}) => [
+  if (isProduction) ...trackingHead,
   const link(rel: 'icon', href: 'favicon.ico', attributes: {'sizes': '32x32'}),
   const link(rel: 'icon', href: 'favicon.svg', type: 'image/svg+xml'),
   const link(

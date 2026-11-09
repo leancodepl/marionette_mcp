@@ -28,6 +28,11 @@ change nothing in `website/` or the package version.
 `dart test` on pull requests. `web/_headers` sets the response headers Netlify
 sends.
 
+Production pages load LeanCode's CookieScript consent banner and Google Tag
+Manager container (`lib/tracking.dart`), first in `<head>`. Deploy Previews,
+`jaspr serve` without `--release` and builds with any other `SITE_URL` load
+neither, so they never count as visits.
+
 ## Layout
 
 | Path | What lives there |

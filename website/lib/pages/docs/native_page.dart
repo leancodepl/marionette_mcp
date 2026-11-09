@@ -476,7 +476,7 @@ class NativePage extends StatelessComponent {
                 'logged as its length, never as the text. '
                 '`native_take_screenshot(inline: false)` saves into '
                 '`screenshots/` like `take_screenshots`. See '
-                '[Reports](/docs/reports#steps).',
+                '[Reports](/docs/reports/#steps).',
               ),
             ),
             const Callout(

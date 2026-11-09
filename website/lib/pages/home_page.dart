@@ -21,7 +21,7 @@ class HomePage extends StatelessComponent {
       version: version,
       children: [
         pageHead(
-          title: '$siteName — $tagline',
+          title: '$siteName MCP — $tagline',
           description: description,
           path: '',
         ),

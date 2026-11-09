@@ -237,7 +237,7 @@ class Hero extends StatelessComponent {
             p(classes: lead.name, const [.text(heroLead)]),
             div(classes: _install.name, [installCommandBox()]),
             div(classes: actions.name, [
-              Button(href: '/docs', [
+              Button(href: '/docs/', [
                 Icon.book.build(size: 18),
                 const .text('Get started'),
               ]),

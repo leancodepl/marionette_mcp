@@ -170,8 +170,8 @@ class DrivePage extends StatelessComponent {
           children: [
             p(
               rich(
-                'The [Agent Skill](/docs#skill) teaches these; they are also '
-                'the checklist for reading a run.',
+                'The drive [Agent Skill](/docs/#skill) teaches these; they '
+                'are also the checklist for reading a run.',
               ),
             ),
             ul(classes: Prose.checklist.name, [
@@ -313,7 +313,7 @@ class DrivePage extends StatelessComponent {
             ),
             Callout(
               'The `native_*` tools for system UI are listed on the '
-              '[Native lane](/docs/native#tools) page.',
+              '[Native lane](/docs/native/#tools) page.',
             ),
             Callout(
               '`press_key` reaches shortcuts, focus and submit on every '

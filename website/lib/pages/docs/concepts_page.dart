@@ -141,7 +141,7 @@ class ConceptsPage extends StatelessComponent {
               rich(
                 'Both see only what Flutter draws. Permission dialogs, '
                 'pickers, WebView content, native views and notifications '
-                'are drawn by the platform; the [native lane](/docs/native) '
+                'are drawn by the platform; the [native lane](/docs/native/) '
                 'reaches them.',
               ),
             ),

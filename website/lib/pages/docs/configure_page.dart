@@ -207,7 +207,7 @@ class ConfigurePage extends StatelessComponent {
                 ],
                 [
                   'A dialog, picker or WebView is not in the listing',
-                  'Drawn by the platform: use the [native lane](/docs/native).',
+                  'Drawn by the platform: use the [native lane](/docs/native/).',
                 ],
               ],
             ),

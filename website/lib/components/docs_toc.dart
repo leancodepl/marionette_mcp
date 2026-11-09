@@ -22,7 +22,7 @@ class DocsToc extends StatefulComponent {
     super.key,
   });
 
-  /// Absolute path of the page the sections live on, e.g. `/docs`.
+  /// Absolute path of the page the sections live on, e.g. `/docs/`.
   final String path;
 
   /// Section element ids, in page order.
