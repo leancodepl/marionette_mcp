@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/services/log_collector.dart';
 
@@ -273,8 +274,11 @@ class MarionetteConfiguration {
 
   /// Extracts text from a widget (built-in + custom).
   String? extractTextFromWidget(Element element) {
-    final builtInText = _extractBuiltInText(element.widget);
-    return builtInText ?? extractText?.call(element);
+    // The controller-less field fallback comes last so an app's own
+    // extractText for such a field (e.g. one returning its label) still wins.
+    return _extractBuiltInText(element.widget) ??
+        extractText?.call(element) ??
+        _extractControllerlessFieldText(element);
   }
 
   // Built-in Flutter widget support
@@ -286,6 +290,9 @@ class MarionetteConfiguration {
     return switch (widget) {
       Checkbox() ||
       CheckboxListTile() ||
+      CupertinoCheckbox() ||
+      CupertinoRadio() ||
+      CupertinoSwitch() ||
       DropdownButton() ||
       DropdownButtonFormField() ||
       FloatingActionButton() ||
@@ -337,6 +344,9 @@ class MarionetteConfiguration {
   static bool _isBuiltInInteractiveType(Type type) {
     return type == Checkbox ||
         type == CheckboxListTile ||
+        type == CupertinoCheckbox ||
+        type == CupertinoRadio ||
+        type == CupertinoSwitch ||
         type == DropdownButton ||
         type == DropdownButtonFormField ||
         type == ElevatedButton ||
@@ -361,6 +371,26 @@ class MarionetteConfiguration {
   static bool _isBuiltInStopType(Type type) {
     return (type != GestureDetector && type != InkWell) &&
         (_isBuiltInInteractiveType(type) || type == Text);
+  }
+
+  /// A `TextField`/`TextFormField` built without a `controller` creates one
+  /// internally, so the typed value lives only on the inner [EditableText].
+  static String? _extractControllerlessFieldText(Element element) {
+    final widget = element.widget;
+    if (widget is! TextField && widget is! TextFormField) return null;
+    String? found;
+    void visit(Element child) {
+      if (found != null) return;
+      final inner = child.widget;
+      if (inner is EditableText) {
+        found = inner.controller.text;
+        return;
+      }
+      child.visitChildren(visit);
+    }
+
+    element.visitChildren(visit);
+    return found;
   }
 
   static String? _extractBuiltInText(Widget widget) {

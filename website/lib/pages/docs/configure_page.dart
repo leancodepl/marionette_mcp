@@ -243,6 +243,12 @@ class ConfigurePage extends StatelessComponent {
               .text(', '),
               code([.text('PopupMenuButton')]),
               .text(', their list-tile forms, '),
+              code([.text('CupertinoSwitch')]),
+              .text(', '),
+              code([.text('CupertinoCheckbox')]),
+              .text(', '),
+              code([.text('CupertinoRadio')]),
+              .text(', '),
               code([.text('GestureDetector')]),
               .text(' and '),
               code([.text('InkWell')]),
@@ -255,7 +261,11 @@ class ConfigurePage extends StatelessComponent {
               code([.text('RichText')]),
               .text(', '),
               code([.text('EditableText')]),
-              .text(' and the text fields. A field’s '),
+              .text(' and the text fields, with or without a '),
+              code([.text('controller')]),
+              .text(': what was typed is the field’s '),
+              code([.text('text')]),
+              .text('. A field’s '),
               code([.text('labelText')]),
               .text(' or '),
               code([.text('hintText')]),
@@ -263,6 +273,17 @@ class ConfigurePage extends StatelessComponent {
               code([.text('label')]),
               .text(', so a field without a key still has a name.'),
             ]),
+            p(
+              rich(
+                'Checkboxes and switches, in their list-tile and Cupertino '
+                'forms too, report their state as `value`: `"true"`, '
+                '`"false"`, or `"null"` for the mixed state of a `tristate` '
+                'checkbox, which is neither checked nor unchecked. A radio '
+                'reports `selected` instead, since its own `value` is the '
+                'option it stands for: `"true"` for the chosen option, '
+                'whether the app uses a `RadioGroup` or `groupValue`.',
+              ),
+            ),
           ],
         ),
         DocSection(
@@ -441,6 +462,14 @@ class ConfigurePage extends StatelessComponent {
                 'the root down. `shouldStopTraversalAtElement` tells it not '
                 'to look inside a widget: the widget itself is still listed, '
                 'everything below it is not.',
+              ),
+            ),
+            p(
+              rich(
+                'An interactive widget it stops at still reports the state '
+                'of the checkbox, switch or radio inside it, so a design '
+                'system toggle built on `Switch` carries its `value` with no '
+                'more configuration.',
               ),
             ),
             const DocTable(

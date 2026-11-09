@@ -121,6 +121,16 @@ class ConceptsPage extends StatelessComponent {
                 'knows where it is.',
               ),
             ),
+            p(
+              rich(
+                'Controls carry their state too, so the agent can tell a '
+                'filled form from an empty one: checkboxes and switches '
+                'report `value`, radios report `selected`, and text fields '
+                'report what was typed as `text`. '
+                '[Configure](/docs/configure/#defaults) lists what each one '
+                'reports.',
+              ),
+            ),
             const p([
               .text(
                 'Below is one real screen of the example app and the list the '
