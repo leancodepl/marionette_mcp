@@ -15,9 +15,13 @@ sealed class WidgetMatcher {
   /// 'focused' > coordinates (x & y) > 'key' > 'identifier' > 'text' > 'type'.
   static WidgetMatcher fromJson(Map<String, dynamic> json) {
     // Focused matcher has highest precedence because it bypasses tree search.
-    if (json.containsKey('focused')) {
-      return const FocusedElementMatcher();
-    } else if (json.containsKey('x') && json.containsKey('y')) {
+    if (json.containsKey('focused') && json['focused'] != null) {
+      final focused = _parseFocusedFlag(json['focused']);
+      if (focused) {
+        return const FocusedElementMatcher();
+      }
+    }
+    if (json['x'] != null && json['y'] != null) {
       return CoordinatesMatcher.fromJson(json);
     } else if (json.containsKey('key')) {
       return KeyMatcher.fromJson(json);
@@ -33,6 +37,16 @@ sealed class WidgetMatcher {
         '"identifier", "text", or "type" field',
       );
     }
+  }
+
+  static bool _parseFocusedFlag(Object? value) {
+    return switch (value) {
+      true || 'true' => true,
+      false || 'false' => false,
+      _ => throw ArgumentError(
+          'Field "focused" must be a boolean or "true"/"false", got: $value',
+        ),
+    };
   }
 
   /// Parses the optional `ancestor_keys` scope that accompanies a matcher.
@@ -116,9 +130,9 @@ class CoordinatesMatcher extends WidgetMatcher {
   factory CoordinatesMatcher.fromJson(Map<String, dynamic> json) {
     final x = double.tryParse(json['x'].toString());
     final y = double.tryParse(json['y'].toString());
-    if (x == null || y == null) {
+    if (x == null || !x.isFinite || y == null || !y.isFinite) {
       throw ArgumentError(
-        'Coordinates "x" and "y" must be valid numbers, '
+        'Coordinates "x" and "y" must be finite numbers, '
         'got x=${json['x']}, y=${json['y']}',
       );
     }
@@ -148,7 +162,11 @@ class KeyMatcher extends WidgetMatcher {
   const KeyMatcher(this.keyValue);
 
   factory KeyMatcher.fromJson(Map<String, dynamic> json) {
-    return KeyMatcher(json['key'] as String);
+    final value = json['key'];
+    if (value is! String) {
+      throw ArgumentError('Field "key" must be a string, got: $value');
+    }
+    return KeyMatcher(value);
   }
 
   final String keyValue;
@@ -188,7 +206,11 @@ class IdentifierMatcher extends WidgetMatcher {
   const IdentifierMatcher(this.identifierValue);
 
   factory IdentifierMatcher.fromJson(Map<String, dynamic> json) {
-    return IdentifierMatcher(json['identifier'] as String);
+    final value = json['identifier'];
+    if (value is! String) {
+      throw ArgumentError('Field "identifier" must be a string, got: $value');
+    }
+    return IdentifierMatcher(value);
   }
 
   final String identifierValue;
@@ -216,7 +238,11 @@ class TextMatcher extends WidgetMatcher {
   const TextMatcher(this.text);
 
   factory TextMatcher.fromJson(Map<String, dynamic> json) {
-    return TextMatcher(json['text'] as String);
+    final value = json['text'];
+    if (value is! String) {
+      throw ArgumentError('Field "text" must be a string, got: $value');
+    }
+    return TextMatcher(value);
   }
 
   final String text;
@@ -255,7 +281,11 @@ class TypeStringMatcher extends WidgetMatcher {
   const TypeStringMatcher(this.typeName);
 
   factory TypeStringMatcher.fromJson(Map<String, dynamic> json) {
-    return TypeStringMatcher(json['type'] as String);
+    final value = json['type'];
+    if (value is! String) {
+      throw ArgumentError('Field "type" must be a string, got: $value');
+    }
+    return TypeStringMatcher(value);
   }
 
   final String typeName;

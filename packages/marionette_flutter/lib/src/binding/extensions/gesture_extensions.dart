@@ -76,27 +76,12 @@ void registerGestureExtensions({
 
   registerInternalMarionetteExtension(
     name: 'marionette.longPress',
-    callback: (params) async {
-      final parsed = parseDurationMs(
-        params,
-        'duration',
-        defaultValue: const Duration(milliseconds: 600),
-      );
-      if (parsed.error case final error?) {
-        return error;
-      }
-      final matcher = WidgetMatcher.fromJson(params);
-      await gestureDispatcher.longPress(
-        matcher,
-        widgetFinder,
-        configuration,
-        duration: parsed.duration!,
-        ancestors: WidgetMatcher.ancestorsFromJson(params),
-      );
-      return MarionetteExtensionResult.success({
-        'message': 'Long pressed element matching: ${matcher.toJson()}',
-      });
-    },
+    callback: (params) => longPressExtension(
+      params,
+      gestureDispatcher: gestureDispatcher,
+      widgetFinder: widgetFinder,
+      configuration: configuration,
+    ),
   );
 
   registerInternalMarionetteExtension(
@@ -246,4 +231,34 @@ void registerGestureExtensions({
       });
     },
   );
+}
+
+/// Handles `marionette.longPress` requests with positive duration validation.
+@visibleForTesting
+Future<MarionetteExtensionResult> longPressExtension(
+  Map<String, String> params, {
+  required GestureDispatcher gestureDispatcher,
+  required WidgetFinder widgetFinder,
+  required MarionetteConfiguration configuration,
+}) async {
+  final parsed = parseDurationMs(
+    params,
+    'duration',
+    defaultValue: const Duration(milliseconds: 600),
+    requirePositive: true,
+  );
+  if (parsed.error case final error?) {
+    return error;
+  }
+  final matcher = WidgetMatcher.fromJson(params);
+  await gestureDispatcher.longPress(
+    matcher,
+    widgetFinder,
+    configuration,
+    duration: parsed.duration!,
+    ancestors: WidgetMatcher.ancestorsFromJson(params),
+  );
+  return MarionetteExtensionResult.success({
+    'message': 'Long pressed element matching: ${matcher.toJson()}',
+  });
 }

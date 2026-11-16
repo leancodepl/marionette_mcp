@@ -63,6 +63,65 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('focused=false falls through to other matchers', () {
+      final matcher = WidgetMatcher.fromJson({
+        'focused': false,
+        'key': 'name_field',
+      });
+
+      expect(matcher, isA<KeyMatcher>());
+      expect((matcher as KeyMatcher).keyValue, 'name_field');
+    });
+
+    test('focused="false" falls through to other matchers', () {
+      final matcher = WidgetMatcher.fromJson({
+        'focused': 'false',
+        'key': 'name_field',
+      });
+
+      expect(matcher, isA<KeyMatcher>());
+    });
+
+    test('focused="true" selects FocusedElementMatcher', () {
+      final matcher = WidgetMatcher.fromJson({'focused': 'true'});
+
+      expect(matcher, isA<FocusedElementMatcher>());
+    });
+
+    test('rejects invalid focused flag values with ArgumentError', () {
+      expect(
+        () => WidgetMatcher.fromJson({'focused': 'maybe'}),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects non-string selector values with ArgumentError', () {
+      for (final badJson in [
+        {'key': null},
+        {'key': 123},
+        {'identifier': null},
+        {'text': 42},
+        {'type': false},
+      ]) {
+        expect(
+          () => WidgetMatcher.fromJson(badJson),
+          throwsArgumentError,
+        );
+      }
+    });
+
+    test('rejects non-finite coordinates with ArgumentError', () {
+      for (final badCoords in [
+        {'x': 'NaN', 'y': '10'},
+        {'x': '10', 'y': 'Infinity'},
+      ]) {
+        expect(
+          () => WidgetMatcher.fromJson(badCoords),
+          throwsArgumentError,
+        );
+      }
+    });
   });
 
   group('WidgetMatcher.ancestorsFromJson', () {
