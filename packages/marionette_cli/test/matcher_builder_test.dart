@@ -86,4 +86,46 @@ void main() {
       );
     });
   });
+
+  group('buildValidatedMatcherFromArgs', () {
+    Never throwUsage(String message) => throw ArgumentError(message);
+
+    test('rejects --x without --y', () {
+      expect(
+        () => buildValidatedMatcherFromArgs(x: '10', onUsageError: throwUsage),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects --y without --x', () {
+      expect(
+        () => buildValidatedMatcherFromArgs(y: '20', onUsageError: throwUsage),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects non-numeric or non-finite coordinates', () {
+      for (final bad in const ['abc', 'NaN', 'Infinity']) {
+        expect(
+          () => buildValidatedMatcherFromArgs(
+            x: bad,
+            y: '20',
+            onUsageError: throwUsage,
+          ),
+          throwsArgumentError,
+        );
+      }
+    });
+
+    test('builds coordinate matcher for valid finite x and y', () {
+      expect(
+        buildValidatedMatcherFromArgs(
+          x: '10.5',
+          y: '20',
+          onUsageError: throwUsage,
+        ),
+        equals({'x': 10.5, 'y': 20}),
+      );
+    });
+  });
 }
