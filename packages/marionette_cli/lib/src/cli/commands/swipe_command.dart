@@ -117,7 +117,11 @@ class SwipeCommand extends InstanceCommand {
       }
 
       final distance = argResults?['distance'] as String;
-      _ensureNumber('--distance', distance);
+      final parsedDistance = _ensureNumber('--distance', distance);
+      if (parsedDistance <= 0) {
+        usageException(
+            '--distance must be a positive number, got "$distance".');
+      }
 
       swipeArgs
         ..addAll(matcher)
@@ -131,9 +135,11 @@ class SwipeCommand extends InstanceCommand {
     return 0;
   }
 
-  void _ensureNumber(String flag, String value) {
-    if (double.tryParse(value) == null) {
-      usageException('$flag must be a number, got "$value".');
+  double _ensureNumber(String flag, String value) {
+    final parsed = double.tryParse(value);
+    if (parsed == null || !parsed.isFinite) {
+      usageException('$flag must be a finite number, got "$value".');
     }
+    return parsed;
   }
 }

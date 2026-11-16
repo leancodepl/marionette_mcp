@@ -38,3 +38,44 @@ Map<String, dynamic> buildMatcherFromArgs({
 bool hasSelector(Map<String, dynamic> matcher) {
   return matcher.keys.any((field) => field != 'ancestor_keys');
 }
+
+/// Parses a finite coordinate value from a CLI flag, invoking [onUsageError]
+/// when [value] is non-null and not a finite number.
+num? parseCoordinate(
+  String flag,
+  String? value,
+  Never Function(String message) onUsageError,
+) {
+  if (value == null) return null;
+  final parsed = num.tryParse(value);
+  if (parsed == null || !parsed.isFinite) {
+    onUsageError('$flag must be a finite number, got "$value".');
+  }
+  return parsed;
+}
+
+/// Validates and builds a matcher map for commands that support `--x`/`--y`
+/// positional selectors alongside widget selectors.
+Map<String, dynamic> buildValidatedMatcherFromArgs({
+  String? key,
+  String? identifier,
+  String? text,
+  String? type,
+  String? x,
+  String? y,
+  List<String> ancestorKeys = const [],
+  required Never Function(String message) onUsageError,
+}) {
+  if ((x == null) != (y == null)) {
+    onUsageError('--x and --y must be provided together.');
+  }
+  return buildMatcherFromArgs(
+    key: key,
+    identifier: identifier,
+    text: text,
+    type: type,
+    x: parseCoordinate('--x', x, onUsageError),
+    y: parseCoordinate('--y', y, onUsageError),
+    ancestorKeys: ancestorKeys,
+  );
+}
