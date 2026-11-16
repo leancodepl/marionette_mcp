@@ -15,13 +15,13 @@ sealed class WidgetMatcher {
   /// 'focused' > coordinates (x & y) > 'key' > 'identifier' > 'text' > 'type'.
   static WidgetMatcher fromJson(Map<String, dynamic> json) {
     // Focused matcher has highest precedence because it bypasses tree search.
-    if (json.containsKey('focused') && json['focused'] != null) {
+    if (json.containsKey('focused')) {
       final focused = _parseFocusedFlag(json['focused']);
       if (focused) {
         return const FocusedElementMatcher();
       }
     }
-    if (json['x'] != null && json['y'] != null) {
+    if (json.containsKey('x') && json.containsKey('y')) {
       return CoordinatesMatcher.fromJson(json);
     } else if (json.containsKey('key')) {
       return KeyMatcher.fromJson(json);
