@@ -598,6 +598,190 @@ void main() {
         expect(caughtError, isA<Exception>());
       },
     );
+
+    testWidgets(
+      'swipe throws when target element is behind modal barrier',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Column(
+                  children: [
+                    ElevatedButton(
+                      key: const ValueKey('open_dialog'),
+                      onPressed: () {
+                        showDialog<void>(
+                          context: context,
+                          builder: (_) => const AlertDialog(
+                            content: Text('Blocking dialog'),
+                          ),
+                        );
+                      },
+                      child: const Text('Open'),
+                    ),
+                    const SizedBox(
+                      key: ValueKey('blocked_swipe_target'),
+                      width: 200,
+                      height: 100,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byKey(const ValueKey('open_dialog')));
+        await tester.pumpAndSettle();
+
+        final dispatcher = GestureDispatcher();
+        Object? caughtError;
+        await tester.runAsync(() async {
+          try {
+            await dispatcher.swipe(
+              const KeyMatcher('blocked_swipe_target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              direction: 'left',
+            );
+          } catch (e) {
+            caughtError = e;
+          }
+        });
+        expect(caughtError, isA<Exception>());
+      },
+    );
+
+    testWidgets(
+      'swipe targets front-most hittable element when covered layer has same key',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        var backgroundPanned = false;
+        var dialogPanned = false;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton(
+                        key: const ValueKey('open_dialog'),
+                        onPressed: () {
+                          showDialog<void>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              content: GestureDetector(
+                                key: const ValueKey('dup_swipe'),
+                                behavior: HitTestBehavior.opaque,
+                                onPanUpdate: (_) => dialogPanned = true,
+                                child: const SizedBox(width: 160, height: 80),
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text('Open'),
+                      ),
+                      GestureDetector(
+                        key: const ValueKey('dup_swipe'),
+                        behavior: HitTestBehavior.opaque,
+                        onPanUpdate: (_) => backgroundPanned = true,
+                        child: const SizedBox(width: 160, height: 80),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byKey(const ValueKey('open_dialog')));
+        await tester.pumpAndSettle();
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.swipe(
+            const KeyMatcher('dup_swipe'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            direction: 'left',
+            distance: 80,
+          ),
+        );
+        await tester.pump();
+
+        expect(dialogPanned, isTrue);
+        expect(backgroundPanned, isFalse);
+      },
+    );
+
+    testWidgets(
+      'swipe rejects non-positive or non-finite distance',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                key: ValueKey('target'),
+                width: 200,
+                height: 200,
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        for (final badDistance in [0.0, -50.0, double.nan, double.infinity]) {
+          Object? caughtError;
+          await tester.runAsync(() async {
+            try {
+              await dispatcher.swipe(
+                const KeyMatcher('target'),
+                WidgetFinder(),
+                const MarionetteConfiguration(),
+                direction: 'left',
+                distance: badDistance,
+              );
+            } catch (e) {
+              caughtError = e;
+            }
+          });
+          expect(caughtError, isA<ArgumentError>());
+        }
+      },
+    );
+
+    testWidgets(
+      'drag rejects non-finite coordinates',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: SizedBox.shrink())),
+        );
+
+        final dispatcher = GestureDispatcher();
+        for (final pair in [
+          (const Offset(double.nan, 10), const Offset(100, 10)),
+          (const Offset(10, 10), const Offset(double.infinity, 10)),
+        ]) {
+          Object? caughtError;
+          await tester.runAsync(() async {
+            try {
+              await dispatcher.drag(pair.$1, pair.$2);
+            } catch (e) {
+              caughtError = e;
+            }
+          });
+          expect(caughtError, isA<ArgumentError>());
+        }
+      },
+    );
   });
 
   group('GestureDispatcher - pinchZoom', () {

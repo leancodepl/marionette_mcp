@@ -407,7 +407,11 @@ class GestureDispatcher {
     double distance = 200.0,
     List<KeyMatcher> ancestors = const [],
   }) async {
-    final element = widgetFinder.findElement(
+    if (!distance.isFinite || distance <= 0) {
+      throw ArgumentError('distance must be a positive finite number');
+    }
+
+    final element = widgetFinder.findHittableElement(
       matcher,
       configuration,
       ancestors: ancestors,
@@ -597,11 +601,22 @@ class GestureDispatcher {
   /// rendered view. Callers that start from an element should pass that
   /// element's view instead.
   Future<void> drag(Offset from, Offset to, {int? viewId}) async {
-    final resolvedViewId = viewId ?? _defaultViewId();
-    final pointerId = _nextPointerId++;
+    if (!from.dx.isFinite ||
+        !from.dy.isFinite ||
+        !to.dx.isFinite ||
+        !to.dy.isFinite) {
+      throw ArgumentError('drag coordinates must be finite numbers');
+    }
 
     final delta = to - from;
     final distance = delta.distance;
+    if (!distance.isFinite) {
+      throw ArgumentError('drag distance must be finite');
+    }
+
+    final resolvedViewId = viewId ?? _defaultViewId();
+    final pointerId = _nextPointerId++;
+
     final stepCount =
         (distance / kMaxDelta).ceil().clamp(1, double.infinity).toInt();
 
