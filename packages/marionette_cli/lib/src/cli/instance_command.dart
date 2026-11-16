@@ -113,6 +113,9 @@ abstract class InstanceCommand extends Command<int> {
       stderr.writeln(e.message);
       _logStep(session, outcome: describeStepError(e.message ?? 'timed out'));
       return 1;
+    } on UsageException catch (e) {
+      _logStep(session, outcome: describeStepError(e.toString()));
+      rethrow;
     } catch (e) {
       stderr.writeln('Error: $e');
       _logStep(session, outcome: describeStepError(e.toString()));

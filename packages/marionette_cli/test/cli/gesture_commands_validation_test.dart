@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/cli/commands/double_tap_command.dart';
@@ -7,6 +10,7 @@ import 'package:marionette_cli/src/cli/commands/secondary_tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/swipe_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
+import 'package:marionette_cli/src/cli/marionette_command_runner.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:test/test.dart';
@@ -168,6 +172,113 @@ void main() {
           connector,
         ),
         throwsA(isA<UsageException>()),
+      );
+    });
+  });
+
+  group('MarionetteCommandRunner exit code 64 with connected VM service', () {
+    late HttpServer server;
+    late String uri;
+
+    setUp(() async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      uri = 'ws://127.0.0.1:${server.port}/ws';
+      server.listen((request) async {
+        final socket = await WebSocketTransformer.upgrade(
+          request,
+          compression: CompressionOptions.compressionOff,
+        );
+        socket.listen((data) {
+          final rpc = jsonDecode(data as String) as Map<String, dynamic>;
+          final method = rpc['method'] as String;
+          const isolateRef = {
+            'type': '@Isolate',
+            'id': 'isolates/1',
+            'number': '1',
+            'name': 'main',
+            'isSystemIsolate': false,
+          };
+          final result = switch (method) {
+            'getVM' => {
+                'type': 'VM',
+                'name': 'vm',
+                'architectureBits': 64,
+                'hostCPU': '',
+                'operatingSystem': '',
+                'targetCPU': '',
+                'version': '',
+                'pid': 1,
+                'startTime': 0,
+                'isolates': [isolateRef],
+                'isolateGroups': <Object>[],
+                'systemIsolates': <Object>[],
+                'systemIsolateGroups': <Object>[],
+              },
+            'getIsolate' => {
+                ...isolateRef,
+                'type': 'Isolate',
+                'isolateFlags': <Object>[],
+                'startTime': 0,
+                'runnable': true,
+                'livePorts': 0,
+                'pauseOnExit': false,
+                'pauseEvent': {
+                  'type': 'Event',
+                  'kind': 'Resume',
+                  'timestamp': 0
+                },
+                'libraries': <Object>[],
+                'breakpoints': <Object>[],
+                'exceptionPauseMode': 'None',
+                'extensionRPCs': ['ext.flutter.marionette.getLogs'],
+              },
+            'ext.flutter.marionette.getConfiguration' => {
+                'type': '_extensionType',
+                'method': 'ext.flutter.marionette.getConfiguration',
+                'status': 'Success',
+                'enableSessionReports': false,
+              },
+            _ => {'type': 'Success'},
+          };
+          socket.add(jsonEncode({
+            'jsonrpc': '2.0',
+            'id': rpc['id'],
+            'result': result,
+          }));
+        });
+      });
+    });
+
+    tearDown(() async {
+      await server.close(force: true);
+    });
+
+    test('returns exit code 64 on UsageException from execute()', () async {
+      final runner = MarionetteCommandRunner();
+
+      expect(
+        await runner.run(['--uri', uri, 'tap', '--x', 'NaN', '--y', '10']),
+        equals(64),
+      );
+      expect(
+        await runner.run(
+          ['--uri', uri, 'long-press', '--key', 'k', '--duration', '0'],
+        ),
+        equals(64),
+      );
+      expect(
+        await runner.run([
+          '--uri',
+          uri,
+          'swipe',
+          '--key',
+          'k',
+          '--direction',
+          'left',
+          '--distance',
+          '0',
+        ]),
+        equals(64),
       );
     });
   });
