@@ -18,9 +18,13 @@ class ElementTreeFinder {
   /// fails loud — this class stays deliberately unaware of matchers.
   ///
   /// [compaction] reduces the per-element payload further (see
-  /// [CompactionMode]). It overrides
-  /// [MarionetteConfiguration.compaction] in both directions; pass null to use
-  /// the app's configured default.
+  /// [CompactionMode]). [CompactionMode.compact] can also leave out an element
+  /// whose only content is an icon-font glyph, text made only of Unicode
+  /// private-use characters. A key or a Semantics identifier keeps the
+  /// element listed; an `Icon`'s `semanticLabel` is reported by its
+  /// `Semantics` wrapper.
+  /// [compaction] overrides [MarionetteConfiguration.compaction] in both
+  /// directions; pass null to use the app's configured default.
   List<Map<String, dynamic>> findInteractiveElements({
     Element? startElement,
     CompactionMode? compaction,
