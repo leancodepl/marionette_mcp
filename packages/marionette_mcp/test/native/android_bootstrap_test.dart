@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -324,6 +325,30 @@ void main() {
               'device offline',
           'Failed to force-stop io.appium.uiautomator2.server: device offline',
         ],
+      );
+      expect(runner.adbCommands.last, ['forward', '--remove', 'tcp:8299']);
+    });
+
+    test('stopServer gives up on an adb step that never ends and goes on',
+        () async {
+      final records = captureLogRecords();
+      final stopwatch = Stopwatch()..start();
+
+      await AndroidBootstrap.stopServer(
+        AdbClient(
+          serial: 'emulator-5554',
+          processRunner: (executable, arguments) =>
+              arguments.contains('io.appium.uiautomator2.server.test')
+                  ? Completer<ProcessResult>().future
+                  : runner(executable, arguments),
+        ),
+        port: 8299,
+      );
+
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 8)));
+      expect(
+        records.map((r) => r.message),
+        [contains('force-stop io.appium.uiautomator2.server.test')],
       );
       expect(runner.adbCommands.last, ['forward', '--remove', 'tcp:8299']);
     });

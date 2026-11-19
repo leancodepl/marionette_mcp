@@ -99,8 +99,8 @@ String formatValue(dynamic value) {
 /// the app is not in front (`appLifecycleState` other than `resumed`):
 /// system UI or another screen covers it, and the listed widgets may not be
 /// reachable. Null when the app is in front or the binding does not report
-/// it. [nativeElements] names the tool / command that reads the screen; null
-/// when the native lane is off.
+/// the state (only Android and iOS do). [nativeElements] names the tool /
+/// command that reads the screen; null when the native lane is off.
 String? coveredAppWarning(
   Map<String, dynamic> response, {
   required String? nativeElements,

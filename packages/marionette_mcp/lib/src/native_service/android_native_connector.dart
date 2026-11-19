@@ -169,9 +169,10 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     return tapAt(center.x, center.y);
   }
 
-  /// Taps [element] and types into the field that took the focus. The rect
-  /// of that field must hold the tap point; the parsed bounds are clipped to
-  /// the screen and the server rect is not, so the two need not be equal.
+  /// Taps [element] and types into the field found after the tap (see
+  /// [_findField]) when its rect holds the tap point or the tap moved the
+  /// focus to it; the parsed bounds are clipped to the screen and the server
+  /// rect is not, so the two need not be equal.
   @override
   Future<void> enterText(
     NativeElement element,
@@ -179,24 +180,36 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     bool clear = false,
   }) async {
     final focusedBeforeTap = await _focusedElement();
+    final tapPoint = element.center;
     await tapElement(element);
 
-    var fieldId = await _tappedField(element, focusedBeforeTap);
-    if (fieldId == null) {
+    var field = await _tappedField(element, tapPoint, focusedBeforeTap);
+    if (field == null || !field.tapped) {
       // The focus may still be moving to the tapped field.
-      await Future<void>.delayed(changedFieldRetryDelay);
-      fieldId = await _tappedField(element, focusedBeforeTap);
-    }
-    if (fieldId == null) {
-      final tapPoint = element.center;
-      throw NativeOperationFailedException(
-        'The field found for typing is not at the tapped point '
-        '(${tapPoint.x}, ${tapPoint.y}); nothing was typed.',
-        hint: 'Another field probably kept the focus. Scroll the field fully '
-            'into view, wait until the screen has settled, then retry.',
+      _logger.info(
+        'No field found for typing at the tapped point; looking again',
       );
+      await Future<void>.delayed(changedFieldRetryDelay);
+      field = await _tappedField(element, tapPoint, focusedBeforeTap);
     }
-    await typeInto(fieldId, text, clear: clear);
+    const settleHint = 'Scroll the field fully into view, wait until the '
+        'screen has settled, then retry.';
+    switch (field) {
+      case null:
+        throw NativeOperationFailedException(
+          'No text field took the focus after the tap at '
+          '(${tapPoint.x}, ${tapPoint.y}); nothing was typed.',
+          hint: settleHint,
+        );
+      case (id: _, tapped: false):
+        throw NativeOperationFailedException(
+          'The field found for typing is not at the tapped point '
+          '(${tapPoint.x}, ${tapPoint.y}); nothing was typed.',
+          hint: 'Another field probably kept the focus. $settleHint',
+        );
+      case (:final id, tapped: true):
+        await typeInto(id, text, clear: clear);
+    }
   }
 
   @override
@@ -262,20 +275,23 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   static bool _isToastReadFailure(WebDriverException error) =>
       error.message.contains("AccessibilityNodeInfo's field 'mSealed'");
 
-  /// The field found for typing (see [_findField]) when its rect holds the
-  /// center of [element], or when focus moved to a different field; otherwise
-  /// null.
-  Future<String?> _tappedField(
+  /// The id of the field found for typing after tapping [element] at
+  /// [tapPoint] (see [_findField]), and whether the tap reached it
+  /// (`tapped`): its rect holds [tapPoint], or the tap moved the focus to
+  /// it. Null when no field is found.
+  Future<({String id, bool tapped})?> _tappedField(
     NativeElement element,
+    ({int x, int y}) tapPoint,
     String? focusedBeforeTap,
   ) async {
     final field = await _findField(element);
+    if (field == null) return null;
     final rect = await client.elementRect(sessionId, field.id);
-    final tapPoint = element.center;
-    return rect.contains(tapPoint.x, tapPoint.y) ||
-            (field.focused && field.id != focusedBeforeTap)
-        ? field.id
-        : null;
+    return (
+      id: field.id,
+      tapped: rect.contains(tapPoint.x, tapPoint.y) ||
+          (field.focused && field.id != focusedBeforeTap),
+    );
   }
 
   /// Returns the element that held focus before the tap, when there was one.
@@ -289,8 +305,10 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     }
   }
 
-  /// The WebDriver id of the field to type into after tapping [element].
-  Future<({String id, bool focused})> _findField(
+  /// The field to type into after tapping [element]: its WebDriver `id`, and
+  /// whether a focused-field lookup found it (`focused`) rather than the id
+  /// or text lookup of [element]; null when no lookup finds a field.
+  Future<({String id, bool focused})?> _findField(
     NativeElement element,
   ) async {
     // The field that received focus comes first; an id lookup could return
@@ -331,13 +349,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       );
     }
 
-    if (elementId == null) {
-      throw const WebDriverException(
-        'Tapped the element but could not locate a focused field for typing',
-        error: webDriverNoSuchElement,
-      );
-    }
-    return (id: elementId, focused: focused);
+    return elementId == null ? null : (id: elementId, focused: focused);
   }
 
   /// Whether the server reports [elementId] with an editable class.

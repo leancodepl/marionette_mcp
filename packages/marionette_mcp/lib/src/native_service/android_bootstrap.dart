@@ -76,6 +76,10 @@ class AndroidBootstrap implements SharedServerBootstrap {
   /// UIAutomator2's port on the device.
   static const _devicePort = 6790;
 
+  /// Longest one adb teardown step may take, so a frozen device that adb
+  /// still lists cannot block a shutdown.
+  static const _teardownStepTimeout = Duration(seconds: 5);
+
   /// SHA-256 of the v[uia2Version] release APKs, by file name.
   static const pinnedApkSha256 = {
     _serverApkName:
@@ -237,18 +241,21 @@ class AndroidBootstrap implements SharedServerBootstrap {
       );
 
   /// Runs the adb [command] of teardown [step]. A failure, a non-zero exit
-  /// included, is logged and teardown goes on.
+  /// or no exit within [_teardownStepTimeout] included, is logged and
+  /// teardown goes on.
   static Future<void> _runTeardownStep(
     String step,
     Future<ProcessResult> Function() command,
   ) async {
     try {
-      final result = await command();
+      final result = await command().timeout(_teardownStepTimeout);
       if (result.exitCode != 0) {
         _logger.warning('Failed to $step: ${processMessage(result)}');
       }
     } on ProcessException catch (error) {
       _logger.warning('Failed to $step', error);
+    } on TimeoutException catch (error) {
+      _logger.warning('Failed to $step: adb did not exit', error);
     }
   }
 

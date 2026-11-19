@@ -76,9 +76,14 @@ Future<int> runMcpServer({
 
   // Both lanes hold connections that keep the process alive: a native
   // session and the VM service WebSocket (without disconnecting it the
-  // server never exits on stdin EOF while an app is connected).
+  // server never exits on stdin EOF while an app is connected). A failed
+  // native teardown must not stop the shutdown, so it is only logged.
   Future<void> disposeLanes() async {
-    await native?.dispose();
+    try {
+      await native?.dispose();
+    } catch (e, st) {
+      logging.Logger('main').severe('Could not stop the native session', e, st);
+    }
     await vmService.connector.disconnect();
   }
 

@@ -347,7 +347,7 @@ void main() {
       /// Answers the focused-field lookup with [before] until the tap and
       /// with [after], one per attempt, after it; every other lookup finds
       /// no element.
-      void focusedFields({String? before, required List<String> after}) {
+      void focusedFields({String? before, required List<String?> after}) {
         var attempt = 0;
         server.on(
           'GET',
@@ -395,6 +395,22 @@ void main() {
         expect(
           server.requestsTo('POST', '/session/sess-1/element/el-other/value'),
           isEmpty,
+        );
+      });
+
+      test('a tap that focuses no field yet is looked up again', () async {
+        focusedFields(after: [null, 'el-field']);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.enterText(field, 'Ann');
+
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element/el-field/value')
+              .single
+              .body,
+          {'text': 'Ann'},
         );
       });
 
@@ -524,8 +540,8 @@ void main() {
       });
 
       test(
-          'a focused non-field container away from the tap point fails '
-          'without typing', () async {
+          'a focused non-field container and no other match fails without '
+          'typing', () async {
         server
           ..on(
             'POST',
@@ -539,7 +555,6 @@ void main() {
                   : _noSuchElement;
             },
           )
-          ..onValue('GET', '/session/sess-1/element/el-host/rect', otherRect)
           ..onValue(
             'GET',
             '/session/sess-1/element/el-host/attribute/className',
@@ -550,7 +565,15 @@ void main() {
 
         await expectLater(
           connector.enterText(field, 'Ann'),
-          throwsA(isA<WebDriverException>()),
+          throwsA(
+            isA<NativeOperationFailedException>()
+                .having(
+                  (e) => e.message,
+                  'message',
+                  startsWith('No text field took the focus'),
+                )
+                .having((e) => e.hint, 'hint', isNot(contains('Another'))),
+          ),
         );
         expect(
           server.requests.where((r) => r.path.endsWith('/value')),
@@ -572,7 +595,13 @@ void main() {
 
         await expectLater(
           connector.enterText(field, 'Ann'),
-          throwsA(isA<NativeOperationFailedException>()),
+          throwsA(
+            isA<NativeOperationFailedException>().having(
+              (e) => e.message,
+              'message',
+              contains('not at the tapped point'),
+            ),
+          ),
         );
         expect(
           server.requests.where((r) => r.path.endsWith('/value')),
