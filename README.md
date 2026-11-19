@@ -32,6 +32,9 @@ Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP c
    }
    ```
 
+   If another package provides a binding mixin, combine both behaviors in one
+   binding and initialize it before startup. See the [binding guide](https://marionette.leancode.co/docs/concepts/#binding).
+
 2. Give your agent a bridge: the MCP server or the `marionette` CLI, whichever you prefer ([every agent](https://marionette.leancode.co/docs/#bridge)):
 
    ```bash

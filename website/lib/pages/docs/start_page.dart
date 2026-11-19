@@ -124,10 +124,11 @@ class StartPage extends StatelessComponent {
               title: 'lib/main.dart',
             ),
             const Callout(
-              '`MarionetteBinding` must be the only binding in the process. '
-              'A test that calls `main()`, or a plugin such as Sentry that '
-              'installs its own binding first, breaks this rule. See '
-              '[Concepts](/docs/concepts/#binding) for the fix.',
+              'Flutter allows one binding per process. If another package '
+              'also provides binding behavior, combine both mixins in one '
+              'binding and initialize it before startup. A test or plugin '
+              'that already installed a different binding cannot be replaced; '
+              'see [Concepts](/docs/concepts/#binding) for the setup.',
               kind: .warning,
             ),
           ],

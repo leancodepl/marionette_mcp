@@ -165,24 +165,48 @@ gate costs one inert element, never a crash).
 
 ## The single-binding rule
 
-Flutter allows exactly one `WidgetsBinding` per process. If something else
-claims it first, `MarionetteBinding.ensureInitialized()` throws a clear
-error — except with one real offender, where it doesn't:
+Flutter allows exactly one `WidgetsBinding` per process. Marionette can be
+combined with another binding when both behaviors are available as mixins:
+create one class, apply `MarionetteBindingMixin` last, and initialize it before
+either package touches `WidgetsBinding`.
+
+```dart
+class AppBinding extends WidgetsFlutterBinding
+    with OtherBindingMixin, MarionetteBindingMixin {
+  AppBinding(this.configuration);
+
+  @override
+  final MarionetteConfiguration configuration;
+}
+
+void main() {
+  if (kDebugMode) {
+    MarionetteBindingMixin.ensureInitialized(
+      () => AppBinding(const MarionetteConfiguration()),
+    );
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+  runApp(const MyApp());
+}
+```
+
+`MarionetteBindingMixin.ensureInitialized` checks for an existing binding
+before calling the factory. If another binding got there first, it reports a
+clear error and does not construct a second one. A direct `AppBinding()` call
+bypasses that guard. This does not retrofit a binding that is already
+installed; use a combined binding or a test-specific entrypoint.
 
 - **`flutter test`** running `main()` under `kDebugMode` collides with
   `AutomatedTestWidgetsFlutterBinding`. Guard against it —
   `Platform.environment.containsKey('FLUTTER_TEST')` — or give tests a
-  separate entrypoint that skips `MarionetteBinding` entirely.
-- **Sentry** is the known silent offender: `SentryFlutter.init()` always calls
-  `WidgetsBinding.ensureInitialized()` inside its own `appRunner`-wrapping
-  zone before your code runs, and it swallows the resulting binding error as
-  if it were a reportable crash — so the app just hangs on the splash screen
-  forever with no exception, no crash, and no log output. The fix is
-  initialization order: call `MarionetteBinding.ensureInitialized()`
-  **before** `SentryFlutter.init()`, not inside its `appRunner`. Sentry checks
-  for an existing binding first and reuses it, so going first avoids the
-  conflict entirely. The same ordering fix applies to any other plugin whose
-  `init()` touches `WidgetsBinding` ahead of your `appRunner`.
+  separate entrypoint that skips Marionette entirely.
+- **Sentry** is the known silent offender: `SentryFlutter.init()` may call
+  `WidgetsBinding.ensureInitialized()` inside its `appRunner`-wrapping zone
+  before your code runs. Initialize the combined binding, or plain Marionette,
+  before Sentry when the app does not need Sentry's binding-specific frame
+  instrumentation. Keep binding initialization and `runApp` in the same
+  Flutter zone.
 
 ## Version alignment
 
