@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/services/log_collector.dart';
 
-/// How much `get_interactive_elements` reduces its per-element payload.
+/// How much `get_interactive_elements` reduces its payload. [compact] can also
+/// leave out an element whose only content is an icon-font glyph: text made
+/// only of Unicode private-use characters (see [compact]).
 ///
 /// Every level reports only primitive-valued properties — `ButtonStyle`,
 /// `TextStyle`, `InputDecoration` and colour blobs never reach the agent,
@@ -17,11 +19,18 @@ enum CompactionMode {
   /// Report every primitive property the widget declares.
   none,
 
-  /// Additionally drop rendering details no interaction tool reads
-  /// (`textAlign`, `softWrap`, `overflow`, …) and the text-style primitives a
-  /// `Text` inlines, drop `Text`'s `data` when it repeats `text`, round
-  /// `bounds` to whole logical pixels, and report `visible` only when an
+  /// Additionally drop icon-font glyphs, rendering details no interaction tool
+  /// reads (`textAlign`, `softWrap`, `overflow`, …) and the text-style
+  /// primitives a `Text` inlines, drop `Text`'s `data` when it repeats `text`,
+  /// round `bounds` to whole logical pixels, and report `visible` only when an
   /// element is not visible.
+  ///
+  /// A glyph is text made only of Unicode private-use characters, which is how
+  /// an icon font draws an `Icon`. An element whose only content is a glyph is
+  /// left out, so an `Icon` outside an interactive widget is not listed as a
+  /// `RichText`. A key or a Semantics identifier on the element keeps it
+  /// listed. An `Icon`'s `semanticLabel` is reported as `text` by the
+  /// `Semantics` widget that the `Icon` wraps around the glyph.
   compact,
 }
 
