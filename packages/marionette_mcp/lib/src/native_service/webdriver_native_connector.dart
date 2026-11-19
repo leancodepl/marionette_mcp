@@ -96,8 +96,7 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   double get serverUnitScale => 1;
 
   /// Converts a coordinate in screen pixels to server units.
-  int toServerUnits(int pixels) =>
-      serverUnitScale == 1 ? pixels : (pixels / serverUnitScale).round();
+  int toServerUnits(int pixels) => (pixels / serverUnitScale).round();
 
   @override
   Future<List<NativeElement>> getNativeElements() async {
@@ -105,7 +104,10 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     final scale = serverUnitScale;
     return scale == 1
         ? elements
-        : [for (final element in elements) element.scaled(scale)];
+        : [
+            for (final element in elements)
+              element.withBounds(element.bounds.scaled(scale)),
+          ];
   }
 
   @override
@@ -172,7 +174,9 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
       throw NativeElementNotFoundException('keyboard focus', hint: _focusHint);
     }
 
-    final className = await _classOf(elementId);
+    final className = await classOf(elementId);
+    // Without a class, typing proceeds unchecked rather than blocking
+    // unusual fields.
     if (className != null && !isEditableClass(className)) {
       throw NativeElementNotFoundException(
         'keyboard focus on a text field (focus is on $className)',
@@ -183,9 +187,8 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   }
 
   /// Class of [elementId], or null when the server reports an empty or
-  /// absent attribute — then typing proceeds unchecked rather than blocking
-  /// unusual fields.
-  Future<String?> _classOf(String elementId) async {
+  /// absent attribute.
+  Future<String?> classOf(String elementId) async {
     final value =
         await client.elementAttribute(sessionId, elementId, classAttribute);
     return value == null || value.isEmpty ? null : value;
@@ -204,11 +207,12 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     }
   }
 
-  /// Whether [error] means "no matching element" on either server. A lost
-  /// session also answers 404 (`invalid session id`) and is not one.
-  static bool isNoSuchElement(WebDriverException error) =>
-      !isLostSession(error) &&
-      (error.error == 'no such element' || error.httpStatus == 404);
+  /// Whether [exception] means "no matching element" on either server. A
+  /// lost session also answers 404 (`invalid session id`) and is not one.
+  static bool isNoSuchElement(WebDriverException exception) =>
+      !isLostSession(exception) &&
+      (exception.error == webDriverNoSuchElement ||
+          exception.httpStatus == 404);
 
   /// Closes the client but keeps the session and the server, for a later
   /// process to reuse them through `openSession(sessionId: …)` — the CLI.

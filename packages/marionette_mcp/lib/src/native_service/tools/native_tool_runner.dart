@@ -15,12 +15,12 @@ Future<CallToolResult> runNativeTool(
     runTool(logger, operation, () async {
       try {
         return await body();
-      } on WebDriverException catch (error, stackTrace) {
-        if (!isLostSession(error)) rethrow;
+      } on WebDriverException catch (exception, stackTrace) {
+        if (!isLostSession(exception)) rethrow;
         logger.warning(
-            'Native session lost during $operation', error, stackTrace);
+            'Native session lost during $operation', exception, stackTrace);
         throw NativeOperationFailedException(
-          'The native session is gone (${error.error}).',
+          'The native session is gone (${exception.error}).',
           hint: 'Call native_connect again.',
         );
       }

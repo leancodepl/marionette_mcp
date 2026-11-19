@@ -2,6 +2,8 @@ import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_device.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/poll.dart';
+import 'package:marionette_mcp/src/native_service/wda_source.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/xpath.dart';
@@ -22,11 +24,20 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     required super.ownsBootstrap,
   });
 
+  /// Keys that dismiss the keyboard without editing the text. `return` is
+  /// deliberately absent: in a multi-line field it inserts a newline.
+  static const _dismissKeyNames = ['Done', 'done', 'Hide keyboard', 'Dismiss'];
+
+  /// How often and how long [hideKeyboard] checks that the keyboard closed
+  /// after a dismiss (the last check at 0.8 s).
+  static const _keyboardCloseChecks = 5;
+  static const _keyboardCloseCheckInterval = Duration(milliseconds: 200);
+
   /// The Notification Center needs a gesture on iOS (see [IosNativeDevice]).
   @override
   late final NativeDevice device = IosNativeDevice(this);
 
-  /// Screen pixels per point; read by [_loadScale] during [connect].
+  /// Screen pixels per point; read from `wda/screen` during [connect].
   double _scale = 1;
 
   @override
@@ -62,7 +73,8 @@ final class IosNativeConnector extends WebDriverNativeConnector {
       ),
     );
     try {
-      await connector._loadScale();
+      final screen = await connector.client.wdaScreen(connector.sessionId);
+      connector._scale = screen.scale;
     } catch (_) {
       await connector.dispose();
       rethrow;
@@ -70,38 +82,12 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     return connector;
   }
 
-  /// Reads the display scale from WDA's `wda/screen`; falls back to the
-  /// screenshot width divided by the window width in points.
-  Future<void> _loadScale() async {
-    try {
-      _scale = (await client.wdaScreen(sessionId)).scale;
-      return;
-    } on WebDriverException {
-      // Older WDA builds: derive the scale from a screenshot below.
-    }
-    final window = await client.windowRectSize(sessionId);
-    final png = pngSize(await client.takeScreenshot(sessionId));
-    if (png == null || window.width <= 0) {
-      throw const WebDriverException(
-        'Could not determine the iOS display scale (wda/screen unavailable '
-        'and the screenshot size is unknown)',
-      );
-    }
-    _scale = png.width / window.width;
-  }
-
   @override
   Future<NativeScreen> getScreen() async {
-    ({int width, int height}) points;
-    try {
-      final screen = await client.wdaScreen(sessionId);
-      points = (width: screen.width, height: screen.height);
-    } on WebDriverException {
-      points = await client.windowRectSize(sessionId);
-    }
+    final screen = await client.wdaScreen(sessionId);
     return NativeScreen(
-      width: (points.width * _scale).round(),
-      height: (points.height * _scale).round(),
+      width: (screen.width * _scale).round(),
+      height: (screen.height * _scale).round(),
       scale: _scale,
     );
   }
@@ -112,15 +98,8 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   @override
   String get classAttribute => 'type';
 
-  static const _editableTypes = {
-    'XCUIElementTypeTextField',
-    'XCUIElementTypeSecureTextField',
-    'XCUIElementTypeTextView',
-    'XCUIElementTypeSearchField',
-  };
-
   @override
-  bool isEditableClass(String className) => _editableTypes.contains(className);
+  bool isEditableClass(String className) => isWdaEditableClass(className);
 
   /// Foreground app bundle identifier from WDA's active-app endpoint, with
   /// page-source fallback when that endpoint is unavailable.
@@ -159,7 +138,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
       throw WebDriverException(
         'Could not locate element to type into '
         '(id=${element.resourceId}, text=${element.text})',
-        error: 'no such element',
+        error: webDriverNoSuchElement,
       );
     }
     await client.elementClick(sessionId, elementId);
@@ -213,10 +192,6 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   Future<bool> isKeyboardShown() async =>
       wdaKeyboardOnScreen(await client.getPageSource(sessionId));
 
-  /// Keys that dismiss the keyboard without editing the text. `return` is
-  /// deliberately absent: in a multi-line field it inserts a newline.
-  static const _dismissKeyNames = ['Done', 'done', 'Hide keyboard', 'Dismiss'];
-
   @override
   Future<bool> hideKeyboard() async {
     if (!await isKeyboardShown()) return false;
@@ -226,13 +201,12 @@ final class IosNativeConnector extends WebDriverNativeConnector {
     } on WebDriverException {
       dismissed = await _tapAccessoryDone();
     }
-    final attempts = dismissed ? 5 : 1;
-    for (var attempt = 0; attempt < attempts; attempt++) {
-      if (!await isKeyboardShown()) return true;
-      if (attempt < attempts - 1) {
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-      }
-    }
+    final closed = await pollUntil(
+      () async => !await isKeyboardShown(),
+      attempts: dismissed ? _keyboardCloseChecks : 1,
+      interval: _keyboardCloseCheckInterval,
+    );
+    if (closed) return true;
     throw const NativeOperationFailedException(
       'Could not hide the iOS keyboard: it has no Done / dismiss key.',
       hint: 'Tap outside the field (native_tap on a non-interactive area), use '
@@ -306,72 +280,13 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   }
 }
 
-/// Whether WDA page source [xml] contains a keyboard that is on screen.
-///
-/// A hidden keyboard can stay in the tree, parked just below the screen
-/// (`y` equal to the application height, `visible="false"`) — e.g. when
-/// it was dismissed while the field kept focus. Mere presence would report
-/// it as shown and make `hideKeyboard` fail. The keyboard counts as shown
-/// when it has a size and its top edge is above the bottom of the
-/// application (the screen). Missing geometry is treated as shown.
-/// `visible` alone is not used: WDA reports it inconsistently (tabs covered
-/// by the keyboard are `visible="false"` while on screen).
-bool wdaKeyboardOnScreen(String xml) {
-  final nodes = parseUiTree(
-    xml,
-    isRelevant: (attributes) {
-      final tag = attributes[uiNodeTagKey];
-      return tag == 'XCUIElementTypeKeyboard' ||
-          tag == 'XCUIElementTypeApplication';
-    },
-  );
-  final screenHeight = nodes
-      .where((n) => n[uiNodeTagKey] == 'XCUIElementTypeApplication')
-      .map((n) => double.tryParse(n['height'] ?? ''))
-      .firstOrNull;
-  return nodes
-      .where((n) => n[uiNodeTagKey] == 'XCUIElementTypeKeyboard')
-      .any((keyboard) {
-    final y = double.tryParse(keyboard['y'] ?? '');
-    final height = double.tryParse(keyboard['height'] ?? '');
-    if (y == null || height == null || screenHeight == null) return true;
-    return height > 0 && y < screenHeight;
-  });
-}
-
-/// Reads a bundle identifier from WDA page source when [wdaActiveAppInfo] is
-/// unavailable.
-String? foregroundAppFromWdaSource(String xml) {
-  final apps = parseUiTree(
-    xml,
-    isRelevant: (attributes) =>
-        attributes[uiNodeTagKey] == 'XCUIElementTypeApplication',
-  );
-  if (apps.isEmpty) return null;
-
-  final attrs = apps.first;
-  final bundleId = attrs['bundleId'] ?? '';
-  if (bundleId.isNotEmpty) return bundleId;
-
-  final name = attrs['name'] ?? '';
-  if (_looksLikeBundleIdentifier(name)) return name;
-
-  return null;
-}
-
-final _bundleIdentifierPattern = RegExp(r'^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$');
-
-bool _looksLikeBundleIdentifier(String value) =>
-    _bundleIdentifierPattern.hasMatch(value);
-
 /// XPath selecting the WDA element of [element]'s type at exactly its bounds,
 /// converted to server units with [toServerUnits] (WDA reports integer
 /// points, so the conversion back from screen pixels is exact).
 String wdaGeometryXPath(
     NativeElement element, int Function(int) toServerUnits) {
   final bounds = element.bounds;
-  final type =
-      element.className.startsWith('XCUIElementType') ? element.className : '*';
+  final type = wdaType(element.className) == null ? '*' : element.className;
   return '//$type[@x=${toServerUnits(bounds.x)} and '
       '@y=${toServerUnits(bounds.y)} and '
       '@width=${toServerUnits(bounds.width)} and '

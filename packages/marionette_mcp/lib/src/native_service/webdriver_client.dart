@@ -42,12 +42,13 @@ class WebDriverException implements Exception {
 }
 
 /// [WebDriverException.error] used when no connection to the server could be
-/// opened, so the request was never sent (not a W3C error code).
+/// opened within the short timeout, so the request was never sent (not a W3C
+/// error code).
 const webDriverServerUnreachable = 'server unreachable';
 
 /// [WebDriverException.error] used when the connection broke after the
-/// request was sent, so the server may have acted on it (not a W3C error
-/// code).
+/// request was sent, or no response arrived within the request's timeout, so
+/// the server may have acted on it (not a W3C error code).
 ///
 /// Together with [webDriverServerUnreachable] and the W3C `invalid session
 /// id` it signals a lost session.
@@ -56,9 +57,18 @@ const webDriverConnectionLost = 'connection lost';
 /// W3C error code for a session the server no longer knows.
 const webDriverInvalidSessionId = 'invalid session id';
 
-/// Whether [error] means the session or its server is gone, so only a new
-/// `native_connect` can continue.
-bool isLostSession(WebDriverException error) => switch (error.error) {
+/// W3C error code for a lookup that matched no element.
+const webDriverNoSuchElement = 'no such element';
+
+/// W3C error code for an element that is no longer in the UI tree.
+const webDriverStaleElementReference = 'stale element reference';
+
+/// W3C error code for an element that cannot take the requested action.
+const webDriverInvalidElementState = 'invalid element state';
+
+/// Whether [exception] means the session or its server is gone, so only a
+/// new `native_connect` can continue.
+bool isLostSession(WebDriverException exception) => switch (exception.error) {
       webDriverInvalidSessionId ||
       webDriverConnectionLost ||
       webDriverServerUnreachable =>
@@ -68,18 +78,18 @@ bool isLostSession(WebDriverException error) => switch (error.error) {
 
 /// W3C WebDriver element identifier key used in element response objects.
 ///
-/// See https://www.w3.org/TR/webdriver/#elements. Older (JSON Wire) servers
-/// use `ELEMENT` instead, which [WebDriverClient.findElement] falls back to.
+/// See https://www.w3.org/TR/webdriver/#elements.
 const w3cElementKey = 'element-6066-11e4-a52e-4f735466cecf';
 
 /// Longest a [WebDriverClient] request may take, from opening the connection
 /// to the end of the response body. Longer than the 60 s maximum of
 /// `native_wait_for`.
-const webDriverRequestTimeout = Duration(seconds: 90);
+const _defaultRequestTimeout = Duration(seconds: 90);
 
-/// Longest [WebDriverClient.status] and [WebDriverClient.deleteSession] may
-/// take, so a health check or a shutdown never waits on a hung server.
-const webDriverStatusTimeout = Duration(seconds: 5);
+/// Longest a [WebDriverClient] health check ([WebDriverClient.status]), a
+/// teardown ([WebDriverClient.deleteSession]) or the opening of a connection
+/// may take, so none of them waits on a hung server.
+const webDriverShortTimeout = Duration(seconds: 5);
 
 /// Minimal W3C WebDriver HTTP client.
 ///
@@ -88,33 +98,33 @@ const webDriverStatusTimeout = Duration(seconds: 5);
 /// element lookup/click/sendKeys, and W3C pointer actions. Uses `dart:io`
 /// [HttpClient] directly so `marionette_mcp` gains no new dependencies.
 ///
-/// All methods throw [WebDriverException] on non-2xx responses, on a body
-/// that is not UTF-8, or when the server returns a W3C error body
+/// All methods but [status] throw [WebDriverException] on non-2xx responses,
+/// on a body that is not UTF-8, or when the server returns a W3C error body
 /// (`{"value": {"error": ..., "message": ...}}`). An I/O failure throws one
 /// with [webDriverServerUnreachable] when no connection opened, else with
-/// [webDriverConnectionLost], as does a request that takes longer than its
-/// timeout (it is aborted). Any other error is a programmer error and
-/// propagates unchanged.
+/// [webDriverConnectionLost], as does a request whose response takes longer
+/// than its timeout (it is aborted). Any other error is a programmer error
+/// and propagates unchanged.
 class WebDriverClient {
   /// Creates a client for a WebDriver server at [baseUrl]
   /// (e.g. `http://127.0.0.1:8100`). A trailing slash is tolerated.
   ///
-  /// [statusTimeout] bounds [status] and [deleteSession], [requestTimeout]
-  /// every other request.
+  /// [shortTimeout] bounds [status], [deleteSession] and the opening of
+  /// every connection, [requestTimeout] the response to every other request.
   WebDriverClient(
     String baseUrl, {
-    Duration requestTimeout = webDriverRequestTimeout,
-    Duration statusTimeout = webDriverStatusTimeout,
+    Duration requestTimeout = _defaultRequestTimeout,
+    Duration shortTimeout = webDriverShortTimeout,
   })  : _baseUrl = baseUrl.endsWith('/')
             ? baseUrl.substring(0, baseUrl.length - 1)
             : baseUrl,
         _requestTimeout = requestTimeout,
-        _statusTimeout = statusTimeout,
-        _http = HttpClient();
+        _shortTimeout = shortTimeout,
+        _http = HttpClient()..connectionTimeout = shortTimeout;
 
   final String _baseUrl;
   final Duration _requestTimeout;
-  final Duration _statusTimeout;
+  final Duration _shortTimeout;
   final HttpClient _http;
 
   /// Creates a new session and returns its session id.
@@ -129,22 +139,16 @@ class WebDriverClient {
     });
 
     // W3C shape: {"value": {"sessionId": ..., "capabilities": ...}}.
-    // Some legacy servers put sessionId at the top level; _request already
-    // unwrapped "value", so also accept a bare string just in case.
-    if (value is Map<String, dynamic>) {
-      final sessionId = value['sessionId'];
-      if (sessionId is String) return sessionId;
-    }
-    if (value is String) return value;
+    if (value case {'sessionId': final String sessionId}) return sessionId;
     throw const WebDriverException(
       'Session created but no sessionId found in response',
     );
   }
 
   /// Deletes the session, releasing the device-side automation. Bounded by
-  /// the status timeout, so a shutdown never waits on a hung server.
+  /// the short timeout, so a shutdown never waits on a hung server.
   Future<void> deleteSession(String sessionId) async {
-    await _request('DELETE', '/session/$sessionId', timeout: _statusTimeout);
+    await _request('DELETE', '/session/$sessionId', timeout: _shortTimeout);
   }
 
   /// Returns the current UI hierarchy as an XML string.
@@ -177,23 +181,18 @@ class WebDriverClient {
   ///
   /// [using] is a W3C location strategy (e.g. `xpath`, `accessibility id`,
   /// `-android uiautomator`) and [value] the corresponding selector. Throws
-  /// [WebDriverException] with error `no such element` when nothing matches.
-  ///
-  /// Sends both W3C (`using`/`value`) and Appium UIAutomator2
-  /// (`strategy`/`selector`) fields — standalone UIA2 rejects requests that
-  /// only include the W3C pair.
+  /// [WebDriverException] with error [webDriverNoSuchElement] when nothing
+  /// matches.
   Future<String> findElement(
     String sessionId,
     String using,
     String value,
   ) async {
-    final result = await _request('POST', '/session/$sessionId/element', body: {
-      'using': using,
-      'value': value,
-      'strategy': using,
-      'selector': value,
-    });
-
+    final result = await _request(
+      'POST',
+      '/session/$sessionId/element',
+      body: _locatorBody(using, value),
+    );
     return _elementId(result);
   }
 
@@ -204,28 +203,15 @@ class WebDriverClient {
     String using,
     String value,
   ) async {
-    final result =
-        await _request('POST', '/session/$sessionId/elements', body: {
-      'using': using,
-      'value': value,
-      'strategy': using,
-      'selector': value,
-    });
+    final result = await _request(
+      'POST',
+      '/session/$sessionId/elements',
+      body: _locatorBody(using, value),
+    );
     if (result is! List<Object?>) {
       throw const WebDriverException('Element list response was not a list');
     }
     return result.map(_elementId).toList();
-  }
-
-  /// The element id of an element response object, W3C or legacy key.
-  static String _elementId(Object? element) {
-    if (element is Map<String, dynamic>) {
-      final elementId = element[w3cElementKey] ?? element['ELEMENT'];
-      if (elementId is String) return elementId;
-    }
-    throw const WebDriverException(
-      'Element found but no element id in response',
-    );
   }
 
   /// Returns the rect of element [elementId] in server units
@@ -290,16 +276,17 @@ class WebDriverClient {
   /// Returns the id of the element that has keyboard focus
   /// (`GET /session/{id}/element/active`).
   ///
-  /// Throws [WebDriverException] (`no such element`) when nothing is focused.
+  /// Throws [WebDriverException] ([webDriverNoSuchElement]) when nothing is
+  /// focused.
   Future<String> activeElement(String sessionId) async {
     final result = await _request('GET', '/session/$sessionId/element/active');
-    if (result is Map<String, dynamic>) {
-      final elementId = result[w3cElementKey] ?? result['ELEMENT'];
-      if (elementId is String && elementId.isNotEmpty) return elementId;
+    if (result case {w3cElementKey: final String elementId}
+        when elementId.isNotEmpty) {
+      return elementId;
     }
     throw const WebDriverException(
       'No focused element',
-      error: 'no such element',
+      error: webDriverNoSuchElement,
     );
   }
 
@@ -362,42 +349,11 @@ class WebDriverClient {
     );
   }
 
-  /// Performs raw W3C actions (https://www.w3.org/TR/webdriver/#actions).
-  ///
-  /// [actions] is the list of input source objects sent as the `actions`
-  /// field; use this for gestures beyond what [swipe] covers.
-  Future<void> performActions(
-    String sessionId,
-    List<Map<String, dynamic>> actions,
-  ) async {
-    await _request(
-      'POST',
-      '/session/$sessionId/actions',
-      body: {'actions': actions},
-    );
-  }
-
-  /// Performs a touch gesture with one pointer per entry of [fingers], all
-  /// running in parallel. Each finger is a list of W3C pointer actions; see
-  /// [TouchStep] for building them. Coordinates are in server units.
-  Future<void> touchActions(
-    String sessionId,
-    List<List<Map<String, dynamic>>> fingers,
-  ) =>
-      performActions(sessionId, [
-        for (final (i, steps) in fingers.indexed)
-          {
-            'type': 'pointer',
-            'id': 'finger${i + 1}',
-            'parameters': {'pointerType': 'touch'},
-            'actions': steps,
-          },
-      ]);
-
-  /// Convenience swipe built on [performActions]: a single pointer
-  /// sequence that presses down at ([startX], [startY]) and moves to
-  /// ([endX], [endY]) over [durationMs] milliseconds, then keeps the finger
-  /// still for [holdMs] before lifting it (no fling when > 0).
+  /// Swipes with one finger through W3C actions
+  /// (https://www.w3.org/TR/webdriver/#actions): presses down at
+  /// ([startX], [startY]) and moves to ([endX], [endY]) over [durationMs]
+  /// milliseconds, then keeps the finger still for [holdMs] before lifting
+  /// it (no fling when > 0).
   ///
   /// Coordinates are in the server's own units (pixels for UIAutomator2,
   /// points for WebDriverAgent).
@@ -409,16 +365,32 @@ class WebDriverClient {
     required int endY,
     int durationMs = 300,
     int holdMs = 0,
-  }) =>
-      touchActions(sessionId, [
-        [
-          TouchStep.move(startX, startY),
-          TouchStep.down(),
-          TouchStep.move(endX, endY, durationMs: durationMs),
-          if (holdMs > 0) TouchStep.pause(holdMs),
-          TouchStep.up(),
-        ],
-      ]);
+  }) async {
+    Map<String, Object> move(int x, int y, int moveMs) => {
+          'type': 'pointerMove',
+          'duration': moveMs,
+          'origin': 'viewport',
+          'x': x,
+          'y': y,
+        };
+
+    await _request('POST', '/session/$sessionId/actions', body: {
+      'actions': [
+        {
+          'type': 'pointer',
+          'id': 'finger1',
+          'parameters': {'pointerType': 'touch'},
+          'actions': [
+            move(startX, startY, 0),
+            {'type': 'pointerDown', 'button': 0},
+            move(endX, endY, durationMs),
+            if (holdMs > 0) {'type': 'pause', 'duration': holdMs},
+            {'type': 'pointerUp', 'button': 0},
+          ],
+        },
+      ],
+    });
+  }
 
   /// Screen orientation (`PORTRAIT` / `LANDSCAPE`) from
   /// `GET /session/{id}/orientation`.
@@ -459,14 +431,6 @@ class WebDriverClient {
     throw const WebDriverException('WDA screen response had no size/scale');
   }
 
-  /// Returns the W3C window rect size (`GET /session/{id}/window/rect`).
-  Future<({int width, int height})> windowRectSize(String sessionId) async {
-    final value = await _request('GET', '/session/$sessionId/window/rect');
-    final size = _sizeOf(value);
-    if (size != null) return size;
-    throw const WebDriverException('Window rect response had no width/height');
-  }
-
   static ({int width, int height})? _sizeOf(Object? value) {
     if (value is! Map<String, dynamic>) return null;
     final width = value['width'];
@@ -488,13 +452,14 @@ class WebDriverClient {
 
   /// Returns true when the server responds successfully to `GET /status`.
   ///
-  /// Never throws — intended as a bootstrap health check that is polled
-  /// while the device-side server is still starting up.
+  /// Returns false instead of throwing a [WebDriverException] — intended as a
+  /// bootstrap health check that is polled while the device-side server is
+  /// still starting up. Other errors propagate.
   Future<bool> status() async {
     try {
-      await _request('GET', '/status', timeout: _statusTimeout);
+      await _request('GET', '/status', timeout: _shortTimeout);
       return true;
-    } catch (_) {
+    } on WebDriverException {
       return false;
     }
   }
@@ -504,38 +469,49 @@ class WebDriverClient {
     _http.close(force: true);
   }
 
+  /// The body of a find request for [using] and [value].
+  ///
+  /// Holds both the W3C (`using`/`value`) and the Appium UIAutomator2
+  /// (`strategy`/`selector`) fields: standalone UIA2 rejects requests that
+  /// only include the W3C pair.
+  static Map<String, dynamic> _locatorBody(String using, String value) => {
+        'using': using,
+        'value': value,
+        'strategy': using,
+        'selector': value,
+      };
+
+  /// The element id of a W3C element response object.
+  static String _elementId(Object? element) {
+    if (element case {w3cElementKey: final String elementId}) return elementId;
+    throw const WebDriverException(
+      'Element found but no element id in response',
+    );
+  }
+
   /// Sends a request and returns the unwrapped W3C `value` field (or the
   /// whole decoded body when no envelope is present).
   ///
-  /// Opening, sending and reading the body together take at most [timeout]
-  /// (the client's request timeout by default).
+  /// Opening the connection takes at most the client's short timeout;
+  /// sending and reading the body take at most [timeout] (the client's
+  /// request timeout by default).
   Future<Object?> _request(
     String method,
     String path, {
     Map<String, dynamic>? body,
     Duration? timeout,
   }) async {
-    final uri = Uri.parse('$_baseUrl$path');
     final limit = timeout ?? _requestTimeout;
     final payload = body == null ? null : utf8.encode(jsonEncode(body));
-    HttpClientRequest? request;
-    var timedOut = false;
-
-    Future<(int, String)> exchange() async {
-      final opened = await _open(method, uri);
-      request = opened;
-      // A connection opened after the timeout is dropped unused.
-      if (timedOut) opened.abort();
-      return _send(opened, method, uri, payload);
-    }
-
-    final (statusCode, responseBody) = await exchange().timeout(
+    final request = await _open(method, Uri.parse('$_baseUrl$path'));
+    final (:statusCode, body: responseBody) =
+        await _send(request, payload).timeout(
       limit,
       onTimeout: () {
-        timedOut = true;
-        request?.abort();
+        request.abort();
         throw WebDriverException(
-          '$method $uri got no response within ${limit.inMilliseconds} ms',
+          '$method ${request.uri} got no response within '
+          '${limit.inMilliseconds} ms',
           error: webDriverConnectionLost,
         );
       },
@@ -593,85 +569,35 @@ class WebDriverClient {
 
   /// Sends [request] with the JSON [payload] and returns the response status
   /// code and body.
-  Future<(int, String)> _send(
+  Future<({int statusCode, String body})> _send(
     HttpClientRequest request,
-    String method,
-    Uri uri,
     List<int>? payload,
   ) async {
     try {
       if (payload != null) {
-        // ChromeDriver rejects chunked request bodies, which dart:io uses
-        // unless contentLength is set explicitly.
         request.headers.contentType =
             ContentType('application', 'json', charset: 'utf-8');
         request.contentLength = payload.length;
         request.add(payload);
       }
       final response = await request.close();
-      return (response.statusCode, await utf8.decodeStream(response));
+      return (
+        statusCode: response.statusCode,
+        body: await utf8.decodeStream(response),
+      );
     } on IOException catch (e) {
       // Reset / closed connections (SocketException, HttpException) mean the
       // device-side server went away, possibly after acting on the request.
       throw WebDriverException(
-        '$method $uri failed: $e',
+        '${request.method} ${request.uri} failed: $e',
         error: webDriverConnectionLost,
       );
     } on FormatException catch (e) {
       // Not a WebDriver server, e.g. a stale forward to another service.
       throw WebDriverException(
-        '$method $uri answered with a body that is not UTF-8: ${e.message}',
+        '${request.method} ${request.uri} answered with a body that is not '
+        'UTF-8: ${e.message}',
       );
     }
   }
-}
-
-/// Width and height of a base64-encoded PNG, read from its IHDR chunk, or
-/// null when [pngBase64] is not a PNG.
-({int width, int height})? pngSize(String pngBase64) {
-  // Signature (8 bytes) + IHDR length/type (8 bytes) + width + height.
-  const headerLength = 24;
-  final List<int> bytes;
-  try {
-    // 32 base64 characters decode to exactly 24 bytes.
-    bytes = base64Decode(pngBase64.substring(0, 32));
-  } on FormatException {
-    return null;
-  } on RangeError {
-    return null;
-  }
-  const signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
-  if (bytes.length < headerLength) return null;
-  for (var i = 0; i < signature.length; i++) {
-    if (bytes[i] != signature[i]) return null;
-  }
-  int readUint32(int offset) =>
-      (bytes[offset] << 24) |
-      (bytes[offset + 1] << 16) |
-      (bytes[offset + 2] << 8) |
-      bytes[offset + 3];
-  return (width: readUint32(16), height: readUint32(20));
-}
-
-/// Builders for the W3C pointer actions passed to
-/// [WebDriverClient.touchActions].
-abstract final class TouchStep {
-  /// Moves the finger to ([x], [y]) over [durationMs].
-  static Map<String, dynamic> move(int x, int y, {int durationMs = 0}) => {
-        'type': 'pointerMove',
-        'duration': durationMs,
-        'origin': 'viewport',
-        'x': x,
-        'y': y,
-      };
-
-  /// Puts the finger down at its current position.
-  static Map<String, dynamic> down() => {'type': 'pointerDown', 'button': 0};
-
-  /// Lifts the finger.
-  static Map<String, dynamic> up() => {'type': 'pointerUp', 'button': 0};
-
-  /// Keeps the finger where it is (down or up) for [durationMs].
-  static Map<String, dynamic> pause(int durationMs) =>
-      {'type': 'pause', 'duration': durationMs};
 }

@@ -2,8 +2,10 @@ import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/android_native_device.dart';
+import 'package:marionette_mcp/src/native_service/android_ui_dump.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/poll.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/xpath.dart';
@@ -23,8 +25,34 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
         _sharedServer = sharedServer,
         device = AndroidNativeDevice(adb);
 
+  /// How long UIAutomator2 waits for the UI to become idle before reading
+  /// the tree or acting. Its default (10 s) made every read on a screen with
+  /// continuous animation (video, map, loading thumbnails) take 10 s; 500 ms
+  /// still waits out ordinary transitions.
+  static const waitForIdleTimeoutMs = 500;
+
+  /// How long a tree read keeps retrying while a toast is on screen; a long
+  /// toast stays 3.5 s.
+  static const toastRetryWindow = Duration(seconds: 5);
+
+  /// Pause between tree reads while a toast is shown.
+  static const _toastRetryDelay = Duration(milliseconds: 500);
+
+  /// Keyboards covering less than this share of their window are Gboard's
+  /// floating toolbar (hardware keyboard attached), which does not consume
+  /// Back.
+  static const _floatingKeyboardCoverage = 0.1;
+
+  /// How often and how long [hideKeyboard] checks that the IME closed after
+  /// Back (the last check at 1.8 s).
+  static const _keyboardCloseChecks = 10;
+  static const _keyboardCloseCheckInterval = Duration(milliseconds: 200);
+
   final AdbClient _adb;
   final bool _sharedServer;
+
+  @override
+  final NativeDevice device;
 
   /// UIAutomator2 (10.3.2) stops itself when its session is deleted, so a
   /// session on a server another process started (reuse — an MCP server,
@@ -33,19 +61,16 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   bool get deletesSessionOnDispose => !_sharedServer;
 
   @override
-  final NativeDevice device;
+  String get classAttribute => 'className';
+
+  @override
+  Future<String?> get foregroundApp => _adb.foregroundPackage();
 
   /// Starts UIAutomator2 (unless [bootstrap] is given) and opens a WebDriver
   /// session.
   ///
   /// A [bootstrap] passed in is not disposed by this connector; the caller
   /// keeps ownership. [adb] defaults to a client for [serial].
-  /// How long UIAutomator2 waits for the UI to become idle before reading
-  /// the tree or acting. Its default (10 s) made every read on a screen with
-  /// continuous animation (video, map, loading thumbnails) take 10 s; 500 ms
-  /// still waits out ordinary transitions.
-  static const waitForIdleTimeoutMs = 500;
-
   static Future<AndroidNativeConnector> connect({
     String? serial,
     NativeServerBootstrap? bootstrap,
@@ -94,10 +119,6 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
   @override
   List<NativeElement> parseSource(String xml) => parseAndroidUiDump(xml);
 
-  /// How long a tree read keeps retrying while a toast is on screen; a long
-  /// toast stays 3.5 s.
-  static const toastRetryWindow = Duration(seconds: 5);
-
   /// While a toast is shown, UIAutomator2 fails every page source with
   /// "Cannot set AccessibilityNodeInfo's field 'mSealed'" (seen on API 35;
   /// on API 28 it adds the toast to the tree instead). Only that failure is
@@ -120,7 +141,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
                 'then retry.',
           );
         }
-        await Future<void>.delayed(const Duration(milliseconds: 500));
+        await Future<void>.delayed(_toastRetryDelay);
       }
     }
   }
@@ -130,18 +151,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       error.message.contains("AccessibilityNodeInfo's field 'mSealed'");
 
   @override
-  String get classAttribute => 'className';
-
-  /// `EditText` and its subclasses (Flutter and Compose fields report
-  /// `android.widget.EditText`; Material's `TextInputEditText`,
-  /// `AutoCompleteTextView`).
-  @override
-  bool isEditableClass(String className) =>
-      className.contains('EditText') ||
-      className.contains('AutoCompleteTextView');
-
-  @override
-  Future<String?> get foregroundApp => _adb.foregroundPackage();
+  bool isEditableClass(String className) => isAndroidEditableClass(className);
 
   /// UIAutomator2 works in pixels (scale 1). Its `window/current/size`
   /// matches the screenshot; `adb shell wm size` is the fallback.
@@ -220,11 +230,6 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     return shown;
   }
 
-  /// Keyboards covering less than this share of their window are Gboard's
-  /// floating toolbar (hardware keyboard attached), which does not consume
-  /// Back.
-  static const _floatingKeyboardCoverage = 0.1;
-
   /// Presses Back, which closes a shown IME without navigating. Back is
   /// only sent when the keyboard is shown — otherwise it would navigate —
   /// and not to Gboard's floating toolbar, which lets Back through to the
@@ -245,10 +250,12 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       );
     }
     await pressKey(NativeKey.back);
-    for (var attempt = 0; attempt < 10; attempt++) {
-      if (!await isKeyboardShown()) return true;
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    }
+    final closed = await pollUntil(
+      () async => !await isKeyboardShown(),
+      attempts: _keyboardCloseChecks,
+      interval: _keyboardCloseCheckInterval,
+    );
+    if (closed) return true;
     throw const NativeOperationFailedException(
       'The keyboard is still shown after pressing Back.',
       hint: 'Unfocus the field in the app (e.g. tap outside it) and retry.',
@@ -294,11 +301,16 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       'xpath',
       '//android.widget.EditText[@focused="true"]',
     );
-    var focused = elementId != null;
     if (elementId == null) {
-      elementId = await _tryFind('xpath', '//*[@focused="true"]');
-      focused = elementId != null;
+      final anyFocused = await _tryFind('xpath', '//*[@focused="true"]');
+      // A focused host or container is no proof that the tap focused a
+      // field, so only an editable class counts; otherwise the id and text
+      // lookups below run with their tap-point check.
+      if (anyFocused != null && await _isEditable(anyFocused)) {
+        elementId = anyFocused;
+      }
     }
+    final focused = elementId != null;
 
     final resourceId = element.resourceId;
     if (elementId == null && resourceId != null && resourceId.isNotEmpty) {
@@ -322,10 +334,16 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     if (elementId == null) {
       throw const WebDriverException(
         'Tapped the element but could not locate a focused field for typing',
-        error: 'no such element',
+        error: webDriverNoSuchElement,
       );
     }
     return (id: elementId, focused: focused);
+  }
+
+  /// Whether the server reports [elementId] with an editable class.
+  Future<bool> _isEditable(String elementId) async {
+    final className = await classOf(elementId);
+    return className != null && isEditableClass(className);
   }
 
   Future<String?> _tryFind(String using, String value) async {

@@ -3,9 +3,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:marionette_mcp/src/native_service/android_ui_dump.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
+import 'package:marionette_mcp/src/native_service/wda_source.dart';
 import 'package:test/test.dart';
 
 /// A captured fixture: elements in screen pixels plus metadata.
@@ -25,7 +27,9 @@ final class Fixture {
     final parsed =
         platform == 'android' ? parseAndroidUiDump(xml) : parseWdaSource(xml);
     // Same conversion as WebDriverNativeConnector.getNativeElements.
-    elements = [for (final e in parsed) e.scaled(screen.scale)];
+    elements = [
+      for (final e in parsed) e.withBounds(e.bounds.scaled(screen.scale)),
+    ];
   }
 
   final String platform;

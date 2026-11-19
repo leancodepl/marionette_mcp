@@ -1,7 +1,7 @@
-import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
-import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
-import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+import 'package:marionette_mcp/src/native_service/android_ui_dump.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/wda_source.dart';
 import 'package:test/test.dart';
 
 const androidFixture = '''
@@ -330,25 +330,6 @@ void _unitTests() {
         'width': 152,
         'height': 50,
       });
-      expect(identical(bounds.scaled(1), bounds), isTrue);
-    });
-  });
-
-  group('pngSize', () {
-    test('reads width and height from the IHDR chunk', () {
-      // 1x1 transparent PNG.
-      const png =
-          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQ'
-          'DwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-
-      expect(pngSize(png), (width: 1, height: 1));
-    });
-
-    test('returns null for non-PNG data', () {
-      expect(
-          pngSize('aGVsbG8gd29ybGQgdGhpcyBpcyBub3QgYSBwbmcgZmlsZQ=='), isNull);
-      expect(pngSize('short'), isNull);
-      expect(pngSize('!!!!not base64 at all, definitely not!!!!'), isNull);
     });
   });
 
@@ -432,7 +413,7 @@ void _unitTests() {
       expect(typed.focused, isNull, reason: 'WDA does not report focus');
     });
 
-    test('scaled keeps the state', () {
+    test('withBounds keeps the state', () {
       const element = NativeElement(
         className: 'XCUIElementTypeSwitch',
         clickable: true,
@@ -444,7 +425,9 @@ void _unitTests() {
         scrollable: true,
       );
 
-      final json = element.scaled(3).toJson();
+      final json = element
+          .withBounds(const NativeBounds(x: 3, y: 3, width: 3, height: 3))
+          .toJson();
 
       expect(json, containsPair('value', 'v'));
       expect(json, containsPair('enabled', false));

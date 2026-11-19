@@ -327,13 +327,13 @@ class RunningServerBootstrap implements NativeServerBootstrap {
   Future<Uri> ensureServerReady() async {
     final client = WebDriverClient(baseUrl.toString());
     try {
-      if (await client.status()) return baseUrl;
-    } catch (_) {
-      // Reported below.
+      if (!await client.status()) {
+        throw NativeSessionNotRunningException(baseUrl);
+      }
+      return baseUrl;
     } finally {
       client.close();
     }
-    throw NativeSessionNotRunningException(baseUrl);
   }
 
   @override

@@ -10,6 +10,7 @@ import 'package:marionette_mcp/src/native_service/android_native_connector.dart'
 import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/poll.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 
@@ -243,19 +244,27 @@ Future<void> _stopAndroidServer(AdbClient adb, int? port, int? pid) async {
   if (pid != null) await _stopDetached(pid, 'am instrument', null);
 }
 
+/// How often and how long [_stopDetached] checks that a process ended after
+/// SIGTERM (the last check at 5 s).
+const _stopChecks = 21;
+const _stopCheckInterval = Duration(milliseconds: 250);
+
 /// Ends detached process [pid] if it still runs [command] (pids are reused):
 /// SIGTERM, then SIGKILL when [baseUrl] keeps answering (or after 5 s).
 Future<void> _stopDetached(int pid, String command, Uri? baseUrl) async {
   final ps = await Process.run('ps', ['-p', '$pid', '-o', 'command=']);
   if (!(ps.stdout as String).contains(command)) return;
   Process.killPid(pid);
-  for (var i = 0; i < 20; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    final alive = await Process.run('ps', ['-p', '$pid']);
-    if (alive.exitCode != 0) return;
-    if (baseUrl != null && !await _isRunning(baseUrl.toString())) return;
-  }
-  Process.killPid(pid, ProcessSignal.sigkill);
+  final stopped = await pollUntil(
+    () async {
+      final alive = await Process.run('ps', ['-p', '$pid']);
+      if (alive.exitCode != 0) return true;
+      return baseUrl != null && !await _isRunning(baseUrl.toString());
+    },
+    attempts: _stopChecks,
+    interval: _stopCheckInterval,
+  );
+  if (!stopped) Process.killPid(pid, ProcessSignal.sigkill);
 }
 
 /// Lists native sessions and whether their servers still run.
@@ -290,12 +299,22 @@ class NativeSessionsCommand extends Command<int> {
   }
 }
 
+/// Longest [_isRunning] waits for `/status`. Shorter than
+/// [webDriverShortTimeout]: `native-sessions` checks every session in turn.
+const _isRunningTimeout = Duration(seconds: 3);
+
+/// Whether a server answers at [baseUrl]. A URL the client cannot call (the
+/// registry file can be edited by hand) counts as not running, so
+/// `native-connect` can replace the entry and `native-disconnect` remove it.
 Future<bool> _isRunning(String baseUrl) async {
-  final client = WebDriverClient(baseUrl);
+  final uri = Uri.tryParse(baseUrl);
+  final callable = uri != null &&
+      (uri.isScheme('http') || uri.isScheme('https')) &&
+      uri.host.isNotEmpty;
+  if (!callable) return false;
+  final client = WebDriverClient(baseUrl, shortTimeout: _isRunningTimeout);
   try {
-    return await client.status().timeout(const Duration(seconds: 3));
-  } catch (_) {
-    return false;
+    return await client.status();
   } finally {
     client.close();
   }

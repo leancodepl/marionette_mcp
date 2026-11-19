@@ -1,5 +1,6 @@
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/poll.dart';
 
 /// [NativeDevice] for an iOS Simulator. iOS has no command for the
 /// Notification Center, so it is driven by edge swipes through the
@@ -55,16 +56,12 @@ final class IosNativeDevice implements NativeDevice {
   }
 
   /// Whether the Notification Center window shows up within a few reads.
-  Future<bool> _waitForNotificationCenter() async {
-    for (var read = 0; read < _openChecks; read++) {
-      final elements = await _connector.getNativeElements();
-      if (elements.any((e) => e.resourceId == _notificationCenterWindow)) {
-        return true;
-      }
-      await Future<void>.delayed(_openCheckDelay);
-    }
-    return false;
-  }
+  Future<bool> _waitForNotificationCenter() => pollUntil(
+        () async => (await _connector.getNativeElements())
+            .any((e) => e.resourceId == _notificationCenterWindow),
+        attempts: _openChecks,
+        interval: _openCheckInterval,
+      );
 }
 
 const _springboard = 'com.apple.springboard';
@@ -74,7 +71,7 @@ const _notificationCenterWindow = 'SBCoverSheetWindow';
 
 const _openAttempts = 2;
 const _openChecks = 3;
-const _openCheckDelay = Duration(milliseconds: 300);
+const _openCheckInterval = Duration(milliseconds: 300);
 
 /// Share of the screen height the opening swipe covers.
 const _openSwipeShare = 0.6;

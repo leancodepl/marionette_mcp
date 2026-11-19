@@ -408,6 +408,17 @@ void main() {
     expect(result.err, contains('native-connect'));
   });
 
+  test('a server URL the client cannot use is reported as it is', () async {
+    saveSession(baseUrl: server.baseUrl.replaceFirst('http:', 'ftp:'));
+
+    final result = await run(['native-get-elements']);
+
+    expect(result.code, 1);
+    expect(result.err, contains('Could not attach'));
+    expect(result.err, contains('ftp'));
+    expect(result.err, isNot(contains('is not running')));
+  });
+
   test('a server that never answers /status fails the attach in time',
       () async {
     final silent = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
@@ -481,6 +492,20 @@ void main() {
     expect(result.code, 0);
     expect(result.out, contains('pixel\tandroid\ttest-serial'));
     expect(result.out, contains('running'));
+  });
+
+  test('native-sessions lists a session with an unusable URL as not running',
+      () async {
+    saveSession(
+      name: 'pixel',
+      baseUrl: server.baseUrl.replaceFirst('http:', 'ftp:'),
+    );
+
+    final result = await run(['native-sessions']);
+
+    expect(result.code, 0);
+    expect(result.out, contains('pixel\tandroid\ttest-serial'));
+    expect(result.out, contains('not running'));
   });
 
   test('native-connect refuses to replace a session whose server it started',

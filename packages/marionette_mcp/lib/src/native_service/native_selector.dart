@@ -1,5 +1,6 @@
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/wda_source.dart';
 
 /// Criteria identifying native elements; all given fields must match (AND).
 ///
@@ -77,7 +78,7 @@ final class NativeSelector {
   static bool _typeMatches(String className, String wanted) =>
       className == wanted ||
       className.endsWith('.$wanted') ||
-      className == 'XCUIElementType$wanted';
+      wdaType(className) == wanted;
 
   static String _escape(String value) => value.replaceAll('\n', r'\n');
 }

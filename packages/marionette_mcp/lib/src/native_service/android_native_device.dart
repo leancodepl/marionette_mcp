@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/native_device.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/poll.dart';
 import 'package:marionette_mcp/src/native_service/process.dart';
 
 /// [NativeDevice] for an Android device or emulator, over `adb`.
@@ -31,14 +32,16 @@ final class AndroidNativeDevice implements NativeDevice {
 
   /// `cmd statusbar` returns while the shade is still moving; a read right
   /// after it reported the app as foregroundApp next to the shade's
-  /// notifications. Waits (at most 2 s) until the shade has or has lost
+  /// notifications. Waits (at most 1.8 s) until the shade has or has lost
   /// focus.
   Future<void> _waitForShade({required bool open}) async {
-    for (var attempt = 0; attempt < 10; attempt++) {
-      final shown = await _adb.foregroundPackage() == 'com.android.systemui';
-      if (shown == open) return;
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    }
+    final settled = await pollUntil(
+      () async =>
+          (await _adb.foregroundPackage() == 'com.android.systemui') == open,
+      attempts: _shadeChecks,
+      interval: _shadeCheckInterval,
+    );
+    if (settled) return;
     throw NativeOperationFailedException(
       'The Android notification shade did not ${open ? 'open' : 'close'}.',
       hint: 'Wait until the system UI settles, then retry.',
@@ -55,3 +58,8 @@ final class AndroidNativeDevice implements NativeDevice {
     );
   }
 }
+
+/// How often and how long the shade is checked after `cmd statusbar`
+/// (the last check at 1.8 s).
+const _shadeChecks = 10;
+const _shadeCheckInterval = Duration(milliseconds: 200);

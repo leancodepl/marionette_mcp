@@ -51,8 +51,8 @@ void registerNativeTextTools(
 /// present in the current view anymore", `stale element reference`), or
 /// Android's set-text action refused (`invalid element state`).
 bool isChangedFieldError(WebDriverException error) =>
-    error.error == 'stale element reference' ||
-    error.error == 'invalid element state' ||
+    error.error == webDriverStaleElementReference ||
+    error.error == webDriverInvalidElementState ||
     error.message.contains('is not present in the current view');
 
 /// Why the field counts as changed, for the log and the error: the W3C

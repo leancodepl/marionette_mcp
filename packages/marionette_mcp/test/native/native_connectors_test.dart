@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:logging/logging.dart' as logging;
@@ -8,6 +7,7 @@ import 'package:marionette_mcp/src/native_service/android_native_connector.dart'
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/wda_source.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:test/test.dart';
 
@@ -166,7 +166,7 @@ void main() {
       expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
       expect(
         stopwatch.elapsed,
-        lessThan(webDriverStatusTimeout + const Duration(seconds: 1)),
+        lessThan(webDriverShortTimeout + const Duration(seconds: 1)),
       );
     });
 
@@ -417,6 +417,37 @@ void main() {
       });
 
       test(
+          'a Material field only the generic focus lookup finds is typed '
+          'into off the tap point', () async {
+        server
+          ..on('POST', '/session/sess-1/element', (request) {
+            final tapped =
+                server.requestsTo('POST', '/session/sess-1/actions').isNotEmpty;
+            return tapped && request.body!['value'] == '//*[@focused="true"]'
+                ? const FakeResponse.value({w3cElementKey: 'el-other'})
+                : _noSuchElement;
+          })
+          ..onValue(
+            'GET',
+            '/session/sess-1/element/el-other/attribute/className',
+            'com.google.android.material.textfield.TextInputEditText',
+          )
+          ..onValue('POST', '/session/sess-1/element/el-other/value', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.enterText(field, 'Ann');
+
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element/el-other/value')
+              .single
+              .body,
+          {'text': 'Ann'},
+        );
+      });
+
+      test(
           'a field focused before the tap that holds the tap point is typed '
           'into', () async {
         focusedFields(before: 'el-field', after: ['el-field']);
@@ -444,6 +475,82 @@ void main() {
         await expectLater(
           connector.enterText(field, 'Ann'),
           throwsA(isA<NativeOperationFailedException>()),
+        );
+        expect(
+          server.requests.where((r) => r.path.endsWith('/value')),
+          isEmpty,
+        );
+      });
+
+      test(
+          'a focused non-field container on the tap point leaves the field '
+          'to the id lookup', () async {
+        server
+          ..on('POST', '/session/sess-1/element', (request) {
+            final tapped =
+                server.requestsTo('POST', '/session/sess-1/actions').isNotEmpty;
+            if (!tapped) return _noSuchElement;
+            return switch (request.body!['value']) {
+              '//*[@focused="true"]' =>
+                const FakeResponse.value({w3cElementKey: 'el-host'}),
+              'com.example:id/name' =>
+                const FakeResponse.value({w3cElementKey: 'el-field'}),
+              _ => _noSuchElement,
+            };
+          })
+          ..onValue('GET', '/session/sess-1/element/el-host/rect', fieldRect)
+          ..onValue(
+            'GET',
+            '/session/sess-1/element/el-host/attribute/className',
+            'android.widget.FrameLayout',
+          )
+          ..onValue('POST', '/session/sess-1/element/el-host/value', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.enterText(field, 'Ann');
+
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element/el-field/value')
+              .single
+              .body,
+          {'text': 'Ann'},
+        );
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/el-host/value'),
+          isEmpty,
+        );
+      });
+
+      test(
+          'a focused non-field container away from the tap point fails '
+          'without typing', () async {
+        server
+          ..on(
+            'POST',
+            '/session/sess-1/element',
+            (request) {
+              final tapped = server
+                  .requestsTo('POST', '/session/sess-1/actions')
+                  .isNotEmpty;
+              return tapped && request.body!['value'] == '//*[@focused="true"]'
+                  ? const FakeResponse.value({w3cElementKey: 'el-host'})
+                  : _noSuchElement;
+            },
+          )
+          ..onValue('GET', '/session/sess-1/element/el-host/rect', otherRect)
+          ..onValue(
+            'GET',
+            '/session/sess-1/element/el-host/attribute/className',
+            'android.widget.FrameLayout',
+          );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.enterText(field, 'Ann'),
+          throwsA(isA<WebDriverException>()),
         );
         expect(
           server.requests.where((r) => r.path.endsWith('/value')),
@@ -869,43 +976,33 @@ void main() {
       expect(screen.toJson(), {'width': 1206, 'height': 2622, 'scale': 3.0});
     });
 
-    test('derives the scale from the screenshot when wda/screen is missing',
+    test('connect fails with the wda/screen error, without a screenshot',
         () async {
       server
         ..on(
           'GET',
           '/session/sess-1/wda/screen',
-          (_) => const FakeResponse.error(
-            'unknown command',
-            'nope',
-            status: HttpStatus.notFound,
-          ),
+          (_) =>
+              const FakeResponse.error('unknown error', 'screen unavailable'),
         )
+        // Routes of the removed older-WDA fallback: connect must not reach them.
         ..onValue('GET', '/session/sess-1/window/rect', {
           'x': 0,
           'y': 0,
           'width': 375,
           'height': 667,
         })
-        ..onValue('GET', '/session/sess-1/screenshot', _pngHeader(750, 1334));
-      final connector = await connect();
-      addTearDown(connector.dispose);
+        ..onValue('GET', '/session/sess-1/screenshot', 'cG5n');
 
-      expect((await connector.getScreen()).toJson(), {
-        'width': 750,
-        'height': 1334,
-        'scale': 2.0,
-      });
-    });
-
-    test('connect fails when the display scale cannot be determined', () async {
-      server.on(
-        'GET',
-        '/session/sess-1/wda/screen',
-        (_) => const FakeResponse.error('unknown command', 'nope'),
+      await expectLater(
+        connect(),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', 'unknown error')
+              .having((e) => e.message, 'message', 'screen unavailable'),
+        ),
       );
-
-      await expectLater(connect(), throwsA(isA<WebDriverException>()));
+      expect(server.requestsTo('GET', '/session/sess-1/screenshot'), isEmpty);
       expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
     });
 
@@ -1355,7 +1452,7 @@ void main() {
             ),
           )
           ..onValue('POST', '/session/sess-1/element', {
-            'ELEMENT': 'done-1',
+            w3cElementKey: 'done-1',
           })
           ..onValue('POST', '/session/sess-1/element/done-1/click', null);
         final connector = await connect();
@@ -1410,19 +1507,6 @@ void main() {
       expect(bootstrap.disposeCalls, 0);
     });
   });
-}
-
-/// Base64 of a PNG signature + IHDR header for a [width]x[height] image.
-String _pngHeader(int width, int height) {
-  List<int> uint32(int value) =>
-      [value >> 24 & 0xFF, value >> 16 & 0xFF, value >> 8 & 0xFF, value & 0xFF];
-  return base64Encode([
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // signature
-    0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, // IHDR length + type
-    ...uint32(width),
-    ...uint32(height),
-    8, 6, 0, 0, 0, 0, 0, 0, 0, // rest of IHDR + CRC (unchecked)
-  ]);
 }
 
 /// A bootstrap that reports whether it started the server.

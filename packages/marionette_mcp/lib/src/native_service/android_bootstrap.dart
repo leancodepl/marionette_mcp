@@ -36,9 +36,9 @@ typedef PortProbe = Future<bool> Function(int port);
 ///
 /// The local port is `MARIONETTE_UIA2_PORT`, else the port of an existing
 /// forward to this device, else the first free port from
-/// [defaultLocalPort]. A healthy server behind an existing forward is reused
-/// and left running on [dispose], because another Marionette process owns
-/// it.
+/// [uia2DefaultLocalPort]. A healthy server behind an existing forward is
+/// reused and left running on [dispose], because another Marionette process
+/// owns it.
 class AndroidBootstrap implements SharedServerBootstrap {
   AndroidBootstrap({
     this.serial,
@@ -73,14 +73,8 @@ class AndroidBootstrap implements SharedServerBootstrap {
   static const _serverPackage = 'io.appium.uiautomator2.server';
   static const _testPackage = 'io.appium.uiautomator2.server.test';
 
-  /// First local port tried when no port is configured or reused.
-  static const defaultLocalPort = uia2DefaultLocalPort;
-
   /// UIAutomator2's port on the device.
   static const _devicePort = 6790;
-
-  /// Environment variable that fixes the local port.
-  static const portEnvironmentKey = uia2PortEnvironmentKey;
 
   /// SHA-256 of the v[uia2Version] release APKs, by file name.
   static const pinnedApkSha256 = {
@@ -311,11 +305,11 @@ class AndroidBootstrap implements SharedServerBootstrap {
   }
 
   int? _environmentPort() =>
-      parseUia2PortEnvironment(_environment[portEnvironmentKey]);
+      parseUia2PortEnvironment(_environment[uia2PortEnvironmentKey]);
 
   Future<int> _chooseLocalPort() => chooseUia2LocalPort(
         explicitPort: _explicitLocalPort,
-        environmentValue: _environment[portEnvironmentKey],
+        environmentValue: _environment[uia2PortEnvironmentKey],
         isPortFree: _isPortFree,
       );
 

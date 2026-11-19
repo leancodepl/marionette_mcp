@@ -100,16 +100,6 @@ void main() {
       expect(await client.findElement('sess-1', 'xpath', '//Button'), 'el-99');
     });
 
-    test('findElement falls back to legacy ELEMENT key', () async {
-      server.onValue(
-        'POST',
-        '/session/sess-1/element',
-        {'ELEMENT': 'legacy-el'},
-      );
-
-      expect(await client.findElement('sess-1', 'id', 'foo'), 'legacy-el');
-    });
-
     test('elementClick posts to element click endpoint', () async {
       server.onValue('POST', '/session/sess-1/element/el-1/click', null);
 
@@ -141,7 +131,7 @@ void main() {
       expect(await client.getOrientation('sess-1'), 'LANDSCAPE');
     });
 
-    test('swipe builds W3C pointer actions via performActions', () async {
+    test('swipe builds W3C pointer actions', () async {
       server.onValue('POST', '/session/sess-1/actions', null);
 
       await client.swipe(
@@ -151,6 +141,7 @@ void main() {
         endX: 10,
         endY: 200,
         durationMs: 150,
+        holdMs: 200,
       );
 
       final body =
@@ -160,21 +151,25 @@ void main() {
       final source = actions.single as Map<String, dynamic>;
       expect(source['type'], 'pointer');
       expect(source['parameters'], {'pointerType': 'touch'});
-      final steps = source['actions'] as List<dynamic>;
-      expect(steps[0], {
-        'type': 'pointerMove',
-        'duration': 0,
-        'origin': 'viewport',
-        'x': 10,
-        'y': 20,
-      });
-      expect(steps[2], {
-        'type': 'pointerMove',
-        'duration': 150,
-        'origin': 'viewport',
-        'x': 10,
-        'y': 200,
-      });
+      expect(source['actions'], [
+        {
+          'type': 'pointerMove',
+          'duration': 0,
+          'origin': 'viewport',
+          'x': 10,
+          'y': 20,
+        },
+        {'type': 'pointerDown', 'button': 0},
+        {
+          'type': 'pointerMove',
+          'duration': 150,
+          'origin': 'viewport',
+          'x': 10,
+          'y': 200,
+        },
+        {'type': 'pause', 'duration': 200},
+        {'type': 'pointerUp', 'button': 0},
+      ]);
     });
 
     test('deleteSession issues DELETE', () async {
@@ -261,7 +256,7 @@ void main() {
       );
 
       await expectLater(
-        client.performActions('sess-1', const []),
+        client.swipe('sess-1', startX: 0, startY: 0, endX: 0, endY: 0),
         throwsA(
           isA<WebDriverException>()
               .having((e) => e.error, 'error', webDriverConnectionLost),
@@ -321,7 +316,7 @@ void main() {
     test('status is false when /status never answers', () async {
       final impatient = WebDriverClient(
         server.baseUrl,
-        statusTimeout: const Duration(milliseconds: 200),
+        shortTimeout: const Duration(milliseconds: 200),
       );
       addTearDown(impatient.close);
       server.on('GET', '/status', (_) => Completer<FakeResponse>().future);
@@ -331,13 +326,13 @@ void main() {
       expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
     });
 
-    test('close cleans up so further requests fail', () async {
+    test('status on a closed client throws, not false', () async {
       server.onValue('GET', '/status', {'ready': true});
       expect(await client.status(), isTrue);
 
       client.close();
 
-      expect(await client.status(), isFalse);
+      await expectLater(client.status(), throwsStateError);
     });
   });
 }
