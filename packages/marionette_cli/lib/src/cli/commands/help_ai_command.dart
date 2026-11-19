@@ -159,8 +159,10 @@ List interactive UI elements in the app's widget tree.
   properties. To act on an element, pass its key or identifier, the text of
   one visible Text widget, or its coordinates. A button or tile reports the
   labels of its children as its text. When that text joins several labels
-  ("Accept terms\nRequired") or comes from a Semantics label (an icon's
-  semanticLabel), it is for discovery only: --text does not match it.
+  ("Accept terms\nRequired"), comes from a Semantics label (an icon's
+  semanticLabel), or includes the content of a WidgetSpan ("Hi Bob" from
+  Text.rich with WidgetSpan(child: Text("Bob"))), it is for discovery only:
+  --text does not match it.
   On a screen that repeats the same subtree, pass
   --ancestor-keys <wrapper key> to list just that subtree, then reuse the same
   keys as --ancestor-keys on tap/enter-text to act inside it.

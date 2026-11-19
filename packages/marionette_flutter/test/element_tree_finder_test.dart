@@ -460,7 +460,8 @@ void main() {
       expect(insideButton, isTrue);
     });
 
-    testWidgets('merged and semantic-only labels do not match tap(text:)',
+    testWidgets(
+        'merged, semantic-only and WidgetSpan labels do not match tap(text:)',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -469,11 +470,26 @@ void main() {
               onPressed: () {},
               child: const Icon(Icons.add, semanticLabel: 'New invoice'),
             ),
-            body: CheckboxListTile(
-              value: true,
-              onChanged: (_) {},
-              title: const Text('Accept terms'),
-              subtitle: const Text('Required'),
+            body: Column(
+              children: [
+                CheckboxListTile(
+                  value: true,
+                  onChanged: (_) {},
+                  title: const Text('Accept terms'),
+                  subtitle: const Text('Required'),
+                ),
+                FilledButton(
+                  onPressed: () {},
+                  child: const Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'Hi '),
+                        WidgetSpan(child: Text('Bob')),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -484,9 +500,13 @@ void main() {
       final labels =
           _finder.findInteractiveElements().map((e) => e['text']).toList();
 
-      expect(labels, containsAll(['Accept terms\nRequired', 'New invoice']));
+      expect(
+        labels,
+        containsAll(['Accept terms\nRequired', 'New invoice', 'Hi Bob']),
+      );
       expect(matchText('Accept terms\nRequired'), isNull);
       expect(matchText('New invoice'), isNull);
+      expect(matchText('Hi Bob'), isNull);
       expect(matchText('Accept terms'), isNotNull);
     });
 

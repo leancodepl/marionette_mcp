@@ -120,10 +120,11 @@ class ConceptsPage extends StatelessComponent {
                 'identifier and bounds, so the agent can name a target and '
                 'knows where it is. A button or list tile reports the labels '
                 'of its children as its text. When that text joins several '
-                'labels or comes from a `Semantics` label, it is for discovery '
-                'only: the text matcher compares one `Text` at a time, so the '
-                'agent selects by key, identifier, the text of one visible '
-                '`Text`, or coordinates.',
+                'labels, comes from a `Semantics` label or includes the '
+                'content of a `WidgetSpan`, it is for discovery only: the text '
+                'matcher compares one `Text` at a time, without its '
+                '`WidgetSpan` content, so the agent selects by key, '
+                'identifier, the text of one visible `Text`, or coordinates.',
               ),
             ),
             const p([
