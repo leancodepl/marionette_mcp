@@ -404,9 +404,11 @@ class ConfigurePage extends StatelessComponent {
             ),
             p(
               rich(
-                '`label` and `value` are for reading only: the matcher '
+                '`label` and `value` are for discovery only: the matcher '
                 'ignores them, so a `Semantics(label: "Submit")` never steals '
-                'a tap from the button inside it. To target a widget without '
+                'a tap from the button inside it. A button that reports a '
+                '`label` from its children as its text cannot be tapped by '
+                'that text either. To target a widget without '
                 'a key, use `identifier`, which the matcher does read and '
                 'screen readers never announce.',
               ),

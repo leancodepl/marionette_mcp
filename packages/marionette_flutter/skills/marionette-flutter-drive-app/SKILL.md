@@ -163,6 +163,11 @@ disconnecting.
   the normal way to target something — if nothing else works, that's a sign
   the widget needs a key or `Semantics(identifier: ...)`, not a reason to keep
   using coordinates.
+- **Discovery text is not always a selector.** A button or list tile reports
+  the labels of its children as its `text`. When that text joins several
+  labels (`"Accept terms\nRequired"`) or comes from a `Semantics` label (an
+  icon's `semanticLabel`), `tap(text:)` does not match it: use the key, the
+  identifier, the text of one visible `Text`, or coordinates.
 - **Repeated keys: scope the match with `ancestor_keys`.** Every tool takes
   the first match in the tree, so on a screen that repeats the same subtree
   (grid cells, repeated cards, a dev screen embedding several copies of the

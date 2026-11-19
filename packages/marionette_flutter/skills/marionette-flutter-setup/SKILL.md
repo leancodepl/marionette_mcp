@@ -91,7 +91,9 @@ inside one is still its own discoverable element. For genuinely non-text
 content, annotate with `Semantics(label: ..., value: ...)` instead; Marionette surfaces that as a
 `Semantics` element with the joined `'label: value'` string, and it costs
 nothing if `label`/`value` are absent (unlabeled `Semantics` nodes are
-silently skipped).
+silently skipped). That text is for discovery only: the text matcher ignores
+it, so give the widget a key or `Semantics(identifier: ...)` when an agent
+must act on it.
 
 Not every custom widget needs an entry: add one when it's a primary
 interactive primitive (button, field, toggle, tab, chip) or when

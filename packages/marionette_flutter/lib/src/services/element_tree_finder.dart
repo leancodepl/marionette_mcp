@@ -288,16 +288,18 @@ class ElementTreeFinder {
     return label == null || label.isEmpty ? null : label;
   }
 
-  /// The label a control announces for its subtree, merged the way Flutter's
-  /// accessibility tree merges the labels under a `MergeSemantics`: in tree
-  /// order, joined line by line, taking a `Semantics` label (such as an
-  /// `Icon`'s `semanticLabel`) and reading only what
-  /// [RenderObject.visitChildrenForSemantics] reaches, which leaves out
-  /// `ExcludeSemantics` (an `Icon`'s glyph), `Offstage`, the hidden children
-  /// of an `IndexedStack` and the like.
+  /// A discovery-only label for a control traversal stops at, built from the
+  /// text its children show and the explicit `Semantics` labels below it
+  /// (such as an `Icon`'s `semanticLabel`), in tree order and joined line by
+  /// line. It reads only what [RenderObject.visitChildrenForSemantics]
+  /// reaches, which leaves out `ExcludeSemantics` (an `Icon`'s glyph),
+  /// `Offstage`, the hidden children of an `IndexedStack` and the like.
   ///
-  /// A control traversal stops at is listed as one element, so it reports
-  /// what its children show; `tap(text:)` still matches each `Text` on its own.
+  /// This is a hybrid of the visible text and the accessibility labels, not
+  /// what Flutter's accessibility tree announces: a `Text` reports its
+  /// visible text even when its `semanticsLabel` says something else.
+  /// `tap(text:)` still matches each `Text` on its own, so a label merged from
+  /// several children or taken from `Semantics` alone does not match.
   /// A control holding an [EditableText] is a field, whose `text` is its value
   /// rather than the label around it, so it gets none.
   String? _extractMergedLabel(Element element) {

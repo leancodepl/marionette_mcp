@@ -460,6 +460,52 @@ void main() {
       expect(insideButton, isTrue);
     });
 
+    testWidgets('merged and semantic-only labels do not match tap(text:)',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            floatingActionButton: FloatingActionButton(
+              onPressed: () {},
+              child: const Icon(Icons.add, semanticLabel: 'New invoice'),
+            ),
+            body: CheckboxListTile(
+              value: true,
+              onChanged: (_) {},
+              title: const Text('Accept terms'),
+              subtitle: const Text('Required'),
+            ),
+          ),
+        ),
+      );
+
+      Element? matchText(String text) =>
+          WidgetFinder().findHittableElement(TextMatcher(text), _configuration);
+      final labels =
+          _finder.findInteractiveElements().map((e) => e['text']).toList();
+
+      expect(labels, containsAll(['Accept terms\nRequired', 'New invoice']));
+      expect(matchText('Accept terms\nRequired'), isNull);
+      expect(matchText('New invoice'), isNull);
+      expect(matchText('Accept terms'), isNotNull);
+    });
+
+    testWidgets('a Text reports its visible text, not its semanticsLabel',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const Text('ABC', semanticsLabel: 'Alphabet'),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'ABC');
+    });
+
     testWidgets('an icon-only control reports no text', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
