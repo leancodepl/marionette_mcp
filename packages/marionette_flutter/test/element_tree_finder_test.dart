@@ -1205,6 +1205,64 @@ void main() {
       });
 
       testWidgets(
+          'reports its merged label and its toggle state in both compaction '
+          'modes', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                _DsCard<bool>(
+                  key: const ValueKey('remember'),
+                  value: '\uE88A',
+                  child: Row(
+                    children: [
+                      Checkbox(value: true, onChanged: (_) {}),
+                      const Expanded(child: Text('Remember me')),
+                    ],
+                  ),
+                ),
+                _DsCard<bool>(
+                  key: const ValueKey('starred'),
+                  child: Row(
+                    children: [
+                      Checkbox(value: false, onChanged: (_) {}),
+                      const Text('\uE88A'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ));
+
+        final compact =
+            finder.findInteractiveElements(compaction: CompactionMode.compact);
+        final verbose =
+            finder.findInteractiveElements(compaction: CompactionMode.none);
+        Map<String, dynamic> entry(
+                List<Map<String, dynamic>> elements, String key) =>
+            elements.singleWhere((e) => e['key'] == key);
+
+        expect(entry(compact, 'remember'), containsPair('text', 'Remember me'));
+        expect(entry(compact, 'remember'), containsPair('value', 'true'));
+        expect(entry(compact, 'starred'), isNot(contains('text')),
+            reason: 'a merged label made of a glyph is unreadable');
+        expect(entry(compact, 'starred'), containsPair('value', 'false'));
+        expect(_types(compact), isNot(contains('Checkbox')));
+
+        expect(entry(verbose, 'remember'), containsPair('text', 'Remember me'));
+        expect(entry(verbose, 'remember'), containsPair('value', '\uE88A'));
+        expect(entry(verbose, 'starred'), containsPair('text', '\uE88A'));
+        expect(entry(verbose, 'starred'), containsPair('value', 'false'));
+        expect(
+          verbose.where((e) => e['type'] == 'Checkbox').map((e) => e['value']),
+          ['true'],
+          reason: 'only the toggle whose state its owner did not take is '
+              'listed on its own',
+        );
+      });
+
+      testWidgets(
           'lists its toggle on its own when its declared value matches the '
           "toggle's state", (tester) async {
         await tester.pumpWidget(MaterialApp(
@@ -2052,7 +2110,7 @@ class _DsTile extends StatelessWidget {
 }
 
 class _DsCard<T> extends StatelessWidget {
-  const _DsCard({required this.child, this.value});
+  const _DsCard({required this.child, this.value, super.key});
 
   final Widget child;
   final String? value;
