@@ -588,6 +588,38 @@ void main() {
       });
 
       testWidgets(
+          "reports its toggle's state when compact mode drops the icon glyph "
+          'it declares as value', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: _DsCard<bool>(
+              value: '',
+              child: Checkbox(value: true, onChanged: (_) {}),
+            ),
+          ),
+        ));
+
+        final compact =
+            finder.findInteractiveElements(compaction: CompactionMode.compact);
+        expect(
+          compact.firstWhere((e) => e['type'] == '_DsCard<bool>')['value'],
+          'true',
+        );
+        expect(compact.where((e) => e['type'] == 'Checkbox'), isEmpty);
+
+        final verbose =
+            finder.findInteractiveElements(compaction: CompactionMode.none);
+        expect(
+          verbose.firstWhere((e) => e['type'] == '_DsCard<bool>')['value'],
+          '',
+        );
+        expect(
+          verbose.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+          'true',
+        );
+      });
+
+      testWidgets(
           'lists its toggle on its own when its declared value matches the '
           "toggle's state", (tester) async {
         await tester.pumpWidget(MaterialApp(
