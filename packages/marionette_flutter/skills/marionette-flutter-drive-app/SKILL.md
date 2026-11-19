@@ -169,7 +169,9 @@ disconnecting.
   icon's `semanticLabel`), or includes the content of a `WidgetSpan`
   (`"Hi Bob"` from `Text.rich` with `WidgetSpan(child: Text("Bob"))`),
   `tap(text:)` does not match it: use the key, the identifier, the text of
-  one visible `Text`, or coordinates.
+  one visible `Text`, or coordinates. The listing prints a line break as
+  `\n`, a carriage return as `\r` and a backslash as `\\`; unescape a copied
+  value before you pass it back.
 - **Repeated keys: scope the match with `ancestor_keys`.** Every tool takes
   the first match in the tree, so on a screen that repeats the same subtree
   (grid cells, repeated cards, a dev screen embedding several copies of the

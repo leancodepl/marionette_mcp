@@ -147,8 +147,10 @@ List interactive UI elements in the app's widget tree.
     marionette -i my-app get-interactive-elements --compaction=none
     marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 
-  Output (stdout), one line per element; a line break inside a value prints
-  as \n:
+  Output (stdout), one line per element; inside a value a line break prints
+  as \n, a carriage return as \r and a backslash as \\. Unescape a copied
+  value before you pass it to --text or --key: Text: "C:\\temp" is
+  --text 'C:\temp'.
     Found 3 interactive element(s):
 
     Type: ElevatedButton, Key: "submit_button", Text: "Submit"
