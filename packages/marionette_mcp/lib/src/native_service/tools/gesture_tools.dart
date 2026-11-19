@@ -12,9 +12,13 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
 const _defaultSwipeDistance = 400;
-const _defaultMaxSwipes = 10;
+
+/// `native_scroll`'s search limit when `maxSwipes` is not given.
+const defaultMaxSwipes = 10;
 const _maxMaxSwipes = 50;
-const _defaultSwipeDurationMs = 300;
+
+/// `native_swipe`'s duration when `durationMs` is not given.
+const defaultSwipeDurationMs = 300;
 const _maxGestureDurationMs = 10000;
 
 /// Share of a `within` container's size a swipe may cover, so the finger
@@ -141,7 +145,7 @@ void registerNativeGestureTools(
       'native_swipe',
       description: 'Swipes one finger from (startX, startY) to (endX, endY) in '
           'screen pixels over durationMs (default '
-          '$_defaultSwipeDurationMs). Use for drags, sliders, and edge '
+          '$defaultSwipeDurationMs). Use for drags, sliders, and edge '
           'gestures (e.g. iOS back: start at x=1). For scrolling until '
           'something appears, use native_scroll. '
           '$nativeRoutingPreferFlutter '
@@ -155,7 +159,7 @@ void registerNativeGestureTools(
           'endY': JsonSchema.number(description: 'Finger end Y.'),
           'durationMs': JsonSchema.integer(
             description: 'Movement duration in milliseconds (default '
-                '$_defaultSwipeDurationMs). Longer is a slow drag; shorter '
+                '$defaultSwipeDurationMs). Longer is a slow drag; shorter '
                 'a fling.',
           ),
         },
@@ -177,7 +181,7 @@ void registerNativeGestureTools(
           'slow drags so the list does not fling past the target. '
           'If a target selector (text, textContains, id, type) is given, '
           'swipes repeatedly until a matching element is visible, up to '
-          'maxSwipes (default $_defaultMaxSwipes), and stops early with an '
+          'maxSwipes (default $defaultMaxSwipes), and stops early with an '
           'error when the content no longer moves (end of the list). '
           '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
@@ -197,7 +201,7 @@ void registerNativeGestureTools(
           ),
           'maxSwipes': JsonSchema.integer(
             description: 'Maximum swipes while looking for the target '
-                '(default $_defaultMaxSwipes, max $_maxMaxSwipes).',
+                '(default $defaultMaxSwipes, max $_maxMaxSwipes).',
           ),
           'distance': JsonSchema.number(
             description: 'Swipe distance in screen pixels '
@@ -336,7 +340,7 @@ Future<CallToolResult> handleNativeSwipe(
   }
   final duration = _durationArg(args, 'durationMs');
   if (duration.error != null) return invalidArguments(duration.error!);
-  final durationMs = duration.value ?? _defaultSwipeDurationMs;
+  final durationMs = duration.value ?? defaultSwipeDurationMs;
 
   logger.info('Native swipe ($startX,$startY) → ($endX,$endY) '
       'in ${durationMs}ms');
@@ -372,7 +376,7 @@ Future<CallToolResult> handleNativeScroll(
   final distance = intArg(args, 'distance');
   final startX = intArg(args, 'startX');
   final startY = intArg(args, 'startY');
-  final maxSwipes = intArg(args, 'maxSwipes') ?? _defaultMaxSwipes;
+  final maxSwipes = intArg(args, 'maxSwipes') ?? defaultMaxSwipes;
   final rawWithin = args['within'];
 
   if (direction == null) {

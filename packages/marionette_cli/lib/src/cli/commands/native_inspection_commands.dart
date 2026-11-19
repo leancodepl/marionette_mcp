@@ -1,17 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:args/args.dart';
 import 'package:marionette_cli/src/cli/native_command.dart';
-import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
 import 'package:marionette_mcp/src/native_service/tools/screenshot_tools.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:mcp_dart/mcp_dart.dart';
-import 'package:path/path.dart' as p;
 
 class NativeGetElementsCommand extends NativeCommand {
-  NativeGetElementsCommand(this.nativeRegistry) {
+  NativeGetElementsCommand(super.nativeRegistry, super.environment) {
     addSelectorOptions(withIndex: false);
     argParser
       ..addFlag(
@@ -27,9 +26,6 @@ class NativeGetElementsCommand extends NativeCommand {
   }
 
   @override
-  final NativeSessionRegistry nativeRegistry;
-
-  @override
   String get name => 'native-get-elements';
 
   @override
@@ -38,10 +34,11 @@ class NativeGetElementsCommand extends NativeCommand {
       'WebView content) as JSON.';
 
   @override
-  Map<String, dynamic> toolArguments() => NativeCommand.compact({
-        ...selectorArgs(withIndex: false),
-        'clickableOnly': flag('clickable-only'),
-        'includeForegroundApp': flag('include-foreground-app'),
+  Map<String, dynamic> toolArguments(ArgResults results) =>
+      NativeCommand.compact({
+        ...selectorArgs(results, withIndex: false),
+        'clickableOnly': flag(results, 'clickable-only'),
+        'includeForegroundApp': flag(results, 'include-foreground-app'),
       });
 
   @override
@@ -53,7 +50,7 @@ class NativeGetElementsCommand extends NativeCommand {
 }
 
 class NativeWaitForCommand extends NativeCommand {
-  NativeWaitForCommand(this.nativeRegistry) {
+  NativeWaitForCommand(super.nativeRegistry, super.environment) {
     addSelectorOptions(withIndex: false);
     argParser
       ..addOption(
@@ -62,12 +59,15 @@ class NativeWaitForCommand extends NativeCommand {
         allowed: [for (final state in NativeWaitState.values) state.name],
         defaultsTo: NativeWaitState.visible.name,
       )
-      ..addOption('timeout-ms', help: 'Maximum wait (default 10000).')
-      ..addOption('interval-ms', help: 'Delay between reads (default 500).');
+      ..addOption(
+        'timeout-ms',
+        help: 'Maximum wait (default $defaultWaitTimeoutMs).',
+      )
+      ..addOption(
+        'interval-ms',
+        help: 'Delay between reads (default $defaultWaitIntervalMs).',
+      );
   }
-
-  @override
-  final NativeSessionRegistry nativeRegistry;
 
   @override
   String get name => 'native-wait-for';
@@ -78,11 +78,12 @@ class NativeWaitForCommand extends NativeCommand {
       'on timeout.';
 
   @override
-  Map<String, dynamic> toolArguments() => NativeCommand.compact({
-        ...selectorArgs(withIndex: false),
-        'state': string('state'),
-        'timeoutMs': integer('timeout-ms'),
-        'intervalMs': integer('interval-ms'),
+  Map<String, dynamic> toolArguments(ArgResults results) =>
+      NativeCommand.compact({
+        ...selectorArgs(results, withIndex: false),
+        'state': string(results, 'state'),
+        'timeoutMs': integer(results, 'timeout-ms'),
+        'intervalMs': integer(results, 'interval-ms'),
       });
 
   @override
@@ -94,7 +95,7 @@ class NativeWaitForCommand extends NativeCommand {
 }
 
 class NativeTakeScreenshotCommand extends NativeCommand {
-  NativeTakeScreenshotCommand(this.nativeRegistry) {
+  NativeTakeScreenshotCommand(super.nativeRegistry, super.environment) {
     argParser.addOption(
       'output',
       abbr: 'o',
@@ -104,17 +105,20 @@ class NativeTakeScreenshotCommand extends NativeCommand {
   }
 
   @override
-  final NativeSessionRegistry nativeRegistry;
-
-  @override
   String get name => 'native-take-screenshot';
 
   @override
   String get description =>
       'Save a screenshot of the whole device screen (system UI included).';
 
+  /// Reads `--output` here, so a missing one fails before the device call.
   @override
-  Map<String, dynamic> toolArguments() => const {};
+  Map<String, dynamic> toolArguments(ArgResults results) {
+    if (string(results, 'output') == null) {
+      usageException('--output must not be empty.');
+    }
+    return const {};
+  }
 
   @override
   Future<CallToolResult> execute(
@@ -123,18 +127,24 @@ class NativeTakeScreenshotCommand extends NativeCommand {
   ) =>
       handleNativeTakeScreenshot(context);
 
-  /// Keeps a copy in the report's `screenshots/`, as `native_take_screenshot`
-  /// with `inline: false` does, so the report can cite it.
+  /// Keeps a copy in the report's `screenshots/` and returns the result
+  /// `native_take_screenshot` gives with `inline: false`, so the report can
+  /// cite it.
   @override
-  String describeSuccess(CallToolResult result, Session session) {
+  CallToolResult recordInSession(CallToolResult result, Session session) {
     final image = result.content.whereType<ImageContent>().firstOrNull;
-    if (image == null) return 'ok';
+    if (image == null) return result;
     final saved = session.saveScreenshots([image.data]).single;
     stdout.writeln('Saved a copy in the session: $saved');
     final note = result.content.whereType<TextContent>().firstOrNull?.text;
-    return 'Saved 1 screenshot(s): '
-        '${p.relative(saved, from: session.directory.path)}'
-        '${note == null ? '' : ' $note'}';
+    return CallToolResult(
+      content: [
+        TextContent(
+          text:
+              'Saved 1 screenshot(s):\n$saved${note == null ? '' : '\n$note'}',
+        ),
+      ],
+    );
   }
 
   @override

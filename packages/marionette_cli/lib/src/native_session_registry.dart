@@ -1,14 +1,11 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:marionette_cli/src/instance_registry.dart';
-import 'package:path/path.dart' as p;
+import 'package:marionette_cli/src/json_file_registry.dart';
+import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 
 /// A native automation session kept between CLI commands.
 ///
 /// The device-side server runs detached from the CLI and every command
 /// attaches to it.
-class NativeSessionInfo {
+class NativeSessionInfo implements JsonFileEntry {
   NativeSessionInfo({
     required this.name,
     required this.platform,
@@ -25,7 +22,10 @@ class NativeSessionInfo {
   factory NativeSessionInfo.fromJson(Map<String, dynamic> json) {
     return NativeSessionInfo(
       name: json['name'] as String,
-      platform: json['platform'] as String,
+      platform: NativePlatform.values.asNameMap()[json['platform']] ??
+          (throw FormatException(
+            'Unknown native platform "${json['platform']}".',
+          )),
       baseUrl: json['baseUrl'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       serial: json['serial'] as String?,
@@ -37,10 +37,10 @@ class NativeSessionInfo {
     );
   }
 
+  @override
   final String name;
 
-  /// `android` or `ios`.
-  final String platform;
+  final NativePlatform platform;
 
   /// Local WebDriver URL of the device-side server.
   final String baseUrl;
@@ -67,9 +67,10 @@ class NativeSessionInfo {
   /// stops it. A server that was already running is left alone.
   final bool startedServer;
 
+  @override
   Map<String, dynamic> toJson() => {
         'name': name,
-        'platform': platform,
+        'platform': platform.name,
         'baseUrl': baseUrl,
         'createdAt': createdAt.toUtc().toIso8601String(),
         if (serial != null) 'serial': serial,
@@ -82,83 +83,18 @@ class NativeSessionInfo {
 
   /// Device the session drives, for messages.
   String get device => serial ?? udid ?? 'default device';
+
+  /// Whether a connect to [platform] with [serial] and [udid] (null: any
+  /// device) asks for the device this session drives.
+  bool targets(NativePlatform platform, {String? serial, String? udid}) =>
+      this.platform == platform &&
+      (serial == null || serial == this.serial) &&
+      (udid == null || udid == this.udid);
 }
 
-/// File-based registry for named native sessions.
-///
-/// Stores session metadata in `~/.marionette/native/<name>.json`.
-class NativeSessionRegistry {
-  NativeSessionRegistry({String? baseDir})
-      : _baseDir = baseDir ??
-            p.join(
-              Platform.environment['HOME'] ??
-                  Platform.environment['USERPROFILE'] ??
-                  '.',
-              '.marionette',
-              'native',
-            );
-
-  final String _baseDir;
-
-  String _filePath(String name) => p.join(_baseDir, '$name.json');
-
-  /// Saves [info], replacing an entry with the same name.
-  void save(NativeSessionInfo info) {
-    InstanceRegistry.validateName(info.name);
-
-    final dir = Directory(_baseDir);
-    if (!dir.existsSync()) {
-      dir.createSync(recursive: true);
-    }
-
-    final json = const JsonEncoder.withIndent('  ').convert(info.toJson());
-
-    // Atomic write: write to tmp, then rename
-    final tmpFile = File('${_filePath(info.name)}.tmp');
-    tmpFile.writeAsStringSync(json);
-    tmpFile.renameSync(_filePath(info.name));
-  }
-
-  /// Removes a session. Returns true if it existed.
-  bool remove(String name) {
-    InstanceRegistry.validateName(name);
-    final file = File(_filePath(name));
-    if (file.existsSync()) {
-      file.deleteSync();
-      return true;
-    }
-    return false;
-  }
-
-  /// Gets a single session, or null if not found.
-  NativeSessionInfo? get(String name) {
-    InstanceRegistry.validateName(name);
-    final file = File(_filePath(name));
-    if (!file.existsSync()) return null;
-    final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-    return NativeSessionInfo.fromJson(json);
-  }
-
-  /// Lists all sessions.
-  List<NativeSessionInfo> listAll() {
-    final dir = Directory(_baseDir);
-    if (!dir.existsSync()) return [];
-
-    return dir
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.json') && !f.path.endsWith('.tmp'))
-        .map((f) {
-          try {
-            final json =
-                jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
-            return NativeSessionInfo.fromJson(json);
-          } catch (_) {
-            return null;
-          }
-        })
-        .whereType<NativeSessionInfo>()
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
-  }
+/// File-based registry for named native sessions, stored in
+/// `~/.marionette/native/`.
+class NativeSessionRegistry extends JsonFileRegistry<NativeSessionInfo> {
+  NativeSessionRegistry({super.baseDir})
+      : super(directoryName: 'native', fromJson: NativeSessionInfo.fromJson);
 }

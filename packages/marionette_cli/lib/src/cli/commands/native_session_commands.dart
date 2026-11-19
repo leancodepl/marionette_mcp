@@ -20,6 +20,8 @@ class NativeConnectCommand extends Command<int> {
     argParser
       ..addOption(
         'platform',
+        help: 'Target platform: android (UIAutomator2) or ios '
+            '(WebDriverAgent on a Simulator).',
         allowed: [for (final p in NativePlatform.values) p.name],
         mandatory: true,
       )
@@ -47,16 +49,29 @@ class NativeConnectCommand extends Command<int> {
     final udid = argResults!['udid'] as String?;
 
     final existing = _registry.get(name);
-    if (existing != null &&
-        existing.platform == platform.name &&
-        (serial == null || serial == existing.serial) &&
-        (udid == null || udid == existing.udid) &&
-        await _isRunning(existing.baseUrl)) {
-      stdout.writeln(
-        'Native session "$name" is already connected '
-        '(${existing.platform}, ${existing.device}).',
-      );
-      return 0;
+    if (existing != null) {
+      final sameDevice = existing.targets(platform, serial: serial, udid: udid);
+      if (!sameDevice && existing.startedServer) {
+        stderr.writeln(
+          'Native session "$name" runs a server it started on '
+          '${existing.platform.name} ${existing.device}.\n'
+          'Hint: Run "${nativeCommandLine(name, 'native-disconnect')}" '
+          'first, or pass another --native-device.',
+        );
+        return 1;
+      }
+      if (sameDevice) {
+        if (await _isRunning(existing.baseUrl)) {
+          stdout.writeln(
+            'Native session "$name" is already connected '
+            '(${existing.platform.name}, ${existing.device}).',
+          );
+          return 0;
+        }
+        // The new entry replaces the recorded pid, so nothing could stop the
+        // old server later.
+        if (existing.startedServer) await _stopStartedServer(existing);
+      }
     }
 
     stdout.writeln(
@@ -87,7 +102,7 @@ class NativeConnectCommand extends Command<int> {
           );
           info = NativeSessionInfo(
             name: name,
-            platform: platform.name,
+            platform: platform,
             baseUrl: baseUrl.toString(),
             createdAt: DateTime.now(),
             serial: resolvedSerial,
@@ -107,7 +122,7 @@ class NativeConnectCommand extends Command<int> {
           );
           info = NativeSessionInfo(
             name: name,
-            platform: platform.name,
+            platform: platform,
             baseUrl: baseUrl.toString(),
             createdAt: DateTime.now(),
             udid: bootstrap.resolvedUdid ?? udid,
@@ -117,7 +132,12 @@ class NativeConnectCommand extends Command<int> {
       }
     } catch (e) {
       await stopStarted?.call();
-      stderr.writeln(cliText('Failed to connect native session "$name": $e'));
+      stderr.writeln(
+        cliText(
+          'Failed to connect native session "$name": $e',
+          runner!.commands.keys.toSet(),
+        ),
+      );
       return 1;
     }
 
@@ -126,23 +146,24 @@ class NativeConnectCommand extends Command<int> {
     connector.release();
 
     stdout.writeln(
-      'Connected native session "$name" (${info.platform}, ${info.device}) '
+      'Connected native session "$name" (${platform.name}, ${info.device}) '
       'at ${info.baseUrl}'
       '${info.startedServer ? '' : ' — reusing a server that was already running'}.',
     );
-    if (!info.startedServer && platform == NativePlatform.android) {
-      // UIAutomator2 has one session per device: the two clients take
-      // it from each other.
-      stdout.writeln(
-        'Warning: another process (e.g. an MCP server) uses UIAutomator2 on '
-        'this device. It has one session per device — while both are used, '
-        'each takes the session from the other, and the MCP server then '
-        'needs native_connect again. Prefer one client per Android device at '
-        'a time.',
-      );
-    }
+    if (oneClientWarning(info) case final warning?) stdout.writeln(warning);
     return 0;
   }
+}
+
+/// Warning for a session on a server that another process started:
+/// UIAutomator2 and WebDriverAgent keep one session per device, so two
+/// clients take it from each other.
+String? oneClientWarning(NativeSessionInfo info) {
+  if (info.startedServer) return null;
+  return 'Warning: another process (e.g. an MCP server) uses the native '
+      'server on this device. It has one session per device — while both '
+      'are used, each takes the session from the other, and the MCP server '
+      'then needs native_connect again. Use one client per device at a time.';
 }
 
 /// Ends a native session: deletes the WebDriver session, stops the server
@@ -186,22 +207,32 @@ class NativeDisconnectCommand extends Command<int> {
     }
 
     var note = '';
-    if (!info.startedServer) {
+    if (info.startedServer) {
+      await _stopStartedServer(info);
+    } else {
       note = ' The server was already running before native-connect and is '
           'left running.';
-    } else if (info.platform == NativePlatform.android.name) {
-      await _stopAndroidServer(
-        AdbClient(serial: info.serial),
-        info.port,
-        info.pid,
-      );
-    } else if (info.pid case final pid?) {
-      await _stopDetached(pid, 'xcodebuild', Uri.parse(info.baseUrl));
     }
 
     _registry.remove(name);
     stdout.writeln('Disconnected native session "$name".$note');
     return 0;
+  }
+}
+
+/// Stops the server `native-connect` started for [info].
+Future<void> _stopStartedServer(NativeSessionInfo info) async {
+  switch (info.platform) {
+    case NativePlatform.android:
+      await _stopAndroidServer(
+        AdbClient(serial: info.serial),
+        info.port,
+        info.pid,
+      );
+    case NativePlatform.ios:
+      if (info.pid case final pid?) {
+        await _stopDetached(pid, 'xcodebuild', Uri.parse(info.baseUrl));
+      }
   }
 }
 
@@ -250,7 +281,8 @@ class NativeSessionsCommand extends Command<int> {
     for (final info in sessions) {
       final running = await _isRunning(info.baseUrl);
       stdout.writeln(
-        '${info.name}\t${info.platform}\t${info.device}\t${info.baseUrl}\t'
+        '${info.name}\t${info.platform.name}\t${info.device}\t'
+        '${info.baseUrl}\t'
         '${running ? 'running' : 'not running'}',
       );
     }

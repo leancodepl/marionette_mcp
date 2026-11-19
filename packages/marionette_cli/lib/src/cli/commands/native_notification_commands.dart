@@ -1,11 +1,11 @@
+import 'package:args/args.dart';
 import 'package:marionette_cli/src/cli/native_command.dart';
-import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/notification_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 class NativeNotificationsCommand extends NativeCommand {
-  NativeNotificationsCommand(this.nativeRegistry) {
+  NativeNotificationsCommand(super.nativeRegistry, super.environment) {
     argParser.addOption(
       'action',
       help: 'open / close the shade or Notification Center.',
@@ -15,16 +15,14 @@ class NativeNotificationsCommand extends NativeCommand {
   }
 
   @override
-  final NativeSessionRegistry nativeRegistry;
-
-  @override
   String get name => 'native-notifications';
 
   @override
   String get description => 'Open or close the notifications.';
 
   @override
-  Map<String, dynamic> toolArguments() => {'action': string('action')};
+  Map<String, dynamic> toolArguments(ArgResults results) =>
+      {'action': string(results, 'action')};
 
   @override
   Future<CallToolResult> execute(

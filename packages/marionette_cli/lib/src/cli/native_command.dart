@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
+import 'package:marionette_cli/src/cli/step_session.dart';
 import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
@@ -24,6 +25,11 @@ String nativeSessionName(ArgResults? globalResults) {
   return (raw != null && raw.isNotEmpty) ? raw : defaultNativeSession;
 }
 
+/// The `marionette` command line that runs [command] on the native session
+/// [name], for hints.
+String nativeCommandLine(String name, String command) => 'marionette '
+    '${name == defaultNativeSession ? '' : '--native-device $name '}$command';
+
 /// Base class for commands that run a native-lane MCP tool against the
 /// session started by `native-connect`.
 ///
@@ -32,7 +38,14 @@ String nativeSessionName(ArgResults? globalResults) {
 /// shared. The device-side server keeps running between commands and the
 /// WebDriver session is reused.
 abstract class NativeCommand extends Command<int> {
-  NativeSessionRegistry get nativeRegistry;
+  /// [environment] holds the environment variables the command reads.
+  NativeCommand(this.nativeRegistry, this.environment);
+
+  final NativeSessionRegistry nativeRegistry;
+  final Map<String, String> environment;
+
+  /// Names of the commands of the runner, for [cliText].
+  Set<String> get _commandNames => runner!.commands.keys.toSet();
 
   /// Runs the shared MCP handler with [args] against [context].
   Future<CallToolResult> execute(
@@ -40,9 +53,9 @@ abstract class NativeCommand extends Command<int> {
     Map<String, dynamic> args,
   );
 
-  /// The tool arguments from the command line; throws a usage error for
-  /// malformed values.
-  Map<String, dynamic> toolArguments();
+  /// The tool arguments from [results], this command's parsed options;
+  /// throws a usage error for malformed values.
+  Map<String, dynamic> toolArguments(ArgResults results);
 
   /// Saves an image returned by the tool. Commands without image output
   /// report that it was dropped.
@@ -50,45 +63,47 @@ abstract class NativeCommand extends Command<int> {
     stderr.writeln('(image output not saved)');
   }
 
+  /// Keeps what a successful [result] adds to [session] and returns the
+  /// result as the session's steps.md records it. Unchanged by default.
+  CallToolResult recordInSession(CallToolResult result, Session session) =>
+      result;
+
   @override
   Future<int> run() async {
-    final args = toolArguments();
-    final name = nativeSessionName(globalResults);
-    final info = nativeRegistry.get(name);
+    final args = toolArguments(argResults!);
+    final sessionName = nativeSessionName(globalResults);
+    final info = nativeRegistry.get(sessionName);
     if (info == null) {
       stderr.writeln(
-        'No native session "$name". Start one with: marionette '
-        '${name == defaultNativeSession ? '' : '--native-device $name '}'
-        'native-connect --platform android|ios',
+        'No native session "$sessionName". Start one with: '
+        '${nativeCommandLine(sessionName, 'native-connect --platform android|ios')}',
       );
       return 1;
     }
-    final platform = NativePlatform.tryParse(info.platform);
-    if (platform == null) {
-      stderr.writeln('Native session "$name" has an unknown platform '
-          '"${info.platform}". Run native-connect again.');
-      return 1;
-    }
-
     final WebDriverNativeConnector connector;
     try {
-      connector = await attachNativeSession(info, platform);
+      connector = await attachNativeSession(info);
     } on NativeSessionNotRunningException catch (e) {
       stderr.writeln(
-        'The native server of session "$name" (${info.device}) is not '
+        'The native server of session "$sessionName" (${info.device}) is not '
         'running at ${e.baseUrl}: the device or simulator was restarted, or '
         'the server was stopped.\n'
         'Hint: Run "marionette native-connect" again.',
       );
       return 1;
     } catch (e) {
-      stderr.writeln(cliText('Could not attach to native session "$name": $e'));
+      stderr.writeln(
+        cliText(
+          'Could not attach to native session "$sessionName": $e',
+          _commandNames,
+        ),
+      );
       return 1;
     }
 
     final context = NativeServiceContext()
       ..connector = connector
-      ..platform = platform;
+      ..platform = info.platform;
     final session = _openReportSession();
     try {
       final CallToolResult result;
@@ -98,66 +113,71 @@ abstract class NativeCommand extends Command<int> {
         _logStep(session, args, describeStepError('$e'));
         rethrow;
       }
-      _logStep(
-        session,
-        args,
-        result.isError
-            ? describeStepError(_firstText(result))
-            : session == null
-                ? 'ok'
-                : describeSuccess(result, session),
-      );
+      if (session != null) {
+        final recorded =
+            result.isError ? result : recordInSession(result, session);
+        _logStep(session, args, describeStepOutcome(name, recorded, session));
+      }
       return await _print(result);
     } finally {
-      info.sessionId = connector.sessionId;
-      nativeRegistry.save(info);
+      _saveSessionId(info, connector.sessionId);
       connector.release();
+    }
+  }
+
+  /// Saves [sessionId] in [info] when the command replaced the session and
+  /// the stored entry is still the one the command started from: a
+  /// `native-disconnect` or `native-connect` that ran meanwhile wins. The
+  /// command's result stands when the save fails or the stored entry was
+  /// edited into a malformed one: the next command replaces the session
+  /// again.
+  void _saveSessionId(NativeSessionInfo info, String? sessionId) {
+    if (sessionId == info.sessionId) return;
+    try {
+      final stored = nativeRegistry.get(info.name);
+      if (stored == null ||
+          stored.createdAt != info.createdAt ||
+          stored.sessionId != info.sessionId) {
+        return;
+      }
+      info.sessionId = sessionId;
+      nativeRegistry.save(info);
+    } on Exception catch (e) {
+      if (e is! FileSystemException && e is! FormatException) rethrow;
+      stderr.writeln('Warning: could not save native session "${info.name}": '
+          '$e');
     }
   }
 
   /// The CLI cannot ask the app whether it enables session reports (a
   /// native command has no Flutter connection), so a native command logs its
-  /// step only when `--session` or `--session-dir` asks for a report
-  /// directory. Best-effort, like the Flutter commands' logging.
+  /// step only when `--session`, `--session-dir` or [sessionDirEnvVar] asks
+  /// for a report directory; `--session-dir` wins over the variable, as in
+  /// [SessionManager]. A directory that cannot be created costs only the
+  /// step log, as in the Flutter commands.
   Session? _openReportSession() {
     final title = globalResults?['session'] as String?;
-    final baseDir = globalResults?['session-dir'] as String?;
+    final envDir = environment[sessionDirEnvVar]?.trim();
+    final baseDir = globalResults?['session-dir'] as String? ??
+        (envDir == null || envDir.isEmpty ? null : envDir);
     if (title == null && baseDir == null) return null;
-    try {
-      return SessionManager().create(title: title, baseDirOverride: baseDir);
-    } catch (e) {
-      stderr.writeln(
-        'Warning: could not open a session directory, so this run will not '
-        'be logged: $e',
-      );
-      return null;
-    }
+    return createCliStepSession(title: title, baseDirOverride: baseDir);
   }
-
-  /// Outcome logged in [session]'s steps.md for a successful [result].
-  String describeSuccess(CallToolResult result, Session session) => 'ok';
 
   void _logStep(Session? session, Map<String, dynamic> args, String outcome) {
     if (session == null) return;
-    final line =
-        formatStepLine(name, describeStepSelector(name, args), outcome);
-    try {
-      session.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
-    } on FileSystemException catch (e) {
-      stderr.writeln('Warning: could not write to steps.md: $e');
-    }
+    appendStepLine(
+      session,
+      formatStepLine(name, describeStepSelector(name, args), outcome),
+    );
   }
-
-  static String _firstText(CallToolResult result) => result.content
-      .whereType<TextContent>()
-      .map((c) => c.text)
-      .firstWhere((t) => t.isNotEmpty, orElse: () => '');
 
   Future<int> _print(CallToolResult result) async {
     final isError = result.isError;
     for (final content in result.content) {
       if (content is TextContent) {
-        (isError ? stderr : stdout).writeln(cliText(content.text));
+        (isError ? stderr : stdout)
+            .writeln(cliText(content.text, _commandNames));
       } else if (content is ImageContent) {
         await saveImage(content);
       }
@@ -179,7 +199,8 @@ abstract class NativeCommand extends Command<int> {
       ..addOption('text-contains', help: 'Substring of the visible text.')
       ..addOption(
         'id',
-        help: 'Resource id (Android) or accessibility identifier (iOS).',
+        help: 'Resource id (Android) or accessibility identifier (iOS). On '
+            'Android it matches the full resource id (package:id/name) only.',
       )
       ..addOption(
         'type',
@@ -196,69 +217,53 @@ abstract class NativeCommand extends Command<int> {
 
   /// The selector options as tool arguments; [textKey] is the tool's name
   /// for the exact-text option.
-  Map<String, Object?> selectorArgs({
+  Map<String, Object?> selectorArgs(
+    ArgResults results, {
     String textOption = 'text',
     String textKey = 'text',
     bool withIndex = true,
   }) =>
       {
-        textKey: string(textOption),
-        'textContains': string('text-contains'),
-        'id': string('id'),
-        'type': string('type'),
-        if (withIndex) 'index': integer('index'),
+        textKey: string(results, textOption),
+        'textContains': string(results, 'text-contains'),
+        'id': string(results, 'id'),
+        'type': string(results, 'type'),
+        if (withIndex) 'index': integer(results, 'index'),
       };
 
-  ArgResults? _parsedForTest;
-
-  /// [toolArguments] for [results] parsed by this command's [argParser] —
-  /// lets tests check the mapping to the MCP tool without a runner.
-  Map<String, dynamic> argumentsFor(ArgResults results) {
-    _parsedForTest = results;
-    try {
-      return toolArguments();
-    } finally {
-      _parsedForTest = null;
-    }
-  }
-
-  ArgResults? get _results => _parsedForTest ?? argResults;
-
-  /// Value of option [name], or null when not given.
-  String? string(String name) {
+  /// Value of option [name] in [results], or null when not given. An empty
+  /// value counts as not given unless [allowEmpty].
+  String? string(ArgResults results, String name, {bool allowEmpty = false}) {
     final String? value;
     try {
-      value = _results?[name] as String?;
+      value = results[name] as String?;
     } on ArgumentError {
       // package:args checks `mandatory` only when the value is read.
       usageException('Missing required option --$name.');
     }
-    return (value == null || value.isEmpty) ? null : value;
+    return (value == null || (value.isEmpty && !allowEmpty)) ? null : value;
   }
 
-  /// Integer value of option [name], or null when not given.
-  int? integer(String name) {
-    final value = string(name);
+  /// Integer value of option [name] in [results], or null when not given.
+  int? integer(ArgResults results, String name) {
+    final value = string(results, name);
     if (value == null) return null;
     return int.tryParse(value) ??
         usageException('--$name must be an integer, got "$value".');
   }
 
-  /// Numeric value of option [name], or null when not given.
-  num? number(String name) {
-    final value = string(name);
+  /// Numeric value of option [name] in [results], or null when not given.
+  num? number(ArgResults results, String name) {
+    final value = string(results, name);
     if (value == null) return null;
     return num.tryParse(value) ??
         usageException('--$name must be a number, got "$value".');
   }
 
-  /// Value of flag [name], or null when it was not given (the tool's
-  /// default applies).
-  bool? flag(String name) {
-    final results = _results;
-    if (results == null || !results.wasParsed(name)) return null;
-    return results[name] as bool;
-  }
+  /// Value of flag [name] in [results], or null when it was not given (the
+  /// tool's default applies).
+  bool? flag(ArgResults results, String name) =>
+      results.wasParsed(name) ? results[name] as bool : null;
 
   /// [args] without the entries that were not given.
   static Map<String, dynamic> compact(Map<String, Object?> args) => {
@@ -267,26 +272,30 @@ abstract class NativeCommand extends Command<int> {
       };
 }
 
-final _toolName = RegExp(r'\bnative_[a-z_]+\b');
+/// A double-quoted value, or a tool name (group 1) that starts a word of
+/// prose (at the start, after a space or `(`). Selector values are quoted
+/// (`id="native_tap"`), and a name inside an unquoted id
+/// (`app:id/native_tap`, `login.native_tap`) does not start a word.
+final _quotedOrToolName = RegExp(r'"[^"]*"|(?<=^|[\s(])(native_[a-z_]+)\b');
 
 /// [text] from a shared MCP handler with tool names (`native_get_elements`)
-/// replaced by the CLI commands (`native-get-elements`). JSON output is left
-/// as it is.
-String cliText(String text) => text.startsWith('{')
+/// replaced by the CLI commands (`native-get-elements`) of [commandNames].
+/// Quoted values, ids and other words keep their `_`, and JSON output is
+/// left as it is.
+String cliText(String text, Set<String> commandNames) => text.startsWith('{')
     ? text
-    : text.replaceAllMapped(
-        _toolName,
-        (match) => match[0]!.replaceAll('_', '-'),
-      );
+    : text.replaceAllMapped(_quotedOrToolName, (match) {
+        final tool = match[1];
+        if (tool == null) return match[0]!;
+        final command = tool.replaceAll('_', '-');
+        return commandNames.contains(command) ? command : tool;
+      });
 
 /// Opens a connector on the running server of [info], reusing its session
 /// when the server still has it.
-Future<WebDriverNativeConnector> attachNativeSession(
-  NativeSessionInfo info,
-  NativePlatform platform,
-) {
+Future<WebDriverNativeConnector> attachNativeSession(NativeSessionInfo info) {
   final bootstrap = RunningServerBootstrap(Uri.parse(info.baseUrl));
-  return switch (platform) {
+  return switch (info.platform) {
     NativePlatform.android => AndroidNativeConnector.connect(
         serial: info.serial,
         bootstrap: bootstrap,

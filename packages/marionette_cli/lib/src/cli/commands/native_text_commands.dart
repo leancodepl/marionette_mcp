@@ -1,5 +1,5 @@
+import 'package:args/args.dart';
 import 'package:marionette_cli/src/cli/native_command.dart';
-import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/native_key.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/keyboard_tools.dart';
@@ -7,7 +7,7 @@ import 'package:marionette_mcp/src/native_service/tools/text_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 class NativeEnterTextCommand extends NativeCommand {
-  NativeEnterTextCommand(this.nativeRegistry) {
+  NativeEnterTextCommand(super.nativeRegistry, super.environment) {
     argParser.addOption(
       'text',
       help: 'The text to type.',
@@ -16,13 +16,10 @@ class NativeEnterTextCommand extends NativeCommand {
     addSelectorOptions(textOption: 'label');
     argParser.addFlag(
       'clear',
-      help: 'Empty the field before typing.',
+      help: 'Replace the field content instead of appending to it.',
       negatable: false,
     );
   }
-
-  @override
-  final NativeSessionRegistry nativeRegistry;
 
   @override
   String get name => 'native-enter-text';
@@ -30,13 +27,15 @@ class NativeEnterTextCommand extends NativeCommand {
   @override
   String get description =>
       'Type into a native field chosen by a selector, or — without one — '
-      'into the field that has keyboard focus. Text is appended.';
+      'into the field that has keyboard focus. The text is appended to the '
+      'field content; --clear replaces the content.';
 
   @override
-  Map<String, dynamic> toolArguments() => NativeCommand.compact({
-        'text': string('text'),
-        ...selectorArgs(textOption: 'label', textKey: 'label'),
-        'clear': flag('clear'),
+  Map<String, dynamic> toolArguments(ArgResults results) =>
+      NativeCommand.compact({
+        'text': string(results, 'text', allowEmpty: true),
+        ...selectorArgs(results, textOption: 'label', textKey: 'label'),
+        'clear': flag(results, 'clear'),
       });
 
   @override
@@ -48,7 +47,7 @@ class NativeEnterTextCommand extends NativeCommand {
 }
 
 class NativePressKeyCommand extends NativeCommand {
-  NativePressKeyCommand(this.nativeRegistry) {
+  NativePressKeyCommand(super.nativeRegistry, super.environment) {
     argParser.addOption(
       'key',
       help: 'Key to press (back, recents and tab: Android only).',
@@ -58,16 +57,14 @@ class NativePressKeyCommand extends NativeCommand {
   }
 
   @override
-  final NativeSessionRegistry nativeRegistry;
-
-  @override
   String get name => 'native-press-key';
 
   @override
   String get description => 'Press a system or hardware key on the device.';
 
   @override
-  Map<String, dynamic> toolArguments() => {'key': string('key')};
+  Map<String, dynamic> toolArguments(ArgResults results) =>
+      {'key': string(results, 'key')};
 
   @override
   Future<CallToolResult> execute(
@@ -78,10 +75,7 @@ class NativePressKeyCommand extends NativeCommand {
 }
 
 class NativeHideKeyboardCommand extends NativeCommand {
-  NativeHideKeyboardCommand(this.nativeRegistry);
-
-  @override
-  final NativeSessionRegistry nativeRegistry;
+  NativeHideKeyboardCommand(super.nativeRegistry, super.environment);
 
   @override
   String get name => 'native-hide-keyboard';
@@ -91,7 +85,7 @@ class NativeHideKeyboardCommand extends NativeCommand {
       'Hide the software keyboard if it is shown and report whether it was.';
 
   @override
-  Map<String, dynamic> toolArguments() => const {};
+  Map<String, dynamic> toolArguments(ArgResults results) => const {};
 
   @override
   Future<CallToolResult> execute(

@@ -30,15 +30,22 @@ import 'package:marionette_cli/src/cli/commands/swipe_command.dart';
 import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/unregister_command.dart';
+import 'package:marionette_cli/src/cli/native_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_cli/src/native_session_registry.dart';
 
 class MarionetteCommandRunner extends CommandRunner<int> {
+  /// [operatingSystem] is the host OS in [Platform.operatingSystem] form and
+  /// [environment] the process environment; both default to the real host.
   MarionetteCommandRunner({
     InstanceRegistry? registry,
     NativeSessionRegistry? nativeRegistry,
+    String? operatingSystem,
+    Map<String, String>? environment,
   })  : _registry = registry ?? InstanceRegistry(),
         _nativeRegistry = nativeRegistry ?? NativeSessionRegistry(),
+        _operatingSystem = operatingSystem ?? Platform.operatingSystem,
+        _environment = environment ?? Platform.environment,
         super(
           'marionette',
           'CLI for multi-instance Flutter app interaction via Marionette.',
@@ -63,7 +70,7 @@ class MarionetteCommandRunner extends CommandRunner<int> {
         'native-device',
         help: 'Name of the native-lane device connection (from '
             'native-connect) for native-* commands.',
-        defaultsTo: 'default',
+        defaultsTo: defaultNativeSession,
       )
       ..addOption(
         'session',
@@ -104,22 +111,24 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(NativeConnectCommand(_nativeRegistry));
     addCommand(NativeDisconnectCommand(_nativeRegistry));
     addCommand(NativeSessionsCommand(_nativeRegistry));
-    addCommand(NativeGetElementsCommand(_nativeRegistry));
-    addCommand(NativeWaitForCommand(_nativeRegistry));
-    addCommand(NativeTakeScreenshotCommand(_nativeRegistry));
-    addCommand(NativeTapCommand(_nativeRegistry));
-    addCommand(NativeSwipeCommand(_nativeRegistry));
-    addCommand(NativeScrollCommand(_nativeRegistry));
-    addCommand(NativeEnterTextCommand(_nativeRegistry));
-    addCommand(NativePressKeyCommand(_nativeRegistry));
-    addCommand(NativeHideKeyboardCommand(_nativeRegistry));
-    addCommand(NativeNotificationsCommand(_nativeRegistry));
+    addCommand(NativeGetElementsCommand(_nativeRegistry, _environment));
+    addCommand(NativeWaitForCommand(_nativeRegistry, _environment));
+    addCommand(NativeTakeScreenshotCommand(_nativeRegistry, _environment));
+    addCommand(NativeTapCommand(_nativeRegistry, _environment));
+    addCommand(NativeSwipeCommand(_nativeRegistry, _environment));
+    addCommand(NativeScrollCommand(_nativeRegistry, _environment));
+    addCommand(NativeEnterTextCommand(_nativeRegistry, _environment));
+    addCommand(NativePressKeyCommand(_nativeRegistry, _environment));
+    addCommand(NativeHideKeyboardCommand(_nativeRegistry, _environment));
+    addCommand(NativeNotificationsCommand(_nativeRegistry, _environment));
     addCommand(HelpAiCommand());
     addCommand(McpCommand());
   }
 
   final InstanceRegistry _registry;
   final NativeSessionRegistry _nativeRegistry;
+  final String _operatingSystem;
+  final Map<String, String> _environment;
 
   @override
   Future<int> run(Iterable<String> args) async {
@@ -140,9 +149,14 @@ class MarionetteCommandRunner extends CommandRunner<int> {
 
   @override
   Future<int?> runCommand(ArgResults topLevelResults) async {
-    if (topLevelResults.command == null) {
+    final commandName = topLevelResults.command?.name;
+    if (commandName == null) {
       printUsage();
       return 0;
+    }
+    if (commandName.startsWith('native-') && _operatingSystem == 'windows') {
+      stderr.writeln('The native lane supports macOS and Linux hosts.');
+      return 1;
     }
     return super.runCommand(topLevelResults);
   }

@@ -1,6 +1,10 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:marionette_cli/src/cli/native_command.dart';
+import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
+import 'package:marionette_mcp/src/native_service/tools/inspection_tools.dart';
+import 'package:marionette_mcp/src/session/session_manager.dart';
 
 class HelpAiCommand extends Command<int> {
   @override
@@ -17,7 +21,7 @@ class HelpAiCommand extends Command<int> {
   }
 }
 
-const _reference = r'''
+const _reference = '''
 # Marionette CLI — AI Agent Reference
 
 Marionette CLI controls Flutter apps running in debug mode. It supports
@@ -53,7 +57,7 @@ gets its own fresh session directory, appending one line to its steps.md (see
       --timeout <seconds>  Connection timeout (default: 5)
       --native-device <name>
                            Device connection (from native-connect) for
-                           native-* commands (default: "default")
+                           native-* commands (default: "$defaultNativeSession")
       --session <title>    Session title for this command's directory
                            (.marionette/sessions/<title>-<timestamp>/).
                            Keep it under ~60 characters — longer is
@@ -61,9 +65,10 @@ gets its own fresh session directory, appending one line to its steps.md (see
                            directory.
       --session-dir <path> Base directory .marionette/sessions/ is created
                            under (default: current directory, or
-                           $MARIONETTE_SESSION_DIR if set)
+                           \$$sessionDirEnvVar if set)
                            native-* commands log a step only when
-                           --session or --session-dir is given
+                           --session, --session-dir or
+                           \$$sessionDirEnvVar is given
 
 ## Commands
 
@@ -72,7 +77,7 @@ gets its own fresh session directory, appending one line to its steps.md (see
 Register a Flutter app instance.
 
   Arguments:
-    name   Any identifier without "/", "\", or control characters (e.g. my-app, 192.168.1.1:5555)
+    name   Any identifier without "/", "\\", or control characters (e.g. my-app, 192.168.1.1:5555)
     uri    VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws)
 
   Example:
@@ -191,7 +196,7 @@ Tap an element. Provide exactly one matching strategy.
     marionette --uri ws://127.0.0.1:8181/ws tap --key submit_button
     marionette -i my-app tap --x 100 --y 200
     marionette -i my-app tap --key cell.joinButton --ancestor-keys grid.cell_2
-    marionette -i my-app tap --key cell.joinButton \
+    marionette -i my-app tap --key cell.joinButton \\
       --ancestor-keys session_2 --ancestor-keys grid.cell_3
 
   Output (stdout):
@@ -599,7 +604,8 @@ each other, and the MCP server then needs native_connect again
 
 Element commands take a selector: `--text` (exact; `--label` in
 native-enter-text), `--text-contains`, `--id` (Android resource id / iOS
-accessibility identifier), `--type`, `--index`. All given options must
+accessibility identifier; on Android the full resource id
+package:id/name only), `--type`, `--index`. All given options must
 match. If several elements match and only one is tappable, that one is
 used; otherwise the command fails and lists the candidates — add --index
 or a more specific option. Coordinates (--x/--y, --start-x …) are
@@ -627,27 +633,28 @@ coordinates into screen pixels.
       clickable, and state when informative: value (typed content),
       enabled, focused, checked, selected, scrollable.
   native-wait-for [selector without --index] [--state visible|gone]
-                  [--timeout-ms 10000] [--interval-ms 500]
+                  [--timeout-ms $defaultWaitTimeoutMs] [--interval-ms $defaultWaitIntervalMs]
       Prints the element (visible) or the elapsed time (gone); exit 1 on
       timeout, naming the foreground app. Wait for an element of the
       expected screen, not for a package name (not element text; see
       foregroundApp of native-get-elements).
   native-tap <selector> | --x X --y Y
-  native-swipe --start-x --start-y --end-x --end-y [--duration-ms 300]
+  native-swipe --start-x --start-y --end-x --end-y [--duration-ms $defaultSwipeDurationMs]
       iOS back gesture: start at x=1. It does not wait for the content to
       settle — on iOS a tap right after a fling only stops the scrolling;
       use native-wait-for (or native-scroll, which settles) before tapping.
   native-scroll --direction up|down|left|right [target selector]
                 [--within-text|--within-text-contains|--within-id|
-                 --within-type|--within-index] [--max-swipes 10]
+                 --within-type|--within-index] [--max-swipes $defaultMaxSwipes]
                 [--distance D] [--start-x X --start-y Y]
       Direction is the finger's. With a target, swipes until it is visible
       and stops at the end of the list; --within-* swipes inside that
       container (nested lists, pickers).
   native-enter-text --text T [--label|--text-contains|--id|--type|--index]
                     [--clear]
-      Appends; without a selector types into the focused field (also
-      Flutter fields on Android).
+      Appends to the field content; --clear replaces the content. Without
+      a selector types into the focused field (also Flutter fields on
+      Android).
   native-press-key --key back|home|enter|backspace|tab|recents|volume_up|
                          volume_down
       back, recents, tab: Android only.
@@ -664,7 +671,7 @@ coordinates into screen pixels.
     marionette native-wait-for --text Allow --timeout-ms 5000
     marionette native-tap --text Allow
     marionette native-enter-text --label "User name" --text "Jan"
-    marionette native-scroll --direction up --within-id "File View" \
+    marionette native-scroll --direction up --within-id "File View" \\
         --text marionette_file_37.txt
 
 ### Platform notes
@@ -727,7 +734,7 @@ If a command fails with a connection error, the app may have stopped.
   repeats. Every key must exist or the command fails
 - Run `get-interactive-elements` first to discover what's on screen before interacting;
   add --ancestor-keys to list just one subtree on busy screens
-- Instance names allow any characters except "/", "\", or control characters (e.g. device IDs like 192.168.1.1:5555)
+- Instance names allow any characters except "/", "\\", or control characters (e.g. device IDs like 192.168.1.1:5555)
 - Flutter commands are stateless — each opens a fresh connection, so no session management needed
 - native-* commands share a session started by native-connect; run native-disconnect at the end
 ''';

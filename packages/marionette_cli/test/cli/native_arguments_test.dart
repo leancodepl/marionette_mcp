@@ -49,7 +49,7 @@ void main() {
   /// Every option given → the exact tool arguments, with tool types.
   final cases = <(NativeCommand, String, List<String>, Map<String, Object>)>[
     (
-      NativeGetElementsCommand(registry),
+      NativeGetElementsCommand(registry, const {}),
       'native_get_elements',
       [
         '--text', 'A', '--text-contains', 'B', '--id', 'C', '--type', 'D', //
@@ -61,7 +61,7 @@ void main() {
       },
     ),
     (
-      NativeWaitForCommand(registry),
+      NativeWaitForCommand(registry, const {}),
       'native_wait_for',
       [
         '--text-contains',
@@ -79,19 +79,19 @@ void main() {
       },
     ),
     (
-      NativeTakeScreenshotCommand(registry),
+      NativeTakeScreenshotCommand(registry, const {}),
       'native_take_screenshot',
       ['-o', 'x.png'],
       {},
     ),
     (
-      NativeTapCommand(registry),
+      NativeTapCommand(registry, const {}),
       'native_tap',
       ['--x', '10', '--y', '20.5'],
       {'x': 10, 'y': 20.5},
     ),
     (
-      NativeSwipeCommand(registry),
+      NativeSwipeCommand(registry, const {}),
       'native_swipe',
       [
         '--start-x', '1', '--start-y', '2', '--end-x', '3', '--end-y', '4', //
@@ -100,7 +100,7 @@ void main() {
       {'startX': 1, 'startY': 2, 'endX': 3, 'endY': 4, 'durationMs': 300},
     ),
     (
-      NativeScrollCommand(registry),
+      NativeScrollCommand(registry, const {}),
       'native_scroll',
       [
         '--direction',
@@ -131,20 +131,25 @@ void main() {
       },
     ),
     (
-      NativeEnterTextCommand(registry),
+      NativeEnterTextCommand(registry, const {}),
       'native_enter_text',
       ['--text', 'Gęś', '--label', 'Title', '--clear'],
       {'text': 'Gęś', 'label': 'Title', 'clear': true},
     ),
     (
-      NativePressKeyCommand(registry),
+      NativePressKeyCommand(registry, const {}),
       'native_press_key',
       ['--key', 'volume_up'],
       {'key': 'volume_up'},
     ),
-    (NativeHideKeyboardCommand(registry), 'native_hide_keyboard', [], {}),
     (
-      NativeNotificationsCommand(registry),
+      NativeHideKeyboardCommand(registry, const {}),
+      'native_hide_keyboard',
+      [],
+      {}
+    ),
+    (
+      NativeNotificationsCommand(registry, const {}),
       'native_notifications',
       ['--action', 'close'],
       {'action': 'close'},
@@ -153,7 +158,7 @@ void main() {
 
   for (final (command, tool, args, expected) in cases) {
     test('${command.name} → $tool', () {
-      final actual = command.argumentsFor(command.argParser.parse(args));
+      final actual = command.toolArguments(command.argParser.parse(args));
 
       expect(actual, expected);
       expect(
@@ -171,19 +176,28 @@ void main() {
   }
 
   test('the enter-text field selector is "label", not "text"', () {
-    final command = NativeEnterTextCommand(registry);
+    final command = NativeEnterTextCommand(registry, const {});
 
     expect(
       command
-          .argumentsFor(command.argParser.parse(['--text', 'x', '--id', 'f'])),
+          .toolArguments(command.argParser.parse(['--text', 'x', '--id', 'f'])),
       {'text': 'x', 'id': 'f'},
     );
   });
 
-  test('options that are not given are left out (the tool defaults apply)', () {
-    final command = NativeGetElementsCommand(registry);
+  test('an empty --text with --clear is passed on, to empty the field', () {
+    final command = NativeEnterTextCommand(registry, const {});
 
-    expect(command.argumentsFor(command.argParser.parse([])), isEmpty);
+    expect(
+      command.toolArguments(command.argParser.parse(['--text', '', '--clear'])),
+      {'text': '', 'clear': true},
+    );
+  });
+
+  test('options that are not given are left out (the tool defaults apply)', () {
+    final command = NativeGetElementsCommand(registry, const {});
+
+    expect(command.toolArguments(command.argParser.parse([])), isEmpty);
   });
 
   test('every MCP tool except connect / disconnect has a command', () {

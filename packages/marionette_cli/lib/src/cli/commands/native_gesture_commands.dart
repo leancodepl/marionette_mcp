@@ -1,5 +1,5 @@
+import 'package:args/args.dart';
 import 'package:marionette_cli/src/cli/native_command.dart';
-import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/gesture_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -12,13 +12,10 @@ void _addPointOptions(NativeCommand command) {
 }
 
 class NativeTapCommand extends NativeCommand {
-  NativeTapCommand(this.nativeRegistry) {
+  NativeTapCommand(super.nativeRegistry, super.environment) {
     addSelectorOptions();
     _addPointOptions(this);
   }
-
-  @override
-  final NativeSessionRegistry nativeRegistry;
 
   @override
   String get name => 'native-tap';
@@ -28,10 +25,11 @@ class NativeTapCommand extends NativeCommand {
       'Tap a native element chosen by a selector, or a point.';
 
   @override
-  Map<String, dynamic> toolArguments() => NativeCommand.compact({
-        ...selectorArgs(),
-        'x': number('x'),
-        'y': number('y'),
+  Map<String, dynamic> toolArguments(ArgResults results) =>
+      NativeCommand.compact({
+        ...selectorArgs(results),
+        'x': number(results, 'x'),
+        'y': number(results, 'y'),
       });
 
   @override
@@ -43,7 +41,7 @@ class NativeTapCommand extends NativeCommand {
 }
 
 class NativeSwipeCommand extends NativeCommand {
-  NativeSwipeCommand(this.nativeRegistry) {
+  NativeSwipeCommand(super.nativeRegistry, super.environment) {
     for (final option in ['start-x', 'start-y', 'end-x', 'end-y']) {
       argParser.addOption(
         option,
@@ -51,11 +49,11 @@ class NativeSwipeCommand extends NativeCommand {
         mandatory: true,
       );
     }
-    argParser.addOption('duration-ms', help: 'Swipe duration (default 300).');
+    argParser.addOption(
+      'duration-ms',
+      help: 'Swipe duration (default $defaultSwipeDurationMs).',
+    );
   }
-
-  @override
-  final NativeSessionRegistry nativeRegistry;
 
   @override
   String get name => 'native-swipe';
@@ -66,12 +64,13 @@ class NativeSwipeCommand extends NativeCommand {
       '(iOS back: start at x=1).';
 
   @override
-  Map<String, dynamic> toolArguments() => NativeCommand.compact({
-        'startX': number('start-x'),
-        'startY': number('start-y'),
-        'endX': number('end-x'),
-        'endY': number('end-y'),
-        'durationMs': integer('duration-ms'),
+  Map<String, dynamic> toolArguments(ArgResults results) =>
+      NativeCommand.compact({
+        'startX': number(results, 'start-x'),
+        'startY': number(results, 'start-y'),
+        'endX': number(results, 'end-x'),
+        'endY': number(results, 'end-y'),
+        'durationMs': integer(results, 'duration-ms'),
       });
 
   @override
@@ -83,7 +82,7 @@ class NativeSwipeCommand extends NativeCommand {
 }
 
 class NativeScrollCommand extends NativeCommand {
-  NativeScrollCommand(this.nativeRegistry) {
+  NativeScrollCommand(super.nativeRegistry, super.environment) {
     argParser.addOption(
       'direction',
       help: 'Finger-swipe direction.',
@@ -104,14 +103,14 @@ class NativeScrollCommand extends NativeCommand {
         'within-index',
         help: 'Container to swipe in: index among matches.',
       )
-      ..addOption('max-swipes', help: 'Search limit (default 10).')
+      ..addOption(
+        'max-swipes',
+        help: 'Search limit (default $defaultMaxSwipes).',
+      )
       ..addOption('distance', help: 'Swipe length in screen pixels.')
       ..addOption('start-x', help: 'Swipe start (with --start-y).')
       ..addOption('start-y', help: 'Swipe start (with --start-x).');
   }
-
-  @override
-  final NativeSessionRegistry nativeRegistry;
 
   @override
   String get name => 'native-scroll';
@@ -122,22 +121,22 @@ class NativeScrollCommand extends NativeCommand {
       'selector is visible; --within-* scrolls inside a container.';
 
   @override
-  Map<String, dynamic> toolArguments() {
+  Map<String, dynamic> toolArguments(ArgResults results) {
     final within = NativeCommand.compact({
-      'text': string('within-text'),
-      'textContains': string('within-text-contains'),
-      'id': string('within-id'),
-      'type': string('within-type'),
-      'index': integer('within-index'),
+      'text': string(results, 'within-text'),
+      'textContains': string(results, 'within-text-contains'),
+      'id': string(results, 'within-id'),
+      'type': string(results, 'within-type'),
+      'index': integer(results, 'within-index'),
     });
     return NativeCommand.compact({
-      'direction': string('direction'),
-      ...selectorArgs(withIndex: false),
+      'direction': string(results, 'direction'),
+      ...selectorArgs(results, withIndex: false),
       if (within.isNotEmpty) 'within': within,
-      'maxSwipes': integer('max-swipes'),
-      'distance': number('distance'),
-      'startX': number('start-x'),
-      'startY': number('start-y'),
+      'maxSwipes': integer(results, 'max-swipes'),
+      'distance': number(results, 'distance'),
+      'startX': number(results, 'start-x'),
+      'startY': number(results, 'start-y'),
     });
   }
 

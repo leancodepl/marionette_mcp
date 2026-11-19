@@ -24,7 +24,8 @@ Map<String, JsonSchema> nativeSelectorProperties({
       ),
       'id': JsonSchema.string(
         description: 'Exact Android resource-id or iOS accessibility id, as '
-            'returned in the "id" field of native_get_elements.',
+            'returned in the "id" field of native_get_elements. On Android '
+            'it matches the full resource id (package:id/name) only.',
       ),
       'type': JsonSchema.string(
         description: 'Element class, full (android.widget.Button, '

@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:marionette_cli/src/native_session_registry.dart';
+import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
@@ -21,7 +23,7 @@ void main() {
   NativeSessionInfo session(String name, {String? sessionId}) =>
       NativeSessionInfo(
         name: name,
-        platform: 'android',
+        platform: NativePlatform.android,
         baseUrl: 'http://127.0.0.1:8200',
         createdAt: DateTime.utc(2026, 10, 20, 12),
         serial: 'emulator-5554',
@@ -59,8 +61,56 @@ void main() {
 
     expect(registry.get('default')!.sessionId, 'new');
     expect(
-      tempDir.listSync().map((f) => f.path.split('/').last),
+      tempDir.listSync().map((f) => p.basename(f.path)),
       ['default.json'],
+    );
+  });
+
+  test('encodes the file name like an instance name and round-trips', () {
+    registry.save(session('a b', sessionId: 'sess-1'));
+
+    expect(
+      tempDir.listSync().map((f) => p.basename(f.path)),
+      ['a%20b.json'],
+    );
+    expect(registry.get('a b')!.sessionId, 'sess-1');
+    expect(registry.listAll().map((s) => s.name), ['a b']);
+    expect(registry.remove('a b'), isTrue);
+    expect(tempDir.listSync(), isEmpty);
+  });
+
+  test('an entry with an unknown platform names its file to delete', () {
+    registry.save(session('default'));
+    final file = File('${tempDir.path}/default.json');
+    file.writeAsStringSync(
+      file.readAsStringSync().replaceFirst('"android"', '"Android"'),
+    );
+
+    expect(
+      () => registry.get('default'),
+      throwsA(
+        isA<FormatException>()
+            .having((e) => e.message, 'message', contains(file.path)),
+      ),
+    );
+  });
+
+  test('an entry with a field of the wrong type names its file to delete', () {
+    registry.save(session('default'));
+    final file = File('${tempDir.path}/default.json');
+    file.writeAsStringSync(
+      file.readAsStringSync().replaceFirst('"port": 8200', '"port": "8200"'),
+    );
+
+    expect(
+      () => registry.get('default'),
+      throwsA(
+        isA<FormatException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains(file.path), contains('Delete the file')),
+        ),
+      ),
     );
   });
 

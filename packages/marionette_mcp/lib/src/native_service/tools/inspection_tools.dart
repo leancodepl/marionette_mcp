@@ -12,13 +12,15 @@ import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart'
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
-const _defaultWaitTimeoutMs = 10000;
+/// `native_wait_for`'s timeout when `timeoutMs` is not given.
+const defaultWaitTimeoutMs = 10000;
 const _maxWaitTimeoutMs = 60000;
 
 /// Consecutive failed tree reads `native_wait_for` retries before failing.
 const _maxFailedWaitReads = 3;
 
-const _defaultWaitIntervalMs = 500;
+/// `native_wait_for`'s pause between reads when `intervalMs` is not given.
+const defaultWaitIntervalMs = 500;
 const _minWaitIntervalMs = 50;
 
 /// What `native_wait_for` waits for.
@@ -88,8 +90,8 @@ void registerNativeInspectionTools(
       description: 'Waits until a native element matching the selector (text, '
           'textContains, id, type — values from native_get_elements) is '
           'visible, or with state "gone" until none matches. Polls the native '
-          'UI tree every intervalMs (default $_defaultWaitIntervalMs) for up '
-          'to timeoutMs (default $_defaultWaitTimeoutMs, max '
+          'UI tree every intervalMs (default $defaultWaitIntervalMs) for up '
+          'to timeoutMs (default $defaultWaitTimeoutMs, max '
           '$_maxWaitTimeoutMs). Returns the first matching element for '
           '"visible". Use it instead of fixed sleeps for system dialogs, '
           'toasts, and screens that appear after a delay. To wait for a '
@@ -111,11 +113,11 @@ void registerNativeInspectionTools(
           ),
           'timeoutMs': JsonSchema.integer(
             description: 'Maximum wait in milliseconds (default '
-                '$_defaultWaitTimeoutMs, max $_maxWaitTimeoutMs).',
+                '$defaultWaitTimeoutMs, max $_maxWaitTimeoutMs).',
           ),
           'intervalMs': JsonSchema.integer(
             description: 'Pause between checks in milliseconds (default '
-                '$_defaultWaitIntervalMs, min $_minWaitIntervalMs).',
+                '$defaultWaitIntervalMs, min $_minWaitIntervalMs).',
           ),
         },
       ),
@@ -171,8 +173,8 @@ Future<CallToolResult> handleNativeWaitFor(
   final logger = context.logger;
   final selector = nativeSelectorFromArgs(args);
   final state = NativeWaitState.tryParse(args['state']);
-  final timeoutMs = intArg(args, 'timeoutMs') ?? _defaultWaitTimeoutMs;
-  final intervalMs = intArg(args, 'intervalMs') ?? _defaultWaitIntervalMs;
+  final timeoutMs = intArg(args, 'timeoutMs') ?? defaultWaitTimeoutMs;
+  final intervalMs = intArg(args, 'intervalMs') ?? defaultWaitIntervalMs;
 
   if (selector.isEmpty) {
     return invalidArguments(

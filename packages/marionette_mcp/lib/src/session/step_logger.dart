@@ -59,7 +59,7 @@ const _nativeSelectorArgKeys = [
 /// dynamically-promoted custom extension tool, whose result may carry
 /// arbitrary app data — gets a generic outcome on success instead, so
 /// steps.md never ends up persisting a payload. Error messages are shown
-/// regardless of the tool (see [_describeOutcome]): they're diagnostic
+/// regardless of the tool (see [describeStepOutcome]): they're diagnostic
 /// context the report contract explicitly wants, not a payload.
 const _shortConfirmationTools = {
   'connect',
@@ -120,7 +120,7 @@ class StepLogger {
     if (activeSession == null) return;
 
     final selector = describeStepSelector(toolName, args);
-    final outcome = _describeOutcome(toolName, result, activeSession);
+    final outcome = describeStepOutcome(toolName, result, activeSession);
     final line = formatStepLine(toolName, selector, outcome);
 
     // steps.md is best-effort bookkeeping, not the tool call itself — a
@@ -135,34 +135,38 @@ class StepLogger {
       _logger.warning('Failed to write steps.md', err);
     }
   }
+}
 
-  String _describeOutcome(
-    String toolName,
-    CallToolResult result,
-    Session session,
-  ) {
-    if (result.isError) {
-      return describeStepError(_firstNonEmptyText(result));
-    }
-
-    if (_shortConfirmationTools.contains(toolName)) {
-      var text = _firstNonEmptyText(result);
-      if (_firstLineOnlyTools.contains(toolName)) {
-        text = text.split('\n').first;
-      }
-      text = _relativizeSessionPaths(text, session);
-      if (text.isNotEmpty) return _truncateText(_oneLine(_redactUrisIn(text)));
-    }
-
-    final imageCount = result.content.whereType<ImageContent>().length;
-    return imageCount > 0 ? '$imageCount screenshot(s) captured' : 'ok';
+/// The outcome part of a step line for [result] of [toolName]. Shared
+/// between [StepLogger] (MCP tool calls) and the CLI's native commands,
+/// whose names (`native-tap`) are the tool names in kebab case.
+String describeStepOutcome(
+  String toolName,
+  CallToolResult result,
+  Session session,
+) {
+  if (result.isError) {
+    return describeStepError(_firstNonEmptyText(result));
   }
 
-  String _firstNonEmptyText(CallToolResult result) => result.content
-      .whereType<TextContent>()
-      .map((c) => c.text)
-      .firstWhere((t) => t.isNotEmpty, orElse: () => '');
+  final tool = toolName.replaceAll('-', '_');
+  if (_shortConfirmationTools.contains(tool)) {
+    var text = _firstNonEmptyText(result);
+    if (_firstLineOnlyTools.contains(tool)) {
+      text = text.split('\n').first;
+    }
+    text = _relativizeSessionPaths(text, session);
+    if (text.isNotEmpty) return _truncateText(_oneLine(_redactUrisIn(text)));
+  }
+
+  final imageCount = result.content.whereType<ImageContent>().length;
+  return imageCount > 0 ? '$imageCount screenshot(s) captured' : 'ok';
 }
+
+String _firstNonEmptyText(CallToolResult result) => result.content
+    .whereType<TextContent>()
+    .map((c) => c.text)
+    .firstWhere((t) => t.isNotEmpty, orElse: () => '');
 
 /// Builds an error outcome (prefixed `error: `) from raw error text — either
 /// an MCP tool result's own message or a CLI command's caught exception's

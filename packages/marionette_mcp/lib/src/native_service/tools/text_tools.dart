@@ -25,7 +25,8 @@ void registerNativeTextTools(
         'currently has keyboard focus (e.g. after native_tap on it). Typing '
         'into the focused field also works for Flutter fields when the '
         'software keyboard is not visible to native_get_elements (Android). '
-        'Set clear to empty the field first. '
+        'The text is appended to the field content; set clear to replace '
+        'the content. '
         '$nativeSelectorRules '
         '$nativeRoutingPreferFlutter '
         'Requires native_connect.',
@@ -37,7 +38,8 @@ void registerNativeTextTools(
         ),
         ...nativeSelectorProperties(textKey: 'label'),
         'clear': JsonSchema.boolean(
-          description: 'Empty the field before typing (default false).',
+          description: 'Replace the field content instead of appending to '
+              'it (default false).',
         ),
       },
       required: ['text'],

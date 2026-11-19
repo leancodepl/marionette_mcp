@@ -63,7 +63,7 @@ class UnregisterCommand extends Command<int> {
     }
 
     for (final info in instances) {
-      _registry.unregister(info.name);
+      _registry.remove(info.name);
       stdout.writeln('Unregistered instance "${info.name}".');
     }
 
@@ -99,7 +99,7 @@ class UnregisterCommand extends Command<int> {
         );
         stdout.writeln('OK');
       } catch (_) {
-        _registry.unregister(info.name);
+        _registry.remove(info.name);
         stdout.writeln('STALE - removed');
         removed++;
       } finally {
@@ -125,7 +125,7 @@ class UnregisterCommand extends Command<int> {
     }
 
     final name = rest[0];
-    final removed = _registry.unregister(name);
+    final removed = _registry.remove(name);
 
     if (removed) {
       stdout.writeln('Unregistered instance "$name".');
