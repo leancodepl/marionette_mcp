@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -20,6 +21,7 @@ import 'package:test/test.dart';
 
 import '../support/fake_native_connector.dart';
 import '../support/fake_webdriver_server.dart';
+import '../support/log_records.dart';
 
 String _text(CallToolResult result) =>
     result.content.whereType<TextContent>().map((c) => c.text).join('\n');
@@ -149,9 +151,7 @@ void main() {
         'GET /source got no response within 90000 ms',
         error: webDriverConnectionLost,
       );
-      final records = <logging.LogRecord>[];
-      final subscription = logging.Logger.root.onRecord.listen(records.add);
-      addTearDown(subscription.cancel);
+      final records = captureLogRecords();
 
       await handleNativeGetElements(
         _contextWith(FakeNativeConnector(error: lost)),
@@ -242,18 +242,76 @@ void main() {
       ]);
     });
 
-    test('reports null foregroundApp instead of failing', () async {
+    test('a failed foregroundApp lookup is logged and reported as null',
+        () async {
       final context = _contextWith(
-        FakeNativeConnector(foregroundAppError: StateError('no adb')),
+        FakeNativeConnector(
+          screens: [
+            [nativeElement(text: 'Allow')],
+          ],
+          foregroundAppError: const ProcessException('adb', [], 'missing'),
+        ),
       );
+      final records = captureLogRecords();
 
       final result = await handleNativeGetElements(context);
 
-      expect(result.isError, isFalse);
+      final payload = jsonDecode(_text(result)) as Map<String, dynamic>;
+      expect(payload['elements'], hasLength(1));
+      expect(payload, containsPair('foregroundApp', isNull));
       expect(
-        (jsonDecode(_text(result)) as Map<String, dynamic>)['foregroundApp'],
-        isNull,
+        records.where((r) => r.error is ProcessException),
+        [
+          isA<logging.LogRecord>()
+              .having((r) => r.message, 'message', contains('foregroundApp')),
+        ],
       );
+    });
+
+    test(
+        'an error of the foregroundApp lookup after a failed tree read is '
+        'logged, not left uncaught', () async {
+      final closed = StateError('Client is closed');
+      final context = _contextWith(
+        FakeNativeConnector(
+          error: const WebDriverException(
+            'GET /source failed',
+            error: webDriverConnectionLost,
+          ),
+          foregroundAppError: closed,
+        ),
+      );
+      final records = captureLogRecords();
+
+      final result = await handleNativeGetElements(context);
+      await pumpEventQueue();
+
+      expect(result, _isToolError(contains('native_connect')));
+      expect(records.where((r) => identical(r.error, closed)), hasLength(1));
+    });
+
+    test(
+        'a failed tree read is returned while the foregroundApp lookup is '
+        'pending, and a late lookup failure is logged', () async {
+      final lookup = Completer<String?>();
+      final closed = StateError('Client is closed');
+      final context = _contextWith(
+        FakeNativeConnector(
+          error: const WebDriverException(
+            'GET /source failed',
+            error: webDriverConnectionLost,
+          ),
+        )..foregroundAppCompleter = lookup,
+      );
+      final records = captureLogRecords();
+
+      final result = await handleNativeGetElements(context)
+          .timeout(const Duration(seconds: 1));
+      lookup.completeError(closed);
+      await pumpEventQueue();
+
+      expect(result, _isToolError(contains('native_connect')));
+      expect(records.where((r) => identical(r.error, closed)), hasLength(1));
     });
 
     test('leaves out off-screen (zero-size) elements', () async {
@@ -887,10 +945,7 @@ void main() {
         );
         final connector = FakeNativeConnector.single([field])
           ..enterTextErrors.addAll([changed, changed]);
-        final logs = <String>[];
-        final subscription =
-            logging.Logger.root.onRecord.listen((r) => logs.add(r.message));
-        addTearDown(subscription.cancel);
+        final records = captureLogRecords();
 
         final result = await handleNativeEnterText(
           _contextWith(connector),
@@ -899,8 +954,37 @@ void main() {
 
         expect(result, _isToolError(contains('invalid element state')));
         expect(result, _isToolError(isNot(contains('S3cret!'))));
-        expect(logs, isNotEmpty);
-        expect(logs.join('\n'), isNot(contains('S3cret!')));
+        expect(records, isNotEmpty);
+        expect(
+          records.map((r) => r.message).join('\n'),
+          isNot(contains('S3cret!')),
+        );
+      });
+
+      test('a retry that types the value keeps it out of the log', () async {
+        final connector = FakeNativeConnector.single([field])
+          ..enterTextErrors.add(
+            const WebDriverException(
+              "Cannot set the element to 'S3cret!'",
+              error: 'invalid element state',
+            ),
+          );
+        final records = captureLogRecords();
+
+        final result = await handleNativeEnterText(
+          _contextWith(connector),
+          {'id': 'f', 'text': 'S3cret!'},
+        );
+
+        expect(result.isError, isFalse);
+        expect(
+          records.map((r) => r.message),
+          contains(startsWith('Field changed before typing')),
+        );
+        expect(
+          records.map((r) => '${r.message} ${r.error}').join('\n'),
+          isNot(contains('S3cret!')),
+        );
       });
 
       test('other WebDriver errors are not retried', () async {
@@ -946,18 +1030,18 @@ void main() {
               error: code,
             ),
           );
-          final logs = <String>[];
-          final subscription = logging.Logger.root.onRecord
-              .listen((r) => logs.add('${r.message} ${r.error}'));
-          addTearDown(subscription.cancel);
+          final records = captureLogRecords();
 
           final result =
               await handleNativeEnterText(_contextWith(connector), args);
 
           expect(result, _isToolError(contains(code)));
           expect(result, _isToolError(isNot(contains('hunter2'))));
-          expect(logs, isNotEmpty);
-          expect(logs.join('\n'), isNot(contains('hunter2')));
+          expect(records, isNotEmpty);
+          expect(
+            records.map((r) => '${r.message} ${r.error}').join('\n'),
+            isNot(contains('hunter2')),
+          );
         });
       }
     });

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
@@ -13,6 +14,7 @@ import 'package:test/test.dart';
 import 'support/fake_native_connector.dart';
 import 'support/fake_process_runner.dart';
 import 'support/fake_webdriver_server.dart';
+import 'support/log_records.dart';
 
 const _noSuchElement = FakeResponse.error(
   'no such element',
@@ -124,6 +126,29 @@ void main() {
       await connector.dispose();
 
       expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
+    });
+
+    test('dispose logs a failed session delete and completes', () async {
+      server.on(
+        'DELETE',
+        '/session/sess-1',
+        (_) => const FakeResponse.error('unknown error', 'delete failed'),
+      );
+      final connector = await connect();
+      final records = captureLogRecords();
+
+      await connector.dispose();
+
+      expect(
+        records.where((r) => r.error is WebDriverException),
+        [
+          isA<logging.LogRecord>().having(
+            (r) => r.message,
+            'message',
+            contains('delete the native session'),
+          ),
+        ],
+      );
     });
 
     test('dispose ends within the short timeout when DELETE never answers',
@@ -592,6 +617,11 @@ void main() {
           ..onValue('GET', '/session/sess-1/element/active', {
             w3cElementKey: 'focused',
           })
+          ..onValue(
+            'GET',
+            '/session/sess-1/element/focused/attribute/className',
+            'android.widget.EditText',
+          )
           ..onValue('POST', '/session/sess-1/element/focused/clear', null)
           ..onValue('POST', '/session/sess-1/element/focused/value', null);
         final connector = await connect();
@@ -640,6 +670,34 @@ void main() {
         );
         expect(
           server.requestsTo('POST', '/session/sess-1/element/btn/value'),
+          isEmpty,
+        );
+      });
+
+      test('typeText stops on a session lost during the focus check', () async {
+        server
+          ..onValue('GET', '/session/sess-1/element/active', {
+            w3cElementKey: 'f',
+          })
+          ..on(
+            'GET',
+            '/session/sess-1/element/f/attribute/className',
+            (_) => const FakeResponse.error(
+              'invalid session id',
+              'session gone',
+              status: HttpStatus.notFound,
+            ),
+          );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.typeText('x'),
+          throwsA(
+              isA<WebDriverException>().having(isLostSession, 'lost', true)),
+        );
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/f/value'),
           isEmpty,
         );
       });

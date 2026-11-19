@@ -5,8 +5,10 @@ import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
 import 'package:test/test.dart';
 
+import 'support/fake_process.dart';
 import 'support/fake_process_runner.dart';
 import 'support/fake_webdriver_server.dart';
+import 'support/log_records.dart';
 
 void main() {
   _portSelectionTests();
@@ -15,8 +17,10 @@ void main() {
     late Directory cacheDir;
     late FakeWebDriverServer server;
     late FakeProcessRunner runner;
+    late List<List<String>> launches;
 
     setUp(() async {
+      launches = [];
       cacheDir = await Directory.systemTemp.createTemp('marionette_uia2_');
       server = await FakeWebDriverServer.start();
       runner = FakeProcessRunner()
@@ -40,12 +44,19 @@ void main() {
       Map<String, String> environment = const {},
       Map<String, String> apkSha256 = const {},
       PortProbe? isPortFree,
+      ProcessStarter? processStarter,
+      Directory? cacheDirectory,
     }) =>
         AndroidBootstrap(
           serial: serial,
           processRunner: runner.call,
+          processStarter: processStarter ??
+              (executable, arguments) async {
+                launches.add([executable, ...arguments]);
+                return FakeProcess();
+              },
           downloader: downloader ?? (_) async => [1],
-          cacheDir: cacheDir,
+          cacheDir: cacheDirectory ?? cacheDir,
           localPort: explicitPort ? (localPort ?? server.port) : null,
           environment: environment,
           apkSha256: apkSha256,
@@ -106,7 +117,7 @@ void main() {
         failsWith(AndroidBootstrapFailure.deviceLocked),
       );
       expect(
-        runner.adbCommands.where((c) => c.contains('instrument')),
+        launches,
         isEmpty,
         reason: 'UIAutomator2 is not started on a locked device',
       );
@@ -140,26 +151,27 @@ void main() {
             .where(
               (cmd) =>
                   cmd.first == 'install' ||
-                  (cmd.first == 'forward' && cmd[1] != '--list') ||
-                  (cmd.length >= 3 &&
-                      cmd[0] == 'shell' &&
-                      cmd[2] == 'instrument'),
+                  (cmd.first == 'forward' && cmd[1] != '--list'),
             )
             .toList();
 
         expect(commands[0].take(3).toList(), ['install', '-r', '-t']);
         expect(commands[1].take(3).toList(), ['install', '-r', '-t']);
-        expect(commands[2], [
+        expect(commands[2], ['forward', 'tcp:${server.port}', 'tcp:6790']);
+        expect(launches.single, [
+          'adb',
+          '-s',
+          'emulator-5554',
           'shell',
           'am',
           'instrument',
+          '-w',
           '-e',
           'disableAnalytics',
           'true',
           'io.appium.uiautomator2.server.test/'
               'androidx.test.runner.AndroidJUnitRunner',
         ]);
-        expect(commands[3], ['forward', 'tcp:${server.port}', 'tcp:6790']);
 
         // Serial is threaded into every device-specific adb invocation
         // (`forward --list` lists all devices).
@@ -241,7 +253,7 @@ void main() {
     test(
       'detached: holds the instrumentation in a detached process',
       () async {
-        final launches = <List<String>>[];
+        const pid = (1 << 30) + 1;
         final subject = AndroidBootstrap(
           serial: 'emulator-5554',
           processRunner: runner.call,
@@ -256,7 +268,7 @@ void main() {
           detached: true,
           detachedProcessStarter: (executable, arguments) async {
             launches.add([executable, ...arguments]);
-            return _FakeProcess(4242);
+            return FakeProcess(pid: pid);
           },
         );
 
@@ -271,12 +283,7 @@ void main() {
           'instrument',
           '-w',
         ]);
-        expect(subject.detachedPid, 4242);
-        expect(
-          runner.adbCommands.where((cmd) => cmd.contains('instrument')),
-          isEmpty,
-          reason: 'not started a second time without -w',
-        );
+        expect(subject.detachedPid, pid);
       },
     );
 
@@ -297,15 +304,95 @@ void main() {
       );
     });
 
-    test('instrumentation start failure throws instrumentation', () async {
+    test('stopServer logs an adb step that exits non-zero and goes on',
+        () async {
       runner.onAdb(
-        ['shell', 'am', 'instrument'],
-        result: failed(stderr: 'INSTRUMENTATION_FAILED'),
+        ['shell', 'am', 'force-stop'],
+        result: failed(stderr: 'device offline'),
+      );
+      final records = captureLogRecords();
+
+      await AndroidBootstrap.stopServer(
+        AdbClient(serial: 'emulator-5554', processRunner: runner.call),
+        port: 8299,
+      );
+
+      expect(
+        records.map((r) => r.message),
+        [
+          'Failed to force-stop io.appium.uiautomator2.server.test: '
+              'device offline',
+          'Failed to force-stop io.appium.uiautomator2.server: device offline',
+        ],
+      );
+      expect(runner.adbCommands.last, ['forward', '--remove', 'tcp:8299']);
+    });
+
+    test('instrumentation that exits early throws instrumentation', () async {
+      server.on(
+        'GET',
+        '/status',
+        (_) => const FakeResponse.error('unknown error', 'starting'),
+      );
+      final subject = bootstrap(
+        processStarter: (_, __) async => FakeProcess()..exit(1),
+      );
+
+      await expectLater(
+        subject.ensureServerReady(),
+        failsWith(AndroidBootstrapFailure.instrumentation),
+      );
+    });
+
+    test('a cache directory path that is a file fails at download, naming it',
+        () async {
+      final notADirectory = File('${cacheDir.path}/uia2');
+      await notADirectory.create();
+
+      await expectLater(
+        bootstrap(cacheDirectory: Directory(notADirectory.path))
+            .ensureServerReady(),
+        throwsA(
+          isA<AndroidBootstrapException>()
+              .having(
+                (e) => e.failure,
+                'failure',
+                AndroidBootstrapFailure.download,
+              )
+              .having((e) => e.hint, 'hint', contains(notADirectory.path)),
+        ),
+      );
+    });
+
+    test('adb that cannot be run on install throws adbMissing', () async {
+      runner.onAdb(
+        ['install'],
+        error: const ProcessException('adb', [], 'Permission denied', 13),
       );
 
       await expectLater(
         bootstrap().ensureServerReady(),
-        failsWith(AndroidBootstrapFailure.instrumentation),
+        failsWith(AndroidBootstrapFailure.adbMissing),
+      );
+    });
+
+    test('an unexpected error reaches the caller after the teardown', () async {
+      runner.onAdb(['install'], error: StateError('unexpected'));
+
+      await expectLater(
+        bootstrap().ensureServerReady(),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        runner.adbCommands,
+        contains(
+          equals([
+            'shell',
+            'am',
+            'force-stop',
+            'io.appium.uiautomator2.server.test',
+          ]),
+        ),
       );
     });
 
@@ -456,10 +543,9 @@ void main() {
         expect(uri.port, server.port);
         expect(subject.localPort, server.port);
         expect(installs(), isEmpty);
+        expect(launches, isEmpty);
         expect(
-          runner.adbCommands.where(
-            (cmd) => cmd.contains('instrument') || cmd.contains('force-stop'),
-          ),
+          runner.adbCommands.where((cmd) => cmd.contains('force-stop')),
           isEmpty,
         );
         expect(
@@ -585,15 +671,4 @@ void _portSelectionTests() {
       );
     });
   });
-}
-
-/// A started process of which only the pid is used.
-class _FakeProcess implements Process {
-  _FakeProcess(this.pid);
-
-  @override
-  final int pid;
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

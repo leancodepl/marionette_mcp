@@ -6,6 +6,9 @@ import 'package:marionette_mcp/src/native_service/process.dart';
 ///
 /// Every command goes through [run], which prepends `-s <serial>` when
 /// [serial] is set, so callers never assemble device selection themselves.
+///
+/// The queries throw [ProcessException] when `adb` cannot be started; null
+/// means `adb` ran and gave no answer.
 class AdbClient {
   AdbClient({this.serial, ProcessRunner? processRunner})
       : _run = processRunner ?? Process.run;
@@ -33,126 +36,94 @@ class AdbClient {
       run(['shell', ...arguments]);
 
   /// Serial of the device this client talks to: [serial] when set, otherwise
-  /// the default device as reported by `adb get-serialno`. Null when it
-  /// cannot be determined.
+  /// the default device as reported by `adb get-serialno`. Null when adb
+  /// reports none.
   Future<String?> resolveSerial() async {
     if (serial != null) return serial;
-    try {
-      final result = await run(const ['get-serialno']);
-      final value = processStdout(result).trim();
-      return result.exitCode == 0 && value.isNotEmpty ? value : null;
-    } catch (_) {
-      return null;
-    }
+    final result = await run(const ['get-serialno']);
+    final value = processStdout(result).trim();
+    return result.exitCode == 0 && value.isNotEmpty ? value : null;
   }
 
   /// Local port of an existing `adb forward` from [deviceSerial] to device
   /// TCP port [remotePort], or null when there is none.
   Future<int?> forwardedLocalPort(String deviceSerial, int remotePort) async {
-    try {
-      final result = await _run('adb', const ['forward', '--list']);
-      if (result.exitCode != 0) return null;
-      return parseForwardedLocalPort(
-        processStdout(result),
-        deviceSerial: deviceSerial,
-        remotePort: remotePort,
-      );
-    } catch (_) {
-      return null;
-    }
+    final result = await _run('adb', const ['forward', '--list']);
+    if (result.exitCode != 0) return null;
+    return parseForwardedLocalPort(
+      processStdout(result),
+      deviceSerial: deviceSerial,
+      remotePort: remotePort,
+    );
   }
 
   /// SHA-256 (lowercase hex) of the APK installed for [packageName], or null
   /// when the package is missing or the device cannot compute it (e.g. no
-  /// `sha256sum` on old Android versions). Never throws.
+  /// `sha256sum` on old Android versions).
   Future<String?> installedApkSha256(String packageName) async {
-    try {
-      final pathResult = await shell(['pm', 'path', packageName]);
-      if (pathResult.exitCode != 0) return null;
-      final apkPath = processStdout(pathResult)
-          .split('\n')
-          .map((line) => line.trim())
-          .firstWhere((line) => line.startsWith('package:'), orElse: () => '')
-          .replaceFirst('package:', '');
-      if (apkPath.isEmpty) return null;
+    final pathResult = await shell(['pm', 'path', packageName]);
+    if (pathResult.exitCode != 0) return null;
+    final apkPath = processStdout(pathResult)
+        .split('\n')
+        .map((line) => line.trim())
+        .firstWhere((line) => line.startsWith('package:'), orElse: () => '')
+        .replaceFirst('package:', '');
+    if (apkPath.isEmpty) return null;
 
-      final hashResult = await shell(['sha256sum', apkPath]);
-      if (hashResult.exitCode != 0) return null;
-      final hash = processStdout(hashResult).trim().split(RegExp(r'\s+')).first;
-      return _sha256Pattern.hasMatch(hash) ? hash.toLowerCase() : null;
-    } catch (_) {
-      return null;
-    }
+    final hashResult = await shell(['sha256sum', apkPath]);
+    if (hashResult.exitCode != 0) return null;
+    final hash = processStdout(hashResult).trim().split(RegExp(r'\s+')).first;
+    return _sha256Pattern.hasMatch(hash) ? hash.toLowerCase() : null;
   }
 
   /// Display size in pixels from `adb shell wm size` (an override size wins
-  /// over the physical one), or null when it cannot be read. Never throws.
+  /// over the physical one), or null when the output has none.
   Future<({int width, int height})?> screenSize() async {
-    try {
-      final result = await shell(const ['wm', 'size']);
-      if (result.exitCode != 0) return null;
-      return parseWmSize(processStdout(result));
-    } catch (_) {
-      return null;
-    }
+    final result = await shell(const ['wm', 'size']);
+    if (result.exitCode != 0) return null;
+    return parseWmSize(processStdout(result));
   }
 
   /// Whether the software keyboard (IME) is shown, from
-  /// `dumpsys input_method`, or null when it cannot be read. Never throws.
+  /// `dumpsys input_method`, or null when the output does not say.
   Future<bool?> isKeyboardShown() async {
-    try {
-      final result = await shell(const ['dumpsys', 'input_method']);
-      if (result.exitCode != 0) return null;
-      final match =
-          RegExp(r'mInputShown=(true|false)').firstMatch(processStdout(result));
-      return match == null ? null : match.group(1) == 'true';
-    } catch (_) {
-      return null;
-    }
+    final result = await shell(const ['dumpsys', 'input_method']);
+    if (result.exitCode != 0) return null;
+    final match =
+        RegExp(r'mInputShown=(true|false)').firstMatch(processStdout(result));
+    return match == null ? null : match.group(1) == 'true';
   }
 
   /// Share of its window the software keyboard covers (0–1), from the
-  /// `InputMethod` window in `dumpsys window windows`; null when it cannot
-  /// be read. Near 0 when Gboard shows only its floating toolbar (a
-  /// hardware keyboard is attached). Never throws.
+  /// `InputMethod` window in `dumpsys window windows`; null when the output
+  /// does not say. Near 0 when Gboard shows only its floating toolbar (a
+  /// hardware keyboard is attached).
   Future<double?> keyboardCoverage() async {
-    try {
-      final result = await shell(const ['dumpsys', 'window', 'windows']);
-      if (result.exitCode != 0) return null;
-      return parseKeyboardCoverage(processStdout(result));
-    } catch (_) {
-      return null;
-    }
+    final result = await shell(const ['dumpsys', 'window', 'windows']);
+    if (result.exitCode != 0) return null;
+    return parseKeyboardCoverage(processStdout(result));
   }
 
   /// Whether the current user is locked after a restart
-  /// ([parseCurrentUserLocked]); false when it cannot be read.
+  /// ([parseCurrentUserLocked]); false when the output does not say.
   Future<bool> isCurrentUserLocked() async {
-    try {
-      final result = await shell(const ['dumpsys', 'user']);
-      return result.exitCode == 0 &&
-          parseCurrentUserLocked(processStdout(result));
-    } catch (_) {
-      return false;
-    }
+    final result = await shell(const ['dumpsys', 'user']);
+    return result.exitCode == 0 &&
+        parseCurrentUserLocked(processStdout(result));
   }
 
   /// Package that owns the focused window (a system dialog when one covers
-  /// the app), or null when it cannot be determined. Never throws.
+  /// the app), or null when the output does not say.
   ///
   /// Android 10+ reports focus under `dumpsys window displays`; older
   /// versions only under `dumpsys window windows`, which newer versions no
   /// longer include it in — so both sections are tried, newest first.
   Future<String?> foregroundPackage() async {
     for (final section in const ['displays', 'windows']) {
-      try {
-        final result = await shell(['dumpsys', 'window', section]);
-        if (result.exitCode != 0) continue;
-        final package = parseForegroundPackage(processStdout(result));
-        if (package != null) return package;
-      } catch (_) {
-        return null;
-      }
+      final result = await shell(['dumpsys', 'window', section]);
+      if (result.exitCode != 0) continue;
+      final package = parseForegroundPackage(processStdout(result));
+      if (package != null) return package;
     }
     return null;
   }

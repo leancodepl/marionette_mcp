@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' show min;
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
@@ -57,6 +58,9 @@ class FakeNativeConnector implements NativeConnector {
 
   String? foregroundAppValue;
   Object? foregroundAppError;
+
+  /// When set, [foregroundApp] answers only when it completes.
+  Completer<String?>? foregroundAppCompleter;
   String screenshot;
   NativeScreen screen;
 
@@ -104,6 +108,8 @@ class FakeNativeConnector implements NativeConnector {
 
   @override
   Future<String?> get foregroundApp async {
+    final completer = foregroundAppCompleter;
+    if (completer != null) return completer.future;
     final pending = foregroundAppError;
     if (pending != null) throw pending;
     return foregroundAppValue;

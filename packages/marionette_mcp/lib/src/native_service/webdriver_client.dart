@@ -4,8 +4,10 @@ import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 
-/// Exception thrown when a WebDriver endpoint returns a non-2xx HTTP status
-/// or a W3C error body.
+/// Exception thrown when a WebDriver endpoint returns a non-2xx HTTP status,
+/// a W3C error body or a body that is not UTF-8, or when the request fails on
+/// I/O: then [error] is [webDriverServerUnreachable] or
+/// [webDriverConnectionLost].
 ///
 /// Carries the HTTP status code plus the W3C `error` and `message` fields
 /// (when the server provided them) so callers can distinguish, for example,
@@ -86,10 +88,13 @@ const webDriverStatusTimeout = Duration(seconds: 5);
 /// element lookup/click/sendKeys, and W3C pointer actions. Uses `dart:io`
 /// [HttpClient] directly so `marionette_mcp` gains no new dependencies.
 ///
-/// All methods throw [WebDriverException] on non-2xx responses or when the
-/// server returns a W3C error body (`{"value": {"error": ..., "message":
-/// ...}}`). A request that takes longer than its timeout is aborted and
-/// throws one with [webDriverConnectionLost].
+/// All methods throw [WebDriverException] on non-2xx responses, on a body
+/// that is not UTF-8, or when the server returns a W3C error body
+/// (`{"value": {"error": ..., "message": ...}}`). An I/O failure throws one
+/// with [webDriverServerUnreachable] when no connection opened, else with
+/// [webDriverConnectionLost], as does a request that takes longer than its
+/// timeout (it is aborted). Any other error is a programmer error and
+/// propagates unchanged.
 class WebDriverClient {
   /// Creates a client for a WebDriver server at [baseUrl]
   /// (e.g. `http://127.0.0.1:8100`). A trailing slash is tolerated.
@@ -470,15 +475,6 @@ class WebDriverClient {
     return (width: width.round(), height: height.round());
   }
 
-  /// Returns WDA device metadata from `GET /wda/device/info` (simulator UDID, etc.).
-  Future<Map<String, dynamic>> wdaDeviceInfo() async {
-    final value = await _request('GET', '/wda/device/info');
-    if (value is Map<String, dynamic>) return value;
-    throw const WebDriverException(
-      'WDA device info response was not an object',
-    );
-  }
-
   /// Returns the foreground app's bundle id from WDA
   /// `GET /session/{id}/wda/activeAppInfo`.
   Future<Map<String, dynamic>> wdaActiveAppInfo(String sessionId) async {
@@ -521,6 +517,7 @@ class WebDriverClient {
   }) async {
     final uri = Uri.parse('$_baseUrl$path');
     final limit = timeout ?? _requestTimeout;
+    final payload = body == null ? null : utf8.encode(jsonEncode(body));
     HttpClientRequest? request;
     var timedOut = false;
 
@@ -529,7 +526,7 @@ class WebDriverClient {
       request = opened;
       // A connection opened after the timeout is dropped unused.
       if (timedOut) opened.abort();
-      return _send(opened, method, uri, body);
+      return _send(opened, method, uri, payload);
     }
 
     final (statusCode, responseBody) = await exchange().timeout(
@@ -591,24 +588,21 @@ class WebDriverClient {
         '$method $uri failed: $e',
         error: webDriverServerUnreachable,
       );
-    } catch (e) {
-      throw WebDriverException('$method $uri failed: $e');
     }
   }
 
-  /// Sends [request] with [body] and returns the response status code and
-  /// body.
+  /// Sends [request] with the JSON [payload] and returns the response status
+  /// code and body.
   Future<(int, String)> _send(
     HttpClientRequest request,
     String method,
     Uri uri,
-    Map<String, dynamic>? body,
+    List<int>? payload,
   ) async {
     try {
-      if (body != null) {
+      if (payload != null) {
         // ChromeDriver rejects chunked request bodies, which dart:io uses
         // unless contentLength is set explicitly.
-        final payload = utf8.encode(jsonEncode(body));
         request.headers.contentType =
             ContentType('application', 'json', charset: 'utf-8');
         request.contentLength = payload.length;
@@ -623,8 +617,11 @@ class WebDriverClient {
         '$method $uri failed: $e',
         error: webDriverConnectionLost,
       );
-    } catch (e) {
-      throw WebDriverException('$method $uri failed: $e');
+    } on FormatException catch (e) {
+      // Not a WebDriver server, e.g. a stale forward to another service.
+      throw WebDriverException(
+        '$method $uri answered with a body that is not UTF-8: ${e.message}',
+      );
     }
   }
 }

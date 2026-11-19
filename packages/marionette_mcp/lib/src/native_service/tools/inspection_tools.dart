@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
@@ -142,25 +143,23 @@ Future<CallToolResult> handleNativeGetElements(
       'clickableOnly: $clickableOnly)');
   return runNativeTool(logger, 'get native elements', () async {
     final connector = context.requireConnector();
-    // foregroundApp is a diagnostic hint: fetch it alongside the tree and
-    // report null rather than failing the whole call when it is unavailable.
-    final foregroundApp = includeForegroundApp
-        ? connector.foregroundApp
-            .then<String?>((value) => value, onError: (Object _) => null)
-        : null;
+    final (tree, foregroundApp) = await _readTreeAndForegroundApp(
+      connector,
+      logger,
+      includeForegroundApp: includeForegroundApp,
+    );
     // Off-screen (zero-size) nodes are left out, as for every selector, so
     // index counts what is listed;
     // a toast has no bounds but is listed.
-    final elements = (await connector.getNativeElements()).where(
+    final elements = tree.where(
       (element) =>
           element.isListed &&
           (!clickableOnly || element.clickable) &&
           filter.matches(element),
     );
-    final foreground = await foregroundApp;
     final payload = <String, dynamic>{
       'elements': elements.map((e) => e.toJson()).toList(),
-      if (foregroundApp != null) 'foregroundApp': foreground,
+      if (includeForegroundApp) 'foregroundApp': foregroundApp,
     };
     return CallToolResult(
       content: [TextContent(text: jsonEncode(payload))],
@@ -207,8 +206,7 @@ Future<CallToolResult> handleNativeWaitFor(
     // A system surface in front of the app is the usual reason an element
     // never appears, so the error names the foreground app.
     Future<Never> timedOut() async {
-      final foregroundApp = await connector.foregroundApp
-          .then<String?>((value) => value, onError: (Object _) => null);
+      final foregroundApp = await _foregroundAppOrNull(connector, logger);
       final inApp = foregroundApp == null ? '' : ' in $foregroundApp';
       throw switch (state) {
         NativeWaitState.visible => NativeElementNotFoundException(
@@ -302,3 +300,56 @@ CallToolResult _waitResult(
         ),
       ],
     );
+
+/// Reads the tree and, when [includeForegroundApp], the foregroundApp, a
+/// diagnostic hint, alongside it.
+///
+/// The lookup is observed from the start, so its error never goes uncaught.
+/// A failed tree read is thrown at once, without waiting for the lookup; a
+/// lookup error that comes after it is logged.
+Future<(List<NativeElement>, String?)> _readTreeAndForegroundApp(
+  NativeConnector connector,
+  logging.Logger logger, {
+  required bool includeForegroundApp,
+}) async {
+  final lookup = includeForegroundApp
+      ? _foregroundAppOrNull(connector, logger)
+      : Future<String?>.value();
+  final lookupError = lookup.then<AsyncError?>(
+    (_) => null,
+    onError: (Object error, StackTrace stackTrace) =>
+        AsyncError(error, stackTrace),
+  );
+  final List<NativeElement> tree;
+  try {
+    tree = await connector.getNativeElements();
+  } on Object {
+    unawaited(
+      lookupError.then((error) {
+        if (error == null) return;
+        logger.severe(
+          'foregroundApp lookup failed after the tree read failed',
+          error.error,
+          error.stackTrace,
+        );
+      }),
+    );
+    rethrow;
+  }
+  return (tree, await lookup);
+}
+
+/// [NativeConnector.foregroundApp], or null when the lookup fails. It only
+/// explains a result, so the tool goes on without it and the failure is
+/// logged.
+Future<String?> _foregroundAppOrNull(
+  NativeConnector connector,
+  logging.Logger logger,
+) async {
+  try {
+    return await connector.foregroundApp;
+  } on Exception catch (error, stackTrace) {
+    logger.warning('Failed to read foregroundApp', error, stackTrace);
+    return null;
+  }
+}

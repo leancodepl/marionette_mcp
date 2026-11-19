@@ -1,6 +1,9 @@
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+
+final _logger = logging.Logger('WebDriverNativeConnector');
 
 /// Shared implementation of [NativeConnector] for WebDriver-based servers
 /// (UIAutomator2 on Android, WebDriverAgent on iOS).
@@ -179,16 +182,13 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     await typeInto(elementId, text, clear: clear);
   }
 
-  /// Class of [elementId], or null when the server cannot report it — then
-  /// typing proceeds unchecked rather than blocking unusual fields.
+  /// Class of [elementId], or null when the server reports an empty or
+  /// absent attribute — then typing proceeds unchecked rather than blocking
+  /// unusual fields.
   Future<String?> _classOf(String elementId) async {
-    try {
-      final value =
-          await client.elementAttribute(sessionId, elementId, classAttribute);
-      return value == null || value.isEmpty ? null : value;
-    } on WebDriverException {
-      return null;
-    }
+    final value =
+        await client.elementAttribute(sessionId, elementId, classAttribute);
+    return value == null || value.isEmpty ? null : value;
   }
 
   /// Types [text] into the WebDriver element [elementId], clearing it first
@@ -227,8 +227,8 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     _disposed = true;
     try {
       if (deletesSessionOnDispose) await client.deleteSession(sessionId);
-    } catch (_) {
-      // Continue teardown when the server/session has already disappeared.
+    } on WebDriverException catch (error) {
+      _logger.warning('Failed to delete the native session $sessionId', error);
     } finally {
       client.close();
       if (_ownsBootstrap) await _bootstrap.dispose();

@@ -120,18 +120,29 @@ void main() {
       ]);
     });
 
-    test('foregroundPackage returns null instead of throwing', () async {
-      final failing = FakeProcessRunner()
+    test('queries throw the ProcessException of an adb that cannot run',
+        () async {
+      final runner = FakeProcessRunner()
         ..failExecutable('adb', const ProcessException('adb', [], 'missing'));
-      final nonZero = FakeProcessRunner()
+      final adb = AdbClient(processRunner: runner.call);
+
+      await expectLater(
+        adb.foregroundPackage(),
+        throwsA(isA<ProcessException>()),
+      );
+      await expectLater(
+        adb.isKeyboardShown(),
+        throwsA(isA<ProcessException>()),
+      );
+      await expectLater(adb.screenSize(), throwsA(isA<ProcessException>()));
+    });
+
+    test('foregroundPackage is null when adb gives no answer', () async {
+      final runner = FakeProcessRunner()
         ..onAdb(['shell'], result: failed(stderr: 'error'));
 
       expect(
-        await AdbClient(processRunner: failing.call).foregroundPackage(),
-        isNull,
-      );
-      expect(
-        await AdbClient(processRunner: nonZero.call).foregroundPackage(),
+        await AdbClient(processRunner: runner.call).foregroundPackage(),
         isNull,
       );
     });
@@ -290,28 +301,6 @@ void main() {
       await expectLater(
         SimctlClient(processRunner: garbage.call).listBootedUdids(),
         throwsA(isA<FormatException>()),
-      );
-    });
-
-    test('install, launch and terminate call simctl and check the result',
-        () async {
-      final runner = FakeProcessRunner();
-      final simctl = SimctlClient(processRunner: runner.call);
-
-      await simctl.install('UDID', '/tmp/WDA.app');
-      await simctl.launch('UDID', 'com.wda');
-      await simctl.terminate('UDID', 'com.wda');
-
-      expect(runner.calls.map((c) => c.arguments), [
-        ['simctl', 'install', 'UDID', '/tmp/WDA.app'],
-        ['simctl', 'launch', 'UDID', 'com.wda'],
-        ['simctl', 'terminate', 'UDID', 'com.wda'],
-      ]);
-
-      runner.on('xcrun', ['simctl', 'launch'], result: failed(stderr: 'no'));
-      await expectLater(
-        simctl.launch('UDID', 'com.wda'),
-        throwsA(isA<ProcessCommandException>()),
       );
     });
 

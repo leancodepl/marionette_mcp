@@ -191,8 +191,9 @@ class NativePage extends StatelessComponent {
                 'at a time: WebDriverAgent listens on port 8100. It is built '
                 'once, for the simulator runtime you use, and Marionette is '
                 'pointed at the build. Marionette also finds a build copied '
-                'to `~/.cache/marionette_mcp/wda/`, and reuses a '
-                'WebDriverAgent already running for the simulator.',
+                r'to `marionette_mcp/wda/` under `$XDG_CACHE_HOME` (default '
+                '`~/.cache`), and reuses a WebDriverAgent already running for '
+                'the simulator.',
               ),
             ),
             const CodeBlock(

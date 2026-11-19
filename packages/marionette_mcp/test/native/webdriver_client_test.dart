@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
@@ -227,18 +228,6 @@ void main() {
       );
     });
 
-    test('wdaDeviceInfo reads /wda/device/info value', () async {
-      server.onValue('GET', '/wda/device/info', {
-        'udid': 'SIM-UDID',
-        'name': 'iPhone 16',
-      });
-
-      expect(await client.wdaDeviceInfo(), {
-        'udid': 'SIM-UDID',
-        'name': 'iPhone 16',
-      });
-    });
-
     test('wdaActiveAppInfo reads session active app value', () async {
       server.onValue('GET', '/session/sess-1/wda/activeAppInfo', {
         'bundleId': 'com.example.app',
@@ -277,6 +266,31 @@ void main() {
           isA<WebDriverException>()
               .having((e) => e.error, 'error', webDriverConnectionLost),
         ),
+      );
+    });
+
+    test('a response body that is not UTF-8 becomes WebDriverException',
+        () async {
+      server.on(
+        'GET',
+        '/session/sess-1/source',
+        (_) => const FakeResponse.bytes([0xC3, 0x28]),
+      );
+
+      await expectLater(
+        client.getPageSource('sess-1'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.message, 'message', contains('UTF-8'))
+              .having(isLostSession, 'isLostSession', isFalse),
+        ),
+      );
+    });
+
+    test('a body that cannot be encoded is a programmer error', () async {
+      await expectLater(
+        client.uia2UpdateSettings('sess-1', {'unencodable': Object()}),
+        throwsA(isA<JsonUnsupportedObjectError>()),
       );
     });
 

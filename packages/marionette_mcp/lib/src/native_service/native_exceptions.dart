@@ -172,8 +172,7 @@ enum IosBootstrapFailure {
     'to) and retry.',
   ),
   launch(
-    'Check that the WebDriverAgent build matches this simulator runtime; '
-    'prefer MARIONETTE_WDA_XCTESTRUN over a plain .app bundle.',
+    'Check that the WebDriverAgent build matches this simulator runtime.',
   ),
   healthCheck(
     'WebDriverAgent is often slow on first start; retry native_connect. If it '

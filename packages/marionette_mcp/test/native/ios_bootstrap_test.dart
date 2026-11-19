@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
 import 'package:test/test.dart';
 
+import 'support/fake_process.dart';
 import 'support/fake_process_runner.dart';
 import 'support/fake_webdriver_server.dart';
 
@@ -64,6 +65,47 @@ void main() {
             matcher.having((e) => e.message, 'message', contains(messagePart));
       }
       return throwsA(matcher);
+    }
+
+    /// An [IosBootstrap] for `SIM-A` whose WDA turns healthy once
+    /// [startXcodebuild] has started it, [detached] or held.
+    Future<IosBootstrap> bootstrapStartingWda(
+      ProcessStarter startXcodebuild, {
+      bool detached = false,
+    }) async {
+      final wda = await FakeWebDriverServer.start();
+      addTearDown(wda.close);
+      var started = false;
+      wda.on(
+        'GET',
+        '/status',
+        (_) => started
+            ? const FakeResponse.value({'ready': true})
+            : const FakeResponse.error('unknown error', 'starting'),
+      );
+      await File('${cacheDir.path}/WDA.xctestrun').create();
+      Future<Process> start(String executable, List<String> arguments) {
+        started = true;
+        return startXcodebuild(executable, arguments);
+      }
+
+      Future<Process> mustNotStart(String _, List<String> __) =>
+          throw StateError('xcodebuild must not start in this mode');
+
+      return IosBootstrap(
+        udid: 'SIM-A',
+        processRunner: runner.call,
+        processStarter: detached ? mustNotStart : start,
+        detachedProcessStarter: detached ? start : mustNotStart,
+        cacheDir: cacheDir,
+        wdaLocalPort: wda.port,
+        readyTimeout: const Duration(seconds: 2),
+        pollInterval: const Duration(milliseconds: 50),
+        // The fake WDA listens before xcodebuild is started.
+        isPortFree: (_) async => true,
+        detached: detached,
+        operatingSystem: 'macos',
+      );
     }
 
     test(
@@ -194,55 +236,62 @@ void main() {
 
       setUp(() async {
         wda = await FakeWebDriverServer.start();
-        wda.onValue('GET', '/wda/device/info', {'udid': 'SIM-A'});
       });
 
       tearDown(() => wda.close());
 
-      test(
-        'reuses a healthy WDA serving the same simulator',
-        () async {
-          final uri = await bootstrap(udid: 'SIM-A', port: wda.port)
-              .ensureServerReady();
-
-          expect(uri.port, wda.port);
-          expect(
-            runner.calls.map((c) => c.arguments.take(2).join(' ')),
-            everyElement('simctl list'),
-            reason: 'no launch needed',
+      test('reuses WDA whose runner runs in the simulator', () async {
+        runner
+          ..on(
+            'xcrun',
+            ['simctl', 'spawn', 'SIM-A', 'launchctl', 'list'],
+            result: ok(
+              '43645\t0\tUIKitApplication:'
+              'com.facebook.WebDriverAgentRunner.xctrunner[a55b][rb-legacy]\n',
+            ),
+          )
+          ..on(
+            'xcrun',
+            ['simctl', 'spawn', 'SIM-B', 'launchctl', 'list'],
+            result: ok('-\t0\tcom.apple.Preferences\n'),
           );
-        },
-      );
+
+        final uri =
+            await bootstrap(udid: 'SIM-A', port: wda.port).ensureServerReady();
+        expect(uri.port, wda.port);
+        await expectLater(
+          bootstrap(udid: 'SIM-B', port: wda.port).ensureServerReady(),
+          failsWith(IosBootstrapFailure.portConflict, 'SIM-B'),
+        );
+      });
 
       test(
-        'without a reported udid, reuses WDA whose runner runs in the '
-        'simulator (WDA 16)',
-        () async {
-          wda.onValue('GET', '/wda/device/info', {'uuid': 'APP-VENDOR-ID'});
-          runner
-            ..on(
-              'xcrun',
-              ['simctl', 'spawn', 'SIM-A', 'launchctl', 'list'],
-              result: ok(
-                '43645\t0\tUIKitApplication:'
-                'com.facebook.WebDriverAgentRunner.xctrunner[a55b][rb-legacy]\n',
-              ),
-            )
-            ..on(
-              'xcrun',
-              ['simctl', 'spawn', 'SIM-B', 'launchctl', 'list'],
-              result: ok('-\t0\tcom.apple.Preferences\n'),
-            );
+          'a failed launchctl fails at simctl with its error, not as a '
+          'port conflict', () async {
+        runner.on(
+          'xcrun',
+          ['simctl', 'spawn', 'SIM-A', 'launchctl', 'list'],
+          result: failed(stderr: 'launchctl: no such process'),
+        );
 
-          final uri = await bootstrap(udid: 'SIM-A', port: wda.port)
-              .ensureServerReady();
-          expect(uri.port, wda.port);
-          await expectLater(
-            bootstrap(udid: 'SIM-B', port: wda.port).ensureServerReady(),
-            failsWith(IosBootstrapFailure.portConflict, 'SIM-B'),
-          );
-        },
-      );
+        await expectLater(
+          bootstrap(udid: 'SIM-A', port: wda.port).ensureServerReady(),
+          failsWith(IosBootstrapFailure.simctl, 'no such process'),
+        );
+      });
+
+      test('an xcrun that cannot be run fails at simctl', () async {
+        runner.on(
+          'xcrun',
+          ['simctl', 'spawn'],
+          error: const ProcessException('xcrun', [], 'Permission denied'),
+        );
+
+        await expectLater(
+          bootstrap(udid: 'SIM-A', port: wda.port).ensureServerReady(),
+          failsWith(IosBootstrapFailure.simctl, 'Permission denied'),
+        );
+      });
 
       test(
         'throws portConflict naming the one-simulator limit when WDA on the '
@@ -287,87 +336,53 @@ void main() {
     test(
       'detached: starts xcodebuild detached and reports its pid',
       () async {
-        final wda = await FakeWebDriverServer.start();
-        addTearDown(wda.close);
-        var started = false;
-        // Healthy only once xcodebuild has been started.
-        wda.on(
-          'GET',
-          '/status',
-          (_) => started
-              ? const FakeResponse.value({'ready': true})
-              : const FakeResponse.error('unknown error', 'starting'),
-        );
-        await File('${cacheDir.path}/WDA.xctestrun').create();
+        const pid = (1 << 30) + 1;
         final launches = <List<String>>[];
-
-        final subject = IosBootstrap(
-          udid: 'SIM-A',
-          processRunner: runner.call,
-          processStarter: (_, __) =>
-              throw StateError('a held process must not be started'),
-          cacheDir: cacheDir,
-          wdaLocalPort: wda.port,
-          readyTimeout: const Duration(seconds: 2),
-          pollInterval: const Duration(milliseconds: 50),
-          // The fake WDA listens before it is "started".
-          isPortFree: (_) async => true,
-          detached: true,
-          operatingSystem: 'macos',
-          detachedProcessStarter: (executable, arguments) async {
+        final subject = await bootstrapStartingWda(
+          (executable, arguments) async {
             launches.add([executable, ...arguments]);
-            started = true;
-            return _FakeProcess(4242);
+            return FakeProcess(pid: pid);
           },
+          detached: true,
         );
 
         final uri = await subject.ensureServerReady();
 
-        expect(uri.port, wda.port);
+        expect(uri.port, subject.wdaLocalPort);
         expect(
             launches.single.take(2), ['xcodebuild', 'test-without-building']);
-        expect(subject.detachedPid, 4242);
+        expect(subject.detachedPid, pid);
       },
     );
 
+    test('dispose stops listening to the xcodebuild output', () async {
+      final xcodebuild = FakeProcess();
+      final subject = await bootstrapStartingWda((_, __) async => xcodebuild);
+      await subject.ensureServerReady();
+
+      await subject.dispose();
+
+      expect(xcodebuild.stdoutController.hasListener, isFalse);
+      expect(xcodebuild.stderrController.hasListener, isFalse);
+    });
+
     test(
-      'simctl launch failure throws launch with the XCTest hint',
+      'a runner .app without an .xctestrun fails with wdaArtifactsMissing',
       () async {
-        final app = await Directory(
+        await Directory(
           '${cacheDir.path}/WebDriverAgentRunner-Runner.app',
         ).create();
-        runner.on(
-          'xcrun',
-          ['simctl', 'install'],
-          result: failed(stderr: 'Invalid bundle'),
-        );
 
         await expectLater(
-          bootstrap(udid: 'SIM-A', port: 18104, wdaPath: app.path)
-              .ensureServerReady(),
-          throwsA(
-            isA<IosBootstrapException>()
-                .having((e) => e.failure, 'failure', IosBootstrapFailure.launch)
-                .having((e) => e.message, 'message', contains('Invalid bundle'))
-                .having(
-                  (e) => e.hint,
-                  'hint',
-                  contains('MARIONETTE_WDA_XCTESTRUN'),
-                ),
-          ),
+          bootstrap(udid: 'SIM-A', port: 18104).ensureServerReady(),
+          failsWith(IosBootstrapFailure.wdaArtifactsMissing),
+        );
+        expect(
+          runner.calls.map((c) => c.arguments.take(2).join(' ')),
+          everyElement('simctl list'),
+          reason: 'no simctl install or launch',
         );
       },
     );
   });
-}
-
-/// A started process of which only the pid is used.
-class _FakeProcess implements Process {
-  _FakeProcess(this.pid);
-
-  @override
-  final int pid;
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

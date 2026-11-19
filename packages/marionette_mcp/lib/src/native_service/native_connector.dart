@@ -209,7 +209,8 @@ abstract interface class NativeServerBootstrap {
   /// Starts the server if needed and returns its local base URL.
   Future<Uri> ensureServerReady();
 
-  /// Stops whatever [ensureServerReady] started. Best-effort; never throws.
+  /// Stops whatever [ensureServerReady] started. A step that fails is logged
+  /// and the rest goes on.
   Future<void> dispose();
 }
 

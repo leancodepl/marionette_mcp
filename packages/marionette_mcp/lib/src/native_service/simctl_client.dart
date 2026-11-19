@@ -21,35 +21,16 @@ class SimctlClient {
     return parseBootedUdids(processStdout(result));
   }
 
-  /// Installs the app bundle at [bundlePath] on simulator [udid].
-  Future<void> install(String udid, String bundlePath) =>
-      _simctl(['install', udid, bundlePath]);
-
-  /// Launches [bundleId] on simulator [udid].
-  Future<void> launch(String udid, String bundleId) =>
-      _simctl(['launch', udid, bundleId]);
-
-  /// Terminates [bundleId] on simulator [udid].
-  Future<void> terminate(String udid, String bundleId) =>
-      _simctl(['terminate', udid, bundleId]);
-
   /// Whether [bundleId] has a running process on simulator [udid], read from
-  /// `launchctl list` inside the simulator. Null when it cannot be read.
-  Future<bool?> isAppRunning(String udid, String bundleId) async {
-    try {
-      final result =
-          await _run('xcrun', ['simctl', 'spawn', udid, 'launchctl', 'list']);
-      if (result.exitCode != 0) return null;
-      return parseLaunchctlAppRunning(processStdout(result), bundleId);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _simctl(List<String> arguments) async {
-    final fullArguments = ['simctl', ...arguments];
-    final result = await _run('xcrun', fullArguments);
-    checkProcessResult(result, 'xcrun', fullArguments);
+  /// `launchctl list` inside the simulator.
+  ///
+  /// Throws [ProcessCommandException] when `launchctl` fails and
+  /// [ProcessException] when `xcrun` cannot be started.
+  Future<bool> isAppRunning(String udid, String bundleId) async {
+    final arguments = ['simctl', 'spawn', udid, 'launchctl', 'list'];
+    final result = await _run('xcrun', arguments);
+    checkProcessResult(result, 'xcrun', arguments);
+    return parseLaunchctlAppRunning(processStdout(result), bundleId);
   }
 }
 

@@ -15,6 +15,7 @@ class FakeResponse {
   const FakeResponse.value(Object? value, {this.status = HttpStatus.ok})
       : _json = value,
         _raw = null,
+        _bytes = null,
         _error = null,
         _drop = false;
 
@@ -25,6 +26,7 @@ class FakeResponse {
     this.status = HttpStatus.internalServerError,
   })  : _json = null,
         _raw = null,
+        _bytes = null,
         _error = (error, message),
         _drop = false;
 
@@ -32,6 +34,15 @@ class FakeResponse {
   const FakeResponse.raw(String body, {required this.status})
       : _json = null,
         _raw = body,
+        _bytes = null,
+        _error = null,
+        _drop = false;
+
+  /// Body of raw [bytes], e.g. one that is not UTF-8.
+  const FakeResponse.bytes(List<int> bytes, {this.status = HttpStatus.ok})
+      : _json = null,
+        _raw = null,
+        _bytes = bytes,
         _error = null,
         _drop = false;
 
@@ -41,12 +52,14 @@ class FakeResponse {
       : status = 0,
         _json = null,
         _raw = null,
+        _bytes = null,
         _error = null,
         _drop = true;
 
   final int status;
   final Object? _json;
   final String? _raw;
+  final List<int>? _bytes;
   final (String, String)? _error;
   final bool _drop;
 
@@ -164,7 +177,11 @@ class FakeWebDriverServer {
 
     request.response.statusCode = response.status;
     request.response.headers.contentType = ContentType.json;
-    request.response.write(response._body);
+    if (response._bytes case final bytes?) {
+      request.response.add(bytes);
+    } else {
+      request.response.write(response._body);
+    }
     await request.response.close();
   }
 }

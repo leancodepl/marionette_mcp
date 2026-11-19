@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
+import 'package:marionette_mcp/src/native_service/bootstrap_helpers.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/process.dart';
@@ -12,6 +14,8 @@ export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
     show AndroidBootstrapException, AndroidBootstrapFailure;
 export 'package:marionette_mcp/src/native_service/process.dart'
     show ProcessRunner, ProcessStarter;
+
+final _logger = logging.Logger('AndroidBootstrap');
 
 /// Signature for downloading a release asset, injectable for tests.
 typedef ApkDownloader = Future<List<int>> Function(Uri url);
@@ -49,15 +53,15 @@ class AndroidBootstrap implements SharedServerBootstrap {
     this.detached = false,
     ProcessStarter? detachedProcessStarter,
   })  : _adb = AdbClient(serial: serial, processRunner: processRunner),
-        _start =
-            processStarter ?? (processRunner == null ? Process.start : null),
+        _start = processStarter ?? Process.start,
         _downloader = downloader ?? _download,
-        _cacheDir = cacheDir ?? _defaultCacheDir(),
+        _cacheDir =
+            cacheDir ?? nativeCacheDir('uia2', environment: environment),
         _explicitLocalPort = localPort,
         _environment = environment ?? Platform.environment,
         _isPortFree = isPortFree ?? canBindLoopbackPort,
         _apkSha256 = apkSha256 ?? pinnedApkSha256,
-        _startDetached = detachedProcessStarter ?? _startDetachedProcess;
+        _startDetached = detachedProcessStarter ?? startDetachedProcess;
 
   static const uia2Version = '10.3.2';
   static const _releaseBaseUrl =
@@ -97,19 +101,8 @@ class AndroidBootstrap implements SharedServerBootstrap {
   final bool detached;
 
   final ProcessStarter _startDetached;
-
-  /// Pid of the detached `adb` process holding the instrumentation, if any.
-  int? get detachedPid => _detachedPid;
-  int? _detachedPid;
-
-  static Future<Process> _startDetachedProcess(
-    String executable,
-    List<String> arguments,
-  ) =>
-      Process.start(executable, arguments, mode: ProcessStartMode.detached);
-
   final AdbClient _adb;
-  final ProcessStarter? _start;
+  final ProcessStarter _start;
   final ApkDownloader _downloader;
   final Directory _cacheDir;
   final int? _explicitLocalPort;
@@ -124,6 +117,7 @@ class AndroidBootstrap implements SharedServerBootstrap {
   StreamSubscription<List<int>>? _instrumentStderr;
   Uri? _readyUri;
   int? _localPort;
+  int? _detachedPid;
 
   /// Whether this instance started the server (and must stop it on
   /// [dispose]) rather than reusing one that was already running.
@@ -134,6 +128,9 @@ class AndroidBootstrap implements SharedServerBootstrap {
 
   /// Local port of the server, once [ensureServerReady] has chosen one.
   int? get localPort => _localPort;
+
+  /// Pid of the detached `adb` process holding the instrumentation, if any.
+  int? get detachedPid => _detachedPid;
 
   @override
   bool get startedServer => _ownsServer;
@@ -178,39 +175,99 @@ class AndroidBootstrap implements SharedServerBootstrap {
       await _startInstrumentation();
       await _forwardPort(port);
 
-      _healthClient = WebDriverClient('http://127.0.0.1:$port');
-      await _waitUntilHealthy(_healthClient!, port);
+      final healthClient = WebDriverClient(_baseUrl(port));
+      _healthClient = healthClient;
+      await _waitUntilHealthy(healthClient, port);
       return _markReady(port);
-    } on AndroidBootstrapException {
-      await dispose();
-      rethrow;
-    } catch (error) {
+    } on ProcessException catch (error) {
       await dispose();
       throw AndroidBootstrapException(
-        AndroidBootstrapFailure.instrumentation,
-        'Unexpected Android bootstrap failure: $error',
+        AndroidBootstrapFailure.adbMissing,
+        'Could not run ${error.executable}: ${error.message}',
       );
+    } catch (_) {
+      await dispose();
+      rethrow;
+    }
+  }
+
+  /// Stops instrumentation and removes the ADB forward. A step that fails
+  /// is logged and the rest goes on. A reused server (see the class docs) is
+  /// left running.
+  @override
+  Future<void> dispose() async {
+    _healthClient?.close();
+    _healthClient = null;
+    _readyUri = null;
+
+    _instrumentProcess?.kill();
+    _instrumentProcess = null;
+    if (_detachedPid case final pid?) {
+      Process.killPid(pid);
+      _detachedPid = null;
+    }
+    await _instrumentStdout?.cancel();
+    await _instrumentStderr?.cancel();
+    _instrumentStdout = null;
+    _instrumentStderr = null;
+
+    final port = _localPort;
+    final ownsServer = _ownsServer;
+    _ownsServer = false;
+    if (!ownsServer) return;
+
+    await _forceStop(_adb, _testPackage);
+    if (port != null) await _removeForward(_adb, port);
+  }
+
+  /// Stops a UIAutomator2 server started on the device behind [adb] (e.g.
+  /// with [detached]) and removes the forward of local [port]. A step that
+  /// fails is logged and the rest goes on.
+  static Future<void> stopServer(AdbClient adb, {int? port}) async {
+    for (final package in const [_testPackage, _serverPackage]) {
+      await _forceStop(adb, package);
+    }
+    if (port != null) await _removeForward(adb, port);
+  }
+
+  static Future<void> _forceStop(AdbClient adb, String package) =>
+      _runTeardownStep(
+        'force-stop $package',
+        () => adb.shell(['am', 'force-stop', package]),
+      );
+
+  static Future<void> _removeForward(AdbClient adb, int port) =>
+      _runTeardownStep(
+        'remove the adb forward of port $port',
+        () => adb.run(['forward', '--remove', 'tcp:$port']),
+      );
+
+  /// Runs the adb [command] of teardown [step]. A failure, a non-zero exit
+  /// included, is logged and teardown goes on.
+  static Future<void> _runTeardownStep(
+    String step,
+    Future<ProcessResult> Function() command,
+  ) async {
+    try {
+      final result = await command();
+      if (result.exitCode != 0) {
+        _logger.warning('Failed to $step: ${processMessage(result)}');
+      }
+    } on ProcessException catch (error) {
+      _logger.warning('Failed to $step', error);
     }
   }
 
   Uri _markReady(int port) {
     _localPort = port;
-    _healthClient ??= WebDriverClient('http://127.0.0.1:$port');
-    final uri = Uri.parse('http://127.0.0.1:$port');
+    final uri = Uri.parse(_baseUrl(port));
+    _healthClient ??= WebDriverClient('$uri');
     _readyUri = uri;
     return uri;
   }
 
   Future<void> _checkAdbAndDevice() async {
-    ProcessResult version;
-    try {
-      version = await _adb.run(const ['version']);
-    } on ProcessException catch (error) {
-      throw AndroidBootstrapException(
-        AndroidBootstrapFailure.adbMissing,
-        'adb was not found on PATH: ${error.message}',
-      );
-    }
+    final version = await _adb.run(const ['version']);
     if (version.exitCode != 0) {
       throw AndroidBootstrapException(
         AndroidBootstrapFailure.adbMissing,
@@ -278,6 +335,21 @@ class AndroidBootstrap implements SharedServerBootstrap {
       return file;
     }
 
+    try {
+      return await _cachedApk(fileName);
+    } on FileSystemException catch (error) {
+      throw AndroidBootstrapException(
+        AndroidBootstrapFailure.download,
+        'Cannot use the APK cache ${_cacheDir.path}: $error',
+        hint: 'Make ${_cacheDir.path} a writable directory, or set '
+            'MARIONETTE_UIA2_SERVER_APK and MARIONETTE_UIA2_TEST_APK.',
+      );
+    }
+  }
+
+  /// Returns the cached [fileName], downloading it when it is missing or does
+  /// not match its pinned checksum.
+  Future<File> _cachedApk(String fileName) async {
     await _cacheDir.create(recursive: true);
     final cached = File('${_cacheDir.path}/$fileName');
     final expected = _apkSha256[fileName];
@@ -337,51 +409,28 @@ class AndroidBootstrap implements SharedServerBootstrap {
   }
 
   Future<void> _startInstrumentation() async {
-    final command = [
+    final arguments = _adb.argumentsFor(const [
       'shell',
       'am',
       'instrument',
+      '-w',
       '-e',
       'disableAnalytics',
       'true',
       '$_testPackage/androidx.test.runner.AndroidJUnitRunner',
-    ];
-
-    try {
-      final heldCommand = [...command.take(3), '-w', ...command.skip(3)];
-      if (detached) {
-        // A detached process has no stdio and no exit code to watch.
-        _detachedPid =
-            (await _startDetached('adb', _adb.argumentsFor(heldCommand))).pid;
-        return;
-      }
-      final starter = _start;
-      if (starter == null) {
-        // A supplied ProcessRunner must see every ADB call in unit tests.
-        // Without `-w`, `am instrument` returns after launching the runner.
-        final result = await _adb.run(command);
-        if (result.exitCode != 0) {
-          throw AndroidBootstrapException(
-            AndroidBootstrapFailure.instrumentation,
-            'Failed to start UIAutomator2 instrumentation: '
-            '${processMessage(result)}',
-          );
-        }
-        return;
-      }
-
-      final process = await starter('adb', _adb.argumentsFor(heldCommand));
-      _instrumentProcess = process;
-      _instrumentExitCode = null;
-      _instrumentStdout = process.stdout.listen((_) {});
-      _instrumentStderr = process.stderr.listen((_) {});
-      unawaited(process.exitCode.then((code) => _instrumentExitCode = code));
-    } on ProcessException catch (error) {
-      throw AndroidBootstrapException(
-        AndroidBootstrapFailure.instrumentation,
-        'Failed to start UIAutomator2 instrumentation: ${error.message}',
-      );
+    ]);
+    if (detached) {
+      // A detached process has no stdio and no exit code to watch.
+      _detachedPid = (await _startDetached('adb', arguments)).pid;
+      return;
     }
+
+    final process = await _start('adb', arguments);
+    _instrumentProcess = process;
+    _instrumentExitCode = null;
+    _instrumentStdout = process.stdout.listen((_) {});
+    _instrumentStderr = process.stderr.listen((_) {});
+    unawaited(process.exitCode.then((code) => _instrumentExitCode = code));
   }
 
   Future<void> _forwardPort(int port) async {
@@ -400,7 +449,7 @@ class AndroidBootstrap implements SharedServerBootstrap {
   }
 
   Future<bool> _isHealthy(int port) async {
-    final client = WebDriverClient('http://127.0.0.1:$port');
+    final client = WebDriverClient(_baseUrl(port));
     try {
       return await client.status();
     } finally {
@@ -408,103 +457,29 @@ class AndroidBootstrap implements SharedServerBootstrap {
     }
   }
 
-  Future<void> _waitUntilHealthy(WebDriverClient client, int port) async {
+  Future<void> _waitUntilHealthy(WebDriverClient client, int port) {
     const timeout = Duration(seconds: 30);
-    const retryDelay = Duration(milliseconds: 500);
-    final stopwatch = Stopwatch()..start();
-
-    while (stopwatch.elapsed < timeout) {
-      if (await client.status()) return;
-      if (_instrumentExitCode case final exitCode?) {
-        throw AndroidBootstrapException(
-          AndroidBootstrapFailure.instrumentation,
-          'UIAutomator2 instrumentation exited early with code $exitCode',
-        );
-      }
-      await Future<void>.delayed(retryDelay);
-    }
-
-    throw AndroidBootstrapException(
-      AndroidBootstrapFailure.healthCheck,
-      'UIAutomator2 did not become healthy at '
-      'http://127.0.0.1:$port within ${timeout.inSeconds} seconds',
+    return waitUntilHealthy(
+      client,
+      timeout: timeout,
+      pollInterval: const Duration(milliseconds: 500),
+      exitCode: () => _instrumentExitCode,
+      exited: (exitCode) => AndroidBootstrapException(
+        AndroidBootstrapFailure.instrumentation,
+        'UIAutomator2 instrumentation exited early with code $exitCode',
+      ),
+      timedOut: () => AndroidBootstrapException(
+        AndroidBootstrapFailure.healthCheck,
+        'UIAutomator2 did not become healthy at ${_baseUrl(port)} within '
+        '${timeout.inSeconds} seconds',
+      ),
     );
-  }
-
-  /// Stops instrumentation and removes the ADB forward, best-effort. A
-  /// reused server (see the class docs) is left running.
-  @override
-  Future<void> dispose() async {
-    _healthClient?.close();
-    _healthClient = null;
-    _readyUri = null;
-
-    _instrumentProcess?.kill();
-    _instrumentProcess = null;
-    if (_detachedPid case final pid?) {
-      Process.killPid(pid);
-      _detachedPid = null;
-    }
-    await _instrumentStdout?.cancel();
-    await _instrumentStderr?.cancel();
-    _instrumentStdout = null;
-    _instrumentStderr = null;
-
-    final port = _localPort;
-    final ownsServer = _ownsServer;
-    _ownsServer = false;
-    if (!ownsServer) return;
-
-    try {
-      await _adb.shell(['am', 'force-stop', _testPackage]);
-    } catch (_) {
-      // The host process above is the primary teardown path.
-    }
-
-    if (port != null) {
-      try {
-        await _adb.run(['forward', '--remove', 'tcp:$port']);
-      } catch (_) {
-        // Teardown is best-effort, including when adb has disappeared.
-      }
-    }
-  }
-
-  /// Stops a UIAutomator2 server started on the device behind [adb] (e.g.
-  /// with [detached]) and removes the forward of local [port]. Best-effort.
-  static Future<void> stopServer(AdbClient adb, {int? port}) async {
-    for (final package in const [_testPackage, _serverPackage]) {
-      try {
-        await adb.shell(['am', 'force-stop', package]);
-      } catch (_) {
-        // The device may be gone; continue with the forward.
-      }
-    }
-    if (port == null) return;
-    try {
-      await adb.run(['forward', '--remove', 'tcp:$port']);
-    } catch (_) {
-      // Already removed, or adb is gone.
-    }
   }
 
   static Future<String> _sha256Of(File file) async =>
       sha256.convert(await file.readAsBytes()).toString();
 
-  static Directory _defaultCacheDir() {
-    final environment = Platform.environment;
-    final xdgCache = environment['XDG_CACHE_HOME'];
-    if (xdgCache != null && xdgCache.isNotEmpty) {
-      return Directory('$xdgCache/marionette_mcp/uia2');
-    }
-    final home = environment['HOME'] ?? environment['USERPROFILE'];
-    if (home != null && home.isNotEmpty) {
-      return Directory('$home/.cache/marionette_mcp/uia2');
-    }
-    return Directory(
-      '${Directory.systemTemp.path}/marionette_mcp/uia2',
-    );
-  }
+  static String _baseUrl(int port) => 'http://127.0.0.1:$port';
 
   static Future<List<int>> _download(Uri url) async {
     final client = HttpClient();
