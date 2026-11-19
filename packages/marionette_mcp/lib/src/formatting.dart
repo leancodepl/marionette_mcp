@@ -56,24 +56,24 @@ String formatElement(Map<String, dynamic> element) {
 
   // Element type
   if (element['type'] != null) {
-    buffer.write('Type: ${element['type']}');
+    buffer.write('Type: ${_escapeForOneLine(element['type'])}');
   }
 
   // Key
   if (element['key'] != null) {
-    buffer.write(', Key: "${element['key']}"');
+    buffer.write(', Key: "${_escapeForOneLine(element['key'])}"');
   }
 
   // Text content
   if (element['text'] != null && element['text'] != '') {
-    buffer.write(', Text: "${element['text']}"');
+    buffer.write(', Text: "${_escapeForOneLine(element['text'])}"');
   }
 
   // Additional properties
   final additionalProps = <String>[];
   element.forEach((key, value) {
     if (key != 'type' && key != 'key' && key != 'text' && value != null) {
-      additionalProps.add('$key: ${formatValue(value)}');
+      additionalProps.add('${_escapeForOneLine(key)}: ${formatValue(value)}');
     }
   });
 
@@ -87,10 +87,18 @@ String formatElement(Map<String, dynamic> element) {
 /// Formats a value for human-readable display.
 String formatValue(dynamic value) {
   if (value is String) {
-    return '"$value"';
+    return '"${_escapeForOneLine(value)}"';
   }
   if (value is Map || value is List) {
     return jsonEncode(value);
   }
   return value.toString();
 }
+
+/// Escapes line breaks so a formatted element stays on one line, and
+/// backslashes so an escaped line break differs from a literal `\n`.
+String _escapeForOneLine(Object value) => value
+    .toString()
+    .replaceAll('\\', '\\\\')
+    .replaceAll('\r', '\\r')
+    .replaceAll('\n', '\\n');

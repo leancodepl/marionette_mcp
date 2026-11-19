@@ -73,4 +73,23 @@ void main() {
       );
     });
   });
+
+  group('formatElement', () {
+    test('keeps an element on one line, escaping every field', () {
+      final line = formatElement({
+        'type': 'Button\nType',
+        'key': 'save\rbutton',
+        'text': 'Accept terms\nRequired',
+        'hint\nname': r'C:\temp',
+        'bounds': {'label': 'a\nb'},
+      });
+
+      expect(
+        line,
+        r'Type: Button\nType, Key: "save\rbutton", '
+        r'Text: "Accept terms\nRequired", hint\nname: "C:\\temp", '
+        r'bounds: {"label":"a\nb"}',
+      );
+    });
+  });
 }
