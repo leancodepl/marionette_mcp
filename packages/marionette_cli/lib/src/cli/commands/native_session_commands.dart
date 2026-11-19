@@ -45,7 +45,7 @@ class NativeConnectCommand extends Command<int> {
   Future<int> run() async {
     final name = nativeSessionName(globalResults);
     final platform =
-        NativePlatform.tryParse(argResults!['platform'] as String)!;
+        NativePlatform.values.byName(argResults!['platform'] as String);
     final serial = argResults!['serial'] as String?;
     final udid = argResults!['udid'] as String?;
 

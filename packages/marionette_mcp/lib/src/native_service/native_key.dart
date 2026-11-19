@@ -21,13 +21,4 @@ enum NativeKey {
 
   /// One-line description for the tool schema.
   final String summary;
-
-  /// Parses a tool argument (case-insensitive), or returns null.
-  static NativeKey? tryParse(String? raw) {
-    final normalized = raw?.toLowerCase().trim();
-    for (final key in values) {
-      if (key.wireName == normalized) return key;
-    }
-    return null;
-  }
 }

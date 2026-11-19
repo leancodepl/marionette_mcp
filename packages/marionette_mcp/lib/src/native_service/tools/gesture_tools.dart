@@ -5,10 +5,10 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
-import 'package:mcp_dart/mcp_dart.dart';
+import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
+import 'package:mcp_dart/mcp_dart.dart';
 
 const _defaultSwipeDistance = 400;
 
@@ -39,15 +39,12 @@ const _searchHoldMs = 300;
 
 /// Finger-swipe direction for [native_scroll] (screen coordinates).
 enum SwipeDirection {
-  up('up', 0, -1),
-  down('down', 0, 1),
-  left('left', -1, 0),
-  right('right', 1, 0);
+  up(0, -1),
+  down(0, 1),
+  left(-1, 0),
+  right(1, 0);
 
-  const SwipeDirection(this.wireName, this.dx, this.dy);
-
-  /// MCP tool argument value (e.g. `"up"`).
-  final String wireName;
+  const SwipeDirection(this.dx, this.dy);
 
   /// X of the unit vector in screen coordinates for this finger direction.
   final int dx;
@@ -58,23 +55,12 @@ enum SwipeDirection {
   /// Whether the finger moves along the Y axis.
   bool get isVertical => dx == 0;
 
-  static String get commaSeparatedWireNames =>
-      values.map((direction) => direction.wireName).join(', ');
+  static String get _commaSeparatedNames =>
+      values.map((direction) => direction.name).join(', ');
 
-  static String get quotedWireNames {
-    final quoted =
-        values.map((direction) => '"${direction.wireName}"').toList();
-    if (quoted.length <= 1) return quoted.join();
+  static String get _quotedNames {
+    final quoted = values.map((direction) => '"${direction.name}"').toList();
     return '${quoted.sublist(0, quoted.length - 1).join(', ')}, or ${quoted.last}';
-  }
-
-  static SwipeDirection? tryParse(String? raw) {
-    if (raw == null) return null;
-    final normalized = raw.toLowerCase().trim();
-    for (final direction in values) {
-      if (direction.wireName == normalized) return direction;
-    }
-    return null;
   }
 
   ({int startX, int startY, int endX, int endY}) swipeEndpoints({
@@ -157,7 +143,7 @@ void registerNativeGestureTools(
       'native_scroll',
       description:
           'Performs a native swipe gesture. direction is the finger-swipe '
-          'direction: ${SwipeDirection.commaSeparatedWireNames} (swipe up to '
+          'direction: ${SwipeDirection._commaSeparatedNames} (swipe up to '
           'see content below). Swipes from screen center by default; within '
           '(a selector of a scrollable container, e.g. a horizontal list) '
           'swipes inside that container instead; startX/startY set the '
@@ -175,7 +161,7 @@ void registerNativeGestureTools(
         properties: {
           'direction': JsonSchema.string(
             description:
-                'Finger-swipe direction: ${SwipeDirection.quotedWireNames}.',
+                'Finger-swipe direction: ${SwipeDirection._quotedNames}.',
           ),
           ...nativeSelectorProperties(withIndex: false),
           'within': JsonSchema.object(
@@ -207,6 +193,23 @@ void registerNativeGestureTools(
     );
 }
 
+/// A parsed tool argument, or the message that rejects it.
+sealed class _Parsed<T> {
+  const _Parsed();
+}
+
+final class _Valid<T> extends _Parsed<T> {
+  const _Valid(this.value);
+
+  final T value;
+}
+
+final class _Invalid<T> extends _Parsed<T> {
+  const _Invalid(this.message);
+
+  final String message;
+}
+
 /// Where a single-point gesture lands: an element chosen by a selector, or
 /// explicit x/y coordinates.
 final class _PointTarget {
@@ -215,9 +218,9 @@ final class _PointTarget {
   final NativeSelector selector;
   final ({int x, int y})? point;
 
-  /// Parses a selector or x+y from [args]. Returns an error message for
-  /// invalid combinations.
-  static ({_PointTarget? target, String? error}) parse(
+  /// Parses a selector or x+y from [args], or rejects an invalid
+  /// combination.
+  static _Parsed<_PointTarget> parse(
     Map<String, dynamic> args,
     String tool,
   ) {
@@ -238,38 +241,25 @@ final class _PointTarget {
     } else if (!hasSelector && selector.index != null) {
       error = '$tool index requires a selector.';
     }
-    if (error != null) return (target: null, error: error);
+    if (error != null) return _Invalid(error);
+    if (!hasCoords) return _Valid(_PointTarget._(selector, null));
 
-    final point =
-        hasCoords ? (x: intArg(args, 'x')!, y: intArg(args, 'y')!) : null;
-    return (target: _PointTarget._(selector, point), error: null);
+    return switch ((intArg(args, 'x'), intArg(args, 'y'))) {
+      (final x?, final y?) => _Valid(_PointTarget._(selector, (x: x, y: y))),
+      _ => _Invalid('$tool x and y must be numbers.'),
+    };
   }
-
-  /// The selected element, or null for coordinates / an empty target. A
-  /// disabled element fails: a gesture on it would do nothing, or land on a
-  /// sheet covering it.
-  Future<NativeElement?> element(NativeConnector connector) async =>
-      selector.isEmpty
-          ? null
-          : requireEnabled(
-              selectElement(await connector.getNativeElements(), selector),
-              selector,
-            );
 }
 
-/// Reads an optional positive duration argument, or returns an error.
-({int? value, String? error}) _durationArg(
-  Map<String, dynamic> args,
-  String key,
-) {
+/// Reads an optional positive duration argument, or rejects it.
+_Parsed<int?> _durationArg(Map<String, dynamic> args, String key) {
   final value = intArg(args, key);
   if (value != null && (value < 1 || value > _maxGestureDurationMs)) {
-    return (
-      value: null,
-      error: 'Parameter "$key" must be between 1 and $_maxGestureDurationMs.',
+    return _Invalid(
+      'Parameter "$key" must be between 1 and $_maxGestureDurationMs.',
     );
   }
-  return (value: value, error: null);
+  return _Valid(value);
 }
 
 /// Handles `native_tap`.
@@ -278,9 +268,13 @@ Future<CallToolResult> handleNativeTap(
   Map<String, dynamic> args,
 ) async {
   final logger = context.logger;
-  final parsed = _PointTarget.parse(args, 'native_tap');
-  final target = parsed.target;
-  if (target == null) return invalidArguments(parsed.error!);
+  final _PointTarget target;
+  switch (_PointTarget.parse(args, 'native_tap')) {
+    case _Invalid(:final message):
+      return invalidArguments(message);
+    case _Valid(:final value):
+      target = value;
+  }
 
   logger.info('Native tapping with args: $args');
   return runNativeTool(logger, 'native tap', () async {
@@ -296,7 +290,13 @@ Future<CallToolResult> handleNativeTap(
       );
     }
 
-    await connector.tapElement((await target.element(connector))!);
+    // A disabled element fails: a tap on it would do nothing, or land on a
+    // sheet covering it.
+    final element = requireEnabled(
+      selectElement(await connector.getNativeElements(), target.selector),
+      target.selector,
+    );
+    await connector.tapElement(element);
     return CallToolResult(
       content: [
         TextContent(
@@ -323,9 +323,13 @@ Future<CallToolResult> handleNativeSwipe(
       'native_swipe requires startX, startY, endX and endY.',
     );
   }
-  final duration = _durationArg(args, 'durationMs');
-  if (duration.error != null) return invalidArguments(duration.error!);
-  final durationMs = duration.value ?? defaultSwipeDurationMs;
+  final int durationMs;
+  switch (_durationArg(args, 'durationMs')) {
+    case _Invalid(:final message):
+      return invalidArguments(message);
+    case _Valid(:final value):
+      durationMs = value ?? defaultSwipeDurationMs;
+  }
 
   logger.info('Native swipe ($startX,$startY) → ($endX,$endY) '
       'in ${durationMs}ms');
@@ -382,10 +386,10 @@ final class _ScrollArguments {
   final NativeSelector? within;
 }
 
-({String? error, _ScrollArguments? value}) _parseScrollArguments(
+_Parsed<_ScrollArguments> _parseScrollArguments(
   Map<String, dynamic> args,
 ) {
-  final direction = SwipeDirection.tryParse(args['direction'] as String?);
+  final direction = enumArg(args, 'direction', SwipeDirection.values);
   final target = nativeSelectorFromArgs(args);
   final distance = intArg(args, 'distance');
   final startX = intArg(args, 'startX');
@@ -394,10 +398,8 @@ final class _ScrollArguments {
   final rawWithin = args['within'];
 
   if (direction == null) {
-    return (
-      error: 'native_scroll requires direction to be '
-          '${SwipeDirection.quotedWireNames}.',
-      value: null,
+    return _Invalid(
+      'native_scroll requires direction to be ${SwipeDirection._quotedNames}.',
     );
   }
 
@@ -414,27 +416,23 @@ final class _ScrollArguments {
     error = 'Parameter "within" must be a selector object, e.g. '
         '{"id": "results_list"}.';
   }
-  if (error != null) return (error: error, value: null);
+  if (error != null) return _Invalid(error);
 
   final within = rawWithin is Map<String, dynamic>
       ? nativeSelectorFromArgs(rawWithin)
       : null;
   if (within != null && within.isEmpty) {
-    return (
-      error: 'Parameter "within" needs at least one of text, textContains, '
-          'id, type.',
-      value: null,
+    return const _Invalid(
+      'Parameter "within" needs at least one of text, textContains, id, type.',
     );
   }
   if (within != null && startX != null) {
-    return (
-      error: 'native_scroll takes either within or startX/startY, not both.',
-      value: null,
+    return const _Invalid(
+      'native_scroll takes either within or startX/startY, not both.',
     );
   }
-  return (
-    error: null,
-    value: _ScrollArguments(
+  return _Valid(
+    _ScrollArguments(
       direction: direction,
       target: target,
       distance: distance,
@@ -452,12 +450,16 @@ Future<CallToolResult> handleNativeScroll(
   Map<String, dynamic> args,
 ) async {
   final logger = context.logger;
-  final parsed = _parseScrollArguments(args);
-  final scroll = parsed.value;
-  if (scroll == null) return invalidArguments(parsed.error!);
+  final _ScrollArguments scroll;
+  switch (_parseScrollArguments(args)) {
+    case _Invalid(:final message):
+      return invalidArguments(message);
+    case _Valid(:final value):
+      scroll = value;
+  }
 
   logger.info(
-    'Native scrolling direction=${scroll.direction.wireName} '
+    'Native scrolling direction=${scroll.direction.name} '
     'target=${scroll.target.describe()} within=${scroll.within?.describe()} '
     'distance=${scroll.distance} start=${scroll.start}',
   );
@@ -502,7 +504,7 @@ Future<CallToolResult> handleNativeScroll(
       return CallToolResult(
         content: [
           TextContent(
-            text: 'Successfully swiped ${scroll.direction.wireName} $inArea '
+            text: 'Successfully swiped ${scroll.direction.name} $inArea '
                 '(distance=$travelled)',
           ),
         ],
@@ -545,7 +547,7 @@ Future<CallToolResult> _scrollUntilFound(
     if (swipes == scroll.maxSwipes) {
       throw NativeElementNotFoundException(
         '${target.describe()} after ${scroll.maxSwipes} swipe(s) '
-        '${scroll.direction.wireName} $inArea',
+        '${scroll.direction.name} $inArea',
         hint: 'Raise maxSwipes, try the opposite direction, or check the '
             'text with native_get_elements.',
       );
@@ -565,7 +567,7 @@ Future<CallToolResult> _scrollUntilFound(
     if (unchangedSwipes == _endOfContentSwipes) {
       throw NativeElementNotFoundException(
         '${target.describe()}: reached the end of the content after '
-        '${swipes + 1} swipe(s) ${scroll.direction.wireName} $inArea',
+        '${swipes + 1} swipe(s) ${scroll.direction.name} $inArea',
         hint: 'Try the opposite direction, or a within container if the '
             'target is in a nested list.',
       );

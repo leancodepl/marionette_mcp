@@ -1,21 +1,11 @@
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
-import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
+import 'package:mcp_dart/mcp_dart.dart';
 
 /// Actions of `native_notifications`.
-enum NativeNotificationsAction {
-  open,
-  close;
-
-  static NativeNotificationsAction? tryParse(Object? raw) {
-    for (final value in values) {
-      if (value.name == raw) return value;
-    }
-    return null;
-  }
-}
+enum NativeNotificationsAction { open, close }
 
 /// Registers `native_notifications`, which opens and closes the system
 /// notification list.
@@ -56,7 +46,7 @@ Future<CallToolResult> handleNativeNotifications(
   NativeServiceContext context,
   Map<String, dynamic> args,
 ) async {
-  final action = NativeNotificationsAction.tryParse(args['action']);
+  final action = enumArg(args, 'action', NativeNotificationsAction.values);
   if (action == null) {
     return invalidArguments(
       'native_notifications action must be "open" or "close".',

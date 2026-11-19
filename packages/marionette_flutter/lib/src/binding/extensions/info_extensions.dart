@@ -1,5 +1,5 @@
-import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:flutter/widgets.dart';
+import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
 import 'package:marionette_flutter/src/binding/register_extension_internal.dart';

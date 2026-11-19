@@ -6,7 +6,7 @@ import 'package:image/image.dart' as img;
 /// Largest width and height of a native screenshot, in pixels — the same
 /// default as `MarionetteConfiguration.maxScreenshotSize` for Flutter's
 /// `take_screenshots`.
-const maxNativeScreenshotSide = 2000;
+const _maxNativeScreenshotSide = 2000;
 
 /// A native screenshot ready to return, and how it relates to the screen.
 class ScaledScreenshot {
@@ -51,7 +51,7 @@ class ScaledScreenshot {
 /// unchanged.
 ScaledScreenshot? scaleScreenshot(
   String pngBase64, {
-  int maxSide = maxNativeScreenshotSide,
+  int maxSide = _maxNativeScreenshotSide,
 }) {
   final img.Image? image;
   try {

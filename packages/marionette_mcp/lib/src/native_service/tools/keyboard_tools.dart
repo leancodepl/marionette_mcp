@@ -2,8 +2,8 @@ import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
-import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
+import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers native key and software-keyboard tools.
 void registerNativeKeyboardTools(
@@ -59,7 +59,12 @@ Future<CallToolResult> handleNativePressKey(
   Map<String, dynamic> args,
 ) async {
   final logger = context.logger;
-  final key = NativeKey.tryParse(args['key'] as String?);
+  final key = enumArg(
+    args,
+    'key',
+    NativeKey.values,
+    wireName: (key) => key.wireName,
+  );
   if (key == null) {
     return invalidArguments(
       'native_press_key requires key to be one of: '

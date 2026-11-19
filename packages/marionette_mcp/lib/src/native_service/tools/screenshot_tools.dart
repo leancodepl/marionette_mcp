@@ -1,8 +1,8 @@
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/screenshot_scaling.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
-import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers native screenshot tools.
@@ -77,13 +77,6 @@ Future<CallToolResult> handleNativeTakeScreenshot(
   logger.info('Taking native screenshot');
   return runNativeTool(logger, 'native take screenshot', () async {
     final captured = await context.requireConnector().takeScreenshot();
-    if (captured.isEmpty) {
-      return CallToolResult(
-        content: [
-          const TextContent(text: 'Native screenshot was empty'),
-        ],
-      );
-    }
     // A capture that cannot be decoded is passed on unchanged.
     final scaled = scaleScreenshot(captured);
     final pngBase64 = scaled?.pngBase64 ?? captured;

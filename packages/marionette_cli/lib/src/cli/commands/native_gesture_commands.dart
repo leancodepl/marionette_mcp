@@ -86,7 +86,7 @@ class NativeScrollCommand extends NativeCommand {
     argParser.addOption(
       'direction',
       help: 'Finger-swipe direction.',
-      allowed: [for (final d in SwipeDirection.values) d.wireName],
+      allowed: [for (final d in SwipeDirection.values) d.name],
       mandatory: true,
     );
     // The target to scroll to; without one, a single swipe.

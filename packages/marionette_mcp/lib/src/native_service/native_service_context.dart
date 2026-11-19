@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
@@ -17,20 +19,7 @@ export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
     show NativeNotConnectedException;
 
 /// Platform targeted by a native automation session.
-enum NativePlatform {
-  android,
-  ios;
-
-  /// Parses the `platform` tool argument (case-insensitive), or returns
-  /// null for anything else.
-  static NativePlatform? tryParse(String? raw) {
-    final normalized = raw?.toLowerCase().trim();
-    for (final platform in values) {
-      if (platform.name == normalized) return platform;
-    }
-    return null;
-  }
-}
+enum NativePlatform { android, ios }
 
 /// Creates a connected [NativeConnector] for [platform].
 ///
@@ -64,11 +53,21 @@ final class NativeServiceContext {
   })  : _connectorFactory = connectorFactory ?? _connectPlatform,
         logger = logger ?? logging.Logger('NativeServiceContext');
 
+  static const _cancelled = NativeOperationFailedException(
+    'Cancelled by a newer native_connect, a native_disconnect or a '
+    'server shutdown while the device session was starting.',
+  );
+
   final NativeConnectorFactory _connectorFactory;
 
   /// Bumped by every [connect] and [dispose], so a connect still waiting for
   /// its connector can tell it was replaced or cancelled.
   var _connectCalls = 0;
+
+  /// Completes when the latest [connect] has finished. The next one waits for
+  /// it: two bootstraps on one device share its UIAutomator2 / WDA server, so
+  /// a stale connector must be disposed before the next bootstrap starts.
+  Future<void> _latestConnect = Future<void>.value();
 
   /// Logger shared by the native tools.
   final logging.Logger logger;
@@ -94,31 +93,39 @@ final class NativeServiceContext {
 
   /// Replaces any active session with a new one for [platform].
   ///
-  /// The previous connector is disposed first, so a failed connect leaves
-  /// the context disconnected. A newer [connect] or a [dispose] that starts
-  /// before the connector is created cancels this call: its connector is
-  /// disposed and it throws [NativeOperationFailedException].
+  /// Connects run one at a time: each waits until the one before it has
+  /// finished. The active connector is disposed first, so a failed connect
+  /// leaves the context disconnected. A newer [connect] or a [dispose] that
+  /// starts before the connector is created cancels this call: its connector
+  /// is disposed, or never created when the call is still waiting, and it
+  /// throws [NativeOperationFailedException].
   Future<NativeConnector> connect(
     NativePlatform platform, {
     String? serial,
     String? udid,
   }) async {
     final call = ++_connectCalls;
-    await _disposeConnector();
-    final created = await _connectorFactory(
-      platform,
-      serial: serial,
-      udid: udid,
-    );
-    if (call != _connectCalls) {
-      await created.dispose();
-      throw const NativeOperationFailedException(
-        'Cancelled by a newer native_connect, a native_disconnect or a '
-        'server shutdown while the device session was starting.',
+    final previous = _latestConnect;
+    final finished = Completer<void>();
+    _latestConnect = finished.future;
+    try {
+      await previous;
+      await _disposeConnector();
+      if (call != _connectCalls) throw _cancelled;
+      final created = await _connectorFactory(
+        platform,
+        serial: serial,
+        udid: udid,
       );
+      if (call != _connectCalls) {
+        await created.dispose();
+        throw _cancelled;
+      }
+      connector = created;
+      return created;
+    } finally {
+      finished.complete();
     }
-    connector = created;
-    return created;
   }
 
   /// Returns the active connector or throws [NativeNotConnectedException].

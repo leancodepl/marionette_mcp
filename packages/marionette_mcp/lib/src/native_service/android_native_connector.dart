@@ -131,7 +131,7 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       try {
         return await super.getNativeElements();
       } on WebDriverException catch (error) {
-        if (!isToastReadFailure(error)) rethrow;
+        if (!_isToastReadFailure(error)) rethrow;
         if (stopwatch.elapsed >= toastRetryWindow) {
           throw NativeOperationFailedException(
             'The UI tree cannot be read right now: $error',
@@ -145,10 +145,6 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       }
     }
   }
-
-  /// Whether [error] is UIAutomator2's failure while a toast is shown.
-  static bool isToastReadFailure(WebDriverException error) =>
-      error.message.contains("AccessibilityNodeInfo's field 'mSealed'");
 
   @override
   bool isEditableClass(String className) => isAndroidEditableClass(className);
@@ -261,6 +257,10 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       hint: 'Unfocus the field in the app (e.g. tap outside it) and retry.',
     );
   }
+
+  /// Whether [error] is UIAutomator2's failure while a toast is shown.
+  static bool _isToastReadFailure(WebDriverException error) =>
+      error.message.contains("AccessibilityNodeInfo's field 'mSealed'");
 
   /// The field found for typing (see [_findField]) when its rect holds the
   /// center of [element], or when focus moved to a different field; otherwise

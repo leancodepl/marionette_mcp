@@ -72,6 +72,20 @@ void main() {
       expect(context.connector, isNotNull);
     });
 
+    test('reads a platform with surrounding spaces', () async {
+      final context = NativeServiceContext(
+        connectorFactory: (platform, {serial, udid}) async {
+          expect(platform, NativePlatform.android);
+          return FakeNativeConnector();
+        },
+      );
+
+      final result =
+          await handleNativeConnect(context, {'platform': ' Android '});
+
+      expect(result, _isToolSuccess(contains('platform=android')));
+    });
+
     test('reports a failed connect and stays disconnected', () async {
       final context = NativeServiceContext(
         connectorFactory: (platform, {serial, udid}) =>
@@ -422,6 +436,21 @@ void main() {
         await handleNativeTap(_contextWith(FakeNativeConnector()), {'x': 1}),
         _isToolError(contains('both x and y')),
       );
+    });
+
+    test('rejects x and y that are not numbers without tapping', () async {
+      final connector = FakeNativeConnector.single([
+        nativeElement(text: 'OK'),
+      ]);
+
+      final result = await handleNativeTap(
+        _contextWith(connector),
+        {'x': null, 'y': null},
+      );
+
+      expect(result, _isToolError(contains('x and y must be numbers')));
+      expect(connector.tappedElements, isEmpty);
+      expect(connector.taps, isEmpty);
     });
 
     test('refuses a disabled element instead of touching it', () async {
@@ -1116,15 +1145,6 @@ void main() {
       expect(image.mimeType, 'image/png');
     });
 
-    test('reports an empty capture as text', () async {
-      expect(
-        await handleNativeTakeScreenshot(
-          _contextWith(FakeNativeConnector(screenshot: '')),
-        ),
-        _isToolSuccess('Native screenshot was empty'),
-      );
-    });
-
     test('fits a large capture in 2000x2000 and gives the factor', () async {
       final png = base64Encode(
         img.encodePng(img.Image(width: 1320, height: 2868)),
@@ -1361,7 +1381,29 @@ void main() {
       );
 
       expect(stopwatch.elapsedMilliseconds, lessThan(1500));
-      expect(result, _isToolError(contains('did not finish within 200ms')));
+      expect(
+        result,
+        _isToolError(
+          allOf(contains('did not finish within 200ms'),
+              contains('native_connect')),
+        ),
+      );
+    });
+
+    test('a foregroundApp lookup that never ends does not hold the timeout',
+        () async {
+      final connector = FakeNativeConnector.single([nativeElement(text: 'A')])
+        ..foregroundAppCompleter = Completer<String?>();
+
+      final stopwatch = Stopwatch()..start();
+      final result = await handleNativeWaitFor(_contextWith(connector), {
+        'text': 'B',
+        'timeoutMs': 120,
+        'intervalMs': 50,
+      });
+
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 4)));
+      expect(result, _isToolError(contains('within 120ms')));
     });
 
     test('times out with a hint', () async {

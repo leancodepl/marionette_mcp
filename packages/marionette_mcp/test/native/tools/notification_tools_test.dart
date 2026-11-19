@@ -40,6 +40,14 @@ void main() {
       expect(device.calls, ['openNotifications', 'closeNotifications']);
     });
 
+    test('reads the action case-insensitively', () async {
+      final result =
+          await handleNativeNotifications(context, {'action': 'OPEN'});
+
+      expect(result.isError, isFalse);
+      expect(device.calls, ['openNotifications']);
+    });
+
     test('rejects an unknown action', () async {
       final result =
           await handleNativeNotifications(context, {'action': 'push'});

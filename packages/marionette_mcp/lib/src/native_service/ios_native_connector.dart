@@ -245,7 +245,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
       return await client.findElement(
         sessionId,
         'xpath',
-        wdaGeometryXPath(element, toServerUnits),
+        _wdaGeometryXPath(element, toServerUnits),
       );
     } on WebDriverException catch (exception) {
       if (isLostSession(exception)) rethrow;
@@ -283,7 +283,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
 /// XPath selecting the WDA element of [element]'s type at exactly its bounds,
 /// converted to server units with [toServerUnits] (WDA reports integer
 /// points, so the conversion back from screen pixels is exact).
-String wdaGeometryXPath(
+String _wdaGeometryXPath(
     NativeElement element, int Function(int) toServerUnits) {
   final bounds = element.bounds;
   final type = wdaType(element.className) == null ? '*' : element.className;

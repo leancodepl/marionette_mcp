@@ -8,18 +8,6 @@ import 'package:test/test.dart';
 import 'support/fake_native_connector.dart';
 
 void main() {
-  group('NativePlatform.tryParse', () {
-    test('accepts known platforms case-insensitively', () {
-      expect(NativePlatform.tryParse(' Android '), NativePlatform.android);
-      expect(NativePlatform.tryParse('IOS'), NativePlatform.ios);
-    });
-
-    test('rejects anything else', () {
-      expect(NativePlatform.tryParse('web'), isNull);
-      expect(NativePlatform.tryParse(null), isNull);
-    });
-  });
-
   group('NativeServiceContext', () {
     test('requireConnector throws when disconnected', () {
       final context = NativeServiceContext();
@@ -107,48 +95,61 @@ void main() {
         );
       });
 
-      test('keeps the second connector when it completes first', () async {
-        final first = FakeNativeConnector();
+      test('starts the next factory only after the stale connector is disposed',
+          () async {
+        final first = FakeNativeConnector()
+          ..disposeCompleter = Completer<void>();
         final second = FakeNativeConnector();
         final firstCall = context.connect(NativePlatform.android);
         await pumpEventQueue();
-        final secondCall = context.connect(NativePlatform.ios);
+        final secondCall = context.connect(NativePlatform.android);
         await pumpEventQueue();
 
-        pending[1].complete(second);
-        await secondCall;
-        pending[0].complete(first);
+        expect(pending, hasLength(1));
+        pending.single.complete(first);
+        await pumpEventQueue();
+        expect(first.disposeCalls, 1);
+        expect(pending, hasLength(1));
 
+        first.disposeCompleter!.complete();
         await expectLater(
           firstCall,
           throwsA(isA<NativeOperationFailedException>()),
         );
+        await pumpEventQueue();
+        expect(pending, hasLength(2));
+
+        pending[1].complete(second);
+        await secondCall;
         expect(context.connector, same(second));
-        expect(first.disposeCalls, 1);
         expect(second.disposeCalls, 0);
       });
 
-      test('never stores the first connector when it completes first',
+      test('never runs the factory of a connect replaced while it waited',
           () async {
         final first = FakeNativeConnector();
-        final second = FakeNativeConnector();
+        final third = FakeNativeConnector();
         final firstCall = context.connect(NativePlatform.android);
         await pumpEventQueue();
-        final secondCall = context.connect(NativePlatform.ios);
+        final secondCall = context.connect(NativePlatform.android);
+        final thirdCall = context.connect(NativePlatform.android);
         await pumpEventQueue();
 
-        pending[0].complete(first);
+        pending.single.complete(first);
         await expectLater(
           firstCall,
           throwsA(isA<NativeOperationFailedException>()),
         );
-        expect(context.connector, isNull);
-        pending[1].complete(second);
-        await secondCall;
+        await expectLater(
+          secondCall,
+          throwsA(isA<NativeOperationFailedException>()),
+        );
+        await pumpEventQueue();
+        expect(pending, hasLength(2));
 
-        expect(context.connector, same(second));
-        expect(first.disposeCalls, 1);
-        expect(second.disposeCalls, 0);
+        pending[1].complete(third);
+        await thirdCall;
+        expect(context.connector, same(third));
       });
 
       test('dispose while the factory is pending cancels the connect',

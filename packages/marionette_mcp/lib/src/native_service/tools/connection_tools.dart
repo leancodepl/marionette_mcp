@@ -1,7 +1,8 @@
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
+import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers native-connector connection lifecycle tools.
 void registerNativeConnectionTools(
@@ -57,14 +58,13 @@ void registerNativeConnectionTools(
     );
 }
 
-/// Handles `native_connect`. Does not use `runNativeTool` because a failed
-/// connect must also leave the context disconnected.
+/// Handles `native_connect`.
 Future<CallToolResult> handleNativeConnect(
   NativeServiceContext context,
   Map<String, dynamic> args,
 ) async {
   final logger = context.logger;
-  final platform = NativePlatform.tryParse(args['platform'] as String?);
+  final platform = enumArg(args, 'platform', NativePlatform.values);
   final serial = args['serial'] as String?;
   final udid = args['udid'] as String?;
 
@@ -78,8 +78,7 @@ Future<CallToolResult> handleNativeConnect(
     'Connecting native connector: platform=${platform.name} '
     'serial=$serial udid=$udid',
   );
-
-  try {
+  return runTool(logger, 'connect native connector', () async {
     await context.connect(platform, serial: serial, udid: udid);
     return CallToolResult(
       content: [
@@ -89,40 +88,19 @@ Future<CallToolResult> handleNativeConnect(
         ),
       ],
     );
-  } catch (err) {
-    // context.connect disposed the previous session before trying, so the
-    // context is disconnected here, or holds the session of a newer
-    // native_connect that cancelled this one.
-    logger.severe('Failed to connect native connector', err);
-    return CallToolResult(
-      isError: true,
-      content: [
-        TextContent(text: 'Failed to connect native connector: $err'),
-      ],
-    );
-  }
+  });
 }
 
 /// Handles `native_disconnect`.
-Future<CallToolResult> handleNativeDisconnect(
-  NativeServiceContext context,
-) async {
+Future<CallToolResult> handleNativeDisconnect(NativeServiceContext context) {
   final logger = context.logger;
   logger.info('Disconnecting native connector');
-  try {
+  return runTool(logger, 'disconnect native connector', () async {
     await context.dispose();
     return CallToolResult(
       content: [
         const TextContent(text: 'Successfully disconnected native connector'),
       ],
     );
-  } catch (err) {
-    logger.severe('Error during native disconnect', err);
-    return CallToolResult(
-      isError: true,
-      content: [
-        TextContent(text: 'Error during native disconnect: $err'),
-      ],
-    );
-  }
+  });
 }

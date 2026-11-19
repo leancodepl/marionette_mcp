@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show max, min;
 
 import 'package:logging/logging.dart' as logging;
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
@@ -7,10 +8,10 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
-import 'package:mcp_dart/mcp_dart.dart';
+import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
+import 'package:mcp_dart/mcp_dart.dart';
 
 /// `native_wait_for`'s timeout when `timeoutMs` is not given.
 const defaultWaitTimeoutMs = 10000;
@@ -23,6 +24,10 @@ const _maxFailedWaitReads = 3;
 const defaultWaitIntervalMs = 500;
 const _minWaitIntervalMs = 50;
 
+/// Longest a timed-out `native_wait_for` waits for the foregroundApp its
+/// error names (a hung device server would hold it for minutes).
+const _timedOutForegroundAppTimeout = Duration(seconds: 2);
+
 const _toastLimitNote = 'A toast cannot be read on recent Android '
     'versions (the tree read fails while it shows) or on iOS; '
     'native_take_screenshot shows it.';
@@ -33,13 +38,7 @@ enum NativeWaitState {
   visible,
 
   /// No element matches.
-  gone;
-
-  static NativeWaitState? tryParse(Object? raw) => switch (raw) {
-        null || 'visible' => visible,
-        'gone' => gone,
-        _ => null,
-      };
+  gone,
 }
 
 /// Registers native UI hierarchy inspection tools.
@@ -174,7 +173,12 @@ Future<CallToolResult> handleNativeWaitFor(
 ) async {
   final logger = context.logger;
   final selector = nativeSelectorFromArgs(args);
-  final state = NativeWaitState.tryParse(args['state']);
+  final state = enumArg(
+    args,
+    'state',
+    NativeWaitState.values,
+    defaultValue: NativeWaitState.visible,
+  );
   final timeoutMs = intArg(args, 'timeoutMs') ?? defaultWaitTimeoutMs;
   final intervalMs = intArg(args, 'intervalMs') ?? defaultWaitIntervalMs;
 
@@ -201,47 +205,87 @@ Future<CallToolResult> handleNativeWaitFor(
 
   logger.info('Native waiting for ${selector.describe()} to be '
       '${state.name} (timeout ${timeoutMs}ms)');
-  return runNativeTool(logger, 'native wait for', () async {
-    final connector = context.requireConnector();
-    // A system surface in front of the app is the usual reason an element
-    // never appears, so the error names the foreground app.
-    Future<Never> timedOut() async {
-      final foregroundApp = await _foregroundAppOrNull(connector, logger);
-      final inApp = foregroundApp == null ? '' : ' in $foregroundApp';
-      throw switch (state) {
-        NativeWaitState.visible => NativeElementNotFoundException(
-            '${selector.describe()} within ${timeoutMs}ms$inApp',
-            hint: 'Call native_get_elements to see the current screen, or '
-                'raise timeoutMs if the element appears later.',
-          ),
-        NativeWaitState.gone => NativeOperationFailedException(
-            'Native element ${selector.describe()} is still visible after '
-            '${timeoutMs}ms.',
-            hint: 'Dismiss it (e.g. native_tap) or raise timeoutMs.',
-          ),
-      };
-    }
+  return runNativeTool(
+    logger,
+    'native wait for',
+    () => _NativeWait(
+      context.requireConnector(),
+      logger,
+      selector: selector,
+      state: state,
+      timeoutMs: timeoutMs,
+      intervalMs: intervalMs,
+    ).run(),
+  );
+}
 
-    final stopwatch = Stopwatch()..start();
-    var reads = 0;
+/// One `native_wait_for` call: reads the tree every [intervalMs] until
+/// [state] holds for [selector], or fails after [timeoutMs].
+final class _NativeWait {
+  _NativeWait(
+    this.connector,
+    this.logger, {
+    required this.selector,
+    required this.state,
+    required this.timeoutMs,
+    required this.intervalMs,
+  });
+
+  final NativeConnector connector;
+  final logging.Logger logger;
+  final NativeSelector selector;
+  final NativeWaitState state;
+  final int timeoutMs;
+  final int intervalMs;
+
+  final _stopwatch = Stopwatch();
+  var _reads = 0;
+
+  int get _remainingMs => timeoutMs - _stopwatch.elapsedMilliseconds;
+
+  Future<CallToolResult> run() async {
+    _stopwatch.start();
+    while (true) {
+      final elements = await _readTree();
+      final match =
+          elements.where((e) => e.isListed && selector.matches(e)).firstOrNull;
+      final done = switch (state) {
+        NativeWaitState.visible => match != null,
+        NativeWaitState.gone => match == null,
+      };
+      if (done) return _succeeded(match);
+
+      final remaining = _remainingMs;
+      if (remaining <= 0) return _timedOut();
+      await Future<void>.delayed(
+        Duration(milliseconds: min(remaining, intervalMs)),
+      );
+    }
+  }
+
+  /// Reads the tree within the time left. A failed read is tried again, up
+  /// to [_maxFailedWaitReads] times in a row.
+  Future<List<NativeElement>> _readTree() async {
     var failedReads = 0;
     while (true) {
-      // One read can be slow (a server waiting for an animating UI to go
-      // idle); never let it stretch the wait past timeoutMs.
-      final budget = timeoutMs - stopwatch.elapsedMilliseconds;
-      final List<NativeElement> elements;
       try {
-        elements = await connector
+        // One read can be slow (a server waiting for an animating UI to go
+        // idle); never let it stretch the wait past timeoutMs.
+        final elements = await connector
             .getNativeElements()
-            .timeout(Duration(milliseconds: budget > 0 ? budget : 1));
+            .timeout(Duration(milliseconds: max(_remainingMs, 1)));
+        _reads++;
+        return elements;
       } on TimeoutException {
         // Earlier reads worked: the element just did not change in time.
-        if (reads > 0) return timedOut();
+        if (_reads > 0) return _timedOut();
         throw NativeOperationFailedException(
           'Reading the native UI tree did not finish within ${timeoutMs}ms, '
           'so ${selector.describe()} could not be checked.',
           hint: 'The screen may be animating continuously (video, map); '
-              'raise timeoutMs or check with native_take_screenshot.',
+              'raise timeoutMs or check with native_take_screenshot. If the '
+              'screenshot hangs too, the device-side server is frozen: call '
+              'native_connect again.',
         );
       } on NativeNotConnectedException {
         rethrow;
@@ -250,56 +294,51 @@ Future<CallToolResult> handleNativeWaitFor(
         // after a terminated app was activated): try again, but
         // let a lasting failure through instead of waiting out timeoutMs.
         failedReads++;
-        final remaining = timeoutMs - stopwatch.elapsedMilliseconds;
+        final remaining = _remainingMs;
         if (failedReads > _maxFailedWaitReads || remaining <= 0) rethrow;
         logger.info('Reading the native UI tree failed ($error); retrying');
         await Future<void>.delayed(
-          Duration(
-            milliseconds: remaining < intervalMs ? remaining : intervalMs,
-          ),
+          Duration(milliseconds: min(remaining, intervalMs)),
         );
-        continue;
       }
-      reads++;
-      failedReads = 0;
-      final match =
-          elements.where((e) => e.isListed && selector.matches(e)).firstOrNull;
-      final done = switch (state) {
-        NativeWaitState.visible => match != null,
-        NativeWaitState.gone => match == null,
-      };
-      if (done) {
-        return _waitResult(selector, state, stopwatch.elapsedMilliseconds,
-            match: match);
-      }
-
-      final remaining = timeoutMs - stopwatch.elapsedMilliseconds;
-      if (remaining <= 0) return timedOut();
-      await Future<void>.delayed(
-        Duration(milliseconds: remaining < intervalMs ? remaining : intervalMs),
-      );
     }
-  });
-}
+  }
 
-CallToolResult _waitResult(
-  NativeSelector selector,
-  NativeWaitState state,
-  int elapsedMs, {
-  NativeElement? match,
-}) =>
-    CallToolResult(
-      content: [
-        TextContent(
-          text: jsonEncode({
-            'state': state.name,
-            'selector': selector.describe(),
-            'elapsedMs': elapsedMs,
-            if (match != null) 'element': match.toJson(),
-          }),
-        ),
-      ],
+  CallToolResult _succeeded(NativeElement? match) => CallToolResult(
+        content: [
+          TextContent(
+            text: jsonEncode({
+              'state': state.name,
+              'selector': selector.describe(),
+              'elapsedMs': _stopwatch.elapsedMilliseconds,
+              if (match != null) 'element': match.toJson(),
+            }),
+          ),
+        ],
+      );
+
+  /// Fails the wait. A system surface in front of the app is the usual
+  /// reason an element never appears, so the error names the foreground app.
+  Future<Never> _timedOut() async {
+    final foregroundApp = await _foregroundAppOrNull(
+      connector.foregroundApp.timeout(_timedOutForegroundAppTimeout),
+      logger,
     );
+    final inApp = foregroundApp == null ? '' : ' in $foregroundApp';
+    throw switch (state) {
+      NativeWaitState.visible => NativeElementNotFoundException(
+          '${selector.describe()} within ${timeoutMs}ms$inApp',
+          hint: 'Call native_get_elements to see the current screen, or '
+              'raise timeoutMs if the element appears later.',
+        ),
+      NativeWaitState.gone => NativeOperationFailedException(
+          'Native element ${selector.describe()} is still visible after '
+          '${timeoutMs}ms.',
+          hint: 'Dismiss it (e.g. native_tap) or raise timeoutMs.',
+        ),
+    };
+  }
+}
 
 /// Reads the tree and, when [includeForegroundApp], the foregroundApp, a
 /// diagnostic hint, alongside it.
@@ -313,7 +352,7 @@ Future<(List<NativeElement>, String?)> _readTreeAndForegroundApp(
   required bool includeForegroundApp,
 }) async {
   final lookup = includeForegroundApp
-      ? _foregroundAppOrNull(connector, logger)
+      ? _foregroundAppOrNull(connector.foregroundApp, logger)
       : Future<String?>.value();
   final lookupError = lookup.then<AsyncError?>(
     (_) => null,
@@ -339,15 +378,15 @@ Future<(List<NativeElement>, String?)> _readTreeAndForegroundApp(
   return (tree, await lookup);
 }
 
-/// [NativeConnector.foregroundApp], or null when the lookup fails. It only
-/// explains a result, so the tool goes on without it and the failure is
-/// logged.
+/// The result of [lookup] ([NativeConnector.foregroundApp]), or null when it
+/// fails or times out. It only explains a result, so the tool goes on
+/// without it and the failure is logged.
 Future<String?> _foregroundAppOrNull(
-  NativeConnector connector,
+  Future<String?> lookup,
   logging.Logger logger,
 ) async {
   try {
-    return await connector.foregroundApp;
+    return await lookup;
   } on Exception catch (error, stackTrace) {
     logger.warning('Failed to read foregroundApp', error, stackTrace);
     return null;

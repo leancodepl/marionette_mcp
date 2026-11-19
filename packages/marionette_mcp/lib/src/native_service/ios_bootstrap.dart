@@ -93,7 +93,7 @@ class IosBootstrap implements NativeServerBootstrap {
         _logger = logger ?? logging.Logger('IosBootstrap');
 
   /// Default WDA runner bundle id used by facebook/appium WebDriverAgent.
-  static const wdaRunnerBundleId =
+  static const _wdaRunnerBundleId =
       'com.facebook.WebDriverAgentRunner.xctrunner';
 
   /// How long [dispose] waits for xcodebuild to exit after SIGTERM.
@@ -374,7 +374,7 @@ class IosBootstrap implements NativeServerBootstrap {
   /// failure: an unknown owner of the port is no proof of a port conflict.
   Future<bool> _wdaServesSimulator(String expectedUdid) async {
     try {
-      return await _simctl.isAppRunning(expectedUdid, wdaRunnerBundleId);
+      return await _simctl.isAppRunning(expectedUdid, _wdaRunnerBundleId);
     } on ProcessCommandException catch (error) {
       throw IosBootstrapException(
         IosBootstrapFailure.simctl,

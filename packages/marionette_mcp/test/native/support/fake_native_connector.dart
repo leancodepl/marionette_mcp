@@ -92,6 +92,9 @@ class FakeNativeConnector implements NativeConnector {
   int getElementsCalls = 0;
   int disposeCalls = 0;
 
+  /// When set, [dispose] finishes only when it completes.
+  Completer<void>? disposeCompleter;
+
   void _maybeThrow() {
     if (errorsOnce.isNotEmpty) throw errorsOnce.removeAt(0);
     final pending = error;
@@ -193,6 +196,7 @@ class FakeNativeConnector implements NativeConnector {
   @override
   Future<void> dispose() async {
     disposeCalls++;
+    await disposeCompleter?.future;
   }
 }
 
