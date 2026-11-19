@@ -10,10 +10,10 @@ class ElementsCommand extends InstanceCommand {
     argParser.addMultiOption('ancestor-keys', help: _ancestorKeysHelp);
     argParser.addOption(
       'compaction',
-      help: 'How much to reduce the payload. "compact" drops rendering '
-          'details and font metrics, rounds bounds to whole pixels, and '
-          'reports visible only when false. "none" forces the full payload. '
-          "Omit to use the app's configured default.",
+      help: 'How much to reduce the payload. "compact" drops icon-font '
+          'glyphs, rendering details and font metrics, rounds bounds to '
+          'whole pixels, and reports visible only when false. "none" forces '
+          "the full payload. Omit to use the app's configured default.",
       allowed: supportedCompactionModes.toList(),
     );
   }
