@@ -18,9 +18,13 @@ class ElementTreeFinder {
   /// fails loud — this class stays deliberately unaware of matchers.
   ///
   /// [compaction] reduces the per-element payload further (see
-  /// [CompactionMode]). It overrides
-  /// [MarionetteConfiguration.compaction] in both directions; pass null to use
-  /// the app's configured default.
+  /// [CompactionMode]). [CompactionMode.compact] can also leave out an element
+  /// whose only content is an icon-font glyph, text made only of Unicode
+  /// private-use characters. A key or a Semantics identifier keeps the
+  /// element listed; an `Icon`'s `semanticLabel` is reported by its
+  /// `Semantics` wrapper.
+  /// [compaction] overrides [MarionetteConfiguration.compaction] in both
+  /// directions; pass null to use the app's configured default.
   List<Map<String, dynamic>> findInteractiveElements({
     Element? startElement,
     CompactionMode? compaction,
@@ -88,11 +92,14 @@ class ElementTreeFinder {
     // TextMatcher (tap/scroll_to/enter_text) is not affected — otherwise a
     // Semantics(label: 'Save', child: ElevatedButton(...)) wrapper would
     // shadow the inner button.
-    final discoverableText = text ??
+    final compact = compaction == CompactionMode.compact;
+    final found = text ??
         _extractSemanticsText(widget) ??
         (isInteractive && collapsesSubtree
             ? _extractMergedLabel(element)
             : null);
+    final discoverableText =
+        found != null && compact && _isIconGlyph(found) ? null : found;
     final keyValue = _extractKeyValue(widget.key);
     final identifierValue = _extractIdentifier(widget);
 
@@ -108,7 +115,6 @@ class ElementTreeFinder {
       return null;
     }
 
-    final compact = compaction == CompactionMode.compact;
     final properties = DiagnosticPropertiesBuilder();
     widget.debugFillProperties(properties);
     // Keep only primitive-valued properties, dropping the object blobs
@@ -124,7 +130,10 @@ class ElementTreeFinder {
               p.name != null &&
               p.value != null &&
               _isPrimitive(p.value) &&
-              !(compact && _isCompactNoise(p.name!)))
+              !(compact && _isCompactNoise(p.name!)) &&
+              !(compact &&
+                  p.value is String &&
+                  _isIconGlyph(p.value! as String)))
           .map(
             (p) => MapEntry(p.name!, p.value.toString()),
           ),
@@ -233,6 +242,33 @@ class ElementTreeFinder {
 
   static bool _isCompactNoise(String name) =>
       _renderingDetails.contains(name) || _textStylePrimitives.contains(name);
+
+  /// Whether [text] is made only of Unicode private-use code points, as the
+  /// glyph an `Icon` renders from an icon font is. It reads as an empty string
+  /// and no agent can match it; an icon's `semanticLabel` is reported by the
+  /// `Semantics` widget `Icon` wraps it in.
+  static bool _isIconGlyph(String text) =>
+      text.isNotEmpty && text.runes.every(_isPrivateUse);
+
+  // Unicode block names from
+  // https://www.unicode.org/Public/UCD/latest/ucd/Blocks.txt. `last` is the
+  // final private-use code point rather than the block end: the last two code
+  // points of every plane are noncharacters.
+  static const _privateUseArea = (first: 0xE000, last: 0xF8FF);
+  static const _supplementaryPrivateUseAreaA = (first: 0xF0000, last: 0xFFFFD);
+  static const _supplementaryPrivateUseAreaB = (
+    first: 0x100000,
+    last: 0x10FFFD,
+  );
+
+  static const _privateUseAreas = [
+    _privateUseArea,
+    _supplementaryPrivateUseAreaA,
+    _supplementaryPrivateUseAreaB,
+  ];
+
+  static bool _isPrivateUse(int rune) =>
+      _privateUseAreas.any((area) => rune >= area.first && rune <= area.last);
 
   String? _extractKeyValue(Key? key) {
     if (key is ValueKey<String>) {
