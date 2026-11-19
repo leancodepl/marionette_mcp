@@ -295,7 +295,7 @@ class ElementTreeFinder {
   /// rather than the label around it, so it gets none.
   String? _extractMergedLabel(Element element) {
     final root = element.renderObject;
-    if (root == null) return null;
+    if (root == null || _containsEditableText(element)) return null;
 
     final announced = <RenderObject>{root};
     void collect(RenderObject child) {
@@ -304,19 +304,6 @@ class ElementTreeFinder {
 
     root.visitChildrenForSemantics(collect);
     bool isAnnounced(Element child) => announced.contains(child.renderObject);
-
-    var isField = false;
-    void findField(Element child) {
-      if (isField || !isAnnounced(child)) return;
-      if (child.widget is EditableText) {
-        isField = true;
-      } else {
-        child.visitChildren(findField);
-      }
-    }
-
-    element.visitChildren(findField);
-    if (isField) return null;
 
     final labels = <String>[];
     void visit(Element child) {
@@ -337,6 +324,24 @@ class ElementTreeFinder {
 
     element.visitChildren(visit);
     return labels.isEmpty ? null : labels.join('\n');
+  }
+
+  /// Whether any descendant of [element] is an [EditableText], including one
+  /// that the semantics walk skips, such as a field below
+  /// `Semantics(excludeSemantics: true)`.
+  static bool _containsEditableText(Element element) {
+    var found = false;
+    void visit(Element child) {
+      if (found) return;
+      if (child.widget is EditableText) {
+        found = true;
+      } else {
+        child.visitChildren(visit);
+      }
+    }
+
+    element.visitChildren(visit);
+    return found;
   }
 
   /// Checks if the element is currently visible in the view it is mounted in.

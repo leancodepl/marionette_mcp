@@ -8,6 +8,14 @@ import 'multi_view_test_helpers.dart';
 
 const _configuration = MarionetteConfiguration();
 const _finder = ElementTreeFinder(_configuration);
+const _tileFinder = ElementTreeFinder(
+  MarionetteConfiguration(
+    isInteractiveElement: _isTile,
+    shouldStopTraversalAtElement: _isTile,
+  ),
+);
+
+bool _isTile(Element element) => element.widget is _DsTile;
 
 void main() {
   group('ElementTreeFinder text extraction', () {
@@ -485,14 +493,6 @@ void main() {
 
     testWidgets('an app control that stops traversal reports its label',
         (tester) async {
-      bool isTile(Element element) => element.widget is _DsTile;
-      final finder = ElementTreeFinder(
-        MarionetteConfiguration(
-          isInteractiveElement: isTile,
-          shouldStopTraversalAtElement: isTile,
-        ),
-      );
-
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -501,7 +501,7 @@ void main() {
         ),
       );
 
-      final elements = finder.findInteractiveElements();
+      final elements = _tileFinder.findInteractiveElements();
       expect(elements, hasLength(1));
       expect(elements.single['type'], '_DsTile');
       expect(elements.single['text'], 'Archive');
@@ -585,6 +585,89 @@ void main() {
       );
 
       expect(_finder.findInteractiveElements().single['text'], 'Pause');
+    });
+
+    testWidgets('a field below excluded semantics gets no merged label',
+        (tester) async {
+      final controller = TextEditingController(text: 'ana@example.com');
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: _DsTile(
+              enabled: true,
+              child: Semantics(
+                label: 'Email',
+                excludeSemantics: true,
+                child: TextField(controller: controller),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        _tileFinder.findInteractiveElements().single.containsKey('text'),
+        isFalse,
+      );
+    });
+
+    testWidgets('a field inside a WidgetSpan gets no merged label',
+        (tester) async {
+      final controller = TextEditingController(text: 'Ana');
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: _DsTile(
+              enabled: true,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(text: 'Name '),
+                    WidgetSpan(
+                      child: SizedBox(
+                        width: 80,
+                        child: TextField(controller: controller),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        _tileFinder.findInteractiveElements().single.containsKey('text'),
+        isFalse,
+      );
+    });
+
+    testWidgets('extracted text of a control holding a field wins',
+        (tester) async {
+      final controller = TextEditingController(text: 'ana@example.com');
+      addTearDown(controller.dispose);
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: _isTile,
+          shouldStopTraversalAtElement: _isTile,
+          extractText: (element) => _isTile(element) ? 'Contact' : null,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: _DsTile(
+              enabled: true,
+              child: TextField(controller: controller),
+            ),
+          ),
+        ),
+      );
+
+      expect(finder.findInteractiveElements().single['text'], 'Contact');
     });
   });
 
