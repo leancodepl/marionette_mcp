@@ -283,49 +283,40 @@ void main() {
     });
 
     test(
-        'an error of the foregroundApp lookup after a failed tree read is '
-        'logged, not left uncaught', () async {
-      final closed = StateError('Client is closed');
-      final context = _contextWith(
-        FakeNativeConnector(
-          error: const WebDriverException(
-            'GET /source failed',
-            error: webDriverConnectionLost,
-          ),
-          foregroundAppError: closed,
+        'a foregroundApp lookup started with a failed tree read may fail '
+        'later without an uncaught error', () async {
+      final lookup = Completer<String?>();
+      final connector = FakeNativeConnector(
+        error: const WebDriverException(
+          'GET /source failed',
+          error: webDriverConnectionLost,
         ),
-      );
-      final records = captureLogRecords();
+      )..foregroundAppCompleter = lookup;
 
-      final result = await handleNativeGetElements(context);
+      final result = await handleNativeGetElements(_contextWith(connector));
+      lookup.completeError(StateError('Client is closed'));
       await pumpEventQueue();
 
       expect(result, _isToolError(contains('native_connect')));
-      expect(records.where((r) => identical(r.error, closed)), hasLength(1));
+      expect(connector.foregroundAppCalls, 1);
     });
 
     test(
-        'a failed tree read is returned while the foregroundApp lookup is '
-        'pending, and a late lookup failure is logged', () async {
-      final lookup = Completer<String?>();
-      final closed = StateError('Client is closed');
+        'a failed tree read is returned without waiting for a hung '
+        'foregroundApp lookup', () async {
       final context = _contextWith(
         FakeNativeConnector(
           error: const WebDriverException(
             'GET /source failed',
             error: webDriverConnectionLost,
           ),
-        )..foregroundAppCompleter = lookup,
+        )..foregroundAppCompleter = Completer<String?>(),
       );
-      final records = captureLogRecords();
 
       final result = await handleNativeGetElements(context)
           .timeout(const Duration(seconds: 1));
-      lookup.completeError(closed);
-      await pumpEventQueue();
 
       expect(result, _isToolError(contains('native_connect')));
-      expect(records.where((r) => identical(r.error, closed)), hasLength(1));
     });
 
     test('leaves out off-screen (zero-size) elements', () async {

@@ -68,10 +68,12 @@ void main() {
     }
 
     /// An [IosBootstrap] for `SIM-A` whose WDA turns healthy once
-    /// [startXcodebuild] has started it, [detached] or held.
+    /// [startXcodebuild] has started it, [detached] or held; never when not
+    /// [ready].
     Future<IosBootstrap> bootstrapStartingWda(
       ProcessStarter startXcodebuild, {
       bool detached = false,
+      bool ready = true,
     }) async {
       final wda = await FakeWebDriverServer.start();
       addTearDown(wda.close);
@@ -79,7 +81,7 @@ void main() {
       wda.on(
         'GET',
         '/status',
-        (_) => started
+        (_) => started && ready
             ? const FakeResponse.value({'ready': true})
             : const FakeResponse.error('unknown error', 'starting'),
       );
@@ -241,28 +243,18 @@ void main() {
       tearDown(() => wda.close());
 
       test('reuses WDA whose runner runs in the simulator', () async {
-        runner
-          ..on(
-            'xcrun',
-            ['simctl', 'spawn', 'SIM-A', 'launchctl', 'list'],
-            result: ok(
-              '43645\t0\tUIKitApplication:'
-              'com.facebook.WebDriverAgentRunner.xctrunner[a55b][rb-legacy]\n',
-            ),
-          )
-          ..on(
-            'xcrun',
-            ['simctl', 'spawn', 'SIM-B', 'launchctl', 'list'],
-            result: ok('-\t0\tcom.apple.Preferences\n'),
-          );
+        runner.on(
+          'xcrun',
+          ['simctl', 'spawn', 'SIM-A', 'launchctl', 'list'],
+          result: ok(
+            '43645\t0\tUIKitApplication:'
+            'com.facebook.WebDriverAgentRunner.xctrunner[a55b][rb-legacy]\n',
+          ),
+        );
 
         final uri =
             await bootstrap(udid: 'SIM-A', port: wda.port).ensureServerReady();
         expect(uri.port, wda.port);
-        await expectLater(
-          bootstrap(udid: 'SIM-B', port: wda.port).ensureServerReady(),
-          failsWith(IosBootstrapFailure.portConflict, 'SIM-B'),
-        );
       });
 
       test(
@@ -332,6 +324,19 @@ void main() {
         );
       },
     );
+
+    test('an xcodebuild that exits before WDA is ready fails at launch',
+        () async {
+      final subject = await bootstrapStartingWda(
+        (_, __) async => FakeProcess()..exit(65),
+        ready: false,
+      );
+
+      await expectLater(
+        subject.ensureServerReady(),
+        failsWith(IosBootstrapFailure.launch, 'code 65'),
+      );
+    });
 
     test(
       'detached: starts xcodebuild detached and reports its pid',

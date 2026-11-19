@@ -292,10 +292,7 @@ Future<CallToolResult> handleNativeTap(
 
     // A disabled element fails: a tap on it would do nothing, or land on a
     // sheet covering it.
-    final element = requireEnabled(
-      selectElement(await connector.getNativeElements(), target.selector),
-      target.selector,
-    );
+    final element = await selectEnabledElement(connector, target.selector);
     await connector.tapElement(element);
     return CallToolResult(
       content: [

@@ -18,9 +18,6 @@ import 'package:mcp_dart/mcp_dart.dart';
 export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
     show NativeNotConnectedException;
 
-/// Platform targeted by a native automation session.
-enum NativePlatform { android, ios }
-
 /// Creates a connected [NativeConnector] for [platform].
 ///
 /// [serial] selects an Android device, [udid] an iOS Simulator; the one not
@@ -80,8 +77,8 @@ final class NativeServiceContext {
   /// Every call is recorded to the active session's steps.md through
   /// [stepLogger] — the one the Flutter lane's `connect` opens a session in,
   /// so both lanes log into the same run.
-  void registerTools(McpServer server, {StepLogger? stepLogger}) {
-    final loggedServer = LoggedMcpServer(server, stepLogger ?? StepLogger());
+  void registerTools(McpServer server, {required StepLogger stepLogger}) {
+    final loggedServer = LoggedMcpServer(server, stepLogger);
     registerNativeConnectionTools(loggedServer, this);
     registerNativeInspectionTools(loggedServer, this);
     registerNativeGestureTools(loggedServer, this);

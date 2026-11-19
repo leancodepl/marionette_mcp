@@ -57,6 +57,9 @@ void checkProcessResult(
   );
 }
 
+/// Returns whether a local TCP port is free to bind, injectable for tests.
+typedef PortProbe = Future<bool> Function(int port);
+
 /// Whether local [port] is free for a server on the loopback interface: it
 /// can be bound, and nothing answers a connection to it. Binding alone is not
 /// enough — on macOS 127.0.0.1 can be bound while a dual-stack listener

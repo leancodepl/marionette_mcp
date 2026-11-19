@@ -70,7 +70,11 @@ final class NativeAmbiguousElementException extends NativeLaneException {
         );
 }
 
-String _quote(String text) => '"${text.replaceAll('\n', r'\n')}"';
+String _quote(String text) => '"${escapeNewlines(text)}"';
+
+/// [text] with each line break written as `\n`, so a quoted value stays on
+/// one line of a message.
+String escapeNewlines(String text) => text.replaceAll('\n', r'\n');
 
 /// A device operation ran but did not have the expected effect (e.g. the
 /// keyboard is still shown after trying to hide it).

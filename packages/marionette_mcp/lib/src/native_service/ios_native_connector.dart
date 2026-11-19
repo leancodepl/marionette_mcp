@@ -48,22 +48,20 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   ///
   /// [udid] selects a simulator when [bootstrap] is omitted. A [bootstrap]
   /// passed in is not disposed by this connector; the caller keeps
-  /// ownership. Session capabilities default to `{platformName: iOS}`, which
-  /// WDA accepts for an already-launched runner.
+  /// ownership. The session asks only for `{platformName: iOS}`, which WDA
+  /// accepts for an already-launched runner.
   static Future<IosNativeConnector> connect({
     String? udid,
     NativeServerBootstrap? bootstrap,
-    Map<String, dynamic>? capabilities,
     String? sessionId,
-    bool? ownsBootstrap,
   }) async {
-    final owns = ownsBootstrap ?? bootstrap == null;
+    final owns = bootstrap == null;
     final resolvedBootstrap = bootstrap ?? IosBootstrap(udid: udid);
 
     final connector = await WebDriverNativeConnector.openSession(
       bootstrap: resolvedBootstrap,
       ownsBootstrap: owns,
-      capabilities: capabilities ?? const {'platformName': 'iOS'},
+      capabilities: const {'platformName': 'iOS'},
       sessionId: sessionId,
       create: (client, id) => IosNativeConnector._(
         client: client,
@@ -115,15 +113,6 @@ final class IosNativeConnector extends WebDriverNativeConnector {
 
     final source = await client.getPageSource(sessionId);
     return foregroundAppFromWdaSource(source);
-  }
-
-  /// Taps the center of [element]. Re-locating it through WDA (by id or
-  /// label) could hit a different element with the same id — exactly the
-  /// ambiguity the selector already resolved.
-  @override
-  Future<void> tapElement(NativeElement element) {
-    final center = element.center;
-    return tapAt(center.x, center.y);
   }
 
   @override

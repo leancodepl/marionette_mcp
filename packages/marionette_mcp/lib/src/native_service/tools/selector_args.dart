@@ -1,4 +1,5 @@
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
+import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 /// JSON schema properties of a [NativeSelector] for a tool's input.
@@ -50,7 +51,7 @@ NativeSelector nativeSelectorFromArgs(
       textContains: args['textContains'] as String?,
       id: args['id'] as String?,
       type: args['type'] as String?,
-      index: (args['index'] as num?)?.toInt(),
+      index: intArg(args, 'index'),
       textMatchesFirstLine: textKey == 'label',
     );
 

@@ -76,11 +76,9 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     NativeServerBootstrap? bootstrap,
     AdbClient? adb,
     String? sessionId,
-    bool? ownsBootstrap,
   }) async {
-    final owns = ownsBootstrap ?? bootstrap == null;
-    final ownedBootstrap =
-        bootstrap == null ? AndroidBootstrap(serial: serial) : null;
+    final owns = bootstrap == null;
+    final ownedBootstrap = owns ? AndroidBootstrap(serial: serial) : null;
     final resolvedBootstrap = bootstrap ?? ownedBootstrap!;
     final resolvedAdb = adb ?? ownedBootstrap?.adb ?? AdbClient(serial: serial);
 
@@ -163,12 +161,6 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     }
   }
 
-  @override
-  Future<void> tapElement(NativeElement element) {
-    final center = element.center;
-    return tapAt(center.x, center.y);
-  }
-
   /// Taps [element] and types into the field found after the tap (see
   /// [_findField]) when its rect holds the tap point or the tap moved the
   /// focus to it; the parsed bounds are clipped to the screen and the server
@@ -179,7 +171,8 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     String text, {
     bool clear = false,
   }) async {
-    final focusedBeforeTap = await _focusedElement();
+    // No focused element is normal before the first text-field tap.
+    final focusedBeforeTap = await activeElementOrNull();
     final tapPoint = element.center;
     await tapElement(element);
 
@@ -292,17 +285,6 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       tapped: rect.contains(tapPoint.x, tapPoint.y) ||
           (field.focused && field.id != focusedBeforeTap),
     );
-  }
-
-  /// Returns the element that held focus before the tap, when there was one.
-  /// A missing focused element is normal before the first text-field tap.
-  Future<String?> _focusedElement() async {
-    try {
-      return await client.activeElement(sessionId);
-    } on WebDriverException catch (error) {
-      if (!WebDriverNativeConnector.isNoSuchElement(error)) rethrow;
-      return null;
-    }
   }
 
   /// The field to type into after tapping [element]: its WebDriver `id`, and

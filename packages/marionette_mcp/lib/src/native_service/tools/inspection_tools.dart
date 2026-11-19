@@ -142,11 +142,15 @@ Future<CallToolResult> handleNativeGetElements(
       'clickableOnly: $clickableOnly)');
   return runNativeTool(logger, 'get native elements', () async {
     final connector = context.requireConnector();
-    final (tree, foregroundApp) = await _readTreeAndForegroundApp(
-      connector,
-      logger,
-      includeForegroundApp: includeForegroundApp,
-    );
+    final treeRead = connector.getNativeElements();
+    final lookup = includeForegroundApp
+        ? _foregroundAppOrNull(connector.foregroundApp, logger)
+        : Future<String?>.value();
+    // eagerError: a failed tree read is not held by a hung lookup, and a
+    // lookup error that comes after it is dropped, not left uncaught.
+    await Future.wait([treeRead, lookup], eagerError: true);
+    final tree = await treeRead;
+    final foregroundApp = await lookup;
     // Off-screen (zero-size) nodes are left out, as for every selector, so
     // index counts what is listed;
     // a toast has no bounds but is listed.
@@ -338,44 +342,6 @@ final class _NativeWait {
         ),
     };
   }
-}
-
-/// Reads the tree and, when [includeForegroundApp], the foregroundApp, a
-/// diagnostic hint, alongside it.
-///
-/// The lookup is observed from the start, so its error never goes uncaught.
-/// A failed tree read is thrown at once, without waiting for the lookup; a
-/// lookup error that comes after it is logged.
-Future<(List<NativeElement>, String?)> _readTreeAndForegroundApp(
-  NativeConnector connector,
-  logging.Logger logger, {
-  required bool includeForegroundApp,
-}) async {
-  final lookup = includeForegroundApp
-      ? _foregroundAppOrNull(connector.foregroundApp, logger)
-      : Future<String?>.value();
-  final lookupError = lookup.then<AsyncError?>(
-    (_) => null,
-    onError: (Object error, StackTrace stackTrace) =>
-        AsyncError(error, stackTrace),
-  );
-  final List<NativeElement> tree;
-  try {
-    tree = await connector.getNativeElements();
-  } on Object {
-    unawaited(
-      lookupError.then((error) {
-        if (error == null) return;
-        logger.severe(
-          'foregroundApp lookup failed after the tree read failed',
-          error.error,
-          error.stackTrace,
-        );
-      }),
-    );
-    rethrow;
-  }
-  return (tree, await lookup);
 }
 
 /// The result of [lookup] ([NativeConnector.foregroundApp]), or null when it

@@ -62,8 +62,9 @@ final class NativeSelector {
 
   /// Human-readable form for error messages, e.g. `text="OK", type="Button"`.
   String describe() => [
-        if (text != null) 'text="${_escape(text!)}"',
-        if (textContains != null) 'textContains="${_escape(textContains!)}"',
+        if (text case final text?) 'text="${escapeNewlines(text)}"',
+        if (textContains case final textContains?)
+          'textContains="${escapeNewlines(textContains)}"',
         if (id != null) 'id="$id"',
         if (type != null) 'type="$type"',
         if (index != null) 'index=$index',
@@ -79,8 +80,6 @@ final class NativeSelector {
       className == wanted ||
       className.endsWith('.$wanted') ||
       wdaType(className) == wanted;
-
-  static String _escape(String value) => value.replaceAll('\n', r'\n');
 }
 
 /// Maximum number of near misses listed when nothing matches.
@@ -150,11 +149,15 @@ NativeElement selectElement(
   ]);
 }
 
-/// [element] (selected by [selector]) if it is enabled. Touching a disabled
-/// one does nothing at best; on iOS the app's elements stay in the tree,
-/// disabled, under a system sheet or picker, and a touch at their position
-/// lands on the sheet instead.
-NativeElement requireEnabled(NativeElement element, NativeSelector selector) {
+/// The element [selector] picks (see [selectElement]) from [connector]'s
+/// current UI tree, if it is enabled. Touching a disabled one does nothing at
+/// best; on iOS the app's elements stay in the tree, disabled, under a system
+/// sheet or picker, and a touch at their position lands on the sheet instead.
+Future<NativeElement> selectEnabledElement(
+  NativeConnector connector,
+  NativeSelector selector,
+) async {
+  final element = selectElement(await connector.getNativeElements(), selector);
   if (element.enabled) return element;
   throw NativeOperationFailedException(
     'The native element ${selector.describe()} is disabled, so it was not '
@@ -168,10 +171,8 @@ NativeElement requireEnabled(NativeElement element, NativeSelector selector) {
 
 String _describe(NativeElement element) => [
       element.className,
-      if (element.text != null)
-        'text="${element.text!.replaceAll('\n', r'\n')}"',
-      if (element.resourceId != null)
-        'id="${element.resourceId!.replaceAll('\n', r'\n')}"',
+      if (element.text case final text?) 'text="${escapeNewlines(text)}"',
+      if (element.resourceId case final id?) 'id="${escapeNewlines(id)}"',
       'clickable=${element.clickable}',
       'bounds=(${element.bounds.x}, ${element.bounds.y}, '
           '${element.bounds.width}x${element.bounds.height})',

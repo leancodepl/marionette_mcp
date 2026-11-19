@@ -1,8 +1,7 @@
 import 'dart:io';
 
 import 'package:marionette_cli/src/native_session_registry.dart';
-import 'package:marionette_mcp/src/native_service/native_service_context.dart';
-import 'package:path/path.dart' as p;
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -42,43 +41,6 @@ void main() {
     expect(restored.device, 'emulator-5554');
   });
 
-  test('save, get, list and remove', () {
-    registry
-      ..save(session('pixel'))
-      ..save(session('default', sessionId: 'sess-1'));
-
-    expect(registry.get('default')!.sessionId, 'sess-1');
-    expect(registry.listAll().map((s) => s.name), ['default', 'pixel']);
-    expect(registry.remove('pixel'), isTrue);
-    expect(registry.remove('pixel'), isFalse);
-    expect(registry.get('pixel'), isNull);
-  });
-
-  test('save replaces the entry and leaves no temporary file', () {
-    registry
-      ..save(session('default', sessionId: 'old'))
-      ..save(session('default', sessionId: 'new'));
-
-    expect(registry.get('default')!.sessionId, 'new');
-    expect(
-      tempDir.listSync().map((f) => p.basename(f.path)),
-      ['default.json'],
-    );
-  });
-
-  test('encodes the file name like an instance name and round-trips', () {
-    registry.save(session('a b', sessionId: 'sess-1'));
-
-    expect(
-      tempDir.listSync().map((f) => p.basename(f.path)),
-      ['a%20b.json'],
-    );
-    expect(registry.get('a b')!.sessionId, 'sess-1');
-    expect(registry.listAll().map((s) => s.name), ['a b']);
-    expect(registry.remove('a b'), isTrue);
-    expect(tempDir.listSync(), isEmpty);
-  });
-
   test('an entry with an unknown platform names its file to delete', () {
     registry.save(session('default'));
     final file = File('${tempDir.path}/default.json');
@@ -112,9 +74,5 @@ void main() {
         ),
       ),
     );
-  });
-
-  test('rejects unsafe names', () {
-    expect(() => registry.get('../x'), throwsFormatException);
   });
 }

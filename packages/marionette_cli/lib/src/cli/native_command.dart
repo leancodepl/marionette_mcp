@@ -6,10 +6,10 @@ import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/cli/step_session.dart';
 import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
+import 'package:marionette_mcp/src/native_service/bootstrap_helpers.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
-import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/session/session_manager.dart';
@@ -325,15 +325,10 @@ class RunningServerBootstrap implements NativeServerBootstrap {
 
   @override
   Future<Uri> ensureServerReady() async {
-    final client = WebDriverClient(baseUrl.toString());
-    try {
-      if (!await client.status()) {
-        throw NativeSessionNotRunningException(baseUrl);
-      }
-      return baseUrl;
-    } finally {
-      client.close();
+    if (!await isServerHealthy(baseUrl.toString())) {
+      throw NativeSessionNotRunningException(baseUrl);
     }
+    return baseUrl;
   }
 
   @override

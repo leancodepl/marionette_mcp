@@ -6,7 +6,7 @@ import 'package:marionette_cli/src/cli/marionette_command_runner.dart';
 import 'package:marionette_cli/src/cli/native_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_cli/src/native_session_registry.dart';
-import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:test/test.dart';
 
 const _source = '<hierarchy>'

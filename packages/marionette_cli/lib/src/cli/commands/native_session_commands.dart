@@ -7,9 +7,10 @@ import 'package:marionette_cli/src/native_session_registry.dart';
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
+import 'package:marionette_mcp/src/native_service/bootstrap_helpers.dart';
 import 'package:marionette_mcp/src/native_service/ios_bootstrap.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_connector.dart';
-import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/poll.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_native_connector.dart';
@@ -312,10 +313,5 @@ Future<bool> _isRunning(String baseUrl) async {
       (uri.isScheme('http') || uri.isScheme('https')) &&
       uri.host.isNotEmpty;
   if (!callable) return false;
-  final client = WebDriverClient(baseUrl, shortTimeout: _isRunningTimeout);
-  try {
-    return await client.status();
-  } finally {
-    client.close();
-  }
+  return isServerHealthy(baseUrl, shortTimeout: _isRunningTimeout);
 }

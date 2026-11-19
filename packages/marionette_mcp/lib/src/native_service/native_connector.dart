@@ -10,6 +10,9 @@ import 'package:marionette_mcp/src/native_service/native_key.dart';
 export 'package:marionette_mcp/src/native_service/native_device.dart';
 export 'package:marionette_mcp/src/native_service/native_key.dart';
 
+/// Platform targeted by a native automation session.
+enum NativePlatform { android, ios }
+
 /// Rectangle in **screen pixels**: the device screen's own pixels, on every
 /// platform. `native_take_screenshot` may return a smaller image and then
 /// reports the factor between the two.

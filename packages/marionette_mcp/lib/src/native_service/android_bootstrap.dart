@@ -13,15 +13,12 @@ import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 export 'package:marionette_mcp/src/native_service/native_exceptions.dart'
     show AndroidBootstrapException, AndroidBootstrapFailure;
 export 'package:marionette_mcp/src/native_service/process.dart'
-    show ProcessRunner, ProcessStarter;
+    show PortProbe, ProcessRunner, ProcessStarter;
 
 final _logger = logging.Logger('AndroidBootstrap');
 
 /// Signature for downloading a release asset, injectable for tests.
 typedef ApkDownloader = Future<List<int>> Function(Uri url);
-
-/// Returns whether a local TCP port is free to bind, injectable for tests.
-typedef PortProbe = Future<bool> Function(int port);
 
 /// Installs, starts, and exposes Appium's standalone UIAutomator2 server.
 ///
@@ -108,11 +105,8 @@ class AndroidBootstrap implements SharedServerBootstrap {
   final PortProbe _isPortFree;
   final Map<String, String> _apkSha256;
 
-  Process? _instrumentProcess;
-  int? _instrumentExitCode;
+  ServerProcess? _instrumentation;
   WebDriverClient? _healthClient;
-  StreamSubscription<List<int>>? _instrumentStdout;
-  StreamSubscription<List<int>>? _instrumentStderr;
   Uri? _readyUri;
   int? _localPort;
   int? _detachedPid;
@@ -148,7 +142,8 @@ class AndroidBootstrap implements SharedServerBootstrap {
       await _checkAdbAndDevice();
 
       final existingPort = await _existingForwardPort();
-      if (existingPort != null && await _isHealthy(existingPort)) {
+      if (existingPort != null &&
+          await isServerHealthy(_baseUrl(existingPort))) {
         // Another Marionette process (or an earlier session of this one that
         // was not torn down) owns this server; reuse it without taking over.
         _ownsServer = false;
@@ -198,16 +193,13 @@ class AndroidBootstrap implements SharedServerBootstrap {
     _healthClient = null;
     _readyUri = null;
 
-    _instrumentProcess?.kill();
-    _instrumentProcess = null;
+    final instrumentation = _instrumentation;
+    _instrumentation = null;
+    await instrumentation?.kill();
     if (_detachedPid case final pid?) {
       Process.killPid(pid);
       _detachedPid = null;
     }
-    await _instrumentStdout?.cancel();
-    await _instrumentStderr?.cancel();
-    _instrumentStdout = null;
-    _instrumentStderr = null;
 
     final port = _localPort;
     final ownsServer = _ownsServer;
@@ -426,12 +418,7 @@ class AndroidBootstrap implements SharedServerBootstrap {
       return;
     }
 
-    final process = await _start('adb', arguments);
-    _instrumentProcess = process;
-    _instrumentExitCode = null;
-    _instrumentStdout = process.stdout.listen((_) {});
-    _instrumentStderr = process.stderr.listen((_) {});
-    unawaited(process.exitCode.then((code) => _instrumentExitCode = code));
+    _instrumentation = ServerProcess(await _start('adb', arguments));
   }
 
   Future<void> _forwardPort(int port) async {
@@ -449,22 +436,13 @@ class AndroidBootstrap implements SharedServerBootstrap {
     }
   }
 
-  Future<bool> _isHealthy(int port) async {
-    final client = WebDriverClient(_baseUrl(port));
-    try {
-      return await client.status();
-    } finally {
-      client.close();
-    }
-  }
-
   Future<void> _waitUntilHealthy(WebDriverClient client, int port) {
     const timeout = Duration(seconds: 30);
     return waitUntilHealthy(
       client,
       timeout: timeout,
       pollInterval: const Duration(milliseconds: 500),
-      exitCode: () => _instrumentExitCode,
+      exitCode: () => _instrumentation?.exitCode,
       exited: (exitCode) => AndroidBootstrapException(
         AndroidBootstrapFailure.instrumentation,
         'UIAutomator2 instrumentation exited early with code $exitCode',

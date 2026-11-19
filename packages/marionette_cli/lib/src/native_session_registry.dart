@@ -1,5 +1,5 @@
 import 'package:marionette_cli/src/json_file_registry.dart';
-import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 
 /// A native automation session kept between CLI commands.
 ///

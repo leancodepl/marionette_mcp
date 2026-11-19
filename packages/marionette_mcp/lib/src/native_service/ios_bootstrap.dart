@@ -77,7 +77,7 @@ class IosBootstrap implements NativeServerBootstrap {
     logging.Logger? logger,
     this.detached = false,
     ProcessStarter? detachedProcessStarter,
-    Future<bool> Function(int port)? isPortFree,
+    PortProbe? isPortFree,
     String? operatingSystem,
   })  : _udid = udid,
         _isPortFree = isPortFree ?? canBindLoopbackPort,
@@ -106,7 +106,7 @@ class IosBootstrap implements NativeServerBootstrap {
   final bool detached;
 
   final ProcessStarter _startDetached;
-  final Future<bool> Function(int port) _isPortFree;
+  final PortProbe _isPortFree;
   final String _operatingSystem;
   final String? _udid;
   final SimctlClient _simctl;
@@ -119,10 +119,7 @@ class IosBootstrap implements NativeServerBootstrap {
   final logging.Logger _logger;
 
   String? _resolvedUdid;
-  Process? _wdaProcess;
-  int? _wdaExitCode;
-  StreamSubscription<List<int>>? _wdaStdout;
-  StreamSubscription<List<int>>? _wdaStderr;
+  ServerProcess? _wdaProcess;
   int? _detachedPid;
 
   /// Pid of the `xcodebuild` started in [detached] mode, if any.
@@ -150,7 +147,7 @@ class IosBootstrap implements NativeServerBootstrap {
     _resolvedUdid = await _resolveSimulatorUdid();
 
     // Fast path: WDA is already healthy on the port for this simulator.
-    if (await _isHealthy(baseUri)) {
+    if (await isServerHealthy('$baseUri')) {
       if (await _wdaServesSimulator(_resolvedUdid!)) {
         return baseUri;
       }
@@ -192,23 +189,18 @@ class IosBootstrap implements NativeServerBootstrap {
   /// then SIGKILL (logged) when it has not exited after [_killTimeout].
   @override
   Future<void> dispose() async {
-    await _wdaStdout?.cancel();
-    await _wdaStderr?.cancel();
-    _wdaStdout = null;
-    _wdaStderr = null;
-
     final process = _wdaProcess;
     _wdaProcess = null;
     if (process == null) return;
-    process.kill(ProcessSignal.sigterm);
+    await process.kill();
     try {
-      await process.exitCode.timeout(_killTimeout);
+      await process.exited.timeout(_killTimeout);
     } on TimeoutException {
       _logger.warning(
         'xcodebuild did not exit within ${_killTimeout.inSeconds}s of '
         'SIGTERM; sending SIGKILL',
       );
-      process.kill(ProcessSignal.sigkill);
+      await process.kill(ProcessSignal.sigkill);
     }
   }
 
@@ -360,7 +352,7 @@ class IosBootstrap implements NativeServerBootstrap {
         'Failed to start xcodebuild: ${error.message}',
       );
     }
-    _attachProcess(process);
+    _wdaProcess = ServerProcess(process);
   }
 
   /// Whether the WDA answering on the port runs on [expectedUdid].
@@ -392,31 +384,6 @@ class IosBootstrap implements NativeServerBootstrap {
         'Failed to run xcrun: ${error.message}',
       );
 
-  void _attachProcess(Process process) {
-    _wdaProcess = process;
-    _wdaExitCode = null;
-    // Drain pipes so a chatty xcodebuild cannot fill OS buffers and stall.
-    _wdaStdout = process.stdout.listen((_) {});
-    _wdaStderr = process.stderr.listen((_) {});
-    unawaited(
-      process.exitCode.then((code) {
-        _wdaExitCode = code;
-        if (identical(_wdaProcess, process)) {
-          _wdaProcess = null;
-        }
-      }),
-    );
-  }
-
-  Future<bool> _isHealthy(Uri baseUri) async {
-    final client = WebDriverClient(baseUri.toString());
-    try {
-      return await client.status();
-    } finally {
-      client.close();
-    }
-  }
-
   Future<void> _waitUntilHealthy(Uri baseUri) async {
     final client = WebDriverClient(baseUri.toString());
     try {
@@ -424,7 +391,7 @@ class IosBootstrap implements NativeServerBootstrap {
         client,
         timeout: _readyTimeout,
         pollInterval: _pollInterval,
-        exitCode: () => _wdaExitCode,
+        exitCode: () => _wdaProcess?.exitCode,
         exited: (exitCode) => IosBootstrapException(
           IosBootstrapFailure.launch,
           'WebDriverAgent process exited with code $exitCode before becoming '

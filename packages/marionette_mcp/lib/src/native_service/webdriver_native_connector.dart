@@ -11,8 +11,7 @@ final _logger = logging.Logger('WebDriverNativeConnector');
 /// Owns the [WebDriverClient], the session and — when [ownsBootstrap] — the
 /// server bootstrap. Platform subclasses supply the session capabilities
 /// (via [openSession]), [parseSource], [getScreen], and the operations whose
-/// protocol differs per platform ([tapElement], [enterText],
-/// [foregroundApp]).
+/// protocol differs per platform ([enterText], [foregroundApp]).
 ///
 /// Coordinates crossing this class are screen pixels; the server may
 /// work in other units. [serverUnitScale] converts between the two: element
@@ -125,6 +124,15 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     );
   }
 
+  /// Taps the center of [element]. Re-locating it on the server (by id or
+  /// label) could hit a different element with the same id — exactly the
+  /// ambiguity the selector already resolved.
+  @override
+  Future<void> tapElement(NativeElement element) {
+    final center = element.center;
+    return tapAt(center.x, center.y);
+  }
+
   @override
   Future<void> swipe({
     required int startX,
@@ -166,11 +174,8 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
   /// UIAutomator2 — report success without typing anything.
   @override
   Future<void> typeText(String text, {bool clear = false}) async {
-    final String elementId;
-    try {
-      elementId = await client.activeElement(sessionId);
-    } on WebDriverException catch (error) {
-      if (!isNoSuchElement(error)) rethrow;
+    final elementId = await activeElementOrNull();
+    if (elementId == null) {
       throw NativeElementNotFoundException('keyboard focus', hint: _focusHint);
     }
 
@@ -184,6 +189,17 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
       );
     }
     await typeInto(elementId, text, clear: clear);
+  }
+
+  /// The element that has keyboard focus (W3C `element/active`), or null
+  /// when none has it.
+  Future<String?> activeElementOrNull() async {
+    try {
+      return await client.activeElement(sessionId);
+    } on WebDriverException catch (error) {
+      if (!isNoSuchElement(error)) rethrow;
+      return null;
+    }
   }
 
   /// Class of [elementId], or null when the server reports an empty or

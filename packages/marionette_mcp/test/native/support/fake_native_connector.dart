@@ -61,6 +61,7 @@ class FakeNativeConnector implements NativeConnector {
 
   /// When set, [foregroundApp] answers only when it completes.
   Completer<String?>? foregroundAppCompleter;
+  int foregroundAppCalls = 0;
   String screenshot;
   NativeScreen screen;
 
@@ -111,6 +112,7 @@ class FakeNativeConnector implements NativeConnector {
 
   @override
   Future<String?> get foregroundApp async {
+    foregroundAppCalls++;
     final completer = foregroundAppCompleter;
     if (completer != null) return completer.future;
     final pending = foregroundAppError;

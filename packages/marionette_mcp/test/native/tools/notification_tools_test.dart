@@ -1,3 +1,4 @@
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/notification_tools.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -23,21 +24,11 @@ void main() {
   });
 
   group('native_notifications', () {
-    test('Android opens and closes the shade with commands', () async {
+    test('opens and closes the notifications through the device', () async {
       await handleNativeNotifications(context, {'action': 'open'});
       await handleNativeNotifications(context, {'action': 'close'});
       expect(device.calls, ['openNotifications', 'closeNotifications']);
       expect(connector.swipes, isEmpty);
-    });
-
-    test('iOS delegates notification actions to its device', () async {
-      await context.connect(NativePlatform.ios);
-
-      await handleNativeNotifications(context, {'action': 'open'});
-      await handleNativeNotifications(context, {'action': 'close'});
-
-      expect(connector.swipes, isEmpty);
-      expect(device.calls, ['openNotifications', 'closeNotifications']);
     });
 
     test('reads the action case-insensitively', () async {

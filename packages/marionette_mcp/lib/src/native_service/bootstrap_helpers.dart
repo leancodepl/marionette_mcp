@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
@@ -9,6 +10,49 @@ Future<Process> startDetachedProcess(
   List<String> arguments,
 ) =>
     Process.start(executable, arguments, mode: ProcessStartMode.detached);
+
+/// A started server process. Its output is drained, so a chatty process
+/// cannot fill the OS pipe buffers and stall, and its exit code is kept.
+final class ServerProcess {
+  ServerProcess(Process process)
+      : _process = process,
+        _stdout = process.stdout.listen((_) {}),
+        _stderr = process.stderr.listen((_) {}) {
+    unawaited(process.exitCode.then((code) => _exitCode = code));
+  }
+
+  final Process _process;
+  final StreamSubscription<List<int>> _stdout;
+  final StreamSubscription<List<int>> _stderr;
+  int? _exitCode;
+
+  /// The exit code, once the process has ended.
+  int? get exitCode => _exitCode;
+
+  /// Completes with the exit code when the process ends.
+  Future<int> get exited => _process.exitCode;
+
+  /// Stops draining the output and sends [signal] to the process.
+  Future<void> kill([ProcessSignal signal = ProcessSignal.sigterm]) async {
+    await _stdout.cancel();
+    await _stderr.cancel();
+    _process.kill(signal);
+  }
+}
+
+/// Whether a WebDriver server answers `/status` at [baseUrl], waiting at
+/// most [shortTimeout] (see [WebDriverClient.status]).
+Future<bool> isServerHealthy(
+  String baseUrl, {
+  Duration shortTimeout = webDriverShortTimeout,
+}) async {
+  final client = WebDriverClient(baseUrl, shortTimeout: shortTimeout);
+  try {
+    return await client.status();
+  } finally {
+    client.close();
+  }
+}
 
 /// Polls `/status` of [client] every [pollInterval] until the server is
 /// ready.

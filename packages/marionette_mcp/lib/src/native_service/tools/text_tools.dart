@@ -108,10 +108,7 @@ Future<void> _enterText(
     await connector.typeText(input, clear: clear);
     return;
   }
-  final match = requireEnabled(
-    selectElement(await connector.getNativeElements(), selector),
-    selector,
-  );
+  final match = await selectEnabledElement(connector, selector);
   try {
     await connector.enterText(match, input, clear: clear);
   } on WebDriverException catch (error) {
@@ -123,10 +120,7 @@ Future<void> _enterText(
       'it again',
     );
     await Future<void>.delayed(changedFieldRetryDelay);
-    final again = requireEnabled(
-      selectElement(await connector.getNativeElements(), selector),
-      selector,
-    );
+    final again = await selectEnabledElement(connector, selector);
     try {
       await connector.enterText(again, input, clear: clear);
     } on WebDriverException catch (retryError) {
