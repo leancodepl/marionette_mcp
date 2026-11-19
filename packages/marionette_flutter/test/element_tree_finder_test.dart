@@ -799,6 +799,32 @@ void main() {
       expect(_finder.findInteractiveElements().single['text'], 'Pay');
     });
 
+    testWidgets(
+        'WidgetSpan content of a Text with a semanticsLabel is read, '
+        'without what the span excludes', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'Hi '),
+                    WidgetSpan(child: Text('Bob')),
+                    WidgetSpan(child: ExcludeSemantics(child: Text(' •'))),
+                  ],
+                ),
+                semanticsLabel: 'Greeting',
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Hi Bob');
+    });
+
     testWidgets('an attributed Semantics label replaces what it excludes',
         (tester) async {
       await tester.pumpWidget(

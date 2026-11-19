@@ -10,6 +10,9 @@ class ElementTreeFinder {
 
   final MarionetteConfiguration configuration;
 
+  static final _placeholder =
+      String.fromCharCode(PlaceholderSpan.placeholderCodeUnit);
+
   /// Returns a list of interactive elements from the current widget tree.
   ///
   /// When [startElement] is given, only that element and its subtree are
@@ -297,37 +300,49 @@ class ElementTreeFinder {
   ///
   /// This is a hybrid of the visible text and the accessibility labels, not
   /// what Flutter's accessibility tree announces: a `Text` reports its
-  /// visible text even when its `semanticsLabel` says something else.
+  /// visible text, `WidgetSpan` content included, even when its
+  /// `semanticsLabel` says something else.
   /// `tap(text:)` still matches each `Text` on its own, so a label merged from
-  /// several children or taken from `Semantics` alone does not match.
-  /// A control holding an [EditableText] is a field, whose `text` is its value
-  /// rather than the label around it, so it gets none.
+  /// several children, taken from `Semantics` alone or filled with
+  /// `WidgetSpan` content does not match.
+  /// A control holding an [EditableText] anywhere below it, including below
+  /// `Semantics(excludeSemantics: true)`, is a field, whose `text` is its
+  /// value rather than the label around it, so it gets none.
   String? _extractMergedLabel(Element element) {
     final root = element.renderObject;
-    if (root == null || _containsEditableText(element)) return null;
-
-    final announced = <RenderObject>{root};
-    void collect(RenderObject child) {
-      if (announced.add(child)) child.visitChildrenForSemantics(collect);
+    if (root == null ||
+        _findDescendant(element, (widget) => widget is EditableText) != null) {
+      return null;
     }
 
-    root.visitChildrenForSemantics(collect);
-
+    final reachable = _semanticsReachableFrom(root);
     final labels = <String>[];
     element.visitChildren(
-      (child) => _collectLabels(child, announced, labels),
+      (child) => _collectLabels(child, reachable, labels),
     );
     return labels.isEmpty ? null : labels.join('\n');
   }
 
+  /// [root] and every render object below it that
+  /// [RenderObject.visitChildrenForSemantics] reaches.
+  static Set<RenderObject> _semanticsReachableFrom(RenderObject root) {
+    final reachable = <RenderObject>{root};
+    void collect(RenderObject child) {
+      if (reachable.add(child)) child.visitChildrenForSemantics(collect);
+    }
+
+    root.visitChildrenForSemantics(collect);
+    return reachable;
+  }
+
   /// Adds the labels of [element] and its subtree to [labels] in tree order,
-  /// skipping elements whose render object is not in [announced].
+  /// skipping elements whose render object is not in [reachable].
   void _collectLabels(
     Element element,
-    Set<RenderObject> announced,
+    Set<RenderObject> reachable,
     List<String> labels,
   ) {
-    if (!announced.contains(element.renderObject)) return;
+    if (!reachable.contains(element.renderObject)) return;
     if (element.widget
         case Semantics(:final properties, :final excludeSemantics)) {
       if (_semanticsLabel(properties) case final label?) labels.add(label);
@@ -336,30 +351,36 @@ class ElementTreeFinder {
     final text = configuration.extractTextFromWidget(element);
     if (text == null) {
       element.visitChildren(
-        (child) => _collectLabels(child, announced, labels),
+        (child) => _collectLabels(child, reachable, labels),
       );
       return;
     }
-    final inlineText = _fillPlaceholders(element, text, announced);
+    final inlineText = _fillPlaceholders(element, text);
     if (inlineText.isNotEmpty) labels.add(inlineText);
   }
 
   /// Replaces each placeholder a `WidgetSpan` leaves in [text] with the labels
   /// of the widget it embeds. [RichText] builds those widgets as its children,
   /// one per placeholder and in the same order.
-  String _fillPlaceholders(
-    Element textElement,
-    String text,
-    Set<RenderObject> announced,
-  ) {
+  ///
+  /// The semantics walk starts again at the [RichText], because a `Text` with
+  /// a `semanticsLabel` excludes it, while its visible text is what is read.
+  /// What the embedded widgets exclude themselves stays left out.
+  String _fillPlaceholders(Element textElement, String text) {
     if (!text.contains(_placeholder)) return text;
 
     final inlineLabels = <String>[];
-    _findRichText(textElement)?.visitChildren((child) {
-      final labels = <String>[];
-      _collectLabels(child, announced, labels);
-      inlineLabels.add(labels.join(' '));
-    });
+    final richText = textElement.widget is RichText
+        ? textElement
+        : _findDescendant(textElement, (widget) => widget is RichText);
+    if (richText case final RenderObjectElement richText) {
+      final reachable = _semanticsReachableFrom(richText.renderObject);
+      richText.visitChildren((child) {
+        final labels = <String>[];
+        _collectLabels(child, reachable, labels);
+        inlineLabels.add(labels.join(' '));
+      });
+    }
     final remaining = inlineLabels.iterator;
     return text.replaceAllMapped(
       _placeholder,
@@ -367,33 +388,17 @@ class ElementTreeFinder {
     );
   }
 
-  static final _placeholder =
-      String.fromCharCode(PlaceholderSpan.placeholderCodeUnit);
-
-  /// [element] itself when it is a [RichText], or the first [RichText] below
-  /// it, such as the one a `Text` builds.
-  static Element? _findRichText(Element element) {
-    if (element.widget is RichText) return element;
-    Element? richText;
-    element.visitChildren((child) => richText ??= _findRichText(child));
-    return richText;
-  }
-
-  /// Whether any descendant of [element] is an [EditableText], including one
-  /// that the semantics walk skips, such as a field below
-  /// `Semantics(excludeSemantics: true)`.
-  static bool _containsEditableText(Element element) {
-    var found = false;
-    void visit(Element child) {
-      if (found) return;
-      if (child.widget is EditableText) {
-        found = true;
-      } else {
-        child.visitChildren(visit);
-      }
-    }
-
-    element.visitChildren(visit);
+  /// The first element below [element], in tree order, whose widget passes
+  /// [test], including one that the semantics walk skips.
+  static Element? _findDescendant(
+    Element element,
+    bool Function(Widget widget) test,
+  ) {
+    Element? found;
+    element.visitChildren(
+      (child) =>
+          found ??= test(child.widget) ? child : _findDescendant(child, test),
+    );
     return found;
   }
 
