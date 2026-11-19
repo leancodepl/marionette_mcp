@@ -1,4 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/extensions/device_config_extensions.dart';
 import 'package:marionette_flutter/src/binding/extensions/gesture_extensions.dart';
@@ -23,7 +27,16 @@ import 'package:marionette_flutter/src/services/widget_finder.dart';
 
 /// A custom binding that extends Flutter's default binding to provide
 /// integration points for the Marionette MCP.
-class MarionetteBinding extends WidgetsFlutterBinding {
+///
+/// To combine Marionette with another binding, use [MarionetteBindingMixin]
+/// instead.
+class MarionetteBinding extends WidgetsFlutterBinding
+    with MarionetteBindingMixin {
+  MarionetteBinding._(this.configuration);
+
+  @override
+  final MarionetteConfiguration configuration;
+
   /// Creates and initializes the binding with the given configuration.
   ///
   /// Returns the singleton instance of [MarionetteBinding].
@@ -42,45 +55,112 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   /// https://github.com/leancodepl/marionette_mcp/issues/96.
   ///
   /// To avoid this, call [ensureInitialized] early in `main()`, before any
-  /// other plugin initialization that might touch `WidgetsBinding`. When a
+  /// other plugin initialization that might touch `WidgetsBinding`, and keep
+  /// binding initialization and `runApp` in the same Flutter zone. When a
   /// plugin installs the binding from inside a callback it runs for you (as
-  /// `SentryFlutter.init()` does with its `appRunner`), call
-  /// [ensureInitialized] before that plugin — not inside the callback.
+  /// `SentryFlutter.init()` does with its `appRunner`), calling this method
+  /// inside that callback throws in the plugin's error-catching zone. That
+  /// zone may swallow the error and leave startup hanging, as in #96. Sentry
+  /// can reuse an existing Marionette binding, but its binding-specific frame
+  /// instrumentation is not preserved; use that setup only when this trade-off
+  /// is acceptable.
   static MarionetteBinding ensureInitialized([
     MarionetteConfiguration configuration = const MarionetteConfiguration(),
   ]) {
-    if (_instance == null) {
-      final existing = _existingWidgetsBinding();
-      if (existing != null) {
-        throw FlutterError.fromParts([
-          ErrorSummary(
-            'MarionetteBinding.ensureInitialized() was called after a '
-            '${existing.runtimeType} was already installed as the '
-            'WidgetsBinding.',
-          ),
-          ErrorDescription(
-            'Flutter only supports a single WidgetsBinding instance per '
-            'app. This usually happens when another plugin initializes the '
-            'binding first — for example, a plugin that installs its own '
-            'binding from within a callback that runs before your app code.',
-          ),
-          ErrorHint(
-            'Call MarionetteBinding.ensureInitialized() early in main(), '
-            'before any other plugin initialization that might touch '
-            'WidgetsBinding. If a plugin initializes the binding from '
-            'inside a callback it invokes for you (such as an appRunner), '
-            'call MarionetteBinding.ensureInitialized() before that plugin '
-            'rather than inside the callback.',
-          ),
-        ]);
-      }
-      MarionetteBinding._(configuration);
-    }
-    return instance;
+    return MarionetteBindingMixin.ensureInitialized(
+      () => MarionetteBinding._(configuration),
+    );
   }
 
-  /// Returns the currently installed [WidgetsBinding], if any, without
-  /// throwing when none has been initialized yet.
+  /// The singleton instance of [MarionetteBinding].
+  ///
+  /// Throws if the installed binding is not a [MarionetteBinding]. Use
+  /// [MarionetteBindingMixin.instance] to also reach a custom binding that
+  /// mixes in [MarionetteBindingMixin].
+  static MarionetteBinding get instance {
+    final binding = MarionetteBindingMixin.instance;
+    if (binding case final MarionetteBinding concreteBinding) {
+      return concreteBinding;
+    }
+    throw FlutterError(
+      'The installed binding is ${binding.runtimeType}, not MarionetteBinding. '
+      'Use MarionetteBindingMixin.instance to access a combined binding.',
+    );
+  }
+
+  /// See [MarionetteBindingMixin.maybeDeviceConfigService].
+  static DeviceConfigService? get maybeDeviceConfigService =>
+      MarionetteBindingMixin.maybeDeviceConfigService;
+}
+
+/// Adds the Marionette MCP integration points to a [WidgetsBinding].
+///
+/// Use this to combine Marionette with another binding that would otherwise
+/// compete with [MarionetteBinding] for the single binding slot:
+///
+/// ```dart
+/// import 'package:flutter/foundation.dart';
+///
+/// class AppBinding extends WidgetsFlutterBinding
+///     with OtherBindingMixin, MarionetteBindingMixin {
+///   AppBinding(this.configuration);
+///
+///   @override
+///   final MarionetteConfiguration configuration;
+/// }
+///
+/// void main() {
+///   if (kDebugMode) {
+///     MarionetteBindingMixin.ensureInitialized(
+///       () => AppBinding(const MarionetteConfiguration()),
+///     );
+///   } else {
+///     WidgetsFlutterBinding.ensureInitialized();
+///   }
+///   runApp(const MyApp());
+/// }
+/// ```
+///
+/// Like [MarionetteBinding.ensureInitialized], the binding must be created
+/// early in `main()`, before any other plugin touches [WidgetsBinding].
+mixin MarionetteBindingMixin
+    on
+        BindingBase,
+        GestureBinding,
+        SchedulerBinding,
+        ServicesBinding,
+        PaintingBinding,
+        SemanticsBinding,
+        RendererBinding,
+        WidgetsBinding {
+  /// Creates or returns the binding that includes Marionette.
+  ///
+  /// The factory is called only when no [WidgetsBinding] has been installed.
+  /// If another binding is already installed, this throws before calling the
+  /// factory, because Flutter supports one binding per process.
+  static T ensureInitialized<T extends MarionetteBindingMixin>(
+    T Function() create,
+  ) {
+    final existing = _existingWidgetsBinding();
+    if (existing != null) {
+      if (existing is T) {
+        return existing;
+      }
+      throw FlutterError.fromParts([
+        ErrorSummary(
+          '${T.toString()} (for example, MarionetteBinding.ensureInitialized()) '
+          'cannot be initialized after a '
+          '${existing.runtimeType} was already installed as the WidgetsBinding.',
+        ),
+        ErrorDescription(
+          'Flutter supports one WidgetsBinding per process. Create one '
+          'binding class that includes both binding mixins before startup.',
+        ),
+      ]);
+    }
+    return create();
+  }
+
   static WidgetsBinding? _existingWidgetsBinding() {
     try {
       return WidgetsBinding.instance;
@@ -89,9 +169,10 @@ class MarionetteBinding extends WidgetsFlutterBinding {
     }
   }
 
-  /// The singleton instance of [MarionetteBinding].
-  static MarionetteBinding get instance => BindingBase.checkInstance(_instance);
-  static MarionetteBinding? _instance;
+  /// The singleton instance of [MarionetteBindingMixin].
+  static MarionetteBindingMixin get instance =>
+      BindingBase.checkInstance(_instance);
+  static MarionetteBindingMixin? _instance;
 
   /// The device config service, or `null` when the binding was never
   /// installed — a release build, or an app that doesn't use Marionette.
@@ -101,10 +182,8 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   static DeviceConfigService? get maybeDeviceConfigService =>
       _instance?._deviceConfigService;
 
-  MarionetteBinding._(this.configuration);
-
   /// Configuration for the Marionette extensions.
-  final MarionetteConfiguration configuration;
+  MarionetteConfiguration get configuration => const MarionetteConfiguration();
 
   // Service instances
   late final DeviceConfigService _deviceConfigService;
@@ -118,11 +197,16 @@ class MarionetteBinding extends WidgetsFlutterBinding {
   late final ScreencastServer _screencastServer;
   late final WidgetFinder _widgetFinder;
 
+  @visibleForTesting
+  LogStore? get logStore => _logStore;
+
+  @visibleForTesting
+  ScreencastServer get screencastServer => _screencastServer;
+
   @override
   void initInstances() {
     super.initInstances();
     _instance = this;
-
     _deviceConfigService = DeviceConfigService();
     _widgetFinder = WidgetFinder();
     _elementTreeFinder = ElementTreeFinder(configuration);
@@ -170,25 +254,21 @@ class MarionetteBinding extends WidgetsFlutterBinding {
       textInputSimulator: _textInputSimulator,
       configuration: configuration,
     );
-    registerKeyboardExtensions(
-      keyboardSimulator: _keyboardSimulator,
-    );
+    registerKeyboardExtensions(keyboardSimulator: _keyboardSimulator);
     registerMediaExtensions(
       screenshotService: _screenshotService,
       screencastServer: _screencastServer,
     );
-    registerDeviceConfigExtensions(
-      deviceConfigService: _deviceConfigService,
-    );
+    registerDeviceConfigExtensions(deviceConfigService: _deviceConfigService);
     // This acts like a normal, non-predictive back. For details, see
     // https://github.com/flutter/flutter/blob/main/packages/flutter/lib/src/widgets/binding.dart#L1196
     registerNavigationExtensions(handlePopRoute: handlePopRoute);
   }
 
   @override
-  Future<void> reassembleApplication() async {
-    _logStore?.clear();
-    await _screencastServer.stopScreencast();
-    return super.reassembleApplication();
+  Future<void> performReassemble() async {
+    logStore?.clear();
+    await screencastServer.stopScreencast();
+    return super.performReassemble();
   }
 }

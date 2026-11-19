@@ -40,7 +40,7 @@ final List<ExtensionDetails> _customExtensionRegistry = [];
 /// Unmodifiable view of custom (non-built-in) extensions with their metadata.
 ///
 /// Only extensions registered via [registerMarionetteExtension] are tracked
-/// here. Internal extensions registered by [MarionetteBinding] are excluded.
+/// here. Internal extensions registered by the Marionette binding are excluded.
 List<ExtensionDetails> get customExtensionRegistry =>
     List.unmodifiable(_customExtensionRegistry);
 
