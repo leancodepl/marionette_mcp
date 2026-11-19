@@ -1,0 +1,147 @@
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
+import 'package:marionette_mcp/src/native_service/native_selector.dart';
+import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
+import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+import 'package:marionette_mcp/src/session/step_logger.dart';
+import 'package:mcp_dart/mcp_dart.dart';
+
+/// Registers native text-entry tools.
+void registerNativeTextTools(
+  LoggedMcpServer server,
+  NativeServiceContext context,
+) {
+  server.registerTool(
+    'native_enter_text',
+    description:
+        'Types into a native / system text field. Provide text (the string '
+        'to type) and either a selector for the field — label (exact visible '
+        'text), textContains, id, type, optional index; values from '
+        'native_get_elements — or no selector to type into the field that '
+        'currently has keyboard focus (e.g. after native_tap on it). Typing '
+        'into the focused field also works for Flutter fields when the '
+        'software keyboard is not visible to native_get_elements (Android). '
+        'The text is appended to the field content; set clear to replace '
+        'the content. '
+        '$nativeSelectorRules '
+        'Requires native_connect.',
+    annotations: const ToolAnnotations(title: 'Native Enter Text'),
+    inputSchema: ToolInputSchema(
+      properties: {
+        'text': JsonSchema.string(
+          description: 'The text to type into the native field.',
+        ),
+        ...nativeSelectorProperties(textKey: 'label'),
+        'clear': JsonSchema.boolean(
+          description: 'Replace the field content instead of appending to '
+              'it (default false).',
+        ),
+      },
+      required: ['text'],
+    ),
+    callback: (args, extra) => handleNativeEnterText(context, args),
+  );
+}
+
+/// Whether typing failed because the chosen field changed before anything
+/// was typed: replaced or moving while a screen transition runs (iOS "is not
+/// present in the current view anymore", `stale element reference`), or
+/// Android's set-text action refused (`invalid element state`).
+bool isChangedFieldError(WebDriverException error) =>
+    error.error == webDriverStaleElementReference ||
+    error.error == webDriverInvalidElementState ||
+    error.message.contains('is not present in the current view');
+
+/// Why the field counts as changed, for the log and the error: the W3C
+/// code, never the message — UIAutomator2's `invalid element state` message
+/// quotes the typed value (`Cannot set the element to '…'`), which can be a
+/// password.
+String _changeReason(WebDriverException error) =>
+    error.error ?? 'no longer in the view';
+
+/// Handles `native_enter_text`.
+Future<CallToolResult> handleNativeEnterText(
+  NativeServiceContext context,
+  Map<String, dynamic> args,
+) async {
+  final logger = context.logger;
+  final input = args['text'] as String?;
+  final selector = nativeSelectorFromArgs(args, textKey: 'label');
+  final clear = args['clear'] == true;
+
+  if (input == null) {
+    return invalidArguments(
+      'native_enter_text requires "text" (the string to type).',
+    );
+  }
+  if (selector.isEmpty && selector.index != null) {
+    return invalidArguments('native_enter_text index requires a selector.');
+  }
+
+  final target =
+      selector.isEmpty ? 'the focused field' : 'field ${selector.describe()}';
+  logger.info('Native enter text into $target (clear=$clear)');
+  return runNativeTool(logger, 'native enter text', () async {
+    try {
+      await _enterText(context, selector, input, clear: clear);
+    } on WebDriverException catch (error) {
+      throw _withoutMessage(error);
+    }
+    return CallToolResult(
+      content: [TextContent(text: 'Successfully entered text into $target')],
+    );
+  });
+}
+
+Future<void> _enterText(
+  NativeServiceContext context,
+  NativeSelector selector,
+  String input, {
+  required bool clear,
+}) async {
+  final logger = context.logger;
+  final connector = context.requireConnector();
+  if (selector.isEmpty) {
+    await connector.typeText(input, clear: clear);
+    return;
+  }
+  final match = await selectEnabledElement(connector, selector);
+  try {
+    await connector.enterText(match, input, clear: clear);
+  } on WebDriverException catch (error) {
+    if (!isChangedFieldError(error)) rethrow;
+    // The field was replaced or was still moving (a screen transition)
+    // and nothing was typed; find it again once.
+    logger.info(
+      'Field changed before typing (${_changeReason(error)}); finding '
+      'it again',
+    );
+    await Future<void>.delayed(changedFieldRetryDelay);
+    final again = await selectEnabledElement(connector, selector);
+    try {
+      await connector.enterText(again, input, clear: clear);
+    } on WebDriverException catch (retryError) {
+      if (!isChangedFieldError(retryError)) rethrow;
+      throw NativeOperationFailedException(
+        'The field ${selector.describe()} kept changing; nothing was '
+        'typed (${_changeReason(retryError)}).',
+        hint: 'Wait until the screen has settled (native_wait_for on an '
+            'element of the new screen), then retry.',
+      );
+    }
+  }
+}
+
+/// [error] with its message replaced by its W3C code: UIAutomator2 quotes
+/// the value it could not set (`Cannot set the element to '…'`), which can
+/// be a password. The code is kept, so a lost session still maps to the
+/// reconnect hint.
+WebDriverException _withoutMessage(WebDriverException error) =>
+    WebDriverException(
+      error.error ?? 'unknown WebDriver error',
+      httpStatus: error.httpStatus,
+      error: error.error,
+    );

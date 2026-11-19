@@ -149,4 +149,37 @@ void main() {
       );
     });
   });
+
+  group('coveredAppLifecycleState', () {
+    testWidgets(
+      'reports the lifecycle state on Android and iOS',
+      (tester) async {
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        addTearDown(
+          () => tester.binding
+              .handleAppLifecycleStateChanged(AppLifecycleState.resumed),
+        );
+
+        expect(coveredAppLifecycleState(), 'paused');
+      },
+      variant: TargetPlatformVariant(
+        {TargetPlatform.android, TargetPlatform.iOS},
+      ),
+    );
+
+    testWidgets(
+      'reports nothing on desktop, where an unfocused window is not resumed',
+      (tester) async {
+        tester.binding
+            .handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        addTearDown(
+          () => tester.binding
+              .handleAppLifecycleStateChanged(AppLifecycleState.resumed),
+        );
+
+        expect(coveredAppLifecycleState(), isNull);
+      },
+      variant: TargetPlatformVariant.desktop(),
+    );
+  });
 }

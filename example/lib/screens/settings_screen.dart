@@ -22,14 +22,6 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notifications'),
-            subtitle: const Text('Manage notification preferences'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/settings/notifications'),
-          ),
-          const Divider(),
-          ListTile(
             leading: const Icon(Icons.swipe_outlined),
             title: const Text('Page View'),
             subtitle: const Text('Horizontal swipe between pages'),

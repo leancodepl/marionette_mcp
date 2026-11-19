@@ -92,4 +92,55 @@ void main() {
       );
     });
   });
+
+  group('coveredAppWarning', () {
+    test('warns while the app is not in front', () {
+      for (final state in ['inactive', 'paused', 'hidden']) {
+        expect(
+          coveredAppWarning(
+            {'elements': [], 'appLifecycleState': state},
+            nativeElements: 'native_get_elements',
+          ),
+          allOf(contains('lifecycle: $state'), contains('native_get_elements')),
+        );
+      }
+    });
+
+    test('points to no native tool when the native lane is off', () {
+      expect(
+        coveredAppWarning(
+          {'appLifecycleState': 'paused'},
+          nativeElements: null,
+        ),
+        allOf(contains('not in front'), endsWith('hidden and not reachable.')),
+      );
+    });
+
+    test('names the given native command', () {
+      expect(
+        coveredAppWarning(
+          {'appLifecycleState': 'paused'},
+          nativeElements: 'marionette native-get-elements',
+        ),
+        contains('marionette native-get-elements'),
+      );
+    });
+
+    test('says nothing when resumed or not reported (older binding)', () {
+      expect(
+        coveredAppWarning(
+          {'appLifecycleState': 'resumed'},
+          nativeElements: 'native_get_elements',
+        ),
+        isNull,
+      );
+      expect(
+        coveredAppWarning(
+          {'elements': []},
+          nativeElements: 'native_get_elements',
+        ),
+        isNull,
+      );
+    });
+  });
 }

@@ -1,6 +1,6 @@
 ---
 name: marionette-flutter-drive-app
-description: Drive a running Flutter app (debug or profile) with Marionette — an AI agent's hands and eyes for the app — tapping/typing/scrolling, screenshots, logs, hot reload/restart, device sweeps, custom extensions, and the session report, via marionette_mcp or the marionette CLI. Use whenever asked to test, click through, smoke-test, automate, QA, or interact with a Flutter app; after a feature or UI/design-system change; to reproduce or verify a bug; to walk a behaviour-neutral refactor; to sweep for accessibility; to exercise form validation; to call or register a custom extension; or to capture before/after evidence for a PR. Also load whenever a Marionette call fails or reports not connected. If the app has no MarionetteBinding yet, connect reports a version mismatch, startup hits a binding assertion or hangs, or Marionette can't see the app's custom widgets, use marionette-flutter-setup. Not for CI suites, release builds, or performance work — see When not to use.
+description: Drive a running Flutter app (debug or profile) with Marionette — an AI agent's hands and eyes for the app — tapping/typing/scrolling, screenshots, logs, hot reload/restart, device sweeps, custom extensions, and the session report, via marionette_mcp or the marionette CLI. Use whenever asked to test, click through, smoke-test, automate, QA, or interact with a Flutter app; after a feature or UI/design-system change; to reproduce or verify a bug; to walk a behaviour-neutral refactor; to sweep for accessibility; to exercise form validation; to call or register a custom extension; or to capture before/after evidence for a PR. Also load whenever a Marionette call fails or reports not connected, and for permission dialogs and other system UI via the native lane. If the app has no MarionetteBinding yet, connect reports a version mismatch, startup hits a binding assertion or hangs, or Marionette can't see the app's custom widgets, use marionette-flutter-setup. Not for CI suites, release builds, or performance work.
 ---
 
 # marionette_flutter: drive an app
@@ -9,129 +9,100 @@ Marionette lets an AI agent drive a **running** Flutter app (debug or profile �
 never release) the way a real user would: read the screen, tap, type, scroll,
 screenshot, read logs, hot reload. It has two halves:
 
-- **`marionette_flutter`** — the package you add to the app. It registers a VM
-  service extension per action (`ext.flutter.marionette.*`).
-- **The bridge** — either **`marionette_mcp`** (MCP tools, e.g. `connect`,
-  `tap`, `get_interactive_elements`) or **`marionette_cli`** (shell commands,
-  e.g. `marionette tap --key ...`). Nearly the same capabilities, different
-  transport — the CLI additionally offers `record-video`, with no MCP
-  equivalent (see the capability table, below). Prefer the MCP tools when
-  they're in your tool list; fall back to the CLI in restricted environments
-  (enterprise policy, a shell-only agent) — run `marionette help-ai` once at
-  the start of such a session and follow its reference for exact syntax.
-
-Everything shared between the two applies to either transport — action names
-differ only in casing (`get_interactive_elements` vs
-`get-interactive-elements`).
+- **`marionette_flutter`** — the package in the app. It registers a VM service
+  extension per action (`ext.flutter.marionette.*`).
+- **The bridge** — **`marionette_mcp`** (MCP tools, e.g. `connect`, `tap`,
+  `get_interactive_elements`) or **`marionette_cli`** (shell commands, e.g.
+  `marionette tap --key ...`). Nearly the same capabilities; the CLI adds
+  `record-video`. Prefer the MCP tools when they're in your tool list; fall
+  back to the CLI in restricted environments (enterprise policy, a shell-only
+  agent) — see *CLI fallback*. Everything below applies to both; action names
+  differ only in casing (`get_interactive_elements` vs
+  `get-interactive-elements`).
 
 ## Before you start
 
-`connect` (or any CLI command) only works if the target app initialized
-`MarionetteBinding`. If you're not sure whether it has, check `main.dart` (or
-ask). If it hasn't, or the agent can't see the app's own buttons and fields,
-set the app up first with `marionette-flutter-setup`: the binding, a custom
-design system, a `LogCollector`, `MarionetteDeviceConfig`, the single-binding
-rule and version alignment all live there. If that skill is not installed, run
-`dart run skills@ get -s marionette-flutter-setup`, or follow
-https://marionette.leancode.co/docs/configure/.
+`connect` (or any CLI command) only works if the app initialized
+`MarionetteBinding`; if unsure, check `main.dart` (or ask). If it hasn't, or
+the agent can't see the app's own buttons and fields, set the app up first with
+`marionette-flutter-setup` (binding, custom design system, `LogCollector`,
+`MarionetteDeviceConfig`, the single-binding rule, version alignment). If that
+skill is not installed, run `dart run skills@ get -s marionette-flutter-setup`,
+or follow https://marionette.leancode.co/docs/configure/.
 
 ## When to use this
 
-Reach for Marionette any time the fastest way to know whether something works
-is to actually run the app and look, rather than reason about the code:
+Whenever the fastest way to know whether something works is to run the app and
+look, rather than reason about the code:
 
 - **After implementing a feature.** Connect, navigate to the new screen, and
-  exercise the happy path — a working build isn't the same as a working
-  feature.
+  exercise the happy path — a working build isn't a working feature.
 - **After a UI or design-system change.** Confirm the affected screens still
-  render and respond as expected, not just that the app compiles.
-- **Reproducing a bug from a ticket.** Follow the reported steps, capture a
-  screenshot and `get_logs` output as evidence the bug is real and what it
-  looks like — before touching any code.
-- **Verifying a bugfix.** Reproduce with the same steps, apply the fix,
-  `hot_reload`, and replay those exact steps again to confirm the symptom is
-  gone (not a different, adjacent symptom).
-- **Walking a "behaviour-neutral" refactor.** Claims that a refactor changes
-  nothing observable are exactly the claims worth checking — a quick
-  regression walk of the touched screens catches what review alone misses.
-- **An accessibility sweep.** Use `set_device_config` to try `text_scale`
-  around 2.0–3.0 (real devices top out near 3.0) and `bold_text: true` on the
-  screen in question, then check `get_logs` for overflow errors — that
-  combination is where cramped layouts usually break first. (Needs the app to
-  have opted in via `MarionetteDeviceConfig` — see `marionette-flutter-setup`.)
-- **Form and validation work.** Enter deliberately invalid input and read the
-  error strings back via `get_interactive_elements`/`take_screenshots` — it's
-  the only way to confirm the *user-visible* message is right, not just that
-  a validator returns an error code.
-- **Evidence for a PR or ticket comment.** A quick before/after
-  `take_screenshots` pair is often more convincing, and faster to produce,
-  than a written description of a UI change. For a multi-step flow rather
-  than a single static change, `record-video` (CLI-only, no MCP equivalent —
-  see the capability table) captures the whole interaction as a short clip,
-  which shows off a new feature or a fixed flow better than a screenshot
-  pair can.
+  render and respond, not just that the app compiles.
+- **Reproducing a bug from a ticket.** Follow the reported steps and capture a
+  screenshot and `get_logs` output as evidence — before touching any code.
+- **Verifying a bugfix.** Reproduce, apply the fix, `hot_reload`, and replay
+  those exact steps to confirm the symptom is gone (not a different, adjacent
+  one).
+- **Walking a "behaviour-neutral" refactor.** A quick regression walk of the
+  touched screens catches what review alone misses.
+- **An accessibility sweep.** `set_device_config` with `text_scale` around
+  2.0–3.0 (real devices top out near 3.0) and `bold_text: true`, then check
+  `get_logs` for overflow errors — where cramped layouts break first. (Needs
+  the app's `MarionetteDeviceConfig` opt-in — see `marionette-flutter-setup`.)
+- **Form and validation work.** Enter invalid input and read the error strings
+  back via `get_interactive_elements`/`take_screenshots` — the only way to
+  confirm the *user-visible* message, not just a validator's error code.
+- **Evidence for a PR or ticket.** A before/after `take_screenshots` pair is
+  often faster and more convincing than a written description. For a
+  multi-step flow, `record-video` (CLI only) captures the whole interaction.
 
 ## When not to use this
 
 - **CI or a repeatable regression suite.** Marionette's gestures are
   best-effort simulations of user input, not deterministic instrumentation —
-  results can vary across platforms, custom widgets, and overlays. For a
-  suite that needs to pass or fail the same way every time, use
+  results vary across platforms, custom widgets, and overlays. Use
   [Patrol](https://patrol.leancode.co) instead; `marionette-flutter-to-patrol`
   turns a verified run into Patrol tests.
-- **Release builds.** Not a limitation to work around — Marionette relies on
-  the Dart VM Service, which doesn't exist in a release binary. Debug and
-  profile only.
-- **Performance work.** Marionette can *trigger* the interactions you want to
-  profile, but measuring them is Flutter DevTools' job, not this one.
+- **Release builds.** Marionette relies on the Dart VM Service, which doesn't
+  exist in a release binary. Debug and profile only.
+- **Performance work.** Marionette can *trigger* the interactions; measuring
+  them is Flutter DevTools' job.
 
 ## Connecting
 
 Every action needs a VM service WebSocket URI (`ws://127.0.0.1:PORT/TOKEN=/ws`).
-Get it one of two ways, then pass it to `connect` (MCP) or `--uri` / a
-registered `-i <name>` (CLI) before anything else:
+Pass it to `connect` (MCP) or `--uri` / a registered `-i <name>` (CLI) first:
 
-- **The developer runs the app.** The URI is in their `flutter run` console
-  output, or in a DevTools link. Ask for it.
-- **You run the app.** Start `flutter run` yourself, in the background since
-  it keeps running, on the device the developer wants. Among its first lines
-  it prints `A Dart VM Service on <device> is available at:
-  http://127.0.0.1:PORT/TOKEN=/`; the URI is that address as
-  `ws://127.0.0.1:PORT/TOKEN=/ws`, and the DevTools line after it carries the
-  same value as its `uri=` parameter. `hot_reload` and `hot_restart` then act
-  on your own `flutter run`.
+- **The developer runs the app.** The URI is in their `flutter run` output or
+  a DevTools link. Ask for it.
+- **You run the app.** Start `flutter run` yourself, in the background, on the
+  device the developer wants. It prints `A Dart VM Service on <device> is
+  available at: http://127.0.0.1:PORT/TOKEN=/`; the URI is that address as
+  `ws://127.0.0.1:PORT/TOKEN=/ws` (the DevTools line's `uri=` parameter carries
+  the same value). `hot_reload` and `hot_restart` then act on your own run.
 
-If more than one running instance is already in play — several apps
-registered with the CLI, or the user's message mentions more than one device
-or simulator — don't guess which one to use. Either infer the right one from
-what's already been said in the conversation (e.g. "the iOS one" when only one
-registered instance is iOS), or ask which to target. Getting the wrong
-instance is easy to miss until several steps later, so it's worth the one
-question up front.
+If more than one running instance is in play — several apps registered with
+the CLI, or the user mentions more than one device or simulator — don't guess.
+Infer the right one from the conversation (e.g. "the iOS one" when only one
+registered instance is iOS), or ask: the wrong instance is easy to miss until
+several steps later.
 
-For the CLI, prefer `--uri` for a one-off session and
-`marionette register <name> <uri>` + `-i <name>` when you'll issue many
-commands against the same app in a row. When you're done for the session
-(MCP), call `disconnect` — it's not required for correctness (a fresh
-`connect` implicitly replaces it), but leaving a session dangling makes it
-easy to act on a stale connection later without noticing.
+For the CLI, use `--uri` for a one-off session and
+`marionette register <name> <uri>` + `-i <name>` for many commands against the
+same app. When done (MCP), call `disconnect` — a fresh `connect` replaces it
+anyway, but a dangling session makes it easy to act on a stale connection.
 
-Give `connect` a `session_title` (a short description of what you're
-testing, e.g. `"profile validation"` — keep it under ~60 characters, longer
-is truncated) — if the app enables session reports
-(`MarionetteConfiguration(enableSessionReports: true)`), it opens a fresh
-session directory that carries this run's step log and screenshots. One
-Marionette run is one session directory, always: there's no resuming, even
-if you pass the same title again on a later `connect` — that just opens
-another, separate directory. If a run gets interrupted partway through (a
-compaction, a dropped connection), its session is simply abandoned; don't
-try to pick up where it left off, and don't reuse its title. **Always give
-it in English**, regardless of the prompt's own language (see *The report
-contract*, below) — it gets slugified straight into the session directory's
-name, and that name should stay predictable and filesystem-friendly rather
-than following the run's language. See *Reporting what you found* for what
-that directory is for and what you're expected to do with it before
-disconnecting.
+Give `connect` a `session_title` — a short description of what you're testing,
+e.g. `"profile validation"`, under ~60 characters (longer is truncated), and
+**always in English**, whatever the prompt's language: it is slugified into the
+session directory's name, which should stay predictable. If the app enables
+session reports (`MarionetteConfiguration(enableSessionReports: true)`), it
+opens a fresh session directory for this run's step log and screenshots. One
+run is one directory: there's no resuming, and the same title on a later
+`connect` opens another directory. A run interrupted partway (a compaction, a
+dropped connection) is abandoned; don't pick it up or reuse its title. See
+*Reporting what you found*.
 
 ## What you can do once connected
 
@@ -144,25 +115,22 @@ disconnecting.
 | Custom extensions | `list_custom_extensions`, `call_custom_extension`, plus any first-class tool an app registered with a schema | See *Custom extensions*, below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Dev workflow      | `hot_reload`, `hot_restart`                                                                                  | `hot_reload` preserves state; use `hot_restart` only for changes a reload can't pick up (main()/bootstrap edits, global singletons, state shape) — requires the app to be running via `flutter run`.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Session           | `connect`, `disconnect`                                                                                      | `connect` must be called before any other tool; a second `connect` implicitly disconnects the first. `connect` also opens a fresh session directory (`session_title`) that owns the step log and screenshots — see *Reporting what you found*.                                                                                                                                                                                                                                                                                                                                                                                             |
+| Native lane       | `native_connect`, `native_disconnect`, `native_get_elements`, `native_wait_for`, `native_tap`, `native_enter_text`, `native_scroll`, `native_swipe`, `native_press_key`, `native_hide_keyboard`, `native_take_screenshot`, `native_notifications` | System UI outside the Flutter tree. Needs its own `native_connect` — see *System UI outside Flutter*, below. |
 | Video (CLI only)  | `record-video`                                                                                               | Records a WebM video of the session (`-o/--output`, `-d/--duration`, `--width`/`--height`; needs `ffmpeg` on `PATH`). No MCP equivalent — use `take_screenshots` there instead.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## Good practices
 
 - **Look before you act.** Call `get_interactive_elements` (or
-  `take_screenshots` for a visual check) before the first gesture on a new
-  screen. Don't infer what's on screen from memory of the source code — the
-  whole point of Marionette is to check the *running* state. The listing is
-  compact by default: it drops rendering details and reports `visible` only
-  when an element is not visible. Pass `compaction: "none"`
-  (`--compaction=none` in the CLI) when you need the full property dump.
+  `take_screenshots`) before the first gesture on a new screen; don't infer the
+  screen from memory of the source. The listing is compact by default: it
+  drops rendering details and reports `visible` only when an element is not
+  visible. Pass `compaction: "none"` (`--compaction=none`) for the full dump.
 - **Selector priority: `key` > `identifier` > `text` > `type`/coordinates.**
   Keys (`ValueKey<String>`) and Semantics `identifier`s survive copy changes,
-  localization, and refactors; `text` breaks the moment a label is edited or
-  translated; coordinates break on any layout shift, font-scale change, or
-  screen-size difference. Treat coordinates as a last-resort diagnostic, not
-  the normal way to target something — if nothing else works, that's a sign
-  the widget needs a key or `Semantics(identifier: ...)`, not a reason to keep
-  using coordinates.
+  localization and refactors; `text` breaks when a label is edited or
+  translated; coordinates break on any layout shift, font scale or screen size.
+  Coordinates are a last-resort diagnostic: needing them means the widget
+  needs a key or `Semantics(identifier: ...)`.
 - **Discovery text is not always a selector.** A button or list tile reports
   the labels of its children as its `text`. When that text joins several
   labels (`"Accept terms\nRequired"`), comes from a `Semantics` label (an
@@ -172,138 +140,125 @@ disconnecting.
   one visible `Text`, or coordinates. The listing prints a line break as
   `\n`, a carriage return as `\r` and a backslash as `\\`; unescape a copied
   value before you pass it back.
-- **Repeated keys: scope the match with `ancestor_keys`.** Every tool takes
-  the first match in the tree, so on a screen that repeats the same subtree
-  (grid cells, repeated cards, a dev screen embedding several copies of the
-  app) a plain `tap(key: "cell.joinButton")` always hits the first copy. Pass
-  the keys of the wrappers around the one you mean, outermost first:
+- **Repeated keys: scope the match with `ancestor_keys`.** Every tool takes the
+  first match, so on a screen that repeats a subtree (grid cells, repeated
+  cards, a dev screen embedding several copies of the app) a plain
+  `tap(key: "cell.joinButton")` always hits the first copy. Pass the wrapper
+  keys, outermost first:
   `{"key": "cell.joinButton", "ancestor_keys": ["session_2", "grid.cell_3"]}`.
-  Each key is looked up strictly *inside* the previous one, which is what lets
-  you reach a wrapper whose own key also repeats (`grid.cell_3` exists in every
-  session), and the target itself must be inside the last one. A single key is
-  often not enough — if the wrapper repeats too, go one level up.
+  Each key is looked up strictly *inside* the previous one (so `grid.cell_3`
+  may repeat in every session), and the target must be inside the last. If the
+  wrapper repeats too, go one level up.
   - **Finding the chain:** `get_interactive_elements` is a flat list in tree
-    order, so a keyed wrapper, when it is listed at all, appears just before
-    the elements inside it. A wrapper whose centre catches no hit test isn't
-    listed, so if a key you expect is missing, read it from the source or ask
-    for it. To confirm a chain, list only that subtree:
-    `get_interactive_elements(ancestor_keys: [...])`. A scope alone is enough
-    there, the wrapper itself is listed too, and a wrong key fails by name.
+    order, so a listed keyed wrapper appears just before its elements. A
+    wrapper whose centre catches no hit test isn't listed: read its key from
+    the source or ask. Confirm a chain with
+    `get_interactive_elements(ancestor_keys: [...])`: a scope alone is enough
+    there, the wrapper itself is listed, and a wrong key fails by name.
   - **A key with no element fails the call**, naming it and where it was
     looked for (`Scope element with key "grid.cell_9" (ancestor_keys[1]) not
-    found inside "session_2"`). It never falls back to searching the whole
-    screen, so a typo can't silently act on the wrong copy.
-  - **`scroll_to` works into lazy lists:** a scope that isn't built yet (e.g.
+    found inside "session_2"`). It never widens the search to the whole
+    screen, so a typo can't act on the wrong copy.
+  - **`scroll_to` works into lazy lists:** a scope not built yet (e.g.
     `ancestor_keys: ["row_20"]` in a long `ListView`) is looked for again after
-    every drag, and the list that scrolls may be inside the scope or above it.
-    A scope key that exists nowhere is reported only after the list has been
-    scanned, like a missing target.
-  - `coordinates` and `focused_element` ignore `ancestor_keys`, and a scope on
-    its own is not a selector for the gesture tools.
-  - Prefer this over tapping by coordinates or baking indices into keys: the
-    chain survives layout changes and keeps production keys clean.
-- **An element "not found" is usually a setup gap, not a bug.** Before
-  concluding a widget can't be reached, suspect it's a custom widget type
-  Marionette doesn't recognize yet, or custom-painted content with no
-  `Semantics` annotation — both fixed in `marionette-flutter-setup`, not
-  something to work around here.
-- **If coverage looks low across a whole screen rather than one missing
-  element, don't reach for `shouldStopTraversalAtElement`.** It's tempting to suggest
-  filtering a scroll container out of traversal to "reduce noise," but that's
-  the one config change measured to make things worse (25.8% → 17.8% widget
-  coverage on a real app) — see `marionette-flutter-setup`.
-- **Confirm side effects with `get_logs`, not just UI state.** A tap that
-  looks like it worked isn't the same as the network call actually firing.
-- **Give the app's flows explicit context.** Marionette can see the widget
-  tree and act on it, but it has no idea what the product's flows, naming
-  conventions, or edge cases are. State which screen to reach, the expected
-  keys/labels, any precondition the flow assumes (e.g. "assume the user is
-  already logged in"), and the interaction goal in one sentence, rather than
-  assuming that's inferable from the UI alone.
-- **Treat every gesture as best-effort.** Focus, text entry, and scrolling
-  are simulations of user input and can behave differently across platforms,
-  custom widgets, or overlays. A flow that's consistently flaky (not just
-  occasionally) is a signal to expose a clearer key/identifier, flatten a
-  deeply nested `GestureDetector` hit target, or extend
+    every drag, and the scrolling list may be inside the scope or above it. A
+    scope key that exists nowhere is reported after the list is scanned.
+  - `coordinates` and `focused_element` ignore `ancestor_keys`, and a scope
+    alone is not a selector for the gesture tools.
+  - Prefer this over coordinates or indices baked into keys: the chain
+    survives layout changes and keeps production keys clean.
+- **An element "not found" is usually a setup gap, not a bug.** Suspect a
+  custom widget type Marionette doesn't recognize yet, or custom-painted
+  content with no `Semantics` — both fixed in `marionette-flutter-setup`.
+- **Low coverage across a whole screen? Don't reach for
+  `shouldStopTraversalAtElement`.** Filtering a scroll container out of
+  traversal is the one change measured to make things worse (25.8% → 17.8%
+  widget coverage on a real app) — see `marionette-flutter-setup`.
+- **Confirm side effects with `get_logs`, not just UI state.** A tap that looks
+  like it worked isn't the network call actually firing.
+- **Give the app's flows explicit context.** Marionette sees the widget tree,
+  not the product's flows, naming or edge cases. State the screen to reach,
+  the expected keys/labels, any precondition (e.g. "assume the user is already
+  logged in"), and the goal in one sentence.
+- **Treat every gesture as best-effort.** Focus, text entry and scrolling are
+  simulations and can differ across platforms, custom widgets, or overlays. A
+  consistently flaky flow is a signal to expose a clearer key/identifier,
+  flatten a deeply nested `GestureDetector` hit target, or extend
   `MarionetteConfiguration` — not to retry harder.
+
+## System UI outside Flutter: the native lane
+
+The Flutter lane sees only the widget tree. Permission dialogs, system alerts,
+pickers and share sheets, WebView content, native views and screens, and
+notifications go through the **native lane** (`native_*` tools, `native-*` CLI
+commands), which drives the device's own UI automation server. While system UI
+is open, `get_interactive_elements` still lists the Flutter widgets underneath,
+and a tap on them does nothing. Switch to the native lane whenever the target
+isn't in the Flutter tree, and back as soon as the app is in front: in-app
+widgets are always better driven by the Flutter lane. It needs its own
+`native_connect`, and its coordinates are screen pixels, never Flutter ones.
+It runs on macOS and Linux hosts, on Android devices and emulators and one iOS
+Simulator at a time, with one client per device. Before the first native call,
+read [references/native-lane.md](references/native-lane.md).
 
 ## Reporting what you found
 
-This section applies only when `connect`'s response actually includes an
-`Opened session:` path — check the real response, not just whether you
-expected one. Two different things can be missing it: the app never
-enabled session reports (`MarionetteConfiguration(enableSessionReports:
-true)`) — don't turn that on yourself unless the user asks for a report —
-or it did, but the session directory itself couldn't be created (a connect
-response saying so instead, e.g. "Could not open a session directory, so
-this run will not be logged"). Either way, there's no session directory,
-no `steps.md`, and nowhere to write `report.md` — see the note on this at
-the end of *The report contract*, below.
+This applies only when `connect`'s response actually includes an
+`Opened session:` path — check the real response. It is missing when the app
+never enabled session reports (`MarionetteConfiguration(enableSessionReports:
+true)`; don't turn that on yourself unless the user asks for a report), or when
+the directory couldn't be created (the response says so, e.g. "Could not open a
+session directory, so this run will not be logged"). Then there's no
+`steps.md` and nowhere to write `report.md` — see the last rule of *The report
+contract*.
 
-`connect` opens a fresh session directory under `.marionette/sessions/` —
-the server's own record of the run, kept separate from your own context.
-`disconnect`'s response repeats that directory's path with a reminder to
-write `report.md`: treat that as a requirement, not a suggestion — it's the
-enforcement mechanism precisely because an instruction here, on its own,
-gets skipped.
+`connect` opens a fresh session directory under `.marionette/sessions/` — the
+server's own record of the run, separate from your context. `disconnect`'s
+response repeats its path with a reminder to write `report.md`: treat that as a
+requirement — it exists because an instruction here, alone, gets skipped.
 
-Two files in that directory are appended by the server, not you — don't
-write to them yourself:
+The server appends two things there; don't write to them yourself:
 
-- **`steps.md`** — one line per tool call: the tool, a short selector, and
-  the outcome. No payloads (`enter_text` values are redacted).
-- **`screenshots/`** — populated only when you call `take_screenshots` with
-  `inline: false`, which is what you want once a screenshot is evidence
-  you're citing rather than something you need to look at right now (each
-  inline image costs real visual tokens).
+- **`steps.md`** — one line per tool call: the tool, a short selector, and the
+  outcome. No payloads (`enter_text` values are redacted).
+- **`screenshots/`** — filled only by `take_screenshots` with `inline: false`,
+  which you want once a screenshot is evidence you're citing rather than
+  something to look at now (each inline image costs real visual tokens).
 
-You own one more file there, which the server never writes:
-
-- **`report.md`** — written once, at the end, from your own context. Write
-  it on either of two triggers: the run completed, or you're stopping early
-  (a blocking failure, a budget/time limit, an ambiguous requirement you
-  can't resolve alone). A report for a run stopped early states *why* it
-  stopped and what was left untested, instead of silently reporting only
-  what got covered — there's no resuming to pick it back up later, so this
-  is the only record of what happened. Before drafting a single line, name
-  the report language
-  explicitly: the language of the prompt that started this session (the
-  message that led to the first `connect` call) — not English by default,
-  not the language of the app's UI under test, not whatever language your
-  own tool-call narration has been in. This check is easy to skip because
-  it's just a rule sitting in the contract below; doing it now, as a
-  deliberate step before writing, is what actually prevents defaulting to
-  English. See *The report contract* for the full rule.
+You own **`report.md`**, which the server never writes. Write it once, at the
+end, from your own context, when the run completed or when you stop early (a
+blocking failure, a budget/time limit, an ambiguous requirement you can't
+resolve alone). A report for a run stopped early states *why* it stopped and
+what was left untested — there's no resuming, so it is the only record. Before
+drafting a single line, name the report language explicitly: the language of
+the prompt that started this session (the message that led to the first
+`connect`) — not English by default, not the app's UI language, not your own
+narration's language. Doing this as a deliberate step is what prevents
+defaulting to English.
 
 ### The report contract
 
-- **Write `report.md` — and the chat message — in the language the prompt
-  that started the run was written in.** Proper nouns stay exactly as they
-  are regardless of that language: tool names, file paths (`report.md`,
-  `steps.md`, `screenshots/01.png`), and widget keys/identifiers
-  (`login_emailTextField`) are never translated. Check this before writing,
-  not after — see the reminder in *Reporting what you found*, above.
-  **`session_title` is the one thing that's exempt in the other direction:
-  give it in English always**, whatever language the prompt itself is in —
-  see *Connecting*, above.
-- **The `Tested:` line is rendered from `steps.md`, never from memory or
-  your own sense of what you did.** This is the anti-overstatement mechanism
-  — read the step count and the actions taken back out of the file the
-  server wrote, don't estimate.
+- **Write `report.md` — and the chat message — in the language of the prompt
+  that started the run.** Tool names, file paths (`report.md`, `steps.md`,
+  `screenshots/01.png`) and widget keys/identifiers (`login_emailTextField`)
+  are never translated. `session_title` is the one exception the other way:
+  always English (see *Connecting*).
+- **The `Tested:` line is rendered from `steps.md`, never from memory or your
+  own sense of what you did.** This is the anti-overstatement mechanism — read
+  the step count and the actions back out of the file the server wrote.
 - **Every finding cites evidence** — a step, a `get_logs` line, or a
-  screenshot path. No evidence means it's a suspicion, not a finding: say so
-  explicitly rather than upgrading a hunch.
-- **Under six lines per finding, no prose paragraphs.** A severity tag,
-  one-line summary, a repro path, and the evidence citation — that's the
-  shape; if it doesn't fit, cut the finding down rather than making room.
+  screenshot path. No evidence means a suspicion, not a finding: say so rather
+  than upgrading a hunch.
+- **Under six lines per finding, no prose paragraphs.** A severity tag, a
+  one-line summary, a repro path, and the evidence citation; if it doesn't
+  fit, cut the finding down.
 - **Prefix the headline and every finding with a status icon**, so severity
-  is scannable without reading a word: `✅` clean (no findings), `⚠️` only
-  suspicions, `🐛` at least one confirmed bug — on the headline, the worst
-  severity present; on a finding, its own. `➖` marks something explicitly
-  skipped (a `Not covered:` line, or an individual check you didn't run).
-  Icons decorate the existing tags/wording — `[bug]`, `[suspicion]`,
-  `Not covered:` — they never replace them: keep both, so the report still
-  greps cleanly and reads fine wherever emoji don't render.
+  is scannable: `✅` clean (no findings), `⚠️` only suspicions, `🐛` at least
+  one confirmed bug — on the headline, the worst severity present; on a
+  finding, its own. `➖` marks something explicitly skipped (a `Not covered:`
+  line, or a check you didn't run). Icons decorate the tags/wording —
+  `[bug]`, `[suspicion]`, `Not covered:` — never replace them, so the report
+  still greps cleanly and reads fine where emoji don't render.
 - **The chat message after disconnecting follows a fixed, compact template
   — not free-form prose, and not a second copy of `report.md`:**
 
@@ -315,36 +270,26 @@ You own one more file there, which the server never writes:
   → <session path>/report.md · <N> steps, <M> screenshots
   ```
 
-  `<VERDICT>` is a fixed, four-word vocabulary — like `[bug]`/`[suspicion]`,
-  never translated regardless of the prompt's language: `PASS` (nothing
-  found, full coverage), `SUSPECT` (only suspicion(s), no confirmed bug),
-  `FAIL` (at least one confirmed bug), `BLOCKED` (coverage was cut short by
-  something that stopped you continuing — bad test data, a stuck flow, a
-  missing prerequisite; use this over `FAIL`/`PASS` when *that's* the
-  story, even if you also found a bug along the way). Each `✗` line's
-  `[type]` is `bug`, `blocker`, `ux`, or `suspicion` — `bug`/`blocker`/`ux`
-  corresponds to a `[bug]`-tagged finding in `report.md` (evidence-backed);
-  `suspicion` corresponds to a `[suspicion]`-tagged one.
-  Rows are optional beyond the headline and the `→` line: skip `✓` if
-  nothing worked, skip `✗`/`∅` for a `PASS`. The step/screenshot counts on
-  the `→` line come from `steps.md`, same as `Tested:` in `report.md` — not
-  a re-estimate.
-  This uses `✓`/`✗`/`∅`/`→`, not the `✅`/`⚠️`/`🐛`/`➖` from `report.md`,
-  deliberately: this message prints as raw terminal text, where a plain
-  Unicode symbol renders as one predictable, monochrome character
-  everywhere, while a full-color emoji can render at an inconsistent width
-  or not at all depending on the terminal. `report.md` is a file usually
-  opened in an editor or on GitHub, where colored emoji render cleanly —
-  different consumption context, different choice; don't mix the two sets.
-- **No session directory (see *Reporting what you found*, above)? There's
-  no `report.md` and no contract to follow** — give the same shape of chat
-  message anyway (verdict, `✓`/`✗`/`∅` lines), just drop the `→` line (no
-  path to give) and don't invent a `Tested:`-style step count — you have no
-  `steps.md` to render one from truthfully.
+  `<VERDICT>` is a fixed vocabulary, never translated: `PASS` (nothing found,
+  full coverage), `SUSPECT` (only suspicions), `FAIL` (at least one confirmed
+  bug), `BLOCKED` (coverage cut short by something that stopped you — bad test
+  data, a stuck flow, a missing prerequisite; use it over `FAIL`/`PASS` when
+  *that's* the story, even if you also found a bug). Each `✗` line's `[type]`
+  is `bug`, `blocker`, `ux` (each matching a `[bug]` finding in `report.md`,
+  evidence-backed) or `suspicion` (matching a `[suspicion]` one). Beyond the
+  headline and the `→` line, rows are optional: skip `✓` if nothing worked,
+  skip `✗`/`∅` for a `PASS`. The `→` line's counts come from `steps.md`, like
+  `Tested:`. The chat message uses plain `✓`/`✗`/`∅`/`→` because it prints as
+  raw terminal text, where emoji render at inconsistent widths; `report.md`
+  is opened in an editor or on GitHub, where the colored `✅`/`⚠️`/`🐛`/`➖`
+  render cleanly. Don't mix the two sets.
+- **No session directory (see *Reporting what you found*)? There's no
+  `report.md` and no contract to follow** — give the same chat message anyway
+  (verdict, `✓`/`✗`/`∅` lines), drop the `→` line, and don't invent a
+  `Tested:`-style step count: there's no `steps.md` to render it from.
 
-This is what `report.md` itself looks like (shown in English here; write
-yours in whatever language the prompt used) — a confirmed bug, a clean run,
-then a suspicion:
+This is what `report.md` looks like (in English here; write yours in the
+prompt's language) — a confirmed bug, a clean run, then a suspicion:
 
 ```
 🐛 Marionette report — 2 findings · User Profile
@@ -365,9 +310,6 @@ Tested: cart, address form, payment, confirmation (18 steps)
 Checks: field validation, back navigation, dark mode, text scale 2.0
 ```
 
-A run with only a suspicion (no hard evidence of a real bug) gets `⚠️`
-instead, on both the headline and the finding itself:
-
 ```
 ⚠️ Marionette report — no confirmed issues, 1 suspicion · Settings
 Tested: notification toggles, language picker, theme toggle (9 steps, 2 screenshots)
@@ -379,10 +321,8 @@ Tested: notification toggles, language picker, theme toggle (9 steps, 2 screensh
 ➖ Not covered: account deletion, data export — out of scope for this run
 ```
 
-The chat message for those three, plus a `BLOCKED` case none of them
-happen to show (this has a different shape from `report.md`'s own
-headline — denser, with a verdict word, since it has to stand alone as
-the whole message):
+The chat message for the first run, and for a `BLOCKED` one — denser than
+`report.md`'s headline, with a verdict word, since it stands alone:
 
 ```
 Marionette · User Profile — FAIL: 2 bugs
@@ -390,20 +330,6 @@ Marionette · User Profile — FAIL: 2 bugs
 ✗ [bug] Date of birth accepts future dates — no validation
 ✗ [bug] Save does not persist — changes lost after restart
 → .marionette/sessions/user-profile-20260922T1412/report.md · 14 steps, 3 screenshots
-```
-
-```
-Marionette · Checkout — PASS: no issues
-✓ Cart, address form, payment, confirmation, dark mode, text scale 2.0
-→ .marionette/sessions/checkout-20260922T1801/report.md · 18 steps
-```
-
-```
-Marionette · Settings — SUSPECT: theme toggle may not persist
-✓ Notification toggles, language picker
-✗ [suspicion] Dark mode toggle reverts to light after hot_restart
-∅ Not covered: account deletion, data export — out of scope for this run
-→ .marionette/sessions/settings-20260922T1601/report.md · 9 steps, 2 screenshots
 ```
 
 ```
@@ -415,9 +341,8 @@ Marionette · Password reset — BLOCKED: reset email never arrives
 ```
 
 `.marionette/` is gitignored by default (the server writes that `.gitignore`
-itself the first time a session is created). Committing a session directory —
-attaching a report to a PR, say — is a deliberate choice you make
-explicitly, never something to do as a matter of course.
+the first time it creates a session). Committing a session directory — to
+attach a report to a PR, say — is a deliberate, explicit choice, never routine.
 
 ## Custom extensions
 
@@ -444,6 +369,7 @@ args.
 | `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                                                 | See *Device-config sweeps* in `marionette-flutter-setup`, then hot restart                                                       |
 | Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                                   | See *The single-binding rule* in `marionette-flutter-setup`                                                                      |
 | Session directory lands somewhere unexpected (e.g. not the project root)                           | No `MARIONETTE_SESSION_DIR` set and the server's own working directory isn't reliably the repo root | Pass `session_dir` to `connect` (`--session-dir` on the CLI) explicitly — see *Reporting what you found*, above                  |
+| A Flutter tap does nothing while a dialog, sheet or picker is open                                 | System UI covers the app; the Flutter tree still lists the widgets underneath                       | Switch to the native lane — see *System UI outside Flutter*, above                                                               |
 | Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                                     | Not supported by design — see *When not to use*                                                                                  |
 
 ## CLI fallback
@@ -456,35 +382,30 @@ dart pub global activate marionette_cli
 marionette help-ai
 ```
 
-That prints every command's syntax, expected output, and exit codes — treat
-it as the authoritative low-level reference; everything in the capability
-table above maps onto it one-for-one (`tap` ↔
+It prints every command's syntax, output, and exit codes — the authoritative
+low-level reference. The capability table maps onto it one-for-one (`tap` ↔
 `tap --key/--identifier/--text/--type/--x/--y`, `get_interactive_elements` ↔
 `get-interactive-elements`, etc.), except the app's custom extensions
 (`list_custom_extensions`, `call_custom_extension` and the named tools built
-from their schemas), which only the MCP server offers. `record-video` only
-exists on this side. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
+from their schemas), which only the MCP server offers; `record-video` exists
+only here. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
 outermost first:
 `tap --key cell.joinButton --ancestor-keys session_2 --ancestor-keys grid.cell_3`.
-Use `--uri <ws-uri>` for a one-off session
-and `register <name> <uri>` + `-i <name>` for repeated interaction with the
-same app; `marionette doctor` checks connectivity of every registered
-instance and `unregister` cleans up stale ones. Session reports work here too,
-with one difference: every CLI invocation is its own process and writes its
-own session directory. `--session <title>` (the CLI's equivalent of
-`session_title`) names that directory; it does not join invocations into one
-run, so a multi-step CLI run leaves one directory per command, where the MCP
-server keeps one per connection — see *Reporting what you found*, above.
+`marionette doctor` checks every registered instance and `unregister` cleans up
+stale ones. Session reports work here too, but every CLI invocation is its own
+process with its own session directory: `--session <title>` (the CLI's
+`session_title`) names it and doesn't join invocations into one run, so a
+multi-step CLI run leaves one directory per command, where the MCP server keeps
+one per connection. The native `native-*` commands are in the native-lane
+reference.
 
 ## Keeping this skill in sync
 
-This file, `marionette-flutter-setup` and `marionette-flutter-to-patrol` must
-track the package release they ship with: setup follows the
-`MarionetteConfiguration` API, and to-patrol reads the `steps.md` format and
-*The report contract*, above, so a change to either updates it too. The
-capability table above should never disagree with `marionette help-ai`'s own
-output — both are generated from the same command set. If a tool or CLI
-command is added, renamed, or changes behavior, update the table and any
-affected practice/troubleshooting entry, and check `marionette help-ai`
-alongside it: if one mentions a command the other doesn't, fix both together
-rather than picking one to trust going forward.
+This file, `references/native-lane.md`, `marionette-flutter-setup` and
+`marionette-flutter-to-patrol` track the package release they ship with: setup
+follows the `MarionetteConfiguration` API, and to-patrol reads the `steps.md`
+format and *The report contract*, so a change to either updates it too. The
+capability table must never disagree with `marionette help-ai` — both come from
+the same command set. When a tool or CLI command is added, renamed, or changes
+behavior, update the table, any affected practice/troubleshooting entry and
+`marionette help-ai` together, rather than picking one to trust.

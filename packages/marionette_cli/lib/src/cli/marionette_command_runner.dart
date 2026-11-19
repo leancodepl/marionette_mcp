@@ -13,6 +13,11 @@ import 'package:marionette_cli/src/cli/commands/hot_restart_command.dart';
 import 'package:marionette_cli/src/cli/commands/long_press_command.dart';
 import 'package:marionette_cli/src/cli/commands/list_command.dart';
 import 'package:marionette_cli/src/cli/commands/mcp_command.dart';
+import 'package:marionette_cli/src/cli/commands/native_gesture_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_inspection_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_notification_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_session_commands.dart';
+import 'package:marionette_cli/src/cli/commands/native_text_commands.dart';
 import 'package:marionette_cli/src/cli/commands/pinch_zoom_command.dart';
 import 'package:marionette_cli/src/cli/commands/record_video_command.dart';
 import 'package:marionette_cli/src/cli/commands/press_back_button_command.dart';
@@ -25,11 +30,22 @@ import 'package:marionette_cli/src/cli/commands/swipe_command.dart';
 import 'package:marionette_cli/src/cli/commands/take_screenshots_command.dart';
 import 'package:marionette_cli/src/cli/commands/tap_command.dart';
 import 'package:marionette_cli/src/cli/commands/unregister_command.dart';
+import 'package:marionette_cli/src/cli/native_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_cli/src/native_session_registry.dart';
 
 class MarionetteCommandRunner extends CommandRunner<int> {
-  MarionetteCommandRunner()
-      : _registry = InstanceRegistry(),
+  /// [operatingSystem] is the host OS in [Platform.operatingSystem] form and
+  /// [environment] the process environment; both default to the real host.
+  MarionetteCommandRunner({
+    InstanceRegistry? registry,
+    NativeSessionRegistry? nativeRegistry,
+    String? operatingSystem,
+    Map<String, String>? environment,
+  })  : _registry = registry ?? InstanceRegistry(),
+        _nativeRegistry = nativeRegistry ?? NativeSessionRegistry(),
+        _operatingSystem = operatingSystem ?? Platform.operatingSystem,
+        _environment = environment ?? Platform.environment,
         super(
           'marionette',
           'CLI for multi-instance Flutter app interaction via Marionette.',
@@ -49,6 +65,12 @@ class MarionetteCommandRunner extends CommandRunner<int> {
         'timeout',
         help: 'Connection timeout in seconds.',
         defaultsTo: '5',
+      )
+      ..addOption(
+        'native-device',
+        help: 'Name of the native-lane device connection (from '
+            'native-connect) for native-* commands.',
+        defaultsTo: defaultNativeSession,
       )
       ..addOption(
         'session',
@@ -86,11 +108,27 @@ class MarionetteCommandRunner extends CommandRunner<int> {
     addCommand(HotReloadCommand(_registry));
     addCommand(HotRestartCommand(_registry));
     addCommand(DoctorCommand(_registry));
+    addCommand(NativeConnectCommand(_nativeRegistry));
+    addCommand(NativeDisconnectCommand(_nativeRegistry));
+    addCommand(NativeSessionsCommand(_nativeRegistry));
+    addCommand(NativeGetElementsCommand(_nativeRegistry, _environment));
+    addCommand(NativeWaitForCommand(_nativeRegistry, _environment));
+    addCommand(NativeTakeScreenshotCommand(_nativeRegistry, _environment));
+    addCommand(NativeTapCommand(_nativeRegistry, _environment));
+    addCommand(NativeSwipeCommand(_nativeRegistry, _environment));
+    addCommand(NativeScrollCommand(_nativeRegistry, _environment));
+    addCommand(NativeEnterTextCommand(_nativeRegistry, _environment));
+    addCommand(NativePressKeyCommand(_nativeRegistry, _environment));
+    addCommand(NativeHideKeyboardCommand(_nativeRegistry, _environment));
+    addCommand(NativeNotificationsCommand(_nativeRegistry, _environment));
     addCommand(HelpAiCommand());
     addCommand(McpCommand());
   }
 
   final InstanceRegistry _registry;
+  final NativeSessionRegistry _nativeRegistry;
+  final String _operatingSystem;
+  final Map<String, String> _environment;
 
   @override
   Future<int> run(Iterable<String> args) async {
@@ -111,9 +149,14 @@ class MarionetteCommandRunner extends CommandRunner<int> {
 
   @override
   Future<int?> runCommand(ArgResults topLevelResults) async {
-    if (topLevelResults.command == null) {
+    final commandName = topLevelResults.command?.name;
+    if (commandName == null) {
       printUsage();
       return 0;
+    }
+    if (commandName.startsWith('native-') && _operatingSystem == 'windows') {
+      stderr.writeln('The native lane supports macOS and Linux hosts.');
+      return 1;
     }
     return super.runCommand(topLevelResults);
   }

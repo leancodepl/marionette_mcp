@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<XCUIElementTypeApplication type="XCUIElementTypeApplication" name="Counter" label="Counter" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits="" processId="18727" bundleId="com.example.counter">
+  <XCUIElementTypeWindow type="XCUIElementTypeWindow" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits="">
+    <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits="">
+      <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits="">
+        <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits="">
+          <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits="">
+            <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits=""/>
+            <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="1" traits="">
+              <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits=""/>
+              <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="1" traits="">
+                <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="0" traits=""/>
+                <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="1" traits="">
+                  <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="760" index="0" traits=""/>
+                  <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="1" traits="">
+                    <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="760" index="0" traits=""/>
+                    <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="1" traits="">
+                      <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="118" index="0" traits=""/>
+                      <XCUIElementTypeButton type="XCUIElementTypeButton" name="Back" label="Back" enabled="true" visible="true" accessible="true" x="4" y="66" width="48" height="48" index="1" traits="Button"/>
+                      <XCUIElementTypeOther type="XCUIElementTypeOther" name="Native controls" label="Native controls" enabled="true" visible="true" accessible="true" x="132" y="76" width="138" height="28" index="2" traits="Header"/>
+                    </XCUIElementTypeOther>
+                    <XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Flutter label above native view" name="Flutter label above native view" label="Flutter label above native view" enabled="true" visible="true" accessible="true" x="16" y="134" width="208" height="20" index="2" traits="StaticText"/>
+                    <XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Native button taps: 0" name="Native button taps: 0" label="Native button taps: 0" enabled="true" visible="true" accessible="true" x="16" y="162" width="144" height="20" index="3" traits="StaticText"/>
+                    <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="4" traits="">
+                      <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="16" y="198" width="370" height="482" index="0" traits=""/>
+                      <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="16" y="198" width="370" height="482" index="1" traits="">
+                        <XCUIElementTypeOther type="XCUIElementTypeOther" name="platform_view[0]" enabled="true" visible="true" accessible="false" x="16" y="198" width="370" height="482" index="0" traits="">
+                          <XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Native label" name="native_label" label="Native label" enabled="true" visible="true" accessible="true" x="32" y="214" width="338" height="362" index="0" traits="StaticText"/>
+                          <XCUIElementTypeTextField type="XCUIElementTypeTextField" value="Type here (native)" name="native_input" label="" enabled="true" visible="true" accessible="true" x="32" y="588" width="338" height="34" index="1" placeholderValue="Type here (native)" traits=""/>
+                          <XCUIElementTypeButton type="XCUIElementTypeButton" name="native_button" label="Tap me (native)" enabled="true" visible="true" accessible="true" x="32" y="634" width="338" height="30" index="2" traits="Button">
+                            <XCUIElementTypeStaticText type="XCUIElementTypeStaticText" value="Tap me (native)" name="Tap me (native)" label="Tap me (native)" enabled="true" visible="true" accessible="false" x="148" y="640" width="106" height="18" index="0" traits="StaticText"/>
+                          </XCUIElementTypeButton>
+                        </XCUIElementTypeOther>
+                      </XCUIElementTypeOther>
+                    </XCUIElementTypeOther>
+                    <XCUIElementTypeButton type="XCUIElementTypeButton" name="Flutter button below" label="Flutter button below" enabled="true" visible="true" accessible="true" x="16" y="696" width="370" height="48" index="5" traits="Button"/>
+                  </XCUIElementTypeOther>
+                </XCUIElementTypeOther>
+                <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="0" width="402" height="874" index="2" traits="">
+                  <XCUIElementTypeOther type="XCUIElementTypeOther" enabled="true" visible="true" accessible="false" x="0" y="760" width="402" height="80" index="0" traits=""/>
+                  <XCUIElementTypeButton type="XCUIElementTypeButton" name="Home&#10;Tab 1 of 4" label="Home&#10;Tab 1 of 4" enabled="true" visible="true" accessible="true" x="0" y="760" width="101" height="80" index="1" traits="Button"/>
+                  <XCUIElementTypeButton type="XCUIElementTypeButton" name="Profile&#10;Tab 2 of 4" label="Profile&#10;Tab 2 of 4" enabled="true" visible="true" accessible="true" x="100" y="760" width="101" height="80" index="2" traits="Button"/>
+                  <XCUIElementTypeButton type="XCUIElementTypeButton" value="1" name="Testing&#10;Tab 3 of 4" label="Testing&#10;Tab 3 of 4" enabled="true" visible="true" accessible="true" x="201" y="760" width="101" height="80" index="3" traits="Selected, Button"/>
+                  <XCUIElementTypeButton type="XCUIElementTypeButton" name="Settings&#10;Tab 4 of 4" label="Settings&#10;Tab 4 of 4" enabled="true" visible="true" accessible="true" x="301" y="760" width="101" height="80" index="4" traits="Button"/>
+                </XCUIElementTypeOther>
+              </XCUIElementTypeOther>
+            </XCUIElementTypeOther>
+          </XCUIElementTypeOther>
+        </XCUIElementTypeOther>
+      </XCUIElementTypeOther>
+    </XCUIElementTypeOther>
+  </XCUIElementTypeWindow>
+</XCUIElementTypeApplication>

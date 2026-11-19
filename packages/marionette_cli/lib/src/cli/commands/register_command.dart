@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
+import 'package:marionette_cli/src/json_file_registry.dart';
 
 class RegisterCommand extends Command<int> {
   RegisterCommand(this._registry);
@@ -28,7 +29,7 @@ class RegisterCommand extends Command<int> {
     final name = rest[0];
     final uri = rest[1];
 
-    InstanceRegistry.validateName(name);
+    JsonFileRegistry.validateName(name);
 
     if (!uri.startsWith('ws://') && !uri.startsWith('wss://')) {
       stderr.writeln(

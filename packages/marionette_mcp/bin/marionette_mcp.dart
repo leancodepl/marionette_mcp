@@ -26,6 +26,12 @@ ArgParser buildParser() {
     ..addOption(
       'sse-port',
       help: 'Port for SSE server. If not set, uses stdio transport.',
+    )
+    ..addFlag(
+      'native',
+      defaultsTo: true,
+      help: 'Register the native lane tools (native_*). '
+          '--no-native leaves them and their instructions out.',
     );
 }
 
@@ -57,9 +63,11 @@ Future<int> main(List<String> arguments) async {
     final logFile = results.option('log-file');
     final ssePortStr = results.option('sse-port');
     final ssePort = ssePortStr != null ? int.tryParse(ssePortStr) : null;
+    final enableNativeLane = results.flag('native');
 
     return await runMcpServer(
       logLevel: logLevel,
+      enableNativeLane: enableNativeLane,
       logFile: logFile,
       ssePort: ssePort,
     );

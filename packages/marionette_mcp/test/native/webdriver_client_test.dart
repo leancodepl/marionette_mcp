@@ -1,0 +1,338 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
+import 'package:test/test.dart';
+
+import 'support/fake_webdriver_server.dart';
+
+void main() {
+  group('WebDriverClient', () {
+    late FakeWebDriverServer server;
+    late WebDriverClient client;
+
+    setUp(() async {
+      server = await FakeWebDriverServer.start(defaultRoutes: false);
+      client = WebDriverClient(server.baseUrl);
+    });
+
+    tearDown(() async {
+      client.close();
+      await server.close();
+    });
+
+    test('status returns true when /status is healthy', () async {
+      server.onValue('GET', '/status', {'ready': true});
+
+      expect(await client.status(), isTrue);
+    });
+
+    test('status returns false on HTTP error without throwing', () async {
+      server.on(
+        'GET',
+        '/status',
+        (_) =>
+            const FakeResponse.raw('', status: HttpStatus.serviceUnavailable),
+      );
+
+      expect(await client.status(), isFalse);
+    });
+
+    test('createSession reads W3C value.sessionId', () async {
+      server.on('POST', '/session', (request) {
+        expect(request.body?['capabilities'], isA<Map<String, dynamic>>());
+        return const FakeResponse.value({
+          'sessionId': 'sess-123',
+          'capabilities': <String, dynamic>{},
+        });
+      });
+
+      expect(await client.createSession(), 'sess-123');
+    });
+
+    test('getPageSource returns XML string', () async {
+      const xml = '<hierarchy/>';
+      server.onValue('GET', '/session/sess-1/source', xml);
+
+      expect(await client.getPageSource('sess-1'), xml);
+    });
+
+    test('takeScreenshot returns raw base64 PNG payload', () async {
+      const png =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQ'
+          'DwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      server.onValue('GET', '/session/sess-1/screenshot', png);
+
+      expect(await client.takeScreenshot('sess-1'), png);
+    });
+
+    test('takeScreenshot strips data URI prefix when present', () async {
+      server.onValue(
+        'GET',
+        '/session/sess-1/screenshot',
+        'data:image/png;base64,abc123',
+      );
+
+      expect(await client.takeScreenshot('sess-1'), 'abc123');
+    });
+
+    test('takeScreenshot rejects empty payload', () async {
+      server.onValue('GET', '/session/sess-1/screenshot', '');
+
+      expect(
+        () => client.takeScreenshot('sess-1'),
+        throwsA(isA<WebDriverException>()),
+      );
+    });
+
+    test('findElement reads W3C element key', () async {
+      server.on('POST', '/session/sess-1/element', (request) {
+        expect(request.body, {
+          'using': 'xpath',
+          'value': '//Button',
+          'strategy': 'xpath',
+          'selector': '//Button',
+        });
+        return const FakeResponse.value({w3cElementKey: 'el-99'});
+      });
+
+      expect(await client.findElement('sess-1', 'xpath', '//Button'), 'el-99');
+    });
+
+    test('elementClick posts to element click endpoint', () async {
+      server.onValue('POST', '/session/sess-1/element/el-1/click', null);
+
+      await client.elementClick('sess-1', 'el-1');
+
+      expect(
+        server.requestsTo('POST', '/session/sess-1/element/el-1/click'),
+        hasLength(1),
+      );
+    });
+
+    test('elementSendKeys posts text payload', () async {
+      server.onValue('POST', '/session/sess-1/element/el-1/value', null);
+
+      await client.elementSendKeys('sess-1', 'el-1', 'hello');
+
+      expect(
+        server
+            .requestsTo('POST', '/session/sess-1/element/el-1/value')
+            .single
+            .body,
+        {'text': 'hello'},
+      );
+    });
+
+    test('reads the orientation', () async {
+      server.onValue('GET', '/session/sess-1/orientation', 'LANDSCAPE');
+
+      expect(await client.getOrientation('sess-1'), 'LANDSCAPE');
+    });
+
+    test('swipe builds W3C pointer actions', () async {
+      server.onValue('POST', '/session/sess-1/actions', null);
+
+      await client.swipe(
+        'sess-1',
+        startX: 10,
+        startY: 20,
+        endX: 10,
+        endY: 200,
+        durationMs: 150,
+        holdMs: 200,
+      );
+
+      final body =
+          server.requestsTo('POST', '/session/sess-1/actions').single.body!;
+      final actions = body['actions'] as List<dynamic>;
+      expect(actions, hasLength(1));
+      final source = actions.single as Map<String, dynamic>;
+      expect(source['type'], 'pointer');
+      expect(source['parameters'], {'pointerType': 'touch'});
+      expect(source['actions'], [
+        {
+          'type': 'pointerMove',
+          'duration': 0,
+          'origin': 'viewport',
+          'x': 10,
+          'y': 20,
+        },
+        {'type': 'pointerDown', 'button': 0},
+        {
+          'type': 'pointerMove',
+          'duration': 150,
+          'origin': 'viewport',
+          'x': 10,
+          'y': 200,
+        },
+        {'type': 'pause', 'duration': 200},
+        {'type': 'pointerUp', 'button': 0},
+      ]);
+    });
+
+    test('deleteSession issues DELETE', () async {
+      server.onValue('DELETE', '/session/sess-1', null);
+
+      await client.deleteSession('sess-1');
+
+      expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
+    });
+
+    test('W3C error body becomes WebDriverException with error/message',
+        () async {
+      server.on(
+        'POST',
+        '/session/sess-1/element',
+        (_) => const FakeResponse.error(
+          'no such element',
+          'Element not found',
+          status: HttpStatus.notFound,
+        ),
+      );
+
+      expect(
+        () => client.findElement('sess-1', 'id', 'missing'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', 'no such element')
+              .having((e) => e.message, 'message', 'Element not found')
+              .having((e) => e.httpStatus, 'httpStatus', 404),
+        ),
+      );
+    });
+
+    test('non-2xx without W3C body becomes WebDriverException', () async {
+      server.on(
+        'GET',
+        '/session/sess-1/source',
+        (_) => const FakeResponse.raw(
+          'upstream down',
+          status: HttpStatus.badGateway,
+        ),
+      );
+
+      expect(
+        () => client.getPageSource('sess-1'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.httpStatus, 'httpStatus', 502)
+              .having((e) => e.message, 'message', contains('upstream down')),
+        ),
+      );
+    });
+
+    test('wdaActiveAppInfo reads session active app value', () async {
+      server.onValue('GET', '/session/sess-1/wda/activeAppInfo', {
+        'bundleId': 'com.example.app',
+        'processArguments': <dynamic>[],
+      });
+
+      expect(await client.wdaActiveAppInfo('sess-1'), {
+        'bundleId': 'com.example.app',
+        'processArguments': isEmpty,
+      });
+    });
+
+    test('an unreachable server is reported as such (request not sent)',
+        () async {
+      await server.close();
+
+      await expectLater(
+        client.getPageSource('sess-1'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', webDriverServerUnreachable),
+        ),
+      );
+    });
+
+    test('a connection dropped after sending is reported as lost', () async {
+      server.on(
+        'POST',
+        '/session/sess-1/actions',
+        (_) => const FakeResponse.dropConnection(),
+      );
+
+      await expectLater(
+        client.swipe('sess-1', startX: 0, startY: 0, endX: 0, endY: 0),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', webDriverConnectionLost),
+        ),
+      );
+    });
+
+    test('a response body that is not UTF-8 becomes WebDriverException',
+        () async {
+      server.on(
+        'GET',
+        '/session/sess-1/source',
+        (_) => const FakeResponse.bytes([0xC3, 0x28]),
+      );
+
+      await expectLater(
+        client.getPageSource('sess-1'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.message, 'message', contains('UTF-8'))
+              .having(isLostSession, 'isLostSession', isFalse),
+        ),
+      );
+    });
+
+    test('a body that cannot be encoded is a programmer error', () async {
+      await expectLater(
+        client.uia2UpdateSettings('sess-1', {'unencodable': Object()}),
+        throwsA(isA<JsonUnsupportedObjectError>()),
+      );
+    });
+
+    test('a request the server never answers ends as a lost connection',
+        () async {
+      final impatient = WebDriverClient(
+        server.baseUrl,
+        requestTimeout: const Duration(milliseconds: 200),
+      );
+      addTearDown(impatient.close);
+      server.on(
+        'GET',
+        '/session/sess-1/source',
+        (_) => Completer<FakeResponse>().future,
+      );
+      final stopwatch = Stopwatch()..start();
+
+      await expectLater(
+        impatient.getPageSource('sess-1'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', webDriverConnectionLost),
+        ),
+      );
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+    });
+
+    test('status is false when /status never answers', () async {
+      final impatient = WebDriverClient(
+        server.baseUrl,
+        shortTimeout: const Duration(milliseconds: 200),
+      );
+      addTearDown(impatient.close);
+      server.on('GET', '/status', (_) => Completer<FakeResponse>().future);
+      final stopwatch = Stopwatch()..start();
+
+      expect(await impatient.status(), isFalse);
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+    });
+
+    test('status on a closed client throws, not false', () async {
+      server.onValue('GET', '/status', {'ready': true});
+      expect(await client.status(), isTrue);
+
+      client.close();
+
+      await expectLater(client.status(), throwsStateError);
+    });
+  });
+}

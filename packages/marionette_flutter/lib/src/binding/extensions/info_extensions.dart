@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
@@ -84,7 +85,10 @@ void registerInfoExtensions({
         configuration: configuration,
         compaction: compaction.value,
       );
-      return MarionetteExtensionResult.success({'elements': elements});
+      return MarionetteExtensionResult.success({
+        'elements': elements,
+        'appLifecycleState': coveredAppLifecycleState(),
+      });
     },
   );
 
@@ -119,6 +123,25 @@ void registerInfoExtensions({
       });
     },
   );
+}
+
+/// The app's lifecycle state for `marionette.interactiveElements`, on Android
+/// and iOS only: there it is not `resumed` while system UI or another screen
+/// covers the app, which the widget tree cannot show. Null elsewhere, where
+/// an unfocused desktop window or browser tab is not `resumed` either.
+@visibleForTesting
+String? coveredAppLifecycleState() {
+  if (kIsWeb) return null;
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.android ||
+    TargetPlatform.iOS =>
+      WidgetsBinding.instance.lifecycleState?.name,
+    TargetPlatform.fuchsia ||
+    TargetPlatform.linux ||
+    TargetPlatform.macOS ||
+    TargetPlatform.windows =>
+      null,
+  };
 }
 
 /// Lists the interactive elements of `marionette.interactiveElements`: inside
