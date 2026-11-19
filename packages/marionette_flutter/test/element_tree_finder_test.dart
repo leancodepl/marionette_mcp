@@ -883,6 +883,42 @@ void main() {
 
       expect(_finder.findInteractiveElements().single['text'], 'Move');
     });
+
+    testWidgets('compact mode keeps a merged label and drops a glyph label',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                FilledButton.icon(
+                  key: const ValueKey('save'),
+                  onPressed: () {},
+                  icon: const Icon(Icons.save),
+                  label: const Text('Save'),
+                ),
+                FilledButton(
+                  key: const ValueKey('glyph'),
+                  onPressed: () {},
+                  child: const Text(''),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      Object? textOf(CompactionMode compaction, String key) => _finder
+          .findInteractiveElements(compaction: compaction)
+          .singleWhere((e) => e['key'] == key)['text'];
+
+      expect(textOf(CompactionMode.compact, 'save'), 'Save');
+      expect(textOf(CompactionMode.compact, 'glyph'), isNull,
+          reason: 'a merged label made of a glyph is unreadable');
+      expect(textOf(CompactionMode.none, 'save'), 'Save');
+      expect(textOf(CompactionMode.none, 'glyph'), '',
+          reason: 'CompactionMode.none keeps the glyphs');
+    });
   });
 
   group('ElementTreeFinder isInteractiveElement', () {
