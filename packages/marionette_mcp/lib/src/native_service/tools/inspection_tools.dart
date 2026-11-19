@@ -8,7 +8,7 @@ import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
-import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
@@ -135,7 +135,7 @@ Future<CallToolResult> handleNativeGetElements(
 
   logger.info('Getting native elements (filter: ${filter.describe()}, '
       'clickableOnly: $clickableOnly)');
-  return runTool(logger, 'get native elements', () async {
+  return runNativeTool(logger, 'get native elements', () async {
     final connector = context.requireConnector();
     // foregroundApp is a diagnostic hint: fetch it alongside the tree and
     // report null rather than failing the whole call when it is unavailable.
@@ -197,7 +197,7 @@ Future<CallToolResult> handleNativeWaitFor(
 
   logger.info('Native waiting for ${selector.describe()} to be '
       '${state.name} (timeout ${timeoutMs}ms)');
-  return runTool(logger, 'native wait for', () async {
+  return runNativeTool(logger, 'native wait for', () async {
     final connector = context.requireConnector();
     // A system surface in front of the app is the usual reason an element
     // never appears, so the error names the foreground app.

@@ -204,9 +204,11 @@ abstract base class WebDriverNativeConnector implements NativeConnector {
     }
   }
 
-  /// Whether [error] means "no matching element" on either server.
+  /// Whether [error] means "no matching element" on either server. A lost
+  /// session also answers 404 (`invalid session id`) and is not one.
   static bool isNoSuchElement(WebDriverException error) =>
-      error.error == 'no such element' || error.httpStatus == 404;
+      !isLostSession(error) &&
+      (error.error == 'no such element' || error.httpStatus == 404);
 
   /// Closes the client but keeps the session and the server, for a later
   /// process to reuse them through `openSession(sessionId: …)` — the CLI.

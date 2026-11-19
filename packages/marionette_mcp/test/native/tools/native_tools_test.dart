@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:image/image.dart' as img;
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/native_service/android_native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
@@ -18,6 +19,7 @@ import 'package:mcp_dart/mcp_dart.dart';
 import 'package:test/test.dart';
 
 import '../support/fake_native_connector.dart';
+import '../support/fake_webdriver_server.dart';
 
 String _text(CallToolResult result) =>
     result.content.whereType<TextContent>().map((c) => c.text).join('\n');
@@ -119,6 +121,104 @@ void main() {
         );
       });
     }
+  });
+
+  group('a lost native session', () {
+    for (final code in [
+      webDriverInvalidSessionId,
+      webDriverConnectionLost,
+      webDriverServerUnreachable,
+    ]) {
+      test('"$code" tells the agent to call native_connect again', () async {
+        final connector = FakeNativeConnector(
+          error: WebDriverException('session gone', error: code),
+        );
+
+        expect(
+          await handleNativeGetElements(_contextWith(connector)),
+          _isToolError(
+            allOf(
+                contains('native session is gone'), contains('native_connect')),
+          ),
+        );
+      });
+    }
+
+    test('the original error and its stack are logged', () async {
+      const lost = WebDriverException(
+        'GET /source got no response within 90000 ms',
+        error: webDriverConnectionLost,
+      );
+      final records = <logging.LogRecord>[];
+      final subscription = logging.Logger.root.onRecord.listen(records.add);
+      addTearDown(subscription.cancel);
+
+      await handleNativeGetElements(
+        _contextWith(FakeNativeConnector(error: lost)),
+      );
+
+      expect(
+        records.where((r) => identical(r.error, lost) && r.stackTrace != null),
+        hasLength(1),
+      );
+    });
+
+    test('a connection lost during a tap tells the agent to reconnect',
+        () async {
+      final connector = FakeNativeConnector(
+        error: const WebDriverException(
+          'socket closed',
+          error: webDriverConnectionLost,
+        ),
+      );
+
+      expect(
+        await handleNativeTap(_contextWith(connector), {'x': 1, 'y': 2}),
+        _isToolError(contains('native_connect')),
+      );
+    });
+
+    test(
+        'a lost session while typing into the focused field is not a '
+        'missing focus', () async {
+      final server = await FakeWebDriverServer.start();
+      addTearDown(server.close);
+      server.on(
+        'GET',
+        '/session/sess-1/element/active',
+        (_) => const FakeResponse.error(
+          webDriverInvalidSessionId,
+          'session deleted',
+          status: HttpStatus.notFound,
+        ),
+      );
+      final connector = await AndroidNativeConnector.connect(
+        bootstrap: FakeServerBootstrap(server.baseUrl),
+      );
+      addTearDown(connector.dispose);
+
+      expect(
+        await handleNativeEnterText(_contextWith(connector), {'text': 'x'}),
+        _isToolError(contains('native_connect')),
+      );
+    });
+
+    test('another WebDriver error keeps its own message', () async {
+      final connector = FakeNativeConnector(
+        error: const WebDriverException(
+          'Element not found',
+          error: 'no such element',
+        ),
+      );
+
+      expect(
+        await handleNativeGetElements(_contextWith(connector)),
+        _isToolError(
+          allOf(
+              contains('Element not found'), isNot(contains('native_connect'))),
+        ),
+      );
+    });
   });
 
   group('native_get_elements', () {

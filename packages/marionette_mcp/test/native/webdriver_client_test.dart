@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
@@ -277,6 +278,43 @@ void main() {
               .having((e) => e.error, 'error', webDriverConnectionLost),
         ),
       );
+    });
+
+    test('a request the server never answers ends as a lost connection',
+        () async {
+      final impatient = WebDriverClient(
+        server.baseUrl,
+        requestTimeout: const Duration(milliseconds: 200),
+      );
+      addTearDown(impatient.close);
+      server.on(
+        'GET',
+        '/session/sess-1/source',
+        (_) => Completer<FakeResponse>().future,
+      );
+      final stopwatch = Stopwatch()..start();
+
+      await expectLater(
+        impatient.getPageSource('sess-1'),
+        throwsA(
+          isA<WebDriverException>()
+              .having((e) => e.error, 'error', webDriverConnectionLost),
+        ),
+      );
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
+    });
+
+    test('status is false when /status never answers', () async {
+      final impatient = WebDriverClient(
+        server.baseUrl,
+        statusTimeout: const Duration(milliseconds: 200),
+      );
+      addTearDown(impatient.close);
+      server.on('GET', '/status', (_) => Completer<FakeResponse>().future);
+      final stopwatch = Stopwatch()..start();
+
+      expect(await impatient.status(), isFalse);
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 2)));
     });
 
     test('close cleans up so further requests fail', () async {

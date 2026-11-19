@@ -200,7 +200,6 @@ Future<int> _runSseServer(
     }
 
     logger.info('Stopping');
-    await server.close();
   } catch (e, st) {
     logger.severe('Error when waiting for MCP client connection', e, st);
     return 1;
@@ -208,6 +207,7 @@ Future<int> _runSseServer(
     await disposeLanes();
   }
 
+  await server.close();
   logger.info('Stopped');
   return 0;
 }

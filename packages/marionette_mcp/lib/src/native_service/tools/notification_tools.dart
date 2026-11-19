@@ -2,7 +2,7 @@ import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
@@ -64,7 +64,7 @@ Future<CallToolResult> handleNativeNotifications(
 
   final logger = context.logger;
   logger.info('Native notifications ${action.name}');
-  return runTool(logger, 'native notifications', () async {
+  return runNativeTool(logger, 'native notifications', () async {
     final connector = context.requireConnector();
     final ios = context.platform == NativePlatform.ios;
     switch (action) {

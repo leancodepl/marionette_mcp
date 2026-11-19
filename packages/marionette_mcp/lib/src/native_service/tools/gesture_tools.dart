@@ -7,7 +7,7 @@ import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
-import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
@@ -294,7 +294,7 @@ Future<CallToolResult> handleNativeTap(
   if (target == null) return invalidArguments(parsed.error!);
 
   logger.info('Native tapping with args: $args');
-  return runTool(logger, 'native tap', () async {
+  return runNativeTool(logger, 'native tap', () async {
     final connector = context.requireConnector();
 
     final point = target.point;
@@ -340,7 +340,7 @@ Future<CallToolResult> handleNativeSwipe(
 
   logger.info('Native swipe ($startX,$startY) → ($endX,$endY) '
       'in ${durationMs}ms');
-  return runTool(logger, 'native swipe', () async {
+  return runNativeTool(logger, 'native swipe', () async {
     final connector = context.requireConnector();
     await connector.swipe(
       startX: startX,
@@ -423,7 +423,7 @@ Future<CallToolResult> handleNativeScroll(
     'target=${target.describe()} within=${within?.describe()} '
     'distance=$distance start=($startX,$startY)',
   );
-  return runTool(logger, 'native scroll', () async {
+  return runNativeTool(logger, 'native scroll', () async {
     final connector = context.requireConnector();
     final screen = await connector.getScreen();
 

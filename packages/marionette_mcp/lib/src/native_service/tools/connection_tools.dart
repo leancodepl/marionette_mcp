@@ -58,8 +58,8 @@ void registerNativeConnectionTools(
     );
 }
 
-/// Handles `native_connect`. Does not use `runTool` because a failed connect
-/// must also leave the context disconnected.
+/// Handles `native_connect`. Does not use `runNativeTool` because a failed
+/// connect must also leave the context disconnected.
 Future<CallToolResult> handleNativeConnect(
   NativeServiceContext context,
   Map<String, dynamic> args,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -51,11 +52,30 @@ const webDriverConnectionLost = 'connection lost';
 /// W3C error code for a session the server no longer knows.
 const webDriverInvalidSessionId = 'invalid session id';
 
+/// Whether [error] means the session or its server is gone, so only a new
+/// `native_connect` can continue.
+bool isLostSession(WebDriverException error) => switch (error.error) {
+      webDriverInvalidSessionId ||
+      webDriverConnectionLost ||
+      webDriverServerUnreachable =>
+        true,
+      _ => false,
+    };
+
 /// W3C WebDriver element identifier key used in element response objects.
 ///
 /// See https://www.w3.org/TR/webdriver/#elements. Older (JSON Wire) servers
 /// use `ELEMENT` instead, which [WebDriverClient.findElement] falls back to.
 const w3cElementKey = 'element-6066-11e4-a52e-4f735466cecf';
+
+/// Longest a [WebDriverClient] request may take, from opening the connection
+/// to the end of the response body. Longer than the 60 s maximum of
+/// `native_wait_for`.
+const webDriverRequestTimeout = Duration(seconds: 90);
+
+/// Longest [WebDriverClient.status] and [WebDriverClient.deleteSession] may
+/// take, so a health check or a shutdown never waits on a hung server.
+const webDriverStatusTimeout = Duration(seconds: 5);
 
 /// Minimal W3C WebDriver HTTP client.
 ///
@@ -66,17 +86,28 @@ const w3cElementKey = 'element-6066-11e4-a52e-4f735466cecf';
 ///
 /// All methods throw [WebDriverException] on non-2xx responses or when the
 /// server returns a W3C error body (`{"value": {"error": ..., "message":
-/// ...}}`).
+/// ...}}`). A request that takes longer than its timeout is aborted and
+/// throws one with [webDriverConnectionLost].
 class WebDriverClient {
   /// Creates a client for a WebDriver server at [baseUrl]
   /// (e.g. `http://127.0.0.1:8100`). A trailing slash is tolerated.
-  WebDriverClient(String baseUrl)
-      : _baseUrl = baseUrl.endsWith('/')
+  ///
+  /// [statusTimeout] bounds [status] and [deleteSession], [requestTimeout]
+  /// every other request.
+  WebDriverClient(
+    String baseUrl, {
+    Duration requestTimeout = webDriverRequestTimeout,
+    Duration statusTimeout = webDriverStatusTimeout,
+  })  : _baseUrl = baseUrl.endsWith('/')
             ? baseUrl.substring(0, baseUrl.length - 1)
             : baseUrl,
+        _requestTimeout = requestTimeout,
+        _statusTimeout = statusTimeout,
         _http = HttpClient();
 
   final String _baseUrl;
+  final Duration _requestTimeout;
+  final Duration _statusTimeout;
   final HttpClient _http;
 
   /// Creates a new session and returns its session id.
@@ -103,9 +134,10 @@ class WebDriverClient {
     );
   }
 
-  /// Deletes the session, releasing the device-side automation.
+  /// Deletes the session, releasing the device-side automation. Bounded by
+  /// the status timeout, so a shutdown never waits on a hung server.
   Future<void> deleteSession(String sessionId) async {
-    await _request('DELETE', '/session/$sessionId');
+    await _request('DELETE', '/session/$sessionId', timeout: _statusTimeout);
   }
 
   /// Returns the current UI hierarchy as an XML string.
@@ -415,7 +447,7 @@ class WebDriverClient {
   /// while the device-side server is still starting up.
   Future<bool> status() async {
     try {
-      await _request('GET', '/status');
+      await _request('GET', '/status', timeout: _statusTimeout);
       return true;
     } catch (_) {
       return false;
@@ -429,53 +461,39 @@ class WebDriverClient {
 
   /// Sends a request and returns the unwrapped W3C `value` field (or the
   /// whole decoded body when no envelope is present).
+  ///
+  /// Opening, sending and reading the body together take at most [timeout]
+  /// (the client's request timeout by default).
   Future<Object?> _request(
     String method,
     String path, {
     Map<String, dynamic>? body,
+    Duration? timeout,
   }) async {
     final uri = Uri.parse('$_baseUrl$path');
+    final limit = timeout ?? _requestTimeout;
+    HttpClientRequest? request;
+    var timedOut = false;
 
-    // dart:io connects inside openUrl, so a failure here means the request
-    // never left this process — unlike failures after it is sent below.
-    final HttpClientRequest request;
-    try {
-      request = await _http.openUrl(method, uri);
-    } on IOException catch (e) {
-      throw WebDriverException(
-        '$method $uri failed: $e',
-        error: webDriverServerUnreachable,
-      );
-    } catch (e) {
-      throw WebDriverException('$method $uri failed: $e');
+    Future<(int, String)> exchange() async {
+      final opened = await _open(method, uri);
+      request = opened;
+      // A connection opened after the timeout is dropped unused.
+      if (timedOut) opened.abort();
+      return _send(opened, method, uri, body);
     }
 
-    HttpClientResponse response;
-    String responseBody;
-    try {
-      if (body != null) {
-        // ChromeDriver rejects chunked request bodies, which dart:io uses
-        // unless contentLength is set explicitly.
-        final payload = utf8.encode(jsonEncode(body));
-        request.headers.contentType =
-            ContentType('application', 'json', charset: 'utf-8');
-        request.contentLength = payload.length;
-        request.add(payload);
-      }
-      response = await request.close();
-      responseBody = await utf8.decodeStream(response);
-    } on WebDriverException {
-      rethrow;
-    } on IOException catch (e) {
-      // Reset / closed connections (SocketException, HttpException) mean the
-      // device-side server went away, possibly after acting on the request.
-      throw WebDriverException(
-        '$method $uri failed: $e',
-        error: webDriverConnectionLost,
-      );
-    } catch (e) {
-      throw WebDriverException('$method $uri failed: $e');
-    }
+    final (statusCode, responseBody) = await exchange().timeout(
+      limit,
+      onTimeout: () {
+        timedOut = true;
+        request?.abort();
+        throw WebDriverException(
+          '$method $uri got no response within ${limit.inMilliseconds} ms',
+          error: webDriverConnectionLost,
+        );
+      },
+    );
 
     Object? decoded;
     if (responseBody.isNotEmpty) {
@@ -495,22 +513,70 @@ class WebDriverClient {
     // W3C error bodies look like {"value": {"error": ..., "message": ...}}.
     // Check for them even on 2xx responses — some servers get the status
     // code wrong.
-    final isHttpError = response.statusCode < 200 || response.statusCode >= 300;
+    final isHttpError = statusCode < 200 || statusCode >= 300;
     if (value is Map<String, dynamic> && value['error'] is String) {
       throw WebDriverException(
         (value['message'] as String?) ?? 'WebDriver error',
-        httpStatus: response.statusCode,
+        httpStatus: statusCode,
         error: value['error'] as String,
       );
     }
     if (isHttpError) {
       throw WebDriverException(
         responseBody.isEmpty ? 'Empty error response' : responseBody,
-        httpStatus: response.statusCode,
+        httpStatus: statusCode,
       );
     }
 
     return value;
+  }
+
+  /// Opens a connection for [method] [uri].
+  Future<HttpClientRequest> _open(String method, Uri uri) async {
+    // dart:io connects inside openUrl, so a failure here means the request
+    // never left this process — unlike failures in [_send].
+    try {
+      return await _http.openUrl(method, uri);
+    } on IOException catch (e) {
+      throw WebDriverException(
+        '$method $uri failed: $e',
+        error: webDriverServerUnreachable,
+      );
+    } catch (e) {
+      throw WebDriverException('$method $uri failed: $e');
+    }
+  }
+
+  /// Sends [request] with [body] and returns the response status code and
+  /// body.
+  Future<(int, String)> _send(
+    HttpClientRequest request,
+    String method,
+    Uri uri,
+    Map<String, dynamic>? body,
+  ) async {
+    try {
+      if (body != null) {
+        // ChromeDriver rejects chunked request bodies, which dart:io uses
+        // unless contentLength is set explicitly.
+        final payload = utf8.encode(jsonEncode(body));
+        request.headers.contentType =
+            ContentType('application', 'json', charset: 'utf-8');
+        request.contentLength = payload.length;
+        request.add(payload);
+      }
+      final response = await request.close();
+      return (response.statusCode, await utf8.decodeStream(response));
+    } on IOException catch (e) {
+      // Reset / closed connections (SocketException, HttpException) mean the
+      // device-side server went away, possibly after acting on the request.
+      throw WebDriverException(
+        '$method $uri failed: $e',
+        error: webDriverConnectionLost,
+      );
+    } catch (e) {
+      throw WebDriverException('$method $uri failed: $e');
+    }
   }
 }
 

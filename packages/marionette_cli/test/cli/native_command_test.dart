@@ -32,12 +32,16 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  void saveSession({String? sessionId, String name = 'default'}) =>
+  void saveSession({
+    String? sessionId,
+    String name = 'default',
+    String? baseUrl,
+  }) =>
       nativeRegistry.save(
         NativeSessionInfo(
           name: name,
           platform: 'android',
-          baseUrl: server.baseUrl,
+          baseUrl: baseUrl ?? server.baseUrl,
           createdAt: DateTime.utc(2026, 10, 20),
           serial: 'test-serial',
           sessionId: sessionId,
@@ -180,6 +184,19 @@ void main() {
     expect(result.err, contains('Hint:'));
   });
 
+  test('a session lost during a command says to run native-connect', () async {
+    saveSession(sessionId: 'kept');
+    server.on('GET', '/session/kept/orientation', 'PORTRAIT');
+
+    final result = await run(
+      ['native-get-elements', '--no-include-foreground-app'],
+    );
+
+    expect(result.code, 1);
+    expect(result.err, contains('native session is gone'));
+    expect(result.err, contains('Call native-connect again.'));
+  });
+
   test('a server that is gone is reported with a hint', () async {
     saveSession(sessionId: 'kept');
     await server.close();
@@ -189,6 +206,27 @@ void main() {
     expect(result.code, 1);
     expect(result.err, contains('is not running'));
     expect(result.err, contains('native-connect'));
+  });
+
+  test('a server that never answers /status fails the attach in time',
+      () async {
+    final silent = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(silent.close);
+    final connections = <Socket>[];
+    silent.listen(connections.add);
+    addTearDown(() {
+      for (final socket in connections) {
+        socket.destroy();
+      }
+    });
+    saveSession(baseUrl: 'http://127.0.0.1:${silent.port}');
+    final stopwatch = Stopwatch()..start();
+
+    final result = await run(['native-get-elements']);
+
+    expect(result.code, 1);
+    expect(result.err, contains('is not running'));
+    expect(stopwatch.elapsed, lessThan(const Duration(seconds: 10)));
   });
 
   test('tool names in messages become CLI commands; JSON is left alone', () {

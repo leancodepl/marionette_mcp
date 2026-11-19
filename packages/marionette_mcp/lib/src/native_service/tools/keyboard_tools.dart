@@ -2,7 +2,7 @@ import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
-import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
@@ -71,7 +71,7 @@ Future<CallToolResult> handleNativePressKey(
   }
 
   logger.info('Native pressing key ${key.wireName}');
-  return runTool(logger, 'native press key', () async {
+  return runNativeTool(logger, 'native press key', () async {
     await context.requireConnector().pressKey(key);
     return CallToolResult(
       content: [TextContent(text: 'Pressed ${key.wireName}')],
@@ -85,7 +85,7 @@ Future<CallToolResult> handleNativeHideKeyboard(
 ) {
   final logger = context.logger;
   logger.info('Native hiding keyboard');
-  return runTool(logger, 'native hide keyboard', () async {
+  return runNativeTool(logger, 'native hide keyboard', () async {
     final wasShown = await context.requireConnector().hideKeyboard();
     return CallToolResult(
       content: [

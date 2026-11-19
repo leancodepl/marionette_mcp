@@ -3,7 +3,7 @@ import 'package:marionette_mcp/src/native_service/screenshot_scaling.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
-import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers native screenshot tools.
@@ -77,7 +77,7 @@ Future<CallToolResult> handleNativeTakeScreenshot(
   }
 
   logger.info('Taking native screenshot');
-  return runTool(logger, 'native take screenshot', () async {
+  return runNativeTool(logger, 'native take screenshot', () async {
     final captured = await context.requireConnector().takeScreenshot();
     if (captured.isEmpty) {
       return CallToolResult(

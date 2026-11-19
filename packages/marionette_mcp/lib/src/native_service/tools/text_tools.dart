@@ -5,7 +5,7 @@ import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
-import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
@@ -86,7 +86,7 @@ Future<CallToolResult> handleNativeEnterText(
   final target =
       selector.isEmpty ? 'the focused field' : 'field ${selector.describe()}';
   logger.info('Native enter text into $target (clear=$clear)');
-  return runTool(logger, 'native enter text', () async {
+  return runNativeTool(logger, 'native enter text', () async {
     final connector = context.requireConnector();
     if (selector.isEmpty) {
       await connector.typeText(input, clear: clear);

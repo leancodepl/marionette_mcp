@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -115,6 +116,25 @@ void main() {
       await connector.dispose();
 
       expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
+    });
+
+    test('dispose ends within the short timeout when DELETE never answers',
+        () async {
+      server.on(
+        'DELETE',
+        '/session/sess-1',
+        (_) => Completer<FakeResponse>().future,
+      );
+      final connector = await connect();
+      final stopwatch = Stopwatch()..start();
+
+      await connector.dispose();
+
+      expect(server.requestsTo('DELETE', '/session/sess-1'), hasLength(1));
+      expect(
+        stopwatch.elapsed,
+        lessThan(webDriverStatusTimeout + const Duration(seconds: 1)),
+      );
     });
 
     group('reusing a session', () {

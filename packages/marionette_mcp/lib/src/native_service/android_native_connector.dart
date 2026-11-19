@@ -275,10 +275,8 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     try {
       return await client.findElement(sessionId, using, value);
     } on WebDriverException catch (error) {
-      if (error.error == 'no such element' || error.httpStatus == 404) {
-        return null;
-      }
-      rethrow;
+      if (!WebDriverNativeConnector.isNoSuchElement(error)) rethrow;
+      return null;
     }
   }
 }
