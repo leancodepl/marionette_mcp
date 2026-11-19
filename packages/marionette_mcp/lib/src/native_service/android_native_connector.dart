@@ -162,51 +162,34 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
     return tapAt(center.x, center.y);
   }
 
+  /// Taps [element] and types into the field that took the focus. The rect
+  /// of that field must hold the tap point; the parsed bounds are clipped to
+  /// the screen and the server rect is not, so the two need not be equal.
   @override
   Future<void> enterText(
     NativeElement element,
     String text, {
     bool clear = false,
   }) async {
+    final focusedBeforeTap = await _focusedElement();
     await tapElement(element);
 
-    // The tap focused exactly the element the selector chose, so the focused
-    // field comes first; an id lookup could return another element with the
-    // same id. Compose-based search bars
-    // also expose the hint as a sibling View while the editable node has
-    // empty text, which the focused lookup handles too.
-    String? elementId = await _tryFind(
-      'xpath',
-      '//android.widget.EditText[@focused="true"]',
-    );
-    elementId ??= await _tryFind('xpath', '//*[@focused="true"]');
-
-    final resourceId = element.resourceId;
-    if (elementId == null && resourceId != null && resourceId.isNotEmpty) {
-      elementId = await _tryFind('id', resourceId);
+    var fieldId = await _tappedField(element, focusedBeforeTap);
+    if (fieldId == null) {
+      // The focus may still be moving to the tapped field.
+      await Future<void>.delayed(changedFieldRetryDelay);
+      fieldId = await _tappedField(element, focusedBeforeTap);
     }
-
-    final visibleText = element.text;
-    if (elementId == null && visibleText != null && visibleText.isNotEmpty) {
-      final literal = xpathLiteral(visibleText);
-      elementId = await _tryFind(
-        'xpath',
-        '//android.widget.EditText[@hint=$literal or @text=$literal or '
-            '@content-desc=$literal]',
-      );
-      elementId ??= await _tryFind(
-        'xpath',
-        '//*[@text=$literal or @content-desc=$literal]',
+    if (fieldId == null) {
+      final tapPoint = element.center;
+      throw NativeOperationFailedException(
+        'The field found for typing is not at the tapped point '
+        '(${tapPoint.x}, ${tapPoint.y}); nothing was typed.',
+        hint: 'Another field probably kept the focus. Scroll the field fully '
+            'into view, wait until the screen has settled, then retry.',
       );
     }
-
-    if (elementId == null) {
-      throw const WebDriverException(
-        'Tapped the element but could not locate a focused field for typing',
-        error: 'no such element',
-      );
-    }
-    await typeInto(elementId, text, clear: clear);
+    await typeInto(fieldId, text, clear: clear);
   }
 
   @override
@@ -269,6 +252,79 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
       'The keyboard is still shown after pressing Back.',
       hint: 'Unfocus the field in the app (e.g. tap outside it) and retry.',
     );
+  }
+
+  /// The field found for typing (see [_findField]) when its rect holds the
+  /// center of [element], or when focus moved to a different field; otherwise
+  /// null.
+  Future<String?> _tappedField(
+    NativeElement element,
+    String? focusedBeforeTap,
+  ) async {
+    final field = await _findField(element);
+    final rect = await client.elementRect(sessionId, field.id);
+    final tapPoint = element.center;
+    return rect.contains(tapPoint.x, tapPoint.y) ||
+            (field.focused && field.id != focusedBeforeTap)
+        ? field.id
+        : null;
+  }
+
+  /// Returns the element that held focus before the tap, when there was one.
+  /// A missing focused element is normal before the first text-field tap.
+  Future<String?> _focusedElement() async {
+    try {
+      return await client.activeElement(sessionId);
+    } on WebDriverException catch (error) {
+      if (!WebDriverNativeConnector.isNoSuchElement(error)) rethrow;
+      return null;
+    }
+  }
+
+  /// The WebDriver id of the field to type into after tapping [element].
+  Future<({String id, bool focused})> _findField(
+    NativeElement element,
+  ) async {
+    // The field that received focus comes first; an id lookup could return
+    // another element with the same id. Compose-based search bars also
+    // expose the hint as a sibling View while the editable node has empty
+    // text, which the focused lookup handles too.
+    String? elementId = await _tryFind(
+      'xpath',
+      '//android.widget.EditText[@focused="true"]',
+    );
+    var focused = elementId != null;
+    if (elementId == null) {
+      elementId = await _tryFind('xpath', '//*[@focused="true"]');
+      focused = elementId != null;
+    }
+
+    final resourceId = element.resourceId;
+    if (elementId == null && resourceId != null && resourceId.isNotEmpty) {
+      elementId = await _tryFind('id', resourceId);
+    }
+
+    final visibleText = element.text;
+    if (elementId == null && visibleText != null && visibleText.isNotEmpty) {
+      final literal = xpathLiteral(visibleText);
+      elementId = await _tryFind(
+        'xpath',
+        '//android.widget.EditText[@hint=$literal or @text=$literal or '
+            '@content-desc=$literal]',
+      );
+      elementId ??= await _tryFind(
+        'xpath',
+        '//*[@text=$literal or @content-desc=$literal]',
+      );
+    }
+
+    if (elementId == null) {
+      throw const WebDriverException(
+        'Tapped the element but could not locate a focused field for typing',
+        error: 'no such element',
+      );
+    }
+    return (id: elementId, focused: focused);
   }
 
   Future<String?> _tryFind(String using, String value) async {

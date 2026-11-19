@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+
 /// Exception thrown when a WebDriver endpoint returns a non-2xx HTTP status
 /// or a W3C error body.
 ///
@@ -187,13 +189,60 @@ class WebDriverClient {
       'selector': value,
     });
 
-    if (result is Map<String, dynamic>) {
-      final elementId = result[w3cElementKey] ?? result['ELEMENT'];
+    return _elementId(result);
+  }
+
+  /// Finds every element matching [using] and [value] (see [findElement])
+  /// and returns their WebDriver element ids; empty when nothing matches.
+  Future<List<String>> findElements(
+    String sessionId,
+    String using,
+    String value,
+  ) async {
+    final result =
+        await _request('POST', '/session/$sessionId/elements', body: {
+      'using': using,
+      'value': value,
+      'strategy': using,
+      'selector': value,
+    });
+    if (result is! List<Object?>) {
+      throw const WebDriverException('Element list response was not a list');
+    }
+    return result.map(_elementId).toList();
+  }
+
+  /// The element id of an element response object, W3C or legacy key.
+  static String _elementId(Object? element) {
+    if (element is Map<String, dynamic>) {
+      final elementId = element[w3cElementKey] ?? element['ELEMENT'];
       if (elementId is String) return elementId;
     }
     throw const WebDriverException(
       'Element found but no element id in response',
     );
+  }
+
+  /// Returns the rect of element [elementId] in server units
+  /// (`GET .../element/{id}/rect`).
+  Future<NativeBounds> elementRect(String sessionId, String elementId) async {
+    final value =
+        await _request('GET', '/session/$sessionId/element/$elementId/rect');
+    if (value
+        case {
+          'x': final num x,
+          'y': final num y,
+          'width': final num width,
+          'height': final num height,
+        }) {
+      return NativeBounds(
+        x: x.round(),
+        y: y.round(),
+        width: width.round(),
+        height: height.round(),
+      );
+    }
+    throw const WebDriverException('Element rect response had no x/y/size');
   }
 
   /// Clicks (taps) the element identified by [elementId].

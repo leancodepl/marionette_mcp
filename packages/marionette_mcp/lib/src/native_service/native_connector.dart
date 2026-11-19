@@ -33,6 +33,10 @@ class NativeBounds {
   final int width;
   final int height;
 
+  /// Whether the point ([x], [y]) lies within these bounds.
+  bool contains(int x, int y) =>
+      x >= this.x && x < this.x + width && y >= this.y && y < this.y + height;
+
   /// These bounds multiplied by [factor], rounded to whole pixels.
   NativeBounds scaled(double factor) {
     if (factor == 1) return this;
@@ -212,6 +216,10 @@ abstract interface class SharedServerBootstrap
   /// one that was already running.
   bool get startedServer;
 }
+
+/// Delay before a field is looked up again when it changed or did not take
+/// the focus before anything was typed.
+const changedFieldRetryDelay = Duration(milliseconds: 300);
 
 /// A connected native automation session (UIAutomator2 on Android,
 /// WebDriverAgent on iOS).

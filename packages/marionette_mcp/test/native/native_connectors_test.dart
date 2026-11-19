@@ -20,6 +20,14 @@ const _noSuchElement = FakeResponse.error(
   status: HttpStatus.notFound,
 );
 
+/// Answers WDA's `/element` lookup as WDA does: an XPath matches only the
+/// raw frame WDA reports, never the frame the parser moved or clipped.
+FakeRouteHandler _findByRawFrame(Map<String, String> elementIdsByXPath) =>
+    (request) => switch (elementIdsByXPath[request.body!['value']]) {
+          final id? => FakeResponse.value({w3cElementKey: id}),
+          null => _noSuchElement,
+        };
+
 /// Extracts the pointer coordinates of a single-finger tap/swipe request.
 ({int x, int y}) _pointerStart(RecordedRequest request) {
   final source = (request.body!['actions'] as List).single as Map;
@@ -271,12 +279,15 @@ void main() {
     test('enterText falls back to an XPath-safe label lookup', () async {
       server
         ..onValue('POST', '/session/sess-1/actions', null)
+        ..on('GET', '/session/sess-1/element/active', (_) => _noSuchElement)
         ..on('POST', '/session/sess-1/element', (request) {
           final selector = request.body!['value'] as String;
           return selector.contains('focused')
               ? _noSuchElement
               : const FakeResponse.value({w3cElementKey: 'el-1'});
         })
+        ..onValue('GET', '/session/sess-1/element/el-1/rect',
+            {'x': 0, 'y': 0, 'width': 100, 'height': 50})
         ..onValue('POST', '/session/sess-1/element/el-1/value', null);
       final connector = await connect();
       addTearDown(connector.dispose);
@@ -295,6 +306,147 @@ void main() {
             .body,
         {'text': 'Ann'},
       );
+    });
+
+    group('enterText checks the field holds the tap point', () {
+      // Center (100, 125).
+      final field = nativeElement(
+        type: 'android.widget.EditText',
+        id: 'com.example:id/name',
+        y: 100,
+        width: 200,
+      );
+      const fieldRect = {'x': 0, 'y': 100, 'width': 200, 'height': 50};
+      const otherRect = {'x': 0, 'y': 600, 'width': 200, 'height': 50};
+
+      /// Answers the focused-field lookup with [before] until the tap and
+      /// with [after], one per attempt, after it; every other lookup finds
+      /// no element.
+      void focusedFields({String? before, required List<String> after}) {
+        var attempt = 0;
+        server.on(
+          'GET',
+          '/session/sess-1/element/active',
+          (_) => before == null
+              ? _noSuchElement
+              : FakeResponse.value({w3cElementKey: before}),
+        );
+        server.on('POST', '/session/sess-1/element', (request) {
+          final selector = request.body!['value'] as String;
+          if (selector != '//android.widget.EditText[@focused="true"]') {
+            return _noSuchElement;
+          }
+          final tapped =
+              server.requestsTo('POST', '/session/sess-1/actions').isNotEmpty;
+          final focused = tapped ? after[attempt++] : before;
+          return focused == null
+              ? _noSuchElement
+              : FakeResponse.value({w3cElementKey: focused});
+        });
+      }
+
+      setUp(() => server
+        ..onValue('POST', '/session/sess-1/actions', null)
+        ..on('GET', '/session/sess-1/element/active', (_) => _noSuchElement)
+        ..onValue('GET', '/session/sess-1/element/el-other/rect', otherRect)
+        ..onValue('GET', '/session/sess-1/element/el-field/rect', fieldRect)
+        ..onValue('POST', '/session/sess-1/element/el-field/value', null));
+
+      test('a miss is looked up again and typed into the matching field',
+          () async {
+        focusedFields(before: 'el-other', after: ['el-other', 'el-field']);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.enterText(field, 'Ann');
+
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element/el-field/value')
+              .single
+              .body,
+          {'text': 'Ann'},
+        );
+        expect(
+          server.requestsTo('POST', '/session/sess-1/element/el-other/value'),
+          isEmpty,
+        );
+      });
+
+      test('a field the keyboard pushed off the tap point is typed into',
+          () async {
+        focusedFields(after: ['el-other']);
+        server.onValue('POST', '/session/sess-1/element/el-other/value', null);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.enterText(field, 'Ann');
+
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element/el-other/value')
+              .single
+              .body,
+          {'text': 'Ann'},
+        );
+      });
+
+      test(
+          'a field focused before the tap that holds the tap point is typed '
+          'into', () async {
+        focusedFields(before: 'el-field', after: ['el-field']);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await connector.enterText(field, 'Ann');
+
+        expect(
+          server
+              .requestsTo('POST', '/session/sess-1/element/el-field/value')
+              .single
+              .body,
+          {'text': 'Ann'},
+        );
+      });
+
+      test(
+          'a tap that leaves the focus on the earlier field fails without '
+          'typing', () async {
+        focusedFields(before: 'el-other', after: ['el-other', 'el-other']);
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.enterText(field, 'Ann'),
+          throwsA(isA<NativeOperationFailedException>()),
+        );
+        expect(
+          server.requests.where((r) => r.path.endsWith('/value')),
+          isEmpty,
+        );
+      });
+
+      test('a field the id fallback finds elsewhere fails without typing',
+          () async {
+        server.on(
+          'POST',
+          '/session/sess-1/element',
+          (request) => request.body!['using'] == 'id'
+              ? const FakeResponse.value({w3cElementKey: 'el-other'})
+              : _noSuchElement,
+        );
+        final connector = await connect();
+        addTearDown(connector.dispose);
+
+        await expectLater(
+          connector.enterText(field, 'Ann'),
+          throwsA(isA<NativeOperationFailedException>()),
+        );
+        expect(
+          server.requests.where((r) => r.path.endsWith('/value')),
+          isEmpty,
+        );
+      });
     });
 
     test('foregroundApp asks adb for the focused package', () async {
@@ -732,11 +884,12 @@ void main() {
     test('the label fallback builds a valid XPath literal for apostrophes',
         () async {
       server
-        ..on('POST', '/session/sess-1/element', (request) {
+        ..on('POST', '/session/sess-1/element', (_) => _noSuchElement)
+        ..on('POST', '/session/sess-1/elements', (request) {
           final value = request.body!['value'] as String;
-          return request.body!['using'] == 'xpath' && value.contains('@label')
-              ? const FakeResponse.value({w3cElementKey: 'el-1'})
-              : _noSuchElement;
+          return FakeResponse.value([
+            if (value.contains('@label')) {w3cElementKey: 'el-1'},
+          ]);
         })
         ..onValue('POST', '/session/sess-1/element/el-1/click', null)
         ..onValue('POST', '/session/sess-1/element/el-1/value', null);
@@ -746,13 +899,113 @@ void main() {
       await connector.enterText(nativeElement(text: "Don't Allow"), 'x');
 
       final xpath = server
-          .requestsTo('POST', '/session/sess-1/element')
+          .requestsTo('POST', '/session/sess-1/elements')
           .last
           .body!['value'] as String;
       expect(
         xpath,
         '//*[@label="Don\'t Allow" or @name="Don\'t Allow" or '
         '@value="Don\'t Allow"]',
+      );
+    });
+
+    test('enterText refuses a fallback that finds several fields', () async {
+      // The second "Name" field reaches below the screen: its clipped bounds
+      // miss the geometry lookup, and both fields match the fallback.
+      server
+        ..onValue(
+          'GET',
+          '/session/sess-1/source',
+          '<XCUIElementTypeApplication name="Runner" x="0" y="0" width="402" '
+              'height="874">'
+              '<XCUIElementTypeTextField name="Name" label="Name" '
+              'enabled="true" x="16" y="200" width="370" height="44"/>'
+              '<XCUIElementTypeTextField name="Name" label="Name" '
+              'enabled="true" x="16" y="850" width="370" height="44"/>'
+              '</XCUIElementTypeApplication>',
+        )
+        ..on(
+          'POST',
+          '/session/sess-1/element',
+          _findByRawFrame({
+            '//XCUIElementTypeTextField[@x=16 and @y=200 and @width=370 and '
+                '@height=44]': 'f-1',
+            '//XCUIElementTypeTextField[@x=16 and @y=850 and @width=370 and '
+                '@height=44]': 'f-2',
+          }),
+        )
+        ..onValue('POST', '/session/sess-1/elements', [
+          {w3cElementKey: 'f-1'},
+          {w3cElementKey: 'f-2'},
+        ]);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+      final secondName = (await connector.getNativeElements())
+          .where((e) => e.text == 'Name')
+          .elementAt(1);
+
+      await expectLater(
+        connector.enterText(secondName, 'Ann'),
+        throwsA(
+          isA<NativeOperationFailedException>().having(
+            (e) => e.hint,
+            'hint',
+            'Scroll the field fully into view, then retry. If it is already '
+                'in view, native_tap it, then call native_enter_text without '
+                'a selector.',
+          ),
+        ),
+      );
+      expect(
+        server.requests.where(
+          (r) => r.path.endsWith('/click') || r.path.endsWith('/value'),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('enterText types into the one field a fallback finds', () async {
+      // A field of the share sheet: its frame moves to screen coordinates,
+      // so the geometry lookup on WDA's raw frame misses.
+      server
+        ..onValue(
+          'GET',
+          '/session/sess-1/source',
+          '<XCUIElementTypeApplication x="0" y="0" width="402" height="874">'
+              '<XCUIElementTypeOther name="ShareSheet.RemoteContainerView" '
+              'x="9" y="500" width="384" height="300">'
+              '<XCUIElementTypeOther x="0" y="0" width="384" height="300">'
+              '<XCUIElementTypeTextField name="Comment" label="Comment" '
+              'enabled="true" x="24" y="100" width="300" height="44"/>'
+              '</XCUIElementTypeOther></XCUIElementTypeOther>'
+              '</XCUIElementTypeApplication>',
+        )
+        ..on(
+          'POST',
+          '/session/sess-1/element',
+          _findByRawFrame({
+            '//XCUIElementTypeTextField[@x=24 and @y=100 and @width=300 and '
+                '@height=44]': 'f-raw',
+          }),
+        )
+        ..onValue('POST', '/session/sess-1/elements', [
+          {w3cElementKey: 'f-1'},
+        ])
+        ..onValue('POST', '/session/sess-1/element/f-1/click', null)
+        ..onValue('POST', '/session/sess-1/element/f-1/value', null);
+      final connector = await connect();
+      addTearDown(connector.dispose);
+      final comment = (await connector.getNativeElements())
+          .singleWhere((e) => e.text == 'Comment');
+
+      await connector.enterText(comment, 'Nice');
+
+      expect(
+        server
+            .requestsTo('POST', '/session/sess-1/element/f-1/value')
+            .single
+            .body,
+        {'text': 'Nice'},
       );
     });
 
@@ -782,7 +1035,9 @@ void main() {
     });
 
     test('enterText reports a missing field without tapping', () async {
-      server.on('POST', '/session/sess-1/element', (_) => _noSuchElement);
+      server
+        ..on('POST', '/session/sess-1/element', (_) => _noSuchElement)
+        ..onValue('POST', '/session/sess-1/elements', <Object>[]);
       final connector = await connect();
       addTearDown(connector.dispose);
 
@@ -794,6 +1049,27 @@ void main() {
         ),
       );
       expect(server.requestsTo('POST', '/session/sess-1/actions'), isEmpty);
+    });
+
+    test('enterText stops on a session lost during the geometry lookup',
+        () async {
+      server.on(
+        'POST',
+        '/session/sess-1/element',
+        (_) => const FakeResponse.error(
+          'invalid session id',
+          'session gone',
+          status: HttpStatus.notFound,
+        ),
+      );
+      final connector = await connect();
+      addTearDown(connector.dispose);
+
+      await expectLater(
+        connector.enterText(nativeElement(id: 'email'), 'x'),
+        throwsA(isA<WebDriverException>().having(isLostSession, 'lost', true)),
+      );
+      expect(server.requestsTo('POST', '/session/sess-1/elements'), isEmpty);
     });
 
     test('foregroundApp falls back to the page source', () async {

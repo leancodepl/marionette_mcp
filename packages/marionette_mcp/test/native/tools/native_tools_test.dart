@@ -891,6 +891,51 @@ void main() {
       });
     });
 
+    group('a WebDriver error keeps the typed value out of', () {
+      // UIAutomator2 quotes the value it could not set, e.g. a password.
+      for (final (name, args, code, arrange) in [
+        (
+          'the focused field',
+          {'text': 'hunter2'},
+          'invalid element state',
+          (FakeNativeConnector connector, WebDriverException error) =>
+              connector.errorsOnce.add(error),
+        ),
+        (
+          'a selected field',
+          {'text': 'hunter2', 'id': 'f'},
+          'invalid argument',
+          (FakeNativeConnector connector, WebDriverException error) =>
+              connector.enterTextErrors.add(error),
+        ),
+      ]) {
+        test('the result and the log ($name)', () async {
+          final connector = FakeNativeConnector.single(
+            [nativeElement(type: 'android.widget.EditText', id: 'f')],
+          );
+          arrange(
+            connector,
+            WebDriverException(
+              "Cannot set the element to 'hunter2'",
+              error: code,
+            ),
+          );
+          final logs = <String>[];
+          final subscription = logging.Logger.root.onRecord
+              .listen((r) => logs.add('${r.message} ${r.error}'));
+          addTearDown(subscription.cancel);
+
+          final result =
+              await handleNativeEnterText(_contextWith(connector), args);
+
+          expect(result, _isToolError(contains(code)));
+          expect(result, _isToolError(isNot(contains('hunter2'))));
+          expect(logs, isNotEmpty);
+          expect(logs.join('\n'), isNot(contains('hunter2')));
+        });
+      }
+    });
+
     test('passes clear to the selected field', () async {
       final field = nativeElement(type: 'android.widget.EditText', id: 'f');
       final connector = FakeNativeConnector.single([field]);

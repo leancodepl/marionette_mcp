@@ -1,3 +1,4 @@
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
@@ -45,9 +46,6 @@ void registerNativeTextTools(
   );
 }
 
-/// Delay before the field is looked up again after [isChangedFieldError].
-const changedFieldRetryDelay = Duration(milliseconds: 300);
-
 /// Whether typing failed because the chosen field changed before anything
 /// was typed: replaced or moving while a screen transition runs (iOS "is not
 /// present in the current view anymore", `stale element reference`), or
@@ -87,44 +85,69 @@ Future<CallToolResult> handleNativeEnterText(
       selector.isEmpty ? 'the focused field' : 'field ${selector.describe()}';
   logger.info('Native enter text into $target (clear=$clear)');
   return runNativeTool(logger, 'native enter text', () async {
-    final connector = context.requireConnector();
-    if (selector.isEmpty) {
-      await connector.typeText(input, clear: clear);
-    } else {
-      final match = requireEnabled(
-        selectElement(await connector.getNativeElements(), selector),
-        selector,
-      );
-      try {
-        await connector.enterText(match, input, clear: clear);
-      } on WebDriverException catch (error) {
-        if (!isChangedFieldError(error)) rethrow;
-        // The field was replaced or was still moving (a screen transition)
-        // and nothing was typed; find it again once.
-        logger.info(
-          'Field changed before typing (${_changeReason(error)}); finding '
-          'it again',
-        );
-        await Future<void>.delayed(changedFieldRetryDelay);
-        final again = requireEnabled(
-          selectElement(await connector.getNativeElements(), selector),
-          selector,
-        );
-        try {
-          await connector.enterText(again, input, clear: clear);
-        } on WebDriverException catch (retryError) {
-          if (!isChangedFieldError(retryError)) rethrow;
-          throw NativeOperationFailedException(
-            'The field ${selector.describe()} kept changing; nothing was '
-            'typed (${_changeReason(retryError)}).',
-            hint: 'Wait until the screen has settled (native_wait_for on an '
-                'element of the new screen), then retry.',
-          );
-        }
-      }
+    try {
+      await _enterText(context, selector, input, clear: clear);
+    } on WebDriverException catch (error) {
+      throw _withoutMessage(error);
     }
     return CallToolResult(
       content: [TextContent(text: 'Successfully entered text into $target')],
     );
   });
 }
+
+Future<void> _enterText(
+  NativeServiceContext context,
+  NativeSelector selector,
+  String input, {
+  required bool clear,
+}) async {
+  final logger = context.logger;
+  final connector = context.requireConnector();
+  if (selector.isEmpty) {
+    await connector.typeText(input, clear: clear);
+    return;
+  }
+  final match = requireEnabled(
+    selectElement(await connector.getNativeElements(), selector),
+    selector,
+  );
+  try {
+    await connector.enterText(match, input, clear: clear);
+  } on WebDriverException catch (error) {
+    if (!isChangedFieldError(error)) rethrow;
+    // The field was replaced or was still moving (a screen transition)
+    // and nothing was typed; find it again once.
+    logger.info(
+      'Field changed before typing (${_changeReason(error)}); finding '
+      'it again',
+    );
+    await Future<void>.delayed(changedFieldRetryDelay);
+    final again = requireEnabled(
+      selectElement(await connector.getNativeElements(), selector),
+      selector,
+    );
+    try {
+      await connector.enterText(again, input, clear: clear);
+    } on WebDriverException catch (retryError) {
+      if (!isChangedFieldError(retryError)) rethrow;
+      throw NativeOperationFailedException(
+        'The field ${selector.describe()} kept changing; nothing was '
+        'typed (${_changeReason(retryError)}).',
+        hint: 'Wait until the screen has settled (native_wait_for on an '
+            'element of the new screen), then retry.',
+      );
+    }
+  }
+}
+
+/// [error] with its message replaced by its W3C code: UIAutomator2 quotes
+/// the value it could not set (`Cannot set the element to '…'`), which can
+/// be a password. The code is kept, so a lost session still maps to the
+/// reconnect hint.
+WebDriverException _withoutMessage(WebDriverException error) =>
+    WebDriverException(
+      error.error ?? 'unknown WebDriver error',
+      httpStatus: error.httpStatus,
+      error: error.error,
+    );

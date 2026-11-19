@@ -263,6 +263,9 @@ final class IosNativeConnector extends WebDriverNativeConnector {
   /// geometry from the same UI tree (unique even when ids or labels repeat),
   /// then by accessibility id (`name`) or visible label/text; null when it
   /// is no longer on screen.
+  ///
+  /// A fallback that finds several elements throws instead of picking one:
+  /// typing into the first could hit another field with the same label.
   Future<String?> locateElement(NativeElement element) async {
     try {
       return await client.findElement(
@@ -270,38 +273,35 @@ final class IosNativeConnector extends WebDriverNativeConnector {
         'xpath',
         wdaGeometryXPath(element, toServerUnits),
       );
-    } on WebDriverException {
+    } on WebDriverException catch (exception) {
+      if (isLostSession(exception)) rethrow;
       // Element moved or the tree changed; fall back to id/label below.
     }
 
     final id = element.resourceId;
-    if (id != null && id.isNotEmpty) {
-      try {
-        return await client.findElement(sessionId, 'accessibility id', id);
-      } on WebDriverException {
-        // Fall through to name/label strategies.
-      }
-    }
-
     final text = element.text;
-    if (text != null && text.isNotEmpty) {
-      try {
-        return await client.findElement(sessionId, 'name', text);
-      } on WebDriverException {
-        // Fall through.
-      }
-      try {
-        final literal = xpathLiteral(text);
-        return await client.findElement(
-          sessionId,
-          'xpath',
-          '//*[@label=$literal or @name=$literal or @value=$literal]',
-        );
-      } on WebDriverException {
-        return null;
+    final fallbacks = [
+      if (id != null && id.isNotEmpty) ('accessibility id', id),
+      if (text != null && text.isNotEmpty) ...[
+        ('name', text),
+        ('xpath', _wdaTextXPath(text)),
+      ],
+    ];
+
+    for (final (using, value) in fallbacks) {
+      switch (await client.findElements(sessionId, using, value)) {
+        case [final only]:
+          return only;
+        case [_, _, ...] && final found:
+          throw NativeOperationFailedException(
+            '${found.length} elements match the field by $using, so the one '
+            'to type into is unclear.',
+            hint: 'Scroll the field fully into view, then retry. If it is '
+                'already in view, native_tap it, then call native_enter_text '
+                'without a selector.',
+          );
       }
     }
-
     return null;
   }
 }
@@ -376,4 +376,10 @@ String wdaGeometryXPath(
       '@y=${toServerUnits(bounds.y)} and '
       '@width=${toServerUnits(bounds.width)} and '
       '@height=${toServerUnits(bounds.height)}]';
+}
+
+/// XPath selecting every WDA element whose label, name or value is [text].
+String _wdaTextXPath(String text) {
+  final literal = xpathLiteral(text);
+  return '//*[@label=$literal or @name=$literal or @value=$literal]';
 }
