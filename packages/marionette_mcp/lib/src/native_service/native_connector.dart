@@ -71,6 +71,10 @@ class NativeScreen {
   final int height;
   final double scale;
 
+  /// The whole screen as bounds.
+  NativeBounds get bounds =>
+      NativeBounds(x: 0, y: 0, width: width, height: height);
+
   Map<String, Object> toJson() => {
         'width': width,
         'height': height,
@@ -271,8 +275,8 @@ abstract class NativeConnector {
   /// Hides the software keyboard; returns false when it was not shown.
   Future<bool> hideKeyboard();
 
-  /// Swipes from ([startX], [startY]) to ([endX], [endY]) in screenshot
-  /// pixels over [durationMs] milliseconds.
+  /// Swipes from ([startX], [startY]) to ([endX], [endY]) in screen pixels
+  /// over [durationMs] milliseconds.
   ///
   /// With [holdMs] > 0 the finger rests at the end for that long before
   /// lifting, so the content moves exactly the swipe distance without a
@@ -297,8 +301,7 @@ abstract class NativeConnector {
   /// Current screen size in screen pixels and the server-unit scale.
   Future<NativeScreen> getScreen();
 
-  /// Operations on the device that do not use the UI session (the
-  /// notification shade).
+  /// Operations on the device: the notification shade.
   NativeDevice get device;
 
   /// Ends the session and tears down any resources the connector started.

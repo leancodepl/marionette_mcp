@@ -32,13 +32,17 @@ final class AndroidNativeDevice implements NativeDevice {
   /// `cmd statusbar` returns while the shade is still moving; a read right
   /// after it reported the app as foregroundApp next to the shade's
   /// notifications. Waits (at most 2 s) until the shade has or has lost
-  /// focus; on timeout the caller still succeeds.
+  /// focus.
   Future<void> _waitForShade({required bool open}) async {
     for (var attempt = 0; attempt < 10; attempt++) {
       final shown = await _adb.foregroundPackage() == 'com.android.systemui';
       if (shown == open) return;
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
+    throw NativeOperationFailedException(
+      'The Android notification shade did not ${open ? 'open' : 'close'}.',
+      hint: 'Wait until the system UI settles, then retry.',
+    );
   }
 
   /// Turns a failed command into a [NativeOperationFailedException].

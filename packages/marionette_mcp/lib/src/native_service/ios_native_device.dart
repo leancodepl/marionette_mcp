@@ -1,23 +1,80 @@
-import 'package:marionette_mcp/src/native_service/native_device.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 
-/// [NativeDevice] for an iOS Simulator. It has no command for the
-/// Notification Center; `native_notifications` swipes instead.
+/// [NativeDevice] for an iOS Simulator. iOS has no command for the
+/// Notification Center, so it is driven by edge swipes through the
+/// connector.
 final class IosNativeDevice implements NativeDevice {
-  const IosNativeDevice();
+  IosNativeDevice(this._connector);
 
-  static const _notificationGestureHint =
-      'The tool opens and closes the Notification Center with a swipe.';
+  final NativeConnector _connector;
 
+  /// Opens the Notification Center and, from the home screen, checks that
+  /// it did: a swipe while a banner is on screen can miss (seen on iOS
+  /// 26.4). Over an app the Notification Center is not in the tree, so
+  /// there is nothing to check.
   @override
-  Future<void> openNotifications() => throw const NativeUnsupportedException(
-        'iOS has no command to open the Notification Center.',
-        hint: _notificationGestureHint,
-      );
+  Future<void> openNotifications() async {
+    final fromHome = await _connector.foregroundApp == _springboard;
+    for (var attempt = 0; attempt < _openAttempts; attempt++) {
+      await _swipeOpen();
+      if (!fromHome || await _waitForNotificationCenter()) return;
+    }
+    throw const NativeOperationFailedException(
+      'The Notification Center did not open.',
+      hint: 'A banner on screen can take the swipe: wait until it is gone, '
+          'then retry.',
+    );
+  }
 
+  /// Swipes up from the bottom edge: a swipe in the middle only scrolls the
+  /// notification list.
   @override
-  Future<void> closeNotifications() => throw const NativeUnsupportedException(
-        'iOS has no command to close the Notification Center.',
-        hint: _notificationGestureHint,
-      );
+  Future<void> closeNotifications() async {
+    final screen = await _connector.getScreen();
+    final x = screen.width ~/ 2;
+    await _connector.swipe(
+      startX: x,
+      startY: screen.height - 1,
+      endX: x,
+      endY: screen.height ~/ 2,
+    );
+  }
+
+  /// Swipes down from the top edge, left of center: the top right opens
+  /// Control Center.
+  Future<void> _swipeOpen() async {
+    final screen = await _connector.getScreen();
+    final x = screen.width ~/ 3;
+    await _connector.swipe(
+      startX: x,
+      startY: 1,
+      endX: x,
+      endY: (screen.height * _openSwipeShare).round(),
+    );
+  }
+
+  /// Whether the Notification Center window shows up within a few reads.
+  Future<bool> _waitForNotificationCenter() async {
+    for (var read = 0; read < _openChecks; read++) {
+      final elements = await _connector.getNativeElements();
+      if (elements.any((e) => e.resourceId == _notificationCenterWindow)) {
+        return true;
+      }
+      await Future<void>.delayed(_openCheckDelay);
+    }
+    return false;
+  }
 }
+
+const _springboard = 'com.apple.springboard';
+
+/// Window of the Notification Center, in the tree only while it is open.
+const _notificationCenterWindow = 'SBCoverSheetWindow';
+
+const _openAttempts = 2;
+const _openChecks = 3;
+const _openCheckDelay = Duration(milliseconds: 300);
+
+/// Share of the screen height the opening swipe covers.
+const _openSwipeShare = 0.6;

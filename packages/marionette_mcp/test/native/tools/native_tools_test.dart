@@ -503,6 +503,32 @@ void main() {
       );
     });
 
+    test('rejects an explicit start point outside the screen', () async {
+      final connector = FakeNativeConnector();
+
+      final result = await handleNativeScroll(_contextWith(connector), {
+        'direction': 'down',
+        'startX': 500,
+        'startY': 2500,
+      });
+
+      expect(result, _isToolError(contains('outside the screen')));
+      expect(connector.swipes, isEmpty);
+    });
+
+    test('rejects an explicit start point left of the screen', () async {
+      final connector = FakeNativeConnector();
+
+      final result = await handleNativeScroll(_contextWith(connector), {
+        'direction': 'right',
+        'startX': -1,
+        'startY': 1000,
+      });
+
+      expect(result, _isToolError(contains('outside the screen')));
+      expect(connector.swipes, isEmpty);
+    });
+
     test('scrolls until the text appears', () async {
       final connector = FakeNativeConnector(
         screens: [
@@ -1303,6 +1329,20 @@ void main() {
         ),
         _isToolError(contains('requires startX, startY, endX and endY')),
       );
+    });
+
+    test('rejects a start point outside the screen', () async {
+      final connector = FakeNativeConnector();
+
+      final result = await handleNativeSwipe(_contextWith(connector), {
+        'startX': 500,
+        'startY': 2500,
+        'endX': 500,
+        'endY': 1000,
+      });
+
+      expect(result, _isToolError(contains('outside the screen')));
+      expect(connector.swipes, isEmpty);
     });
   });
 }

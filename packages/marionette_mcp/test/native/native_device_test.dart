@@ -1,9 +1,11 @@
 import 'package:marionette_mcp/src/native_service/adb_client.dart';
 import 'package:marionette_mcp/src/native_service/android_native_device.dart';
 import 'package:marionette_mcp/src/native_service/ios_native_device.dart';
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:test/test.dart';
 
+import 'support/fake_native_connector.dart';
 import 'support/fake_process_runner.dart';
 
 const _app = 'com.example.counter';
@@ -65,15 +67,78 @@ void main() {
         throwsA(isA<NativeOperationFailedException>()),
       );
     });
+
+    test('a shade that never reaches the requested state becomes an error',
+        () async {
+      runner
+        ..onAdb(['shell', 'cmd', 'statusbar'], respond: (_) => ok())
+        ..onAdb(
+          ['shell', 'dumpsys', 'window'],
+          respond: (_) => ok('mCurrentFocus=Window{1 u0 $_app/.MainActivity}'),
+        );
+
+      await expectLater(
+        device.openNotifications(),
+        throwsA(
+          isA<NativeOperationFailedException>().having(
+            (error) => error.hint,
+            'hint',
+            contains('retry'),
+          ),
+        ),
+      );
+    });
   });
 
   group('IosNativeDevice', () {
-    test('notification center needs a gesture', () {
-      const device = IosNativeDevice();
-      expect(
-          device.openNotifications, throwsA(isA<NativeUnsupportedException>()));
-      expect(device.closeNotifications,
-          throwsA(isA<NativeUnsupportedException>()));
+    test('notification center uses edge gestures', () async {
+      final connector = FakeNativeConnector(
+        screen: const NativeScreen(width: 1000, height: 2000, scale: 1),
+      );
+      final device = IosNativeDevice(connector);
+
+      await device.openNotifications();
+      await device.closeNotifications();
+
+      expect(connector.swipes, [
+        (startX: 333, startY: 1, endX: 333, endY: 1200),
+        (startX: 500, startY: 1999, endX: 500, endY: 1000),
+      ]);
+    });
+
+    test('retries a swipe that did not open it from the home screen', () async {
+      // Seen on iOS 26.4: with a banner on screen, the first swipe missed.
+      final connector = FakeNativeConnector(
+        foregroundAppValue: 'com.apple.springboard',
+      );
+      connector.onGetElements = (_) => [
+            if (connector.swipes.length > 1)
+              nativeElement(
+                type: 'XCUIElementTypeWindow',
+                id: 'SBCoverSheetWindow',
+              ),
+          ];
+
+      await IosNativeDevice(connector).openNotifications();
+
+      expect(connector.swipes, hasLength(2));
+    });
+
+    test('reports a Notification Center that did not open', () async {
+      final connector = FakeNativeConnector(
+        foregroundAppValue: 'com.apple.springboard',
+      );
+
+      await expectLater(
+        IosNativeDevice(connector).openNotifications(),
+        throwsA(
+          isA<NativeOperationFailedException>().having(
+            (error) => error.message,
+            'message',
+            contains('did not open'),
+          ),
+        ),
+      );
     });
   });
 }

@@ -100,6 +100,20 @@ void main() {
         100,
       );
     });
+
+    test('never returns a negative distance for a start past the edge', () {
+      expect(
+        cappedSwipeDistanceFromStart(
+          direction: SwipeDirection.down,
+          distance: 400,
+          startX: 500,
+          startY: 2500,
+          maxX: 1080,
+          maxY: 2400,
+        ),
+        0,
+      );
+    });
   });
 
   group('swipeFromStart', () {
@@ -117,6 +131,22 @@ void main() {
       expect(endpoints.startY, 200);
       expect(endpoints.endX, 150);
       expect(endpoints.endY, 200);
+    });
+
+    test('swipes up from explicit start', () {
+      final endpoints = swipeFromStart(
+        direction: SwipeDirection.up,
+        startX: 100,
+        startY: 200,
+        distance: 50,
+        maxX: 300,
+        maxY: 400,
+      );
+
+      expect(endpoints.startX, 100);
+      expect(endpoints.startY, 200);
+      expect(endpoints.endX, 100);
+      expect(endpoints.endY, 150);
     });
   });
 }

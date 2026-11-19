@@ -101,9 +101,7 @@ abstract class NativeCommand extends Command<int> {
       return 1;
     }
 
-    final context = NativeServiceContext()
-      ..connector = connector
-      ..platform = info.platform;
+    final context = NativeServiceContext()..connector = connector;
     final session = _openReportSession();
     try {
       final CallToolResult result;

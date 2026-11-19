@@ -30,65 +30,14 @@ void main() {
       expect(connector.swipes, isEmpty);
     });
 
-    test('iOS swipes the Notification Center', () async {
+    test('iOS delegates notification actions to its device', () async {
       await context.connect(NativePlatform.ios);
 
       await handleNativeNotifications(context, {'action': 'open'});
       await handleNativeNotifications(context, {'action': 'close'});
 
-      expect(connector.swipes, [
-        (startX: 333, startY: 1, endX: 333, endY: 1200),
-        // Up from the bottom edge: a swipe in the middle only scrolls the
-        // notification list.
-        (startX: 500, startY: 1999, endX: 500, endY: 1000),
-      ]);
-      expect(device.calls, isEmpty);
-    });
-
-    test('iOS retries a swipe that did not open it from the home screen',
-        () async {
-      // Seen on iOS 26.4: with a banner on screen, the first swipe missed.
-      connector
-        ..foregroundAppValue = 'com.apple.springboard'
-        ..onGetElements = (_) => [
-              if (connector.swipes.length > 1)
-                nativeElement(
-                  type: 'XCUIElementTypeWindow',
-                  id: 'SBCoverSheetWindow',
-                ),
-            ];
-      await context.connect(NativePlatform.ios);
-
-      final result = await handleNativeNotifications(context, {
-        'action': 'open',
-      });
-
-      expect(result.isError, isNot(true));
-      expect(connector.swipes, hasLength(2));
-    });
-
-    test('iOS reports a Notification Center that did not open', () async {
-      connector.foregroundAppValue = 'com.apple.springboard';
-      await context.connect(NativePlatform.ios);
-
-      final result = await handleNativeNotifications(context, {
-        'action': 'open',
-      });
-
-      expect(result.isError, isTrue);
-      expect(_text(result), contains('did not open'));
-    });
-
-    test('iOS explains notification groups, Android does not', () async {
-      final android =
-          _text(await handleNativeNotifications(context, {'action': 'open'}));
-      await context.connect(NativePlatform.ios);
-      final ios =
-          _text(await handleNativeNotifications(context, {'action': 'open'}));
-
-      expect(android, isNot(contains('group')));
-      expect(ios, contains('the first tap on a group expands it'));
-      expect(ios, contains('swiping it right'));
+      expect(connector.swipes, isEmpty);
+      expect(device.calls, ['openNotifications', 'closeNotifications']);
     });
 
     test('rejects an unknown action', () async {

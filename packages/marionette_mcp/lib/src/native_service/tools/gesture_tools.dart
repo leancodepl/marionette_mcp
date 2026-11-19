@@ -1,4 +1,4 @@
-import 'dart:math' show min;
+import 'dart:math' show max, min;
 
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
@@ -40,15 +40,24 @@ const _searchHoldMs = 300;
 
 /// Finger-swipe direction for [native_scroll] (screen coordinates).
 enum SwipeDirection {
-  up('up'),
-  down('down'),
-  left('left'),
-  right('right');
+  up('up', 0, -1),
+  down('down', 0, 1),
+  left('left', -1, 0),
+  right('right', 1, 0);
 
-  const SwipeDirection(this.wireName);
+  const SwipeDirection(this.wireName, this.dx, this.dy);
 
   /// MCP tool argument value (e.g. `"up"`).
   final String wireName;
+
+  /// X of the unit vector in screen coordinates for this finger direction.
+  final int dx;
+
+  /// Y of the unit vector in screen coordinates for this finger direction.
+  final int dy;
+
+  /// Whether the finger moves along the Y axis.
+  bool get isVertical => dx == 0;
 
   static String get commaSeparatedWireNames =>
       values.map((direction) => direction.wireName).join(', ');
@@ -74,32 +83,12 @@ enum SwipeDirection {
     required int centerY,
     required int half,
   }) {
-    return switch (this) {
-      SwipeDirection.up => (
-          startX: centerX,
-          startY: centerY + half,
-          endX: centerX,
-          endY: centerY - half,
-        ),
-      SwipeDirection.down => (
-          startX: centerX,
-          startY: centerY - half,
-          endX: centerX,
-          endY: centerY + half,
-        ),
-      SwipeDirection.left => (
-          startX: centerX + half,
-          startY: centerY,
-          endX: centerX - half,
-          endY: centerY,
-        ),
-      SwipeDirection.right => (
-          startX: centerX - half,
-          startY: centerY,
-          endX: centerX + half,
-          endY: centerY,
-        ),
-    };
+    return (
+      startX: centerX - dx * half,
+      startY: centerY - dy * half,
+      endX: centerX + dx * half,
+      endY: centerY + dy * half,
+    );
   }
 }
 
@@ -115,7 +104,7 @@ Map<String, JsonSchema> _pointProperties(String purpose) => {
       ),
     };
 
-/// Registers native tap, press, pinch, swipe and scroll tools.
+/// Registers native_tap, native_swipe and native_scroll.
 void registerNativeGestureTools(
   LoggedMcpServer server,
   NativeServiceContext context,
@@ -346,6 +335,12 @@ Future<CallToolResult> handleNativeSwipe(
       'in ${durationMs}ms');
   return runNativeTool(logger, 'native swipe', () async {
     final connector = context.requireConnector();
+    final screen = await connector.getScreen();
+    if (!screen.bounds.contains(startX, startY)) {
+      return invalidArguments(
+        _startOffScreenMessage('native_swipe', (x: startX, y: startY), screen),
+      );
+    }
     await connector.swipe(
       startX: startX,
       startY: startY,
@@ -364,13 +359,36 @@ Future<CallToolResult> handleNativeSwipe(
   });
 }
 
-/// Handles `native_scroll`: search, settling, end-of-content detection and
-/// `within`.
-Future<CallToolResult> handleNativeScroll(
-  NativeServiceContext context,
+String _startOffScreenMessage(
+  String tool,
+  ({int x, int y}) start,
+  NativeScreen screen,
+) =>
+    '$tool start point (${start.x}, ${start.y}) is outside the screen '
+    'bounds (${screen.width}×${screen.height}).';
+
+/// The parsed arguments of `native_scroll`.
+final class _ScrollArguments {
+  const _ScrollArguments({
+    required this.direction,
+    required this.target,
+    required this.distance,
+    required this.start,
+    required this.maxSwipes,
+    required this.within,
+  });
+
+  final SwipeDirection direction;
+  final NativeSelector target;
+  final int? distance;
+  final ({int x, int y})? start;
+  final int maxSwipes;
+  final NativeSelector? within;
+}
+
+({String? error, _ScrollArguments? value}) _parseScrollArguments(
   Map<String, dynamic> args,
-) async {
-  final logger = context.logger;
+) {
   final direction = SwipeDirection.tryParse(args['direction'] as String?);
   final target = nativeSelectorFromArgs(args);
   final distance = intArg(args, 'distance');
@@ -380,146 +398,183 @@ Future<CallToolResult> handleNativeScroll(
   final rawWithin = args['within'];
 
   if (direction == null) {
-    return invalidArguments(
-      'native_scroll requires direction to be '
-      '${SwipeDirection.quotedWireNames}.',
-    );
-  }
-  if (distance != null && distance <= 0) {
-    return invalidArguments(
-      'Parameter "distance" must be a positive integer.',
-    );
-  }
-  if (argPairPresence(args, 'startX', 'startY') == ArgPairPresence.partial) {
-    return invalidArguments(
-      'native_scroll requires both startX and startY when either is '
-      'provided.',
-    );
-  }
-  if (maxSwipes < 1 || maxSwipes > _maxMaxSwipes) {
-    return invalidArguments(
-      'Parameter "maxSwipes" must be between 1 and $_maxMaxSwipes.',
-    );
-  }
-  if (rawWithin != null && rawWithin is! Map<String, dynamic>) {
-    return invalidArguments(
-      'Parameter "within" must be a selector object, e.g. '
-      '{"id": "results_list"}.',
-    );
-  }
-  final within = rawWithin == null
-      ? null
-      : nativeSelectorFromArgs(rawWithin as Map<String, dynamic>);
-  if (within != null && within.isEmpty) {
-    return invalidArguments(
-      'Parameter "within" needs at least one of text, textContains, id, '
-      'type.',
-    );
-  }
-  if (within != null && startX != null) {
-    return invalidArguments(
-      'native_scroll takes either within or startX/startY, not both.',
+    return (
+      error: 'native_scroll requires direction to be '
+          '${SwipeDirection.quotedWireNames}.',
+      value: null,
     );
   }
 
+  String? error;
+  if (distance != null && distance <= 0) {
+    error = 'Parameter "distance" must be a positive integer.';
+  } else if (argPairPresence(args, 'startX', 'startY') ==
+      ArgPairPresence.partial) {
+    error = 'native_scroll requires both startX and startY when either is '
+        'provided.';
+  } else if (maxSwipes < 1 || maxSwipes > _maxMaxSwipes) {
+    error = 'Parameter "maxSwipes" must be between 1 and $_maxMaxSwipes.';
+  } else if (rawWithin != null && rawWithin is! Map<String, dynamic>) {
+    error = 'Parameter "within" must be a selector object, e.g. '
+        '{"id": "results_list"}.';
+  }
+  if (error != null) return (error: error, value: null);
+
+  final within = rawWithin is Map<String, dynamic>
+      ? nativeSelectorFromArgs(rawWithin)
+      : null;
+  if (within != null && within.isEmpty) {
+    return (
+      error: 'Parameter "within" needs at least one of text, textContains, '
+          'id, type.',
+      value: null,
+    );
+  }
+  if (within != null && startX != null) {
+    return (
+      error: 'native_scroll takes either within or startX/startY, not both.',
+      value: null,
+    );
+  }
+  return (
+    error: null,
+    value: _ScrollArguments(
+      direction: direction,
+      target: target,
+      distance: distance,
+      start: startX != null && startY != null ? (x: startX, y: startY) : null,
+      maxSwipes: maxSwipes,
+      within: within,
+    ),
+  );
+}
+
+/// Handles `native_scroll`: search, settling, end-of-content detection and
+/// `within`.
+Future<CallToolResult> handleNativeScroll(
+  NativeServiceContext context,
+  Map<String, dynamic> args,
+) async {
+  final logger = context.logger;
+  final parsed = _parseScrollArguments(args);
+  final scroll = parsed.value;
+  if (scroll == null) return invalidArguments(parsed.error!);
+
   logger.info(
-    'Native scrolling direction=${direction.wireName} '
-    'target=${target.describe()} within=${within?.describe()} '
-    'distance=$distance start=($startX,$startY)',
+    'Native scrolling direction=${scroll.direction.wireName} '
+    'target=${scroll.target.describe()} within=${scroll.within?.describe()} '
+    'distance=${scroll.distance} start=${scroll.start}',
   );
   return runNativeTool(logger, 'native scroll', () async {
     final connector = context.requireConnector();
     final screen = await connector.getScreen();
+    if (scroll.start case final start?
+        when !screen.bounds.contains(start.x, start.y)) {
+      return invalidArguments(
+          _startOffScreenMessage('native_scroll', start, screen));
+    }
 
-    var elements = within == null && target.isEmpty
+    final within = scroll.within;
+    final elements = within == null && scroll.target.isEmpty
         ? const <NativeElement>[]
         : await connector.getNativeElements();
     final container = within == null ? null : selectElement(elements, within);
-    final area = container?.bounds ??
-        NativeBounds(x: 0, y: 0, width: screen.width, height: screen.height);
+    final area = container?.bounds ?? screen.bounds;
     final endpoints = _scrollEndpoints(
-      direction: direction,
+      direction: scroll.direction,
       area: area,
       inContainer: container != null,
-      searching: !target.isEmpty,
-      distance: distance,
-      startX: startX,
-      startY: startY,
+      searching: !scroll.target.isEmpty,
+      distance: scroll.distance,
+      start: scroll.start,
     );
-    final inArea = container != null
-        ? 'within ${within!.describe()}'
-        : startX != null
-            ? 'from ($startX, $startY)'
-            : 'from screen center';
+    final inArea = switch ((within, scroll.start)) {
+      (final selector?, _) => 'within ${selector.describe()}',
+      (_, final start?) => 'from (${start.x}, ${start.y})',
+      _ => 'from screen center',
+    };
 
-    // While searching, a fling could carry the target past the viewport
-    // between two reads; see [_searchSwipeDurationMs].
-    Future<void> swipeOnce() => target.isEmpty
-        ? connector.swipe(
-            startX: endpoints.startX,
-            startY: endpoints.startY,
-            endX: endpoints.endX,
-            endY: endpoints.endY,
-          )
-        : connector.swipe(
-            startX: endpoints.startX,
-            startY: endpoints.startY,
-            endX: endpoints.endX,
-            endY: endpoints.endY,
-            durationMs: _searchSwipeDurationMs,
-            holdMs: _searchHoldMs,
-          );
-
-    if (target.isEmpty) {
-      await swipeOnce();
+    if (scroll.target.isEmpty) {
+      await connector.swipe(
+        startX: endpoints.startX,
+        startY: endpoints.startY,
+        endX: endpoints.endX,
+        endY: endpoints.endY,
+      );
       final travelled = (endpoints.endX - endpoints.startX).abs() +
           (endpoints.endY - endpoints.startY).abs();
       return CallToolResult(
         content: [
           TextContent(
-            text: 'Successfully swiped ${direction.wireName} $inArea '
+            text: 'Successfully swiped ${scroll.direction.wireName} $inArea '
                 '(distance=$travelled)',
           ),
         ],
       );
     }
 
-    var unchangedSwipes = 0;
-    for (var swipes = 0;; swipes++) {
-      if (elements.any((e) => e.isVisible && target.matches(e))) {
-        return CallToolResult(
-          content: [
-            TextContent(
-              text: 'Found native element ${target.describe()} '
-                  'after $swipes swipe(s)',
-            ),
-          ],
-        );
-      }
-      if (swipes == maxSwipes) {
-        throw NativeElementNotFoundException(
-          '${target.describe()} after $maxSwipes swipe(s) '
-          '${direction.wireName} $inArea',
-          hint: 'Raise maxSwipes, try the opposite direction, or check the '
-              'text with native_get_elements.',
-        );
-      }
-
-      final before = _contentSignature(elements, area);
-      await swipeOnce();
-      elements = await _settledElements(connector, area);
-      unchangedSwipes =
-          _contentSignature(elements, area) == before ? unchangedSwipes + 1 : 0;
-      if (unchangedSwipes == _endOfContentSwipes) {
-        throw NativeElementNotFoundException(
-          '${target.describe()}: reached the end of the content after '
-          '${swipes + 1} swipe(s) ${direction.wireName} $inArea',
-          hint: 'Try the opposite direction, or a within container if the '
-              'target is in a nested list.',
-        );
-      }
-    }
+    return _scrollUntilFound(
+      connector,
+      scroll,
+      elements: elements,
+      area: area,
+      endpoints: endpoints,
+      inArea: inArea,
+    );
   });
+}
+
+/// Swipes slowly until [scroll]'s target is visible in [elements], the
+/// search limit is reached, or the content of [area] stops moving.
+Future<CallToolResult> _scrollUntilFound(
+  NativeConnector connector,
+  _ScrollArguments scroll, {
+  required List<NativeElement> elements,
+  required NativeBounds area,
+  required ({int startX, int startY, int endX, int endY}) endpoints,
+  required String inArea,
+}) async {
+  final target = scroll.target;
+  var current = elements;
+  var unchangedSwipes = 0;
+  for (var swipes = 0;; swipes++) {
+    if (current.any((e) => e.isVisible && target.matches(e))) {
+      return CallToolResult(content: [
+        TextContent(
+          text:
+              'Found native element ${target.describe()} after $swipes swipe(s)',
+        ),
+      ]);
+    }
+    if (swipes == scroll.maxSwipes) {
+      throw NativeElementNotFoundException(
+        '${target.describe()} after ${scroll.maxSwipes} swipe(s) '
+        '${scroll.direction.wireName} $inArea',
+        hint: 'Raise maxSwipes, try the opposite direction, or check the '
+            'text with native_get_elements.',
+      );
+    }
+    final before = _contentSignature(current, area);
+    await connector.swipe(
+      startX: endpoints.startX,
+      startY: endpoints.startY,
+      endX: endpoints.endX,
+      endY: endpoints.endY,
+      durationMs: _searchSwipeDurationMs,
+      holdMs: _searchHoldMs,
+    );
+    current = await _settledElements(connector, area);
+    unchangedSwipes =
+        _contentSignature(current, area) == before ? unchangedSwipes + 1 : 0;
+    if (unchangedSwipes == _endOfContentSwipes) {
+      throw NativeElementNotFoundException(
+        '${target.describe()}: reached the end of the content after '
+        '${swipes + 1} swipe(s) ${scroll.direction.wireName} $inArea',
+        hint: 'Try the opposite direction, or a within container if the '
+            'target is in a nested list.',
+      );
+    }
+  }
 }
 
 /// Consecutive swipes without a visible change that mean the end of the
@@ -559,25 +614,20 @@ Future<List<NativeElement>> _settledElements(
   required bool inContainer,
   required bool searching,
   required int? distance,
-  required int? startX,
-  required int? startY,
+  required ({int x, int y})? start,
 }) {
-  final maxX = area.x + area.width;
-  final maxY = area.y + area.height;
-  if (startX != null && startY != null) {
+  if (start != null) {
     return swipeFromStart(
       direction: direction,
-      startX: startX,
-      startY: startY,
+      startX: start.x,
+      startY: start.y,
       distance: distance ?? _defaultSwipeDistance,
-      maxX: maxX,
-      maxY: maxY,
+      maxX: area.x + area.width,
+      maxY: area.y + area.height,
     );
   }
 
-  final vertical =
-      direction == SwipeDirection.up || direction == SwipeDirection.down;
-  final span = vertical ? area.height : area.width;
+  final span = direction.isVertical ? area.height : area.width;
   // Inside a container the swipe covers most of it by default: a fixed
   // 400 px moves a short list by only a couple of items per swipe.
   final containerMax = (span * _containerSwipeShare).round();
@@ -610,14 +660,8 @@ Future<List<NativeElement>> _settledElements(
 String _contentSignature(List<NativeElement> elements, NativeBounds area) {
   final buffer = StringBuffer();
   for (final element in elements) {
-    final c = element.center;
-    if (!element.isVisible ||
-        c.x < area.x ||
-        c.y < area.y ||
-        c.x >= area.x + area.width ||
-        c.y >= area.y + area.height) {
-      continue;
-    }
+    final center = element.center;
+    if (!element.isVisible || !area.contains(center.x, center.y)) continue;
     final b = element.bounds;
     buffer
       ..write(element.text ?? element.resourceId ?? element.className)
@@ -643,36 +687,16 @@ String _contentSignature(List<NativeElement> elements, NativeBounds area) {
     maxX: maxX,
     maxY: maxY,
   );
-
-  return switch (direction) {
-    SwipeDirection.up => (
-        startX: startX,
-        startY: startY,
-        endX: startX,
-        endY: startY - effectiveDistance,
-      ),
-    SwipeDirection.down => (
-        startX: startX,
-        startY: startY,
-        endX: startX,
-        endY: startY + effectiveDistance,
-      ),
-    SwipeDirection.left => (
-        startX: startX,
-        startY: startY,
-        endX: startX - effectiveDistance,
-        endY: startY,
-      ),
-    SwipeDirection.right => (
-        startX: startX,
-        startY: startY,
-        endX: startX + effectiveDistance,
-        endY: startY,
-      ),
-  };
+  return (
+    startX: startX,
+    startY: startY,
+    endX: startX + direction.dx * effectiveDistance,
+    endY: startY + direction.dy * effectiveDistance,
+  );
 }
 
-/// Limits swipe distance so the finger end stays within the viewport.
+/// Limits swipe distance so the finger end stays within the viewport. A
+/// start already past the edge in [direction] gives 0.
 int cappedSwipeDistanceFromStart({
   required SwipeDirection direction,
   required int distance,
@@ -681,13 +705,10 @@ int cappedSwipeDistanceFromStart({
   required int maxX,
   required int maxY,
 }) {
-  final maxDistance = switch (direction) {
-    SwipeDirection.up => startY,
-    SwipeDirection.down => maxY - startY,
-    SwipeDirection.left => startX,
-    SwipeDirection.right => maxX - startX,
-  };
-  return min(distance, maxDistance);
+  final (start, limit) = direction.isVertical ? (startY, maxY) : (startX, maxX);
+  final towardsLimit = direction.dx + direction.dy > 0;
+  final room = towardsLimit ? limit - start : start;
+  return max(0, min(distance, room));
 }
 
 /// Limits swipe distance so finger endpoints stay within the viewport.
@@ -699,10 +720,8 @@ int cappedSwipeHalf({
   required int maxX,
   required int maxY,
 }) {
-  final maxHalfX = min(centerX, maxX - centerX);
-  final maxHalfY = min(centerY, maxY - centerY);
-  return switch (direction) {
-    SwipeDirection.up || SwipeDirection.down => min(half, maxHalfY),
-    SwipeDirection.left || SwipeDirection.right => min(half, maxHalfX),
-  };
+  final axisLimit = direction.isVertical
+      ? min(centerY, maxY - centerY)
+      : min(centerX, maxX - centerX);
+  return min(half, axisLimit);
 }

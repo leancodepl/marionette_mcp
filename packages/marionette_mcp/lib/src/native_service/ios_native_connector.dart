@@ -24,7 +24,7 @@ final class IosNativeConnector extends WebDriverNativeConnector {
 
   /// The Notification Center needs a gesture on iOS (see [IosNativeDevice]).
   @override
-  NativeDevice get device => const IosNativeDevice();
+  late final NativeDevice device = IosNativeDevice(this);
 
   /// Screen pixels per point; read by [_loadScale] during [connect].
   double _scale = 1;

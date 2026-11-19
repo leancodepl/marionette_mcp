@@ -76,9 +76,6 @@ final class NativeServiceContext {
   /// Active native connector, or null when disconnected.
   NativeConnector? connector;
 
-  /// Platform of the active session; null when disconnected.
-  NativePlatform? platform;
-
   /// Registers all native-lane MCP tools with [server].
   ///
   /// Every call is recorded to the active session's steps.md through
@@ -121,7 +118,6 @@ final class NativeServiceContext {
       );
     }
     connector = created;
-    this.platform = platform;
     return created;
   }
 
@@ -144,7 +140,6 @@ final class NativeServiceContext {
   Future<void> _disposeConnector() async {
     final active = connector;
     connector = null;
-    platform = null;
     if (active != null) {
       await active.dispose();
     }

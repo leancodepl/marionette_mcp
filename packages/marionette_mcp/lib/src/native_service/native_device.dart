@@ -1,14 +1,15 @@
-/// Device operations of the native lane that do not go through the
-/// WebDriver session: the notification shade. Backed by `adb` (Android).
+/// Device operations of the native lane: the notification shade. Android
+/// runs `adb` commands; iOS swipes through its connector.
 library;
 
-/// Device operations outside the WebDriver session.
+/// Device operations of the native lane.
 ///
-/// Failures are reported as `NativeLaneException`s with a hint; operations
-/// a platform cannot do throw `NativeUnsupportedException`.
+/// Failures are reported as `NativeLaneException`s with a hint.
 abstract interface class NativeDevice {
-  /// Opens the notification shade. Throws `NativeUnsupportedException` when
-  /// the platform needs a gesture instead (iOS).
+  /// Opens the notification shade (Android, with `cmd statusbar`) or the
+  /// Notification Center (iOS, with a swipe from the top edge). Throws
+  /// `NativeOperationFailedException` when it did not open; iOS checks this
+  /// only from the home screen.
   Future<void> openNotifications();
 
   /// Closes the notification shade (see [openNotifications]).

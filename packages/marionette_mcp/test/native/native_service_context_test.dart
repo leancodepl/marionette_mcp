@@ -124,7 +124,6 @@ void main() {
           throwsA(isA<NativeOperationFailedException>()),
         );
         expect(context.connector, same(second));
-        expect(context.platform, NativePlatform.ios);
         expect(first.disposeCalls, 1);
         expect(second.disposeCalls, 0);
       });
@@ -167,7 +166,6 @@ void main() {
         );
         expect(created.disposeCalls, 1);
         expect(context.connector, isNull);
-        expect(context.platform, isNull);
       });
     });
   });
