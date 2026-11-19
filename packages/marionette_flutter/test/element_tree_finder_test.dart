@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show AttributedString;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:marionette_flutter/src/services/element_tree_finder.dart';
@@ -132,6 +133,29 @@ void main() {
         reason:
             'When both label and value are set, the discovery output should '
             'preserve the dynamic state instead of dropping value',
+      );
+    });
+
+    testWidgets('Semantics joins an attributed label with its value',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Semantics(
+              attributedLabel: AttributedString('Volume'),
+              value: '70%',
+              child: Container(width: 100, height: 100, color: Colors.blue),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        _finder
+            .findInteractiveElements()
+            .where((e) => e['type'] == 'Semantics')
+            .single['text'],
+        'Volume: 70%',
       );
     });
 
@@ -727,6 +751,45 @@ void main() {
       );
 
       expect(_finder.findInteractiveElements().single['text'], 'Pay');
+    });
+
+    testWidgets('an attributed Semantics label replaces what it excludes',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: Semantics(
+                attributedLabel: AttributedString('Archive'),
+                excludeSemantics: true,
+                child: const Text('Move'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Archive');
+    });
+
+    testWidgets('an empty attributed Semantics label adds nothing',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: Semantics(
+                attributedLabel: AttributedString(''),
+                child: const Text('Move'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Move');
     });
   });
 

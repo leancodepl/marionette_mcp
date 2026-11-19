@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsProperties;
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 
@@ -271,14 +272,20 @@ class ElementTreeFinder {
   /// class-level dartdoc on `MarionetteConfiguration` for the rationale.
   static String? _extractSemanticsText(Widget widget) {
     if (widget is! Semantics) return null;
-    final label = widget.properties.label;
+    final label = _semanticsLabel(widget.properties);
     final value = widget.properties.value;
-    final hasLabel = label != null && label.isNotEmpty;
     final hasValue = value != null && value.isNotEmpty;
-    if (hasLabel && hasValue) return '$label: $value';
-    if (hasLabel) return label;
+    if (label != null && hasValue) return '$label: $value';
+    if (label != null) return label;
     if (hasValue) return value;
     return null;
+  }
+
+  /// The nonempty `label` of [properties], or the text of its
+  /// `attributedLabel`: `Semantics` takes one or the other, never both.
+  static String? _semanticsLabel(SemanticsProperties properties) {
+    final label = properties.label ?? properties.attributedLabel?.string;
+    return label == null || label.isEmpty ? null : label;
   }
 
   /// The label a control announces for its subtree, merged the way Flutter's
@@ -321,8 +328,7 @@ class ElementTreeFinder {
     if (!announced.contains(element.renderObject)) return;
     if (element.widget
         case Semantics(:final properties, :final excludeSemantics)) {
-      final label = properties.label;
-      if (label != null && label.isNotEmpty) labels.add(label);
+      if (_semanticsLabel(properties) case final label?) labels.add(label);
       if (excludeSemantics) return;
     }
     final text = configuration.extractTextFromWidget(element);
