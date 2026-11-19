@@ -59,7 +59,10 @@ final class VmServiceContext {
   /// logging its own step, which the generic wrapper has no hook for), so
   /// they log manually instead of going through [LoggedMcpServer].
   /// Everything else is delegated to themed registration functions.
-  void registerTools(McpServer server) {
+  ///
+  /// With [enableNativeLane], `get_interactive_elements` points to
+  /// `native_get_elements` when the app is not in front.
+  void registerTools(McpServer server, {required bool enableNativeLane}) {
     final loggedServer = LoggedMcpServer(server, _stepLogger);
     _dynamicTools = DynamicExtensionTools(
       server: server,
@@ -68,7 +71,12 @@ final class VmServiceContext {
       stepLogger: _stepLogger,
     );
     _registerConnectionTools(server);
-    registerInspectionTools(loggedServer, connector, _logger);
+    registerInspectionTools(
+      loggedServer,
+      connector,
+      _logger,
+      nativeElements: enableNativeLane ? 'native_get_elements' : null,
+    );
     registerGestureTools(loggedServer, connector, _logger);
     registerTextTools(loggedServer, connector, _logger);
     registerKeyboardTools(loggedServer, connector, _logger);

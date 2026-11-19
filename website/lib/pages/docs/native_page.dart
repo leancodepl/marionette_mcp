@@ -165,7 +165,10 @@ class NativePage extends StatelessComponent {
                 'The app needs nothing new: the native lane does not go '
                 'through `MarionetteBinding`. The device does. The native '
                 'lane runs on macOS and Linux hosts; Windows is not '
-                'supported.',
+                'supported. To run the MCP server without the native tools '
+                'and their instructions, start it with `--no-native` '
+                '(`marionette_mcp --no-native` or `marionette mcp '
+                '--no-native`).',
               ),
             ),
             const h3([.text('Android')]),

@@ -78,10 +78,23 @@ void main() {
     test('warns while the app is not in front', () {
       for (final state in ['inactive', 'paused', 'hidden']) {
         expect(
-          coveredAppWarning({'elements': [], 'appLifecycleState': state}),
+          coveredAppWarning(
+            {'elements': [], 'appLifecycleState': state},
+            nativeElements: 'native_get_elements',
+          ),
           allOf(contains('lifecycle: $state'), contains('native_get_elements')),
         );
       }
+    });
+
+    test('points to no native tool when the native lane is off', () {
+      expect(
+        coveredAppWarning(
+          {'appLifecycleState': 'paused'},
+          nativeElements: null,
+        ),
+        allOf(contains('not in front'), endsWith('hidden and not reachable.')),
+      );
     });
 
     test('names the given native command', () {
@@ -95,8 +108,20 @@ void main() {
     });
 
     test('says nothing when resumed or not reported (older binding)', () {
-      expect(coveredAppWarning({'appLifecycleState': 'resumed'}), isNull);
-      expect(coveredAppWarning({'elements': []}), isNull);
+      expect(
+        coveredAppWarning(
+          {'appLifecycleState': 'resumed'},
+          nativeElements: 'native_get_elements',
+        ),
+        isNull,
+      );
+      expect(
+        coveredAppWarning(
+          {'elements': []},
+          nativeElements: 'native_get_elements',
+        ),
+        isNull,
+      );
     });
   });
 }

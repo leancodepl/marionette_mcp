@@ -64,7 +64,7 @@ With `MarionetteConfiguration(enableSessionReports: true)`, every run leaves a f
 
 The `marionette` CLI drives the app with the same actions as shell commands: see [Drive](https://marionette.leancode.co/docs/drive/#cli).
 
-For UI **outside** the Flutter widget tree (system permission dialogs, OS sheets, webviews), use the native lane: `native_connect` with `platform` `android` | `ios`, then `native_get_elements` / `native_tap` / etc. Prefer Flutter tools when the target is an in-app widget. The CLI has the same native lane as `native-*` commands (`marionette native-connect --platform android`, `marionette native-tap --text Allow`). Setup (adb, a WebDriverAgent build), the CLI and the workflow: [Native lane](https://marionette.leancode.co/docs/native/).
+For UI **outside** the Flutter widget tree (system permission dialogs, OS sheets, webviews), use the native lane: `native_connect` with `platform` `android` | `ios`, then `native_get_elements` / `native_tap` / etc. Prefer Flutter tools when the target is an in-app widget. The CLI has the same native lane as `native-*` commands (`marionette native-connect --platform android`, `marionette native-tap --text Allow`). Setup (adb, a WebDriverAgent build), the CLI and the workflow: [Native lane](https://marionette.leancode.co/docs/native/). To run the MCP server without the native tools, start it with `--no-native` (`marionette_mcp --no-native` or `marionette mcp --no-native`).
 
 ## Agent Skills
 

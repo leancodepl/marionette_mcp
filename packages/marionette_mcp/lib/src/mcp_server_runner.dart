@@ -7,10 +7,15 @@ import 'package:marionette_mcp/src/version.g.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_context.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
-/// Instructions the server sends to the agent. Claude Code keeps only the
-/// first 4096 characters, so they must stay within that; details belong in
-/// the tool descriptions.
-const serverInstructions = '''
+/// Instructions the server sends to the agent, with the native lane's block
+/// when [enableNativeLane] is on. Claude Code keeps only the first 4096
+/// characters, so they must stay within that; details belong in the tool
+/// descriptions.
+String serverInstructions({required bool enableNativeLane}) => enableNativeLane
+    ? '$_flutterInstructions\n$_nativeInstructions'
+    : _flutterInstructions;
+
+const _flutterInstructions = '''
 Marionette MCP enables AI agents to interact with Flutter apps running in debug mode. It provides tools to inspect UI elements, tap buttons, enter text, scroll, take screenshots, retrieve logs, and perform hot reloads and hot restarts.
 
 Usage:
@@ -25,7 +30,9 @@ Usage:
 Important: Elements are matched by their key (ValueKey<String>), Semantics identifier, or text content. Keys are the most reliable; a Semantics identifier (set via `Semantics(identifier: ...)`) is an equally stable alternative when adding a key is not practical. If you cannot locate a widget, you may need to add a ValueKey to it in the Flutter source code. For example: `ElevatedButton(key: ValueKey('submit_button'), ...)`.
 
 When the same key exists in several identical subtrees (grid cells, repeated cards, embedded app instances), a plain match always hits the first one. Pass "ancestor_keys" alongside the selector to scope the search to one subtree, e.g. `{"key": "cell.joinButton", "ancestor_keys": ["grid.cell_2"]}`. The keys nest, outermost first — each is looked up inside the previous one's subtree — so `["session_2", "grid.cell_3"]` reaches a cell whose own key also repeats in the other sessions. Only descendants of the last key match, never that element itself. If a key has no element the call fails naming it, instead of searching the whole tree; scroll_to keeps scrolling first, because the scope may not be built yet. ancestor_keys is ignored when targeting by coordinates or focused_element. "get_interactive_elements" accepts "ancestor_keys" as well, to list only that subtree — use it to find the right scope keys and to keep the listing small on busy screens.
+''';
 
+const _nativeInstructions = '''
 Native lane — UI outside the Flutter tree (permission dialogs, system alerts, pickers and sheets, notifications, browser sign-in, native screens, WebView content): use the native_* tools; prefer Flutter tools for in-app widgets.
 - get_interactive_elements warns when the app is not in front (an alert the app itself shows on iOS gives no warning — if a Flutter action has no effect, check native_get_elements). The warning lags a moment: after system UI opens or closes, native_wait_for the expected screen first.
 - Call native_connect before the flow opens system UI (starting WebDriverAgent can dismiss an alert already on screen); call it again if a native call says the session or server is gone. One client per device.
@@ -37,38 +44,41 @@ Native lane — UI outside the Flutter tree (permission dialogs, system alerts, 
 ///
 /// Sets up logging, creates the MCP server with tools, and runs it on either
 /// stdio or SSE transport depending on whether [ssePort] is provided.
+/// Without [enableNativeLane] the server has no native tools and no native
+/// instructions.
 Future<int> runMcpServer({
   required String logLevel,
+  required bool enableNativeLane,
   String? logFile,
   int? ssePort,
 }) async {
   setupLogging(logLevel, logFile);
 
   final vmService = VmServiceContext();
-  final native = NativeServiceContext();
+  final native = enableNativeLane ? NativeServiceContext() : null;
 
   final server = McpServer(
     const Implementation(name: 'marionette-mcp', version: version),
-    options: const McpServerOptions(
+    options: McpServerOptions(
       // listChanged: true advertises that the tool set can change at
       // runtime — required for clients to refetch tools/list when an app
       // connects with custom extensions registered via
       // registerMarionetteExtension.
-      capabilities: ServerCapabilities(
+      capabilities: const ServerCapabilities(
         tools: ServerCapabilitiesTools(listChanged: true),
       ),
-      instructions: serverInstructions,
+      instructions: serverInstructions(enableNativeLane: enableNativeLane),
     ),
   );
 
-  vmService.registerTools(server);
-  native.registerTools(server, stepLogger: vmService.stepLogger);
+  vmService.registerTools(server, enableNativeLane: enableNativeLane);
+  native?.registerTools(server, stepLogger: vmService.stepLogger);
 
   // Both lanes hold connections that keep the process alive: a native
   // session and the VM service WebSocket (without disconnecting it the
   // server never exits on stdin EOF while an app is connected).
   Future<void> disposeLanes() async {
-    await native.dispose();
+    await native?.dispose();
     await vmService.connector.disconnect();
   }
 

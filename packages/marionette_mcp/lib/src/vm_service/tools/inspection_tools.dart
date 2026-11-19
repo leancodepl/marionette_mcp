@@ -8,16 +8,20 @@ import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers read-only MCP tools that inspect the running app:
 /// `get_interactive_elements`, `get_logs`, `take_screenshots`.
+///
+/// [nativeElements] names the tool that reads a covered screen; null when the
+/// native lane is off.
 void registerInspectionTools(
   LoggedMcpServer server,
   VmServiceConnector connector,
-  logging.Logger logger,
-) {
+  logging.Logger logger, {
+  required String? nativeElements,
+}) {
   server
     ..registerTool(
       'get_interactive_elements',
       description:
-          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Style, decoration and colour blobs are never reported. Set compaction to "compact" (the default for most apps) to also drop rendering details no interaction tool reads (textAlign, softWrap, overflow, font metrics, …), report visible only when an element is not visible, round bounds to whole logical pixels, and drop a Text element\'s duplicated data field — much more token-efficient for agent loops. Set compaction to "none" to force the full payload. Omit compaction to use the app\'s MarionetteConfiguration.compaction default. When the app is not in front (a system dialog, the notification shade, a biometric prompt, a browser or a native screen covers it) the result starts with a warning: the listed widgets may not be reachable — use native_get_elements. Requires an active connection established via connect.',
+          'Returns a list of all interactive elements currently visible in the Flutter app UI tree. Each element includes its type, text content (if any), key (if any), and other identifying properties. This is useful for understanding what can be interacted with in the app. Style, decoration and colour blobs are never reported. Set compaction to "compact" (the default for most apps) to also drop rendering details no interaction tool reads (textAlign, softWrap, overflow, font metrics, …), report visible only when an element is not visible, round bounds to whole logical pixels, and drop a Text element\'s duplicated data field — much more token-efficient for agent loops. Set compaction to "none" to force the full payload. Omit compaction to use the app\'s MarionetteConfiguration.compaction default. When the app is not in front (a system dialog, the notification shade, a biometric prompt, a browser or a native screen covers it) the result starts with a warning: the listed widgets may not be reachable${nativeElements == null ? '' : ' — use $nativeElements'}. Requires an active connection established via connect.',
       annotations: const ToolAnnotations(
         title: 'Get Interactive Elements',
         readOnlyHint: true,
@@ -56,7 +60,8 @@ void registerInspectionTools(
           final elements = response['elements'] as List<dynamic>;
 
           final buffer = StringBuffer();
-          if (coveredAppWarning(response) case final warning?) {
+          if (coveredAppWarning(response, nativeElements: nativeElements)
+              case final warning?) {
             buffer.writeln('$warning\n');
           }
           buffer.writeln('Found ${elements.length} interactive element(s):\n');

@@ -19,9 +19,9 @@ closes, `native_wait_for` the next screen before you trust the Flutter list.
   can dismiss an alert on screen. On failure, follow the error's hint. Nothing
   reconnects by itself: when a native call says the device-side server or
   session is gone, call `native_connect` again.
-- One client per device: an MCP server and a CLI session on the same device
-  take the single device-side session from each other. One iOS Simulator at a
-  time. Call `native_disconnect` when you're done.
+- One client per device: an MCP server and a CLI session on one device take
+  the device-side session from each other. One iOS Simulator at a time. Call
+  `native_disconnect` when done. The server's `--no-native` turns the lane off.
 
 ## Work with it
 

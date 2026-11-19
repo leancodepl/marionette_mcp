@@ -563,6 +563,7 @@ Run the Marionette MCP server (preserves original marionette_mcp behavior).
     -l, --log-level <level>   FINEST|FINER|FINE|CONFIG|INFO|WARNING|SEVERE (default: INFO)
     --log-file <path>         Log file path (default: stderr)
     --sse-port <port>         Use SSE transport on this port (default: stdio)
+    --[no-]native             Register the native_* tools and their instructions (default: on)
 
   Example:
     marionette mcp
