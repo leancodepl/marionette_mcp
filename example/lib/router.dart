@@ -13,6 +13,7 @@ import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/scoped_matching_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/toggles_screen.dart';
 
 /// Page name → route path mapping used by the custom VM service extension.
 const availablePages = <String, String>{
@@ -28,6 +29,7 @@ const availablePages = <String, String>{
   'mouse_tap': '/settings/mouse-tap',
   'scoped_matching': '/settings/scoped-matching',
   'custom_widgets': '/settings/custom-widgets',
+  'toggles': '/settings/toggles',
 };
 
 final router = GoRouter(
@@ -76,6 +78,10 @@ final router = GoRouter(
             GoRoute(
               path: 'custom-widgets',
               builder: (context, state) => const CustomWidgetsScreen(),
+            ),
+            GoRoute(
+              path: 'toggles',
+              builder: (context, state) => const TogglesScreen(),
             ),
           ],
         ),

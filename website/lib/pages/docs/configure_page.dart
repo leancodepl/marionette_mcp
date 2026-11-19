@@ -243,6 +243,12 @@ class ConfigurePage extends StatelessComponent {
               .text(', '),
               code([.text('PopupMenuButton')]),
               .text(', their list-tile forms, '),
+              code([.text('CupertinoSwitch')]),
+              .text(', '),
+              code([.text('CupertinoCheckbox')]),
+              .text(', '),
+              code([.text('CupertinoRadio')]),
+              .text(', '),
               code([.text('GestureDetector')]),
               .text(' and '),
               code([.text('InkWell')]),
@@ -440,7 +446,7 @@ class ConfigurePage extends StatelessComponent {
                 'To list the screen, Marionette walks the widget tree from '
                 'the root down. `shouldStopTraversalAtElement` tells it not '
                 'to look inside a widget: the widget itself is still listed, '
-                'everything below it is not.',
+                'everything below it is not (except toggles).',
               ),
             ),
             const DocTable(
