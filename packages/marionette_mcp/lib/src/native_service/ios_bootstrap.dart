@@ -72,6 +72,9 @@ class IosBootstrap implements NativeServerBootstrap {
   /// [wdaPath] overrides `MARIONETTE_WDA_PATH` / `MARIONETTE_WDA_BUNDLE` for
   /// the runner `.app` or a Products/DerivedData directory that contains one
   /// (or an `.xctestrun`).
+  ///
+  /// [operatingSystem] is the host OS in [Platform.operatingSystem] form; it
+  /// defaults to the real host.
   IosBootstrap({
     String? udid,
     ProcessRunner? processRunner,
@@ -85,8 +88,10 @@ class IosBootstrap implements NativeServerBootstrap {
     this.detached = false,
     ProcessStarter? detachedProcessStarter,
     Future<bool> Function(int port)? isPortFree,
+    String? operatingSystem,
   })  : _udid = udid,
         _isPortFree = isPortFree ?? canBindLoopbackPort,
+        _operatingSystem = operatingSystem ?? Platform.operatingSystem,
         _startDetached = detachedProcessStarter ?? _startDetachedProcess,
         _simctl = SimctlClient(processRunner: processRunner),
         _start = processStarter ?? Process.start,
@@ -105,6 +110,7 @@ class IosBootstrap implements NativeServerBootstrap {
 
   final ProcessStarter _startDetached;
   final Future<bool> Function(int port) _isPortFree;
+  final String _operatingSystem;
 
   /// Pid of the `xcodebuild` started in [detached] mode, if any.
   int? get detachedPid => _detachedPid;
@@ -165,7 +171,8 @@ class IosBootstrap implements NativeServerBootstrap {
       throw IosBootstrapException(
         IosBootstrapFailure.portConflict,
         'Port $_wdaLocalPort is already in use by WebDriverAgent attached to '
-        'a different simulator than $_resolvedUdid.',
+        'a different simulator than $_resolvedUdid. Marionette supports one '
+        'iOS Simulator at a time.',
       );
     }
     // Something else listening there would make WDA fail to bind and the
@@ -218,11 +225,11 @@ class IosBootstrap implements NativeServerBootstrap {
   }
 
   void _requireMacOS() {
-    if (!Platform.isMacOS) {
+    if (_operatingSystem != 'macos') {
       throw IosBootstrapException(
         IosBootstrapFailure.notMacOS,
         'IosBootstrap requires macOS (WebDriverAgent / xcrun simctl). '
-        'Current platform: ${Platform.operatingSystem}.',
+        'Current platform: $_operatingSystem.',
       );
     }
   }

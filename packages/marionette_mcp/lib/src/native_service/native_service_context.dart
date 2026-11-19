@@ -66,6 +66,10 @@ final class NativeServiceContext {
 
   final NativeConnectorFactory _connectorFactory;
 
+  /// Bumped by every [connect] and [dispose], so a connect still waiting for
+  /// its connector can tell it was replaced or cancelled.
+  var _connectCalls = 0;
+
   /// Logger shared by the native tools.
   final logging.Logger logger;
 
@@ -94,18 +98,28 @@ final class NativeServiceContext {
   /// Replaces any active session with a new one for [platform].
   ///
   /// The previous connector is disposed first, so a failed connect leaves
-  /// the context disconnected.
+  /// the context disconnected. A newer [connect] or a [dispose] that starts
+  /// before the connector is created cancels this call: its connector is
+  /// disposed and it throws [NativeOperationFailedException].
   Future<NativeConnector> connect(
     NativePlatform platform, {
     String? serial,
     String? udid,
   }) async {
-    await dispose();
+    final call = ++_connectCalls;
+    await _disposeConnector();
     final created = await _connectorFactory(
       platform,
       serial: serial,
       udid: udid,
     );
+    if (call != _connectCalls) {
+      await created.dispose();
+      throw const NativeOperationFailedException(
+        'Cancelled by a newer native_connect, a native_disconnect or a '
+        'server shutdown while the device session was starting.',
+      );
+    }
     connector = created;
     this.platform = platform;
     return created;
@@ -120,8 +134,14 @@ final class NativeServiceContext {
     return active;
   }
 
-  /// Tears down the active connector if any. Safe to call multiple times.
+  /// Tears down the active connector if any, and cancels a pending
+  /// [connect]. Safe to call multiple times.
   Future<void> dispose() async {
+    _connectCalls++;
+    await _disposeConnector();
+  }
+
+  Future<void> _disposeConnector() async {
     final active = connector;
     connector = null;
     platform = null;

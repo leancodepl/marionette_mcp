@@ -6,8 +6,6 @@ import 'package:test/test.dart';
 import 'support/fake_process_runner.dart';
 import 'support/fake_webdriver_server.dart';
 
-const _macOnly = 'IosBootstrap requires macOS';
-
 String _bootedJson(List<String> udids) => '''
 {
   "devices": {
@@ -41,7 +39,12 @@ void main() {
       }
     });
 
-    IosBootstrap bootstrap({String? udid, int port = 18100, String? wdaPath}) =>
+    IosBootstrap bootstrap({
+      String? udid,
+      int port = 18100,
+      String? wdaPath,
+      String operatingSystem = 'macos',
+    }) =>
         IosBootstrap(
           udid: udid,
           processRunner: runner.call,
@@ -50,6 +53,7 @@ void main() {
           wdaPath: wdaPath,
           readyTimeout: const Duration(milliseconds: 200),
           pollInterval: const Duration(milliseconds: 50),
+          operatingSystem: operatingSystem,
         );
 
     Matcher failsWith(IosBootstrapFailure failure, [String? messagePart]) {
@@ -63,15 +67,15 @@ void main() {
     }
 
     test(
-      'ensureServerReady throws notMacOS on non-macOS',
-      () async {
-        await expectLater(
-          bootstrap(udid: 'TEST-UDID').ensureServerReady(),
-          failsWith(IosBootstrapFailure.notMacOS, 'requires macOS'),
-        );
-      },
-      skip: Platform.isMacOS ? 'requires a non-macOS host' : false,
-    );
+        'ensureServerReady throws notMacOS on a Linux host without running '
+        'a process', () async {
+      await expectLater(
+        bootstrap(udid: 'TEST-UDID', operatingSystem: 'linux')
+            .ensureServerReady(),
+        failsWith(IosBootstrapFailure.notMacOS, 'requires macOS'),
+      );
+      expect(runner.calls, isEmpty);
+    });
 
     test(
       'throws noBootedSimulator when no simulator is booted',
@@ -87,7 +91,6 @@ void main() {
           failsWith(IosBootstrapFailure.noBootedSimulator),
         );
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
 
     test(
@@ -104,7 +107,6 @@ void main() {
           failsWith(IosBootstrapFailure.simctl, 'CoreSimulator'),
         );
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
 
     test(
@@ -126,7 +128,6 @@ void main() {
         );
         expect(subject.resolvedUdid, firstUdid);
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
 
     test(
@@ -153,7 +154,6 @@ void main() {
           ),
         );
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
 
     test(
@@ -187,7 +187,6 @@ void main() {
           ),
         );
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
 
     group('with WDA already listening', () {
@@ -213,7 +212,6 @@ void main() {
             reason: 'no launch needed',
           );
         },
-        skip: !Platform.isMacOS ? _macOnly : false,
       );
 
       test(
@@ -244,18 +242,20 @@ void main() {
             failsWith(IosBootstrapFailure.portConflict, 'SIM-B'),
           );
         },
-        skip: !Platform.isMacOS ? _macOnly : false,
       );
 
       test(
-        'throws portConflict when WDA on the port serves another simulator',
+        'throws portConflict naming the one-simulator limit when WDA on the '
+        'port serves another simulator',
         () async {
           await expectLater(
             bootstrap(udid: 'SIM-B', port: wda.port).ensureServerReady(),
-            failsWith(IosBootstrapFailure.portConflict, 'SIM-B'),
+            failsWith(
+              IosBootstrapFailure.portConflict,
+              'one iOS Simulator at a time',
+            ),
           );
         },
-        skip: !Platform.isMacOS ? _macOnly : false,
       );
     });
 
@@ -272,6 +272,7 @@ void main() {
             cacheDir: cacheDir,
             wdaLocalPort: 18199,
             isPortFree: (_) async => false,
+            operatingSystem: 'macos',
           ).ensureServerReady(),
           throwsA(
             isA<IosBootstrapException>()
@@ -281,7 +282,6 @@ void main() {
           ),
         );
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
 
     test(
@@ -313,6 +313,7 @@ void main() {
           // The fake WDA listens before it is "started".
           isPortFree: (_) async => true,
           detached: true,
+          operatingSystem: 'macos',
           detachedProcessStarter: (executable, arguments) async {
             launches.add([executable, ...arguments]);
             started = true;
@@ -327,7 +328,6 @@ void main() {
             launches.single.take(2), ['xcodebuild', 'test-without-building']);
         expect(subject.detachedPid, 4242);
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
 
     test(
@@ -357,7 +357,6 @@ void main() {
           ),
         );
       },
-      skip: !Platform.isMacOS ? _macOnly : false,
     );
   });
 }

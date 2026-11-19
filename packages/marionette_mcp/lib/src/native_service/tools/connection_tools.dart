@@ -92,7 +92,8 @@ Future<CallToolResult> handleNativeConnect(
     );
   } catch (err) {
     // context.connect disposed the previous session before trying, so the
-    // context is already disconnected here.
+    // context is disconnected here, or holds the session of a newer
+    // native_connect that cancelled this one.
     logger.severe('Failed to connect native connector', err);
     return CallToolResult(
       isError: true,
