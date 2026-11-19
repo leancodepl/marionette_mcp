@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:marionette_flutter/src/binding/marionette_binding.dart';
@@ -15,19 +17,28 @@ void main() {
       // constructor instead of a clear, catchable error.
       TestWidgetsFlutterBinding.ensureInitialized();
 
-      expect(
+      Object? caught;
+      runZonedGuarded(
         MarionetteBinding.ensureInitialized,
-        throwsA(
-          isA<FlutterError>().having(
-            (e) => e.toString(),
-            'message',
-            allOf(
-              contains('already installed'),
-              contains('MarionetteBinding.ensureInitialized()'),
-            ),
-          ),
-        ),
+        (error, _) => caught = error,
       );
+
+      expect(caught, isA<FlutterError>());
+      expect(caught.toString(), contains('already installed'));
+      expect(
+          caught.toString(), contains('MarionetteBinding.ensureInitialized()'));
+
+      var factoryCalled = false;
+      expect(
+        () => MarionetteBindingMixin.ensureInitialized(() {
+          factoryCalled = true;
+          return _OtherBinding();
+        }),
+        throwsA(isA<FlutterError>()),
+      );
+      expect(factoryCalled, isFalse);
     },
   );
 }
+
+class _OtherBinding extends WidgetsFlutterBinding with MarionetteBindingMixin {}

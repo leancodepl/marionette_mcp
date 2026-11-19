@@ -22,16 +22,36 @@ if (kDebugMode && !isFlutterTest) {
 }''';
 
 const _sentry = '''
-void main() {
+Future<void> main() async {
   if (kDebugMode) {
-    MarionetteBinding.ensureInitialized(); // before Sentry, not inside appRunner
+    MarionetteBinding.ensureInitialized();
   } else {
     WidgetsFlutterBinding.ensureInitialized();
   }
-  SentryFlutter.init(
+  await SentryFlutter.init(
     (options) => options.dsn = _sentryDsn,
-    appRunner: () => runApp(const MyApp()),
   );
+  runApp(const MyApp());
+}''';
+
+const _combinedBinding = '''
+class AppBinding extends WidgetsFlutterBinding
+    with OtherBindingMixin, MarionetteBindingMixin {
+  AppBinding(this.configuration);
+
+  @override
+  final MarionetteConfiguration configuration;
+}
+
+void main() {
+  if (kDebugMode) {
+    MarionetteBindingMixin.ensureInitialized(
+      () => AppBinding(const MarionetteConfiguration()),
+    );
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
+  runApp(const MyApp());
 }''';
 
 const _toc = [
@@ -247,11 +267,28 @@ class ConceptsPage extends StatelessComponent {
           children: [
             p(
               rich(
-                'Flutter allows one `WidgetsBinding` per process, and '
-                '`MarionetteBinding` is one. If another binding got there '
-                'first, `ensureInitialized` throws and names it. Two cases '
-                'come up often.',
+                'Flutter allows one `WidgetsBinding` per process. Marionette '
+                'can either own that binding or be combined with another '
+                'binding in one class. If another binding got there first, '
+                'the guarded initializer throws and names it. Two cases come '
+                'up often.',
               ),
+            ),
+            h3(rich('Combine Marionette with another binding')),
+            p(
+              rich(
+                'When another package exposes binding behavior as a mixin, '
+                'apply `MarionetteBindingMixin` last and create the combined '
+                'class before either package initializes `WidgetsBinding`. '
+                'The configuration getter must be ready during construction. '
+                'This still creates one binding; it cannot retrofit a binding '
+                'that is already installed.',
+              ),
+            ),
+            const CodeBlock(
+              source: _combinedBinding,
+              language: .dart,
+              title: 'lib/main.dart',
             ),
             h3(rich('Tests that call `main()`')),
             p(
@@ -270,11 +307,16 @@ class ConceptsPage extends StatelessComponent {
             const h3([.text('Plugins with their own binding, such as Sentry')]),
             p(
               rich(
-                '`SentryFlutter.init` installs a binding before it calls '
-                '`appRunner`. Initialized inside `appRunner`, Marionette '
-                'throws inside Sentry’s error zone and the app hangs on the '
-                'splash screen with no error at all. Initialize Marionette '
-                'first; Sentry reuses the binding it finds.',
+                'Initialize Marionette before `SentryFlutter.init` and run '
+                'both initialization and `runApp` in the same Flutter zone, '
+                'as in the example. Sentry reuses the existing binding, but '
+                'Sentry binding-specific frame instrumentation is not '
+                'preserved. If Marionette is initialized inside Sentry’s '
+                '`appRunner`, the guard throws in Sentry’s error-catching '
+                'zone; that exception may be swallowed and leave the app '
+                'hanging on the splash screen. Use the combined binding or '
+                'plain Marionette only when that instrumentation trade-off '
+                'is acceptable.',
               ),
             ),
             const CodeBlock(

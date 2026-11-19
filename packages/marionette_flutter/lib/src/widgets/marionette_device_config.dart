@@ -43,9 +43,9 @@ class MarionetteDeviceConfig extends StatefulWidget {
 
   /// The service to take overrides from.
   ///
-  /// Defaults to the binding's, which is `null` when no [MarionetteBinding]
-  /// was installed — in that case this widget is a pass-through. Mainly a
-  /// testing seam.
+  /// Defaults to the Marionette binding's service, which is `null` when no
+  /// Marionette binding was installed — in that case this widget is a
+  /// pass-through. Mainly a testing seam.
   final DeviceConfigService? service;
 
   final Widget child;

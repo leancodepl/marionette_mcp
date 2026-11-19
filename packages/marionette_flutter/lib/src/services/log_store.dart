@@ -2,7 +2,7 @@ import 'dart:collection';
 
 /// Stores collected logs in memory with a maximum capacity.
 ///
-/// This class is used internally by [MarionetteBinding] to store logs
+/// This class is used internally by the Marionette binding to store logs
 /// received from a [LogCollector].
 class LogStore {
   final _logs = Queue<String>();
