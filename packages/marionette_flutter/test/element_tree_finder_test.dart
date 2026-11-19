@@ -1329,6 +1329,127 @@ void main() {
       }
       expect(compactBounds['x'], (verboseBounds['x']! as double).round());
     });
+
+    testWidgets('drops icon glyphs and keeps the icon semantic label',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Icon(Icons.home),
+                Icon(Icons.search, semanticLabel: 'Search'),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final verbose =
+          _finder.findInteractiveElements(compaction: CompactionMode.none);
+      expect(verbose.where((e) => e['type'] == 'RichText'), hasLength(2),
+          reason: 'CompactionMode.none keeps the glyphs');
+
+      final compact =
+          _finder.findInteractiveElements(compaction: CompactionMode.compact);
+      expect(compact.map((e) => e['text']), ['Search'],
+          reason: 'a private-use glyph is unreadable and unmatchable');
+    });
+
+    testWidgets('drops an icon glyph from a kept element\'s properties',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Text('\uE88A', key: ValueKey('glyph')),
+                Text('Home', key: ValueKey('label')),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final verbose = _finder
+          .findInteractiveElements(compaction: CompactionMode.none)
+          .firstWhere((e) => e['key'] == 'glyph');
+      expect(verbose, containsPair('text', '\uE88A'),
+          reason: 'CompactionMode.none keeps the glyph as text');
+      expect(verbose, containsPair('data', '\uE88A'),
+          reason: 'CompactionMode.none keeps the glyph as data');
+
+      final compact =
+          _finder.findInteractiveElements(compaction: CompactionMode.compact);
+      expect(
+        compact.firstWhere((e) => e['key'] == 'glyph'),
+        isNot(anyOf(contains('data'), contains('text'))),
+        reason: 'Text also declares its glyph as `data`',
+      );
+      expect(compact.firstWhere((e) => e['key'] == 'label')['text'], 'Home');
+    });
+
+    testWidgets('drops an icon glyph from a supplementary private-use plane',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: Center(child: Icon(Icons.onetwothree))),
+        ),
+      );
+
+      final verbose =
+          _finder.findInteractiveElements(compaction: CompactionMode.none);
+      expect(verbose.where((e) => e['type'] == 'RichText'), hasLength(1),
+          reason: 'CompactionMode.none keeps the glyph');
+
+      final compact =
+          _finder.findInteractiveElements(compaction: CompactionMode.compact);
+      expect(compact.where((e) => e['type'] == 'RichText'), isEmpty,
+          reason: 'U+F04B5 is one private-use code point, not two surrogates');
+    });
+
+    testWidgets('keeps text that mixes a glyph with readable words',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(body: Center(child: Text('\uE88A Home'))),
+        ),
+      );
+
+      final compact =
+          _finder.findInteractiveElements(compaction: CompactionMode.compact);
+      expect(compact.map((e) => e['text']), contains('\uE88A Home'),
+          reason: 'TextMatcher matches the exact text, glyph included');
+    });
+
+    testWidgets('drops a glyph at the end of the BMP private-use area only',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Text('\uF8FF', key: ValueKey('lastPrivateUse')),
+                Text('\uF900', key: ValueKey('firstCjkCompatibility')),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      final compact =
+          _finder.findInteractiveElements(compaction: CompactionMode.compact);
+      expect(
+        compact.firstWhere((e) => e['key'] == 'lastPrivateUse'),
+        isNot(anyOf(contains('data'), contains('text'))),
+        reason: 'U+F8FF is the last private-use code point of the BMP',
+      );
+      expect(
+        compact.firstWhere((e) => e['key'] == 'firstCjkCompatibility')['text'],
+        '\uF900',
+        reason: 'U+F900 is a CJK compatibility ideograph',
+      );
+    });
   });
 
   group('ElementTreeFinder compaction configuration', () {
