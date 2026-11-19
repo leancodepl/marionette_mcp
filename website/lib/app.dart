@@ -4,11 +4,12 @@ import 'package:marionette_website/demo.dart';
 import 'package:marionette_website/pages/docs/concepts_page.dart';
 import 'package:marionette_website/pages/docs/configure_page.dart';
 import 'package:marionette_website/pages/docs/drive_page.dart';
+import 'package:marionette_website/pages/docs/native_page.dart';
 import 'package:marionette_website/pages/docs/reports_page.dart';
 import 'package:marionette_website/pages/docs/start_page.dart';
 import 'package:marionette_website/pages/home_page.dart';
 
-/// The site: the landing page and five docs pages. Every route is rendered to
+/// The site: the landing page and six docs pages. Every route is rendered to
 /// static HTML at build time; only small `@client` islands hydrate.
 class App extends StatelessComponent {
   const App({
@@ -51,6 +52,10 @@ class App extends StatelessComponent {
         Route(
           path: '/docs/drive',
           builder: (context, state) => DrivePage(version: version),
+        ),
+        Route(
+          path: '/docs/native',
+          builder: (context, state) => NativePage(version: version),
         ),
         Route(
           path: '/docs/reports',

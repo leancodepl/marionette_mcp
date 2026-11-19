@@ -1,0 +1,89 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../webview_screen.dart';
+
+class TestingScreen extends StatelessWidget {
+  const TestingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Testing'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      body: ListView(
+        children: [
+          if (isWebViewSupported) ...[
+            ListTile(
+              leading: const Icon(Icons.language_outlined),
+              title: const Text('WebView'),
+              subtitle: const Text('Embedded browser'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.go('/testing/webview'),
+            ),
+            const Divider(),
+          ],
+          ListTile(
+            leading: const Icon(Icons.view_in_ar_outlined),
+            title: const Text('Native controls'),
+            subtitle: const Text(
+              'Custom AndroidView / UiKitView with label, field, and button',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/platform-views/native-controls'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.security_outlined),
+            title: const Text('Permission dialogs'),
+            subtitle: const Text('OS permission prompts'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/permission-dialogs'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.folder_open_outlined),
+            title: const Text('Pickers & sheets'),
+            subtitle: const Text('File, photo, camera, share'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/pickers-and-sheets'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.keyboard_outlined),
+            title: const Text('Keyboard / IME'),
+            subtitle: const Text('Numeric, return, done keyboards'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/keyboard'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.notifications_outlined),
+            title: const Text('Notifications'),
+            subtitle: const Text('Local notifications, toasts'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/notifications'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.open_in_new),
+            title: const Text('Native screen'),
+            subtitle: const Text('Activity / UIViewController'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/native-screen'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.chat_bubble_outline),
+            title: const Text('Native dialogs'),
+            subtitle: const Text('Platform alerts'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/testing/native-dialogs'),
+          ),
+        ],
+      ),
+    );
+  }
+}

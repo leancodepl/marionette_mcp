@@ -1,6 +1,6 @@
 ---
 name: marionette-flutter-setup
-description: Prepare a Flutter app for Marionette, so an AI agent can drive it in debug or profile builds. Covers adding marionette_flutter, MarionetteBinding behind kDebugMode, MarionetteConfiguration for a custom design system (isInteractiveElement, extractText, Semantics), a LogCollector for get_logs, screenshot size, MarionetteDeviceConfig for set_device_config, session reports, the single-binding rule, and matching marionette_mcp or marionette_cli versions. Use when adding Marionette to an app; when connect fails because the app has no binding, or with a version mismatch; when the app hangs at startup or hits a binding assertion after adding Marionette; when get_interactive_elements misses custom buttons or fields, or tap(text:) cannot find visible text; when get_logs says no collector is configured; or when set_device_config returns setup instructions. To drive an app that is already set up, use marionette-flutter-drive-app.
+description: Prepare a Flutter app for Marionette, so an AI agent can drive it in debug or profile builds. Covers adding marionette_flutter, MarionetteBinding behind kDebugMode, MarionetteConfiguration for a custom design system (isInteractiveElement, extractText, Semantics), a LogCollector for get_logs, screenshot size, MarionetteDeviceConfig for set_device_config, session reports, the single-binding rule, matching marionette_mcp or marionette_cli versions, and the native lane's device setup (adb, the WebDriverAgent build, supported hosts). Use when adding Marionette to an app; when connect fails because the app has no binding, or with a version mismatch; when the app hangs at startup or hits a binding assertion after adding Marionette; when get_interactive_elements misses custom buttons or fields, or tap(text:) cannot find visible text; when get_logs says no collector is configured; or when set_device_config returns setup instructions. To drive an app that is already set up, use marionette-flutter-drive-app.
 ---
 
 # marionette_flutter: set up an app
@@ -226,6 +226,23 @@ agent's `report.md` (see `marionette-flutter-drive-app`). Turn it on when the us
 asks for reports, or for Patrol tests from a run: `marionette-flutter-to-patrol` reads
 that folder. The server gitignores `.marionette/` itself. It is binding
 configuration, so it needs a hot restart.
+
+## Native lane setup
+
+The native lane (`native_*` tools, `native-*` CLI commands) drives UI outside
+the Flutter tree: permission dialogs, pickers, WebViews, notifications. The app
+needs nothing new — it doesn't go through `MarionetteBinding` — but every flow
+still starts in an app reached with `connect`. The device needs setup:
+
+- **Hosts:** macOS and Linux. Windows is not supported.
+- **Android:** `adb` on `PATH` and a device or emulator. Marionette downloads
+  and installs UIAutomator2 itself on the first `native_connect`.
+- **iOS:** the **Simulator only** (not physical iPhones yet), on macOS with
+  Xcode, one iOS Simulator at a time, and a one-time WebDriverAgent build —
+  the steps are on the
+  [Native lane](https://marionette.leancode.co/docs/native/#setup) docs page.
+
+Driving it is in `marionette-flutter-drive-app` and its native-lane reference.
 
 ## Next
 

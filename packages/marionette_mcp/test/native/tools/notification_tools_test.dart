@@ -1,0 +1,49 @@
+import 'package:marionette_mcp/src/native_service/native_connector.dart';
+import 'package:marionette_mcp/src/native_service/native_service_context.dart';
+import 'package:marionette_mcp/src/native_service/tools/notification_tools.dart';
+import 'package:mcp_dart/mcp_dart.dart';
+import 'package:test/test.dart';
+
+import '../support/fake_native_connector.dart';
+
+String _text(CallToolResult result) =>
+    result.content.whereType<TextContent>().map((c) => c.text).join('\n');
+
+void main() {
+  late FakeNativeConnector connector;
+  late FakeNativeDevice device;
+  late NativeServiceContext context;
+
+  setUp(() async {
+    connector = FakeNativeConnector();
+    device = connector.device;
+    context = NativeServiceContext(
+      connectorFactory: (platform, {serial, udid}) async => connector,
+    );
+    await context.connect(NativePlatform.android);
+  });
+
+  group('native_notifications', () {
+    test('opens and closes the notifications through the device', () async {
+      await handleNativeNotifications(context, {'action': 'open'});
+      await handleNativeNotifications(context, {'action': 'close'});
+      expect(device.calls, ['openNotifications', 'closeNotifications']);
+      expect(connector.swipes, isEmpty);
+    });
+
+    test('reads the action case-insensitively', () async {
+      final result =
+          await handleNativeNotifications(context, {'action': 'OPEN'});
+
+      expect(result.isError, isFalse);
+      expect(device.calls, ['openNotifications']);
+    });
+
+    test('rejects an unknown action', () async {
+      final result =
+          await handleNativeNotifications(context, {'action': 'push'});
+      expect(result.isError, isTrue);
+      expect(_text(result), contains('"open" or "close"'));
+    });
+  });
+}

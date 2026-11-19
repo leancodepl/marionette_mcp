@@ -31,6 +31,26 @@ const _maxStackFrames = 4;
 /// records what was acted on, not the payload.
 const _selectorArgKeys = ['key', 'identifier', 'text', 'type', 'uri', 'x', 'y'];
 
+/// Extra arg names shown for the native lane's tools (`native_*`) and CLI
+/// commands (`native-*`), which select elements by these fields and name
+/// what they act on with them (`direction`, `action`, `state`, `platform`).
+/// `within` (a container selector) is summarized separately, and the typed
+/// text of `native_enter_text` is left out like other payloads.
+const _nativeSelectorArgKeys = [
+  'label',
+  'textContains',
+  'id',
+  'index',
+  'startX',
+  'startY',
+  'endX',
+  'endY',
+  'direction',
+  'action',
+  'state',
+  'platform',
+];
+
 /// Tools whose successful result is a short, synthesized confirmation
 /// message (e.g. "Successfully tapped"), never a dump of application data —
 /// safe to echo verbatim (truncated) in steps.md. Everything else —
@@ -39,7 +59,7 @@ const _selectorArgKeys = ['key', 'identifier', 'text', 'type', 'uri', 'x', 'y'];
 /// dynamically-promoted custom extension tool, whose result may carry
 /// arbitrary app data — gets a generic outcome on success instead, so
 /// steps.md never ends up persisting a payload. Error messages are shown
-/// regardless of the tool (see [_describeOutcome]): they're diagnostic
+/// regardless of the tool (see [describeStepOutcome]): they're diagnostic
 /// context the report contract explicitly wants, not a payload.
 const _shortConfirmationTools = {
   'connect',
@@ -58,6 +78,16 @@ const _shortConfirmationTools = {
   'hot_reload',
   'hot_restart',
   'take_screenshots',
+  'native_connect',
+  'native_disconnect',
+  'native_tap',
+  'native_swipe',
+  'native_scroll',
+  'native_enter_text',
+  'native_press_key',
+  'native_hide_keyboard',
+  'native_notifications',
+  'native_take_screenshot',
 };
 
 /// Tools whose success message is one status line followed by session
@@ -90,7 +120,7 @@ class StepLogger {
     if (activeSession == null) return;
 
     final selector = describeStepSelector(toolName, args);
-    final outcome = _describeOutcome(toolName, result, activeSession);
+    final outcome = describeStepOutcome(toolName, result, activeSession);
     final line = formatStepLine(toolName, selector, outcome);
 
     // steps.md is best-effort bookkeeping, not the tool call itself — a
@@ -105,34 +135,38 @@ class StepLogger {
       _logger.warning('Failed to write steps.md', err);
     }
   }
+}
 
-  String _describeOutcome(
-    String toolName,
-    CallToolResult result,
-    Session session,
-  ) {
-    if (result.isError) {
-      return describeStepError(_firstNonEmptyText(result));
-    }
-
-    if (_shortConfirmationTools.contains(toolName)) {
-      var text = _firstNonEmptyText(result);
-      if (_firstLineOnlyTools.contains(toolName)) {
-        text = text.split('\n').first;
-      }
-      text = _relativizeSessionPaths(text, session);
-      if (text.isNotEmpty) return _truncateText(_oneLine(_redactUrisIn(text)));
-    }
-
-    final imageCount = result.content.whereType<ImageContent>().length;
-    return imageCount > 0 ? '$imageCount screenshot(s) captured' : 'ok';
+/// The outcome part of a step line for [result] of [toolName]. Shared
+/// between [StepLogger] (MCP tool calls) and the CLI's native commands,
+/// whose names (`native-tap`) are the tool names in kebab case.
+String describeStepOutcome(
+  String toolName,
+  CallToolResult result,
+  Session session,
+) {
+  if (result.isError) {
+    return describeStepError(_firstNonEmptyText(result));
   }
 
-  String _firstNonEmptyText(CallToolResult result) => result.content
-      .whereType<TextContent>()
-      .map((c) => c.text)
-      .firstWhere((t) => t.isNotEmpty, orElse: () => '');
+  final tool = toolName.replaceAll('-', '_');
+  if (_shortConfirmationTools.contains(tool)) {
+    var text = _firstNonEmptyText(result);
+    if (_firstLineOnlyTools.contains(tool)) {
+      text = text.split('\n').first;
+    }
+    text = _relativizeSessionPaths(text, session);
+    if (text.isNotEmpty) return _truncateText(_oneLine(_redactUrisIn(text)));
+  }
+
+  final imageCount = result.content.whereType<ImageContent>().length;
+  return imageCount > 0 ? '$imageCount screenshot(s) captured' : 'ok';
 }
+
+String _firstNonEmptyText(CallToolResult result) => result.content
+    .whereType<TextContent>()
+    .map((c) => c.text)
+    .firstWhere((t) => t.isNotEmpty, orElse: () => '');
 
 /// Builds an error outcome (prefixed `error: `) from raw error text — either
 /// an MCP tool result's own message or a CLI command's caught exception's
@@ -257,9 +291,16 @@ String _redactUrisIn(String text) =>
 /// [StepLogger] (MCP tool calls) and the CLI (command invocations), which
 /// use the same field names.
 String describeStepSelector(String toolName, Map<String, dynamic> args) {
+  final tool = toolName.replaceAll('-', '_');
+  final isNative = tool.startsWith('native_');
+  // native_enter_text's `text` is what gets typed, not a selector.
+  final isNativeEnterText = tool == 'native_enter_text';
   final parts = <String>[
-    for (final key in _selectorArgKeys)
-      if (args[key] != null)
+    for (final key in [
+      ..._selectorArgKeys,
+      if (isNative) ..._nativeSelectorArgKeys,
+    ])
+      if (args[key] != null && !(isNativeEnterText && key == 'text'))
         key == 'uri'
             ? 'uri=${_redactUri(args[key].toString())}'
             : '$key=${_oneLine(args[key].toString())}',
@@ -282,8 +323,22 @@ String describeStepSelector(String toolName, Map<String, dynamic> args) {
   }
   // Matches both the MCP tool name (enter_text) and the CLI command name
   // (enter-text).
-  if (toolName.replaceAll('-', '_') == 'enter_text') {
+  if (tool == 'enter_text') {
     parts.add(_describeEnterTextInput(args));
+  }
+  // native_scroll's container, e.g. `within=id:list`.
+  if (args['within'] case final Map<String, dynamic> within when isNative) {
+    final fields = [
+      for (final MapEntry(:key, :value) in within.entries)
+        if (value != null) '$key:${_oneLine(value.toString())}',
+    ];
+    if (fields.isNotEmpty) parts.add('within=${fields.join(',')}');
+  }
+  if (isNativeEnterText) {
+    parts.add(_describeEnterTextInput({
+      'key': args['label'] ?? args['id'] ?? args['textContains'],
+      'input': args['text'],
+    }));
   }
   return parts.join(' ');
 }

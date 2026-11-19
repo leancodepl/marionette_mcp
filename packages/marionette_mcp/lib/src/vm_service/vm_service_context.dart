@@ -39,6 +39,10 @@ final class VmServiceContext {
   final SessionManager _sessionManager;
   final StepLogger _stepLogger;
 
+  /// Records tool calls into the session `connect` opens; shared with the
+  /// native lane so its calls land in the same steps.md.
+  StepLogger get stepLogger => _stepLogger;
+
   /// Owns the registry of dynamic extension tools across the lifetime of
   /// this context. Reused across connect/disconnect cycles so a previously
   /// disabled tool can be revived in place — see [DynamicExtensionTools].
@@ -55,7 +59,10 @@ final class VmServiceContext {
   /// logging its own step, which the generic wrapper has no hook for), so
   /// they log manually instead of going through [LoggedMcpServer].
   /// Everything else is delegated to themed registration functions.
-  void registerTools(McpServer server) {
+  ///
+  /// With [enableNativeLane], `get_interactive_elements` points to
+  /// `native_get_elements` when the app is not in front.
+  void registerTools(McpServer server, {required bool enableNativeLane}) {
     final loggedServer = LoggedMcpServer(server, _stepLogger);
     _dynamicTools = DynamicExtensionTools(
       server: server,
@@ -64,7 +71,12 @@ final class VmServiceContext {
       stepLogger: _stepLogger,
     );
     _registerConnectionTools(server);
-    registerInspectionTools(loggedServer, connector, _logger);
+    registerInspectionTools(
+      loggedServer,
+      connector,
+      _logger,
+      nativeElements: enableNativeLane ? 'native_get_elements' : null,
+    );
     registerGestureTools(loggedServer, connector, _logger);
     registerTextTools(loggedServer, connector, _logger);
     registerKeyboardTools(loggedServer, connector, _logger);

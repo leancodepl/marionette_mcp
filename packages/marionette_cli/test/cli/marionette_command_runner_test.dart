@@ -47,6 +47,19 @@ void main() {
         'help-ai',
         'mcp',
         'help',
+        'native-connect',
+        'native-disconnect',
+        'native-sessions',
+        'native-get-elements',
+        'native-wait-for',
+        'native-take-screenshot',
+        'native-tap',
+        'native-swipe',
+        'native-scroll',
+        'native-enter-text',
+        'native-press-key',
+        'native-hide-keyboard',
+        'native-notifications',
       };
 
       expect(commandNames, equals(expected));

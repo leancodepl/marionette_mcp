@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
+import 'package:marionette_cli/src/cli/step_session.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_mcp/src/session/session.dart';
-import 'package:marionette_mcp/src/session/session_manager.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
@@ -81,20 +81,10 @@ abstract class InstanceCommand extends Command<int> {
           );
 
       if (await _sessionReportsEnabled(connector)) {
-        try {
-          session = SessionManager().create(
-            title: globalResults?['session'] as String?,
-            baseDirOverride: globalResults?['session-dir'] as String?,
-          );
-        } catch (e) {
-          // Best-effort: the connection already works, so a directory
-          // creation failure shouldn't abort the command — just run it
-          // without step logging (session stays null).
-          stderr.writeln(
-            'Warning: could not open a session directory, so this run '
-            'will not be logged: $e',
-          );
-        }
+        session = createCliStepSession(
+          title: globalResults?['session'] as String?,
+          baseDirOverride: globalResults?['session-dir'] as String?,
+        );
       }
 
       final exitCode = await execute(connector);
@@ -147,14 +137,6 @@ abstract class InstanceCommand extends Command<int> {
         if (argResults!.wasParsed(option)) option: argResults![option],
     };
     final selector = describeStepSelector(name, args);
-    final line = formatStepLine(name, selector, outcome);
-    // Best-effort — see StepLogger.logStep. A failed write here must never
-    // turn a command that already ran into an uncaught crash, but is still
-    // worth a warning so a persistent problem doesn't go unnoticed.
-    try {
-      session.stepsFile.writeAsStringSync('$line\n', mode: FileMode.append);
-    } on FileSystemException catch (e) {
-      stderr.writeln('Warning: could not write to steps.md: $e');
-    }
+    appendStepLine(session, formatStepLine(name, selector, outcome));
   }
 }

@@ -213,7 +213,7 @@ Future<McpClient> _startTools(VmServiceContext context) async {
       ),
     ),
   );
-  context.registerTools(server);
+  context.registerTools(server, enableNativeLane: false);
   final toServer = StreamController<List<int>>();
   final toClient = StreamController<List<int>>();
   await server.connect(
