@@ -160,6 +160,19 @@ List interactive UI elements in the app's widget tree.
   --ancestor-keys <wrapper key> to list just that subtree, then reuse the same
   keys as --ancestor-keys on tap/enter-text to act inside it.
 
+  A checkbox or switch (Checkbox, Switch, their *ListTile variants and the
+  Cupertino ones) reports its state as value: "true" (checked/on), "false"
+  (unchecked/off) or "null" (the indeterminate "mixed" state of a tristate
+  checkbox — neither checked nor unchecked). A radio (Radio, RadioListTile,
+  CupertinoRadio) reports selected: "true" when it is the chosen option. A
+  toggle inside another control, such as a checkbox in a text field's suffix
+  or a switch in a button, is listed as its own element; a CheckboxListTile or
+  SwitchListTile, or an interactive app widget that hides its subtree and
+  holds a single toggle, reports that toggle's state instead. A TextField or
+  TextFormField reports the entered value as text (also when built without a
+  controller; empty for a blank field) and its decoration's labelText — or
+  hintText when there is no label — as label.
+
 ---
 
 ### tap

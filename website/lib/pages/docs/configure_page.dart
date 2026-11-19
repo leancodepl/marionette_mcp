@@ -461,15 +461,17 @@ class ConfigurePage extends StatelessComponent {
                 'To list the screen, Marionette walks the widget tree from '
                 'the root down. `shouldStopTraversalAtElement` tells it not '
                 'to look inside a widget: the widget itself is still listed, '
-                'everything below it is not.',
+                'everything below it is not, except checkboxes, switches and '
+                'radios: each is listed as its own element with its state, '
+                'unless the widget reports it.',
               ),
             ),
             p(
               rich(
-                'An interactive widget it stops at still reports the state '
-                'of the checkbox, switch or radio inside it, so a design '
-                'system toggle built on `Switch` carries its `value` with no '
-                'more configuration.',
+                'An interactive widget it stops at that holds a single toggle '
+                "reports that toggle's state instead, and the toggle is then "
+                'not listed. So a design system toggle built on `Switch` '
+                'carries its `value` with no more configuration.',
               ),
             ),
             const DocTable(
