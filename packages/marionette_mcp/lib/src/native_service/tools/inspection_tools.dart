@@ -6,7 +6,6 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -22,6 +21,10 @@ const _maxFailedWaitReads = 3;
 /// `native_wait_for`'s pause between reads when `intervalMs` is not given.
 const defaultWaitIntervalMs = 500;
 const _minWaitIntervalMs = 50;
+
+const _toastLimitNote = 'A toast cannot be read on recent Android '
+    'versions (the tree read fails while it shows) or on iOS; '
+    'native_take_screenshot shows it.';
 
 /// What `native_wait_for` waits for.
 enum NativeWaitState {
@@ -64,7 +67,7 @@ void registerNativeInspectionTools(
           'iOS bundle id) helps detect permission controllers and other '
           'system UIs on top of the Flutter app. Prefer Flutter '
           'get_interactive_elements first. '
-          '$nativeRoutingPreferFlutter '
+          '$_toastLimitNote '
           'Requires native_connect.',
       annotations: const ToolAnnotations(
         title: 'Get Native Elements',
@@ -93,13 +96,13 @@ void registerNativeInspectionTools(
           'UI tree every intervalMs (default $defaultWaitIntervalMs) for up '
           'to timeoutMs (default $defaultWaitTimeoutMs, max '
           '$_maxWaitTimeoutMs). Returns the first matching element for '
-          '"visible". Use it instead of fixed sleeps for system dialogs, '
-          'toasts, and screens that appear after a delay. To wait for a '
+          '"visible". Use it instead of fixed sleeps for system dialogs '
+          'and screens that appear after a delay. To wait for a '
           'system screen (a picker, a browser), wait for an element you '
           'expect on it: a package name is not element text and can match '
           'a label of the app — foregroundApp of native_get_elements tells '
           'which app is in front. '
-          '$nativeRoutingPreferFlutter '
+          '$_toastLimitNote '
           'Requires native_connect.',
       annotations: const ToolAnnotations(
         title: 'Native Wait For',

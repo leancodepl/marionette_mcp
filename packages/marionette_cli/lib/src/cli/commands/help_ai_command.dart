@@ -580,6 +580,9 @@ Simulator). While system UI covers the app, get-interactive-elements still
 lists the Flutter widgets underneath as if they were reachable — check
 native-get-elements when an action has no effect.
 
+The native-* commands run on macOS and Linux hosts (not Windows). They drive
+an Android device or emulator, or one iOS Simulator at a time.
+
 ### Workflow
 
 1. Before the flow opens system UI (starting WebDriverAgent can dismiss an
@@ -595,10 +598,10 @@ native-get-elements when an action has no effect.
 Several devices at once: give each a name with
 `--native-device <name>` (before the command), e.g.
 `marionette --native-device iphone native-tap --text Allow`.
-Prefer one client per Android device at a time: UIAutomator2 has a single
-session, so an MCP server and a CLI session on the same device take it from
-each other, and the MCP server then needs native_connect again
-(native-connect warns when it reuses another process's server).
+Use one client per device: the device-side server has a single session,
+so an MCP server and a CLI session on the same device take it from each
+other, and the MCP server then needs native_connect again (native-connect
+warns when it reuses another process's server).
 
 ### Selectors and coordinates
 
@@ -682,9 +685,10 @@ coordinates into screen pixels.
   not open it. A collapsed "N Notifications" button must be
   tapped first. Opened over the app it is not in the tree — background the
   app first (native-press-key --key home). A banner can be tapped.
-- Android: toasts and heads-up banners are visible only on screenshots on
-  recent versions (older ones list toasts read-only); a tree read during a
-  toast waits until it is gone.
+- Toasts cannot be read on recent Android (a tree read fails while one
+  shows; older versions list them read-only) or on iOS;
+  native-take-screenshot shows them. Android heads-up banners are visible
+  only on screenshots.
 - Android with a hardware keyboard shows Gboard's floating toolbar:
   native-hide-keyboard refuses (Back would close the screen).
 - iOS WebView: once the keyboard has scrolled it, WebKit can report its

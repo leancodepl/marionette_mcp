@@ -1,6 +1,5 @@
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 
@@ -13,15 +12,16 @@ void registerNativeConnectionTools(
     ..registerTool(
       'native_connect',
       description:
+          'The native_* tools are for UI outside the Flutter widget tree; '
+          'Flutter tools stay first for in-app widgets, and native screen '
+          'pixels never mix with Flutter logical coordinates. '
           'Starts a native automation session (UIAutomator2 on Android, '
-          'WebDriverAgent on iOS) for system / native UI that is NOT part of the '
-          'Flutter widget tree — permission dialogs, system sheets, and other '
-          'surfaces outside Marionette\'s Flutter lane. Independent of the '
-          'Flutter "connect" tool; both lanes may be used together. '
+          'WebDriverAgent on iOS) for permission dialogs, system sheets and '
+          'other system UI. Independent of the Flutter "connect" tool; both '
+          'lanes may be used together. '
           'Call it before the flow opens system UI: starting WebDriverAgent '
           'can dismiss an alert already on screen. If a native call later '
           'says the device-side server or session is gone, call it again. '
-          '$nativeRoutingPreferFlutter '
           'Requires platform=android|ios; optionally pass serial (Android) or '
           'udid (iOS simulator).',
       annotations: const ToolAnnotations(title: 'Connect Native Connector'),
@@ -50,8 +50,7 @@ void registerNativeConnectionTools(
       description:
           'Stops the native automation session started by native_connect '
           'and releases device-side processes (UIAutomator2 / WDA). '
-          'Does not affect the Flutter VM-service connection. '
-          '$nativeRoutingPreferFlutter',
+          'Does not affect the Flutter VM-service connection.',
       annotations: const ToolAnnotations(title: 'Disconnect Native Connector'),
       inputSchema: const ToolInputSchema(properties: {}),
       callback: (args, extra) => handleNativeDisconnect(context),

@@ -163,7 +163,9 @@ class NativePage extends StatelessComponent {
             p(
               rich(
                 'The app needs nothing new: the native lane does not go '
-                'through `MarionetteBinding`. The device does.',
+                'through `MarionetteBinding`. The device does. The native '
+                'lane runs on macOS and Linux hosts; Windows is not '
+                'supported.',
               ),
             ),
             const h3([.text('Android')]),
@@ -182,11 +184,12 @@ class NativePage extends StatelessComponent {
             p(
               rich(
                 'macOS with Xcode and a booted simulator; physical iPhones '
-                'are not supported yet. WebDriverAgent is built once, for the '
-                'simulator runtime you use, and Marionette is pointed at the '
-                'build. It also finds a build copied to '
-                '`~/.cache/marionette_mcp/wda/`, and reuses a WebDriverAgent '
-                'already running for the simulator.',
+                'are not supported yet. Marionette drives one iOS Simulator '
+                'at a time: WebDriverAgent listens on port 8100. It is built '
+                'once, for the simulator runtime you use, and Marionette is '
+                'pointed at the build. Marionette also finds a build copied '
+                'to `~/.cache/marionette_mcp/wda/`, and reuses a '
+                'WebDriverAgent already running for the simulator.',
               ),
             ),
             const CodeBlock(
@@ -206,10 +209,9 @@ class NativePage extends StatelessComponent {
                 '`serial` or `udid` when several devices are attached. It is '
                 'separate from `connect`: a run usually uses both. Call it '
                 'before the flow opens system UI: starting WebDriverAgent can '
-                'dismiss an alert already on screen. If a '
-                'native call later says the device-side server or session is '
-                'gone, call `native_connect` again; `native_disconnect` ends '
-                'it.',
+                'dismiss an alert already on screen. If a native call later '
+                'says the device-side server or session is gone, call '
+                '`native_connect` again; `native_disconnect` ends it.',
               ),
             ),
             p(
@@ -227,10 +229,10 @@ class NativePage extends StatelessComponent {
               title: 'a permission dialog from the CLI',
             ),
             const Callout(
-              'UIAutomator2 has one session per Android device. An MCP '
-              'server and a CLI on the same device take it from each other: '
-              'the CLI opens a new one for its next command, the MCP server '
-              'needs `native_connect` again. Use one client per device.',
+              'UIAutomator2 and WebDriverAgent keep one session per device. '
+              'An MCP server and a CLI on the same device take it from each '
+              'other: the CLI opens a new one for its next command, the MCP '
+              'server needs `native_connect` again. Use one client per device.',
               kind: .warning,
             ),
           ],
@@ -381,8 +383,9 @@ class NativePage extends StatelessComponent {
               ),
               li(
                 rich(
-                  'Android heads-up banners, and toasts on recent versions, '
-                  'appear only on `native_take_screenshot`.',
+                  'Android heads-up banners, and toasts on recent Android '
+                  'versions and on iOS, appear only on '
+                  '`native_take_screenshot`.',
                 ),
               ),
             ]),
@@ -482,7 +485,8 @@ class NativePage extends StatelessComponent {
             const Callout(
               'A `native-*` CLI command has no Flutter connection to ask '
               'whether reports are on, so it logs its step only when '
-              '`--session` or `--session-dir` is given. '
+              '`--session`, `--session-dir` or `MARIONETTE_SESSION_DIR` is '
+              'given. '
               '`native-take-screenshot` then also keeps a copy in the '
               'session’s `screenshots/`.',
             ),
@@ -513,7 +517,7 @@ class NativePage extends StatelessComponent {
                 ],
                 [
                   '`native_connect` on iOS: port 8100 is taken',
-                  'Stop what `lsof -nP -iTCP:8100 -sTCP:LISTEN` shows.',
+                  'One iOS Simulator at a time: stop what `lsof -nP -iTCP:8100 -sTCP:LISTEN` shows.',
                 ],
                 [
                   'A native call says several elements match',

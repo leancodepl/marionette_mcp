@@ -1,6 +1,5 @@
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/screenshot_scaling.dart';
-import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
@@ -27,7 +26,6 @@ void registerNativeScreenshotTools(
         'says by how much, so a point read off the image can be turned into '
         'native x/y. With inline: false saves it into the session directory '
         'instead and returns its path. '
-        '$nativeRoutingPreferFlutter '
         'Requires native_connect.',
     annotations: const ToolAnnotations(
       title: 'Native Take Screenshot',

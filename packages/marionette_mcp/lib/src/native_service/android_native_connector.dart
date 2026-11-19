@@ -100,8 +100,9 @@ final class AndroidNativeConnector extends WebDriverNativeConnector {
 
   /// While a toast is shown, UIAutomator2 fails every page source with
   /// "Cannot set AccessibilityNodeInfo's field 'mSealed'" (seen on API 35;
-  /// on API 28 it adds the toast to the tree instead). Reads are retried
-  /// until it is gone.
+  /// on API 28 it adds the toast to the tree instead). Only that failure is
+  /// retried, for up to [toastRetryWindow]. On API 36 the read times out
+  /// instead, and the timeout is not retried.
   @override
   Future<List<NativeElement>> getNativeElements() async {
     final stopwatch = Stopwatch()..start();

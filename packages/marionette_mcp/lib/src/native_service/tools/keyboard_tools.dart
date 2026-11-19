@@ -1,7 +1,6 @@
 import 'package:marionette_mcp/src/native_service/native_connector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
@@ -20,7 +19,6 @@ void registerNativeKeyboardTools(
           'like the software keyboard. back, recents and tab exist only on '
           'Android; on iOS the call fails with a hint. For key presses inside '
           'a Flutter app prefer the Flutter press_key tool. '
-          '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native Press Key'),
       inputSchema: ToolInputSchema(
@@ -45,7 +43,6 @@ void registerNativeKeyboardTools(
           'the keyboard\'s '
           'Done / dismiss key; keyboards without one (e.g. number pad) fail '
           'with a hint. '
-          '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(
         title: 'Native Hide Keyboard',

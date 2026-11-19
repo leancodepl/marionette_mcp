@@ -164,7 +164,8 @@ enum IosBootstrapFailure {
   ),
   wdaArtifactsMissing(
     'Build WebDriverAgent once and point MARIONETTE_WDA_XCTESTRUN at the '
-    'generated .xctestrun (see README, "Native lane requirements (iOS)").',
+    'generated .xctestrun (see '
+    'https://marionette.leancode.co/docs/native/#setup).',
   ),
   portConflict(
     'Stop the other WebDriverAgent instance (or the simulator it is attached '

@@ -5,7 +5,6 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/native_selector.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -119,7 +118,6 @@ void registerNativeGestureTools(
           '(the units of the bounds in native_get_elements; a point read off '
           'native_take_screenshot needs the factor it reports). Use either a selector or x+y, not both. '
           '$nativeSelectorRules '
-          '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native Tap'),
       inputSchema: ToolInputSchema(
@@ -137,7 +135,6 @@ void registerNativeGestureTools(
           '$defaultSwipeDurationMs). Use for drags, sliders, and edge '
           'gestures (e.g. iOS back: start at x=1). For scrolling until '
           'something appears, use native_scroll. '
-          '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native Swipe'),
       inputSchema: ToolInputSchema(
@@ -172,7 +169,6 @@ void registerNativeGestureTools(
           'swipes repeatedly until a matching element is visible, up to '
           'maxSwipes (default $defaultMaxSwipes), and stops early with an '
           'error when the content no longer moves (end of the list). '
-          '$nativeRoutingPreferFlutter '
           'Requires native_connect.',
       annotations: const ToolAnnotations(title: 'Native Scroll'),
       inputSchema: ToolInputSchema(

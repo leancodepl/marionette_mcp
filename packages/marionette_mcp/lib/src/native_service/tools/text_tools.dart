@@ -4,7 +4,6 @@ import 'package:marionette_mcp/src/native_service/native_exceptions.dart';
 import 'package:marionette_mcp/src/native_service/webdriver_client.dart';
 import 'package:marionette_mcp/src/native_service/native_service_context.dart';
 import 'package:marionette_mcp/src/native_service/tools/arg_validation.dart';
-import 'package:marionette_mcp/src/native_service/tools/native_tool_routing.dart';
 import 'package:marionette_mcp/src/native_service/tools/selector_args.dart';
 import 'package:marionette_mcp/src/native_service/tools/native_tool_runner.dart';
 import 'package:mcp_dart/mcp_dart.dart';
@@ -28,7 +27,6 @@ void registerNativeTextTools(
         'The text is appended to the field content; set clear to replace '
         'the content. '
         '$nativeSelectorRules '
-        '$nativeRoutingPreferFlutter '
         'Requires native_connect.',
     annotations: const ToolAnnotations(title: 'Native Enter Text'),
     inputSchema: ToolInputSchema(

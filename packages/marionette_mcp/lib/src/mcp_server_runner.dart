@@ -28,7 +28,7 @@ When the same key exists in several identical subtrees (grid cells, repeated car
 
 Native lane — UI outside the Flutter tree (permission dialogs, system alerts, pickers and sheets, notifications, browser sign-in, native screens, WebView content): use the native_* tools; prefer Flutter tools for in-app widgets.
 - get_interactive_elements warns when the app is not in front (an alert the app itself shows on iOS gives no warning — if a Flutter action has no effect, check native_get_elements). The warning lags a moment: after system UI opens or closes, native_wait_for the expected screen first.
-- Call native_connect before the flow opens system UI (starting WebDriverAgent can dismiss an alert already on screen); call it again if a native call says the session or server is gone. One client per Android device.
+- Call native_connect before the flow opens system UI (starting WebDriverAgent can dismiss an alert already on screen); call it again if a native call says the session or server is gone. One client per device.
 - Read screens with native_get_elements; take native_take_screenshot only for what the tree lacks (heads-up banners, toasts, camera preview). Native x/y and bounds are screen pixels, never Flutter coordinates; a downscaled screenshot reports the factor to them.
 - Wait with native_wait_for, not delays. Permission dialogs: answer them with native_wait_for + native_tap; to see one again, reset the permission outside Marionette (adb shell pm revoke, xcrun simctl privacy … reset), which ends the Flutter connection.
 ''';

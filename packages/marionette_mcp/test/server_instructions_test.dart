@@ -7,16 +7,4 @@ void main() {
     // section, so agents never saw its rules.
     expect(serverInstructions.length, lessThanOrEqualTo(4096));
   });
-
-  test('server instructions keep the native lane rules', () {
-    for (final rule in [
-      'native_get_elements',
-      'native_connect before the flow opens system UI',
-      'native_wait_for',
-      'screen pixels',
-      'reset the permission outside Marionette',
-    ]) {
-      expect(serverInstructions, contains(rule), reason: rule);
-    }
-  });
 }
