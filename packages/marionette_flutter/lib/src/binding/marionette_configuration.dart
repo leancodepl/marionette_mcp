@@ -115,8 +115,8 @@ class MarionetteConfiguration {
   /// Determines if traversal should stop at an app-specific widget.
   ///
   /// This is called only after checking built-in Flutter widgets.
-  /// Return true for custom widgets whose descendants should be skipped
-  /// during tree traversal. The widget itself is still discovered.
+  /// Return true for custom widgets whose descendants (except toggles) should
+  /// be skipped during tree traversal. The widget itself is still discovered.
   ///
   /// The callback receives the [Element], so it can match generic widgets
   /// and class hierarchies with an `is` check on `element.widget`, or decide
