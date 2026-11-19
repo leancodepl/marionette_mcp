@@ -303,27 +303,72 @@ class ElementTreeFinder {
     }
 
     root.visitChildrenForSemantics(collect);
-    bool isAnnounced(Element child) => announced.contains(child.renderObject);
 
     final labels = <String>[];
-    void visit(Element child) {
-      if (!isAnnounced(child)) return;
-      if (child.widget
-          case Semantics(:final properties, :final excludeSemantics)) {
-        final label = properties.label;
-        if (label != null && label.isNotEmpty) labels.add(label);
-        if (excludeSemantics) return;
-      }
-      final text = configuration.extractTextFromWidget(child);
-      if (text == null) {
-        child.visitChildren(visit);
-      } else if (text.isNotEmpty) {
-        labels.add(text);
-      }
-    }
-
-    element.visitChildren(visit);
+    element.visitChildren(
+      (child) => _collectLabels(child, announced, labels),
+    );
     return labels.isEmpty ? null : labels.join('\n');
+  }
+
+  /// Adds the labels of [element] and its subtree to [labels] in tree order,
+  /// skipping elements whose render object is not in [announced].
+  void _collectLabels(
+    Element element,
+    Set<RenderObject> announced,
+    List<String> labels,
+  ) {
+    if (!announced.contains(element.renderObject)) return;
+    if (element.widget
+        case Semantics(:final properties, :final excludeSemantics)) {
+      final label = properties.label;
+      if (label != null && label.isNotEmpty) labels.add(label);
+      if (excludeSemantics) return;
+    }
+    final text = configuration.extractTextFromWidget(element);
+    if (text == null) {
+      element.visitChildren(
+        (child) => _collectLabels(child, announced, labels),
+      );
+      return;
+    }
+    final inlineText = _fillPlaceholders(element, text, announced);
+    if (inlineText.isNotEmpty) labels.add(inlineText);
+  }
+
+  /// Replaces each placeholder a `WidgetSpan` leaves in [text] with the labels
+  /// of the widget it embeds. [RichText] builds those widgets as its children,
+  /// one per placeholder and in the same order.
+  String _fillPlaceholders(
+    Element textElement,
+    String text,
+    Set<RenderObject> announced,
+  ) {
+    if (!text.contains(_placeholder)) return text;
+
+    final inlineLabels = <String>[];
+    _findRichText(textElement)?.visitChildren((child) {
+      final labels = <String>[];
+      _collectLabels(child, announced, labels);
+      inlineLabels.add(labels.join(' '));
+    });
+    final remaining = inlineLabels.iterator;
+    return text.replaceAllMapped(
+      _placeholder,
+      (_) => remaining.moveNext() ? remaining.current : '',
+    );
+  }
+
+  static final _placeholder =
+      String.fromCharCode(PlaceholderSpan.placeholderCodeUnit);
+
+  /// [element] itself when it is a [RichText], or the first [RichText] below
+  /// it, such as the one a `Text` builds.
+  static Element? _findRichText(Element element) {
+    if (element.widget is RichText) return element;
+    Element? richText;
+    element.visitChildren((child) => richText ??= _findRichText(child));
+    return richText;
   }
 
   /// Whether any descendant of [element] is an [EditableText], including one

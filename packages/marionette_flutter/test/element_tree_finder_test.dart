@@ -669,6 +669,65 @@ void main() {
 
       expect(finder.findInteractiveElements().single['text'], 'Contact');
     });
+
+    for (final compaction in CompactionMode.values) {
+      testWidgets(
+          'WidgetSpan text and labels are read inline in order '
+          '(compaction: ${compaction.name})', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: FilledButton(
+                onPressed: () {},
+                child: const Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: 'Pay '),
+                      WidgetSpan(child: Text('now')),
+                      TextSpan(text: ' with '),
+                      WidgetSpan(
+                        child: Icon(Icons.credit_card, semanticLabel: 'card'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(
+          _finder
+              .findInteractiveElements(compaction: compaction)
+              .single['text'],
+          'Pay now with card',
+        );
+      });
+    }
+
+    testWidgets('excluded and offstage WidgetSpan content is left out',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FilledButton(
+              onPressed: () {},
+              child: const Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'Pay'),
+                    WidgetSpan(child: ExcludeSemantics(child: Text(' •'))),
+                    WidgetSpan(child: Offstage(child: Text(' old'))),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_finder.findInteractiveElements().single['text'], 'Pay');
+    });
   });
 
   group('ElementTreeFinder isInteractiveElement', () {
