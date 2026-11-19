@@ -46,14 +46,18 @@ class ElementTreeFinder {
     required CompactionMode compaction,
   }) {
     final widget = element.widget;
-    final elementData =
-        _extractElementData(element, widget, compaction: compaction);
+    final entry = _extractElementData(element, widget, compaction: compaction);
 
-    if (elementData != null) {
-      result.add(elementData);
+    if (entry != null) {
+      result.add(entry.data);
     }
 
     if (configuration.shouldStopAtElement(element)) {
+      // A toggle below whose state the entry did not take is listed on its
+      // own, or no output would carry its state.
+      if (!(entry?.wroteToggleState ?? false)) {
+        _listNestedToggles(element, result, compaction: compaction);
+      }
       return;
     }
 
@@ -62,7 +66,9 @@ class ElementTreeFinder {
     });
   }
 
-  Map<String, dynamic>? _extractElementData(
+  /// The element's entry, and whether this method wrote the state of the one
+  /// toggle at or below the element into the entry.
+  ({Map<String, dynamic> data, bool wroteToggleState})? _extractElementData(
     Element element,
     Widget widget, {
     required CompactionMode compaction,
@@ -153,20 +159,26 @@ class ElementTreeFinder {
     // Unlike Switch, most toggles (Checkbox, Radio, the *ListTile variants, the
     // Cupertino controls) declare none of their state as diagnostics, so
     // without this a checked box looks like an empty one. Only an element that
-    // owns its toggle reports it: one that stops traversal (the toggle inside
-    // is not listed on its own) or a RadioListTile, the one built-in toggle
-    // tile that passes through. A GestureDetector or InkWell wrapping a row
-    // must not claim the state of the checkbox inside it.
+    // owns its toggle reports it: a built-in toggle or toggle tile, or an
+    // interactive app widget the app stops traversal at that holds exactly
+    // one toggle. A text field, button or GestureDetector must not claim the
+    // state of a checkbox inside it, and a value the widget declares itself
+    // wins.
+    var wroteToggleState = false;
     if (isInteractive &&
-        (configuration.shouldStopAtElement(element) ||
-            widget is RadioListTile)) {
+        (_isBuiltInToggle(widget) ||
+            configuration.shouldAppStopAtElement(element))) {
       final toggle = _findToggleState(element);
       if (toggle != null) {
         // A tristate checkbox's indeterminate "mixed" state is a `null`
         // value, reported as the string 'null' — neither checked nor
         // unchecked. A radio's own `value` is the option it stands for, so
         // whether it is the chosen one is reported as `selected`.
-        data[toggle.isRadio ? 'selected' : 'value'] = '${toggle.value}';
+        final key = toggle.isRadio ? 'selected' : 'value';
+        if (!data.containsKey(key)) {
+          data[key] = '${toggle.value}';
+          wroteToggleState = true;
+        }
       }
     }
 
@@ -204,7 +216,7 @@ class ElementTreeFinder {
       data['visible'] = visible;
     }
 
-    return data;
+    return (data: data, wroteToggleState: wroteToggleState);
   }
 
   /// The label or hint of a `TextField`, or of the `TextField` a
@@ -229,16 +241,17 @@ class ElementTreeFinder {
     return label == null || label.isEmpty ? null : label;
   }
 
-  /// The state of the first toggle at or below [element], read off its
+  /// The state of the one toggle at or below [element], read off its
   /// [ToggleableStateMixin] — the state every Material and Cupertino checkbox,
   /// switch and radio is built on. For a radio its `value` already says
   /// whether it is selected, whether the app uses a `RadioGroup` or the
   /// deprecated `groupValue`; the widget alone cannot tell with a
-  /// `RadioGroup`, which Flutter 3.27 lacks. Null when there is no toggle.
+  /// `RadioGroup`, which Flutter 3.27 lacks. Null when there is no toggle or
+  /// more than one.
   static ({bool? value, bool isRadio})? _findToggleState(Element element) {
-    ({bool? value, bool isRadio})? found;
+    final found = <({bool? value, bool isRadio})>[];
     void visit(Element child, bool inRadio) {
-      if (found != null) return;
+      if (found.length > 1) return;
       final inner = child.widget;
       final isRadio = inRadio ||
           inner is Radio ||
@@ -246,14 +259,52 @@ class ElementTreeFinder {
           inner is CupertinoRadio;
       if (child is StatefulElement && child.state is ToggleableStateMixin) {
         final state = child.state as ToggleableStateMixin;
-        found = (value: state.value, isRadio: isRadio);
+        found.add((value: state.value, isRadio: isRadio));
         return;
       }
       child.visitChildren((grandchild) => visit(grandchild, isRadio));
     }
 
     visit(element, false);
-    return found;
+    return found.singleOrNull;
+  }
+
+  /// Adds each built-in toggle below [element] to [result], in tree order.
+  void _listNestedToggles(
+    Element element,
+    List<Map<String, dynamic>> result, {
+    required CompactionMode compaction,
+  }) {
+    void visit(Element child) {
+      final inner = child.widget;
+      if (_isBuiltInToggle(inner)) {
+        final toggleEntry =
+            _extractElementData(child, inner, compaction: compaction);
+        if (toggleEntry != null) {
+          result.add(toggleEntry.data);
+        }
+        return;
+      }
+      child.visitChildren(visit);
+    }
+
+    element.visitChildren(visit);
+  }
+
+  static bool _isBuiltInToggle(Widget widget) {
+    return switch (widget) {
+      Checkbox() ||
+      CheckboxListTile() ||
+      CupertinoCheckbox() ||
+      CupertinoRadio() ||
+      CupertinoSwitch() ||
+      Radio() ||
+      RadioListTile() ||
+      Switch() ||
+      SwitchListTile() =>
+        true,
+      _ => false,
+    };
   }
 
   /// Whether [value] is a primitive worth keeping in the property dump.

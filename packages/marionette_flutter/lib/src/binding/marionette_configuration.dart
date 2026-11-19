@@ -236,10 +236,16 @@ class MarionetteConfiguration {
 
   /// Returns whether traversal should stop at the given element.
   bool shouldStopAtElement(Element element) {
-    final widget = element.widget;
-    return _isBuiltInStopWidget(widget) ||
-        // ignore: deprecated_member_use_from_same_package
-        (shouldStopTraversal?.call(widget.runtimeType) ?? false) ||
+    return _isBuiltInStopWidget(element.widget) ||
+        shouldAppStopAtElement(element);
+  }
+
+  /// Returns whether the app's own callbacks, [shouldStopTraversalAtElement]
+  /// or the deprecated `shouldStopTraversal`, stop traversal at the given
+  /// element.
+  bool shouldAppStopAtElement(Element element) {
+    // ignore: deprecated_member_use_from_same_package
+    return (shouldStopTraversal?.call(element.widget.runtimeType) ?? false) ||
         (shouldStopTraversalAtElement?.call(element) ?? false);
   }
 
