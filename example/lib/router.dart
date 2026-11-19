@@ -19,7 +19,6 @@ import 'screens/testing/native_controls_platform_view_screen.dart';
 import 'screens/testing/keyboard_screen.dart';
 import 'screens/testing/permission_dialogs_screen.dart';
 import 'screens/testing/pickers_and_sheets_screen.dart';
-import 'screens/testing/platform_views_screen.dart';
 import 'screens/testing/testing_screen.dart';
 import 'screens/webview_screen.dart';
 
@@ -29,7 +28,6 @@ const availablePages = <String, String>{
   'profile': '/profile',
   'testing': '/testing',
   'webview': '/testing/webview',
-  'platform_views': '/testing/platform-views',
   'native_controls_platform_view': '/testing/platform-views/native-controls',
   'permission_dialogs': '/testing/permission-dialogs',
   'pickers_and_sheets': '/testing/pickers-and-sheets',
@@ -68,15 +66,9 @@ final router = GoRouter(
               builder: (context, state) => const WebViewScreen(),
             ),
             GoRoute(
-              path: 'platform-views',
-              builder: (context, state) => const PlatformViewsScreen(),
-              routes: [
-                GoRoute(
-                  path: 'native-controls',
-                  builder: (context, state) =>
-                      const NativeControlsPlatformViewScreen(),
-                ),
-              ],
+              path: 'platform-views/native-controls',
+              builder: (context, state) =>
+                  const NativeControlsPlatformViewScreen(),
             ),
             GoRoute(
               path: 'permission-dialogs',

@@ -24,24 +24,35 @@ bool get _isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 /// other platforms instead of failing.
 bool get _isSupported => _isAndroid || _isIOS;
 
-Future<void> _initialize() => _initialized ??= () async {
-      await _notifications.initialize(
-        const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-          iOS: DarwinInitializationSettings(
-            requestAlertPermission: false,
-            requestBadgePermission: false,
-            requestSoundPermission: false,
-          ),
-        ),
-        onDidReceiveNotificationResponse: (response) =>
-            _openedFrom.value = response.payload,
-      );
-      final launch = await _notifications.getNotificationAppLaunchDetails();
-      if (launch?.didNotificationLaunchApp ?? false) {
-        _openedFrom.value = launch!.notificationResponse?.payload;
-      }
-    }();
+/// Initializes the plugin once; after a failure the next call tries again.
+Future<void> _initialize() async {
+  final initialized = _initialized ??= _initializePlugin();
+  try {
+    await initialized;
+  } catch (_) {
+    if (identical(_initialized, initialized)) _initialized = null;
+    rethrow;
+  }
+}
+
+Future<void> _initializePlugin() async {
+  await _notifications.initialize(
+    const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
+    ),
+    onDidReceiveNotificationResponse: (response) =>
+        _openedFrom.value = response.payload,
+  );
+  final launch = await _notifications.getNotificationAppLaunchDetails();
+  if (launch?.didNotificationLaunchApp ?? false) {
+    _openedFrom.value = launch!.notificationResponse?.payload;
+  }
+}
 
 /// Notifications and toasts: a local notification posted after a delay
 /// (so the app can be sent to the background first), opening the app from
@@ -59,11 +70,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    if (_isSupported) _initialize();
+    if (_isSupported) unawaited(_initializeOrReport());
+  }
+
+  /// Initializes the plugin; a failure goes to the status text. Returns
+  /// whether the plugin is ready.
+  Future<bool> _initializeOrReport() async {
+    try {
+      await _initialize();
+      return true;
+    } catch (error) {
+      if (mounted) setState(() => _status = 'initialization failed: $error');
+      return false;
+    }
   }
 
   Future<void> _notifyLater() async {
-    await _initialize();
+    if (!await _initializeOrReport()) return;
     final allowed = _isAndroid
         ? await _notifications
             .resolvePlatformSpecificImplementation<

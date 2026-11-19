@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../webview_screen.dart';
+
 class TestingScreen extends StatelessWidget {
   const TestingScreen({super.key});
 
@@ -13,20 +15,24 @@ class TestingScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          ListTile(
-            leading: const Icon(Icons.language_outlined),
-            title: const Text('WebView'),
-            subtitle: const Text('Embedded browser'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/testing/webview'),
-          ),
-          const Divider(),
+          if (isWebViewSupported) ...[
+            ListTile(
+              leading: const Icon(Icons.language_outlined),
+              title: const Text('WebView'),
+              subtitle: const Text('Embedded browser'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.go('/testing/webview'),
+            ),
+            const Divider(),
+          ],
           ListTile(
             leading: const Icon(Icons.view_in_ar_outlined),
-            title: const Text('Platform Views'),
-            subtitle: const Text('Embedded native surfaces'),
+            title: const Text('Native controls'),
+            subtitle: const Text(
+              'Custom AndroidView / UiKitView with label, field, and button',
+            ),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/testing/platform-views'),
+            onTap: () => context.go('/testing/platform-views/native-controls'),
           ),
           const Divider(),
           ListTile(

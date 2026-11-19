@@ -18,11 +18,21 @@ class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
   PermissionStatus? _photosStatus;
   Permission _photos = Permission.photos;
   Permission? _requesting;
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
     super.initState();
+    // openAppSettings returns when Settings opens, before the user changes
+    // anything, so the statuses are read again when the app comes back.
+    _lifecycleListener = AppLifecycleListener(onResume: _refreshStatuses);
     _refreshStatuses();
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener.dispose();
+    super.dispose();
   }
 
   Future<void> _refreshStatuses() async {
@@ -56,7 +66,6 @@ class _PermissionDialogsScreenState extends State<PermissionDialogsScreen> {
       return;
     }
     await openAppSettings();
-    await _refreshStatuses();
   }
 
   @override

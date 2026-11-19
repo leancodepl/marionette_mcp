@@ -10,7 +10,7 @@ A multi-page Flutter app demonstrating **`call_custom_extension`** with Marionet
 | `/profile` | Profile | User profile |
 | `/testing` | Testing | Native-lane test cases hub |
 | `/testing/webview` | WebView | Local HTML form (default, no network) or the marionette_mcp website |
-| `/testing/platform-views` | Platform views | Native controls (label, field, button) in a platform view |
+| `/testing/platform-views/native-controls` | Native controls | Native controls (label, field, button) in a platform view |
 | `/testing/permission-dialogs` | Permission dialogs | OS permission prompts |
 | `/testing/pickers-and-sheets` | Pickers & sheets | File, photo, camera, share |
 | `/testing/keyboard` | Keyboard / IME | Numeric, return, done keyboards |
