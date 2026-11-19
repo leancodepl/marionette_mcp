@@ -125,3 +125,34 @@ class DsTile extends StatelessWidget {
     );
   }
 }
+
+/// A labelled switch row; tapping anywhere on it flips the switch.
+///
+/// Marionette lists it as one element (see `main.dart`) and reads the state
+/// of the [Switch] inside it, so the inner switch is not listed on its own.
+class DsToggle extends StatelessWidget {
+  const DsToggle({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(!value),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}

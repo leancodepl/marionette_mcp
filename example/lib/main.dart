@@ -17,15 +17,18 @@ void main() {
         // An `is` check matches every DsButton subclass and every
         // DsSelect<T>, and the widget's fields allow per-instance decisions.
         isInteractiveElement: (element) => switch (element.widget) {
-          DsButton() || DsSelect() => true,
+          DsButton() || DsSelect() || DsToggle() => true,
           DsTile(:final onTap) => onTap != null,
           _ => false,
         },
-        // DsSelect reports its label through extractText, so its internals
-        // would only duplicate it.
-        shouldStopTraversalAtElement: (element) => element.widget is DsSelect,
+        // DsSelect and DsToggle report their label through extractText, so
+        // their internals would only duplicate it. DsToggle still reports the
+        // state of the Switch inside it.
+        shouldStopTraversalAtElement: (element) =>
+            element.widget is DsSelect || element.widget is DsToggle,
         extractText: (element) => switch (element.widget) {
           DsSelect(:final selectedLabel) => selectedLabel,
+          DsToggle(:final label) => label,
           _ => null,
         },
       ),

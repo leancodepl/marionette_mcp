@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:marionette_flutter/src/services/log_collector.dart';
 
@@ -123,8 +124,8 @@ class MarionetteConfiguration {
   /// Determines if traversal should stop at an app-specific widget.
   ///
   /// This is called only after checking built-in Flutter widgets.
-  /// Return true for custom widgets whose descendants should be skipped
-  /// during tree traversal. The widget itself is still discovered.
+  /// Return true for custom widgets whose descendants (except toggles) should
+  /// be skipped during tree traversal. The widget itself is still discovered.
   ///
   /// The callback receives the [Element], so it can match generic widgets
   /// and class hierarchies with an `is` check on `element.widget`, or decide
@@ -146,7 +147,9 @@ class MarionetteConfiguration {
   ///    parameter.
   ///
   /// This callback is called only after checking built-in Flutter widgets
-  /// (Text, RichText, EditableText, TextField, TextFormField).
+  /// (Text, RichText, EditableText, TextField, TextFormField). For a text
+  /// field built without a controller, it runs before the fallback that
+  /// reports the typed text, so the text it returns wins.
   /// Return the text content of your custom widgets, or null if not applicable.
   ///
   /// Example:
@@ -244,10 +247,16 @@ class MarionetteConfiguration {
 
   /// Returns whether traversal should stop at the given element.
   bool shouldStopAtElement(Element element) {
-    final widget = element.widget;
-    return _isBuiltInStopWidget(widget) ||
-        // ignore: deprecated_member_use_from_same_package
-        (shouldStopTraversal?.call(widget.runtimeType) ?? false) ||
+    return _isBuiltInStopWidget(element.widget) ||
+        shouldAppStopAtElement(element);
+  }
+
+  /// Returns whether the app's own callbacks, [shouldStopTraversalAtElement]
+  /// or the deprecated `shouldStopTraversal`, stop traversal at the given
+  /// element.
+  bool shouldAppStopAtElement(Element element) {
+    // ignore: deprecated_member_use_from_same_package
+    return (shouldStopTraversal?.call(element.widget.runtimeType) ?? false) ||
         (shouldStopTraversalAtElement?.call(element) ?? false);
   }
 
@@ -282,8 +291,11 @@ class MarionetteConfiguration {
 
   /// Extracts text from a widget (built-in + custom).
   String? extractTextFromWidget(Element element) {
-    final builtInText = _extractBuiltInText(element.widget);
-    return builtInText ?? extractText?.call(element);
+    // The controller-less field fallback comes last so an app's own
+    // extractText for such a field (e.g. one returning its label) still wins.
+    return _extractBuiltInText(element.widget) ??
+        extractText?.call(element) ??
+        _extractControllerlessFieldText(element);
   }
 
   // Built-in Flutter widget support
@@ -295,6 +307,9 @@ class MarionetteConfiguration {
     return switch (widget) {
       Checkbox() ||
       CheckboxListTile() ||
+      CupertinoCheckbox() ||
+      CupertinoRadio() ||
+      CupertinoSwitch() ||
       DropdownButton() ||
       DropdownButtonFormField() ||
       FloatingActionButton() ||
@@ -346,6 +361,9 @@ class MarionetteConfiguration {
   static bool _isBuiltInInteractiveType(Type type) {
     return type == Checkbox ||
         type == CheckboxListTile ||
+        type == CupertinoCheckbox ||
+        type == CupertinoRadio ||
+        type == CupertinoSwitch ||
         type == DropdownButton ||
         type == DropdownButtonFormField ||
         type == ElevatedButton ||
@@ -370,6 +388,26 @@ class MarionetteConfiguration {
   static bool _isBuiltInStopType(Type type) {
     return (type != GestureDetector && type != InkWell) &&
         (_isBuiltInInteractiveType(type) || type == Text);
+  }
+
+  /// A `TextField`/`TextFormField` built without a `controller` creates one
+  /// internally, so the typed value lives only on the inner [EditableText].
+  static String? _extractControllerlessFieldText(Element element) {
+    final widget = element.widget;
+    if (widget is! TextField && widget is! TextFormField) return null;
+    String? found;
+    void visit(Element child) {
+      if (found != null) return;
+      final inner = child.widget;
+      if (inner is EditableText) {
+        found = inner.controller.text;
+        return;
+      }
+      child.visitChildren(visit);
+    }
+
+    element.visitChildren(visit);
+    return found;
   }
 
   static String? _extractBuiltInText(Widget widget) {
