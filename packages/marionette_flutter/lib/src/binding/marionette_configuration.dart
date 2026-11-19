@@ -117,11 +117,6 @@ class MarionetteConfiguration {
   /// This is called only after checking built-in Flutter widgets.
   /// Return true for custom widgets whose descendants should be skipped
   /// during tree traversal. The widget itself is still discovered.
-  /// Checkboxes, switches and radios below it are still listed, each as its
-  /// own element, unless the widget is interactive and holds exactly one of
-  /// them: then the widget reports that toggle's state itself. A `value`
-  /// (checkbox, switch) or `selected` (radio) the widget declares itself wins,
-  /// and the toggle is then listed on its own.
   ///
   /// The callback receives the [Element], so it can match generic widgets
   /// and class hierarchies with an `is` check on `element.widget`, or decide
