@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show AttributedString;
 import 'package:flutter_test/flutter_test.dart';
@@ -611,7 +613,7 @@ void main() {
       final field = _finder
           .findInteractiveElements()
           .singleWhere((e) => e['type'] == 'TextField');
-      expect(field.containsKey('text'), isFalse);
+      expect(field['text'], '');
       expect(field['label'], 'Email');
     });
 
@@ -1095,6 +1097,132 @@ void main() {
       expect(texts, isNot(contains('in tile')));
       expect(texts, contains('outside'));
     });
+
+    group('an app widget that stops traversal', () {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          isInteractiveElement: (element) => element.widget is _DsCard,
+          shouldStopTraversalAtElement: (element) => element.widget is _DsCard,
+        ),
+      );
+
+      testWidgets('reports the state of the one toggle it holds',
+          (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: _DsCard<bool>(
+              child: Checkbox(value: true, onChanged: (_) {}),
+            ),
+          ),
+        ));
+        final elements = finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == '_DsCard<bool>')['value'],
+          'true',
+        );
+        expect(_types(elements), isNot(contains('Checkbox')));
+      });
+
+      testWidgets('lists each of two toggles it holds on its own',
+          (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: _DsCard<bool>(
+              child: Row(
+                children: [
+                  Checkbox(value: false, onChanged: (_) {}),
+                  Checkbox(value: true, onChanged: (_) {}),
+                ],
+              ),
+            ),
+          ),
+        ));
+        final elements = finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == '_DsCard<bool>'),
+          isNot(contains('value')),
+        );
+        expect(
+          elements.where((e) => e['type'] == 'Checkbox').map((e) => e['value']),
+          ['false', 'true'],
+        );
+      });
+
+      testWidgets('keeps a value it declares and lists its toggle on its own',
+          (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: _DsCard<bool>(
+              value: 'weekly',
+              child: Checkbox(value: true, onChanged: (_) {}),
+            ),
+          ),
+        ));
+        final elements = finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == '_DsCard<bool>')['value'],
+          'weekly',
+        );
+        expect(
+          elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+          'true',
+        );
+      });
+
+      testWidgets(
+          "reports its toggle's state when compact mode drops the icon glyph "
+          'it declares as value', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: _DsCard<bool>(
+              value: '',
+              child: Checkbox(value: true, onChanged: (_) {}),
+            ),
+          ),
+        ));
+
+        final compact =
+            finder.findInteractiveElements(compaction: CompactionMode.compact);
+        expect(
+          compact.firstWhere((e) => e['type'] == '_DsCard<bool>')['value'],
+          'true',
+        );
+        expect(compact.where((e) => e['type'] == 'Checkbox'), isEmpty);
+
+        final verbose =
+            finder.findInteractiveElements(compaction: CompactionMode.none);
+        expect(
+          verbose.firstWhere((e) => e['type'] == '_DsCard<bool>')['value'],
+          '',
+        );
+        expect(
+          verbose.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+          'true',
+        );
+      });
+
+      testWidgets(
+          'lists its toggle on its own when its declared value matches the '
+          "toggle's state", (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: _DsCard<bool>(
+              value: 'true',
+              child: Checkbox(value: true, onChanged: (_) {}),
+            ),
+          ),
+        ));
+        final elements = finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+          'true',
+        );
+      });
+    });
   });
 
   group('ElementTreeFinder visibility in a non-implicit view', () {
@@ -1201,6 +1329,302 @@ void main() {
               'CompactionMode.none');
       expect(field['label'], 'Email',
           reason: 'without the label an empty keyless field has no handle');
+    });
+
+    testWidgets('reports a TextFormField label read off its inner TextField',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TextFormField(
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+          ),
+        ),
+      );
+
+      final field = _finder
+          .findInteractiveElements()
+          .firstWhere((e) => e['type'] == 'TextFormField');
+
+      expect(field['label'], 'Title');
+    });
+
+    for (final (name, field) in [
+      ('TextField', TextField()),
+      ('TextFormField', TextFormField()),
+    ]) {
+      testWidgets('reports the typed value of a $name without a controller',
+          (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: field)),
+        );
+        await tester.enterText(find.byType(EditableText), 'Groceries');
+        await tester.pump();
+
+        final element = _finder
+            .findInteractiveElements()
+            .firstWhere((e) => e['type'] == name);
+
+        expect(element['text'], 'Groceries',
+            reason: 'the value lives only in the internal controller');
+      });
+    }
+
+    testWidgets('an app extractText wins over the typed value of a field',
+        (tester) async {
+      final finder = ElementTreeFinder(
+        MarionetteConfiguration(
+          extractText: (element) =>
+              element.widget is TextFormField ? 'Title' : null,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: TextFormField())),
+      );
+      await tester.enterText(find.byType(EditableText), 'Groceries');
+      await tester.pump();
+
+      final element = finder
+          .findInteractiveElements()
+          .firstWhere((e) => e['type'] == 'TextFormField');
+
+      expect(element['text'], 'Title');
+    });
+
+    for (final value in [true, false, null]) {
+      testWidgets('reports Checkbox value $value', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Checkbox(value: value, tristate: true, onChanged: (_) {}),
+          ),
+        ));
+        final elements = _finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+          '$value',
+        );
+      });
+    }
+
+    testWidgets('reports CheckboxListTile value', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: CheckboxListTile(
+            value: true,
+            title: const Text('Brushed Teeth'),
+            onChanged: (_) {},
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements.firstWhere((e) => e['type'] == 'CheckboxListTile')['value'],
+        'true',
+      );
+    });
+
+    for (final value in [true, false]) {
+      testWidgets('reports SwitchListTile value $value', (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: SwitchListTile(
+              value: value,
+              title: const Text('Wi-Fi'),
+              onChanged: (_) {},
+            ),
+          ),
+        ));
+        final elements = _finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == 'SwitchListTile')['value'],
+          '$value',
+        );
+      });
+    }
+
+    for (final (name, toggle, expected) in [
+      (
+        'CupertinoSwitch',
+        CupertinoSwitch(value: true, onChanged: (_) {}),
+        'true',
+      ),
+      (
+        'CupertinoCheckbox',
+        CupertinoCheckbox(value: null, tristate: true, onChanged: (_) {}),
+        'null',
+      ),
+    ]) {
+      testWidgets('reports $name value', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: Center(child: toggle))),
+        );
+        final elements = _finder.findInteractiveElements();
+
+        expect(
+          elements.firstWhere((e) => e['type'] == name)['value'],
+          expected,
+        );
+      });
+    }
+
+    for (final groupValue in [1, 2]) {
+      testWidgets(
+          'reports whether a Radio is selected (groupValue $groupValue)',
+          (tester) async {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: Radio<int>(
+              value: 1,
+              // RadioGroup replaces these only in newer Flutter versions.
+              // ignore: deprecated_member_use
+              groupValue: groupValue,
+              // ignore: deprecated_member_use
+              onChanged: (_) {},
+            ),
+          ),
+        ));
+        final radio = _finder
+            .findInteractiveElements()
+            .firstWhere((e) => e['type'] == 'Radio<int>');
+
+        expect(radio['selected'], '${groupValue == 1}');
+        expect(radio.containsKey('value'), isFalse,
+            reason: "a radio's value is its option, not its state");
+      });
+    }
+
+    testWidgets('reports whether a RadioListTile and its Radio are selected',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: RadioListTile<int>(
+            value: 1,
+            // RadioGroup replaces these only in newer Flutter versions.
+            // ignore: deprecated_member_use
+            groupValue: 1,
+            // ignore: deprecated_member_use
+            onChanged: (_) {},
+            title: const Text('One'),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements
+            .firstWhere((e) => e['type'] == 'RadioListTile<int>')['selected'],
+        'true',
+      );
+      expect(
+        elements.firstWhere((e) => e['type'] == 'Radio<int>')['selected'],
+        'true',
+      );
+    });
+
+    testWidgets('reports whether a CupertinoRadio is selected', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CupertinoRadio<int>(
+              value: 1,
+              // RadioGroup replaces these only in newer Flutter versions.
+              // ignore: deprecated_member_use
+              groupValue: 2,
+              // ignore: deprecated_member_use
+              onChanged: (_) {},
+            ),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements
+            .firstWhere((e) => e['type'] == 'CupertinoRadio<int>')['selected'],
+        'false',
+      );
+    });
+
+    testWidgets('a GestureDetector does not claim the state of a toggle in it',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: GestureDetector(
+            // So the row's empty middle, where hittability is probed, hits.
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: Row(
+              children: [
+                Checkbox(value: true, onChanged: (_) {}),
+                const Text('Remember me'),
+              ],
+            ),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements.firstWhere((e) => e['type'] == 'GestureDetector'),
+        isNot(contains('value')),
+      );
+      expect(
+        elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+        'true',
+      );
+    });
+
+    testWidgets('lists a checkbox in a text field suffix on its own',
+        (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: TextField(
+            decoration: InputDecoration(
+              suffixIcon: Checkbox(value: true, onChanged: (_) {}),
+            ),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements.firstWhere((e) => e['type'] == 'TextField'),
+        isNot(contains('value')),
+      );
+      expect(
+        elements.firstWhere((e) => e['type'] == 'Checkbox')['value'],
+        'true',
+      );
+    });
+
+    testWidgets('lists a switch in a button on its own', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ElevatedButton(
+            onPressed: () {},
+            child: Row(
+              children: [
+                const Text('Wi-Fi'),
+                Switch(value: true, onChanged: (_) {}),
+              ],
+            ),
+          ),
+        ),
+      ));
+      final elements = _finder.findInteractiveElements();
+
+      expect(
+        elements.firstWhere((e) => e['type'] == 'ElevatedButton'),
+        isNot(contains('value')),
+      );
+      expect(
+        elements.firstWhere((e) => e['type'] == 'Switch')['value'],
+        'true',
+      );
     });
   });
 
@@ -1628,12 +2052,19 @@ class _DsTile extends StatelessWidget {
 }
 
 class _DsCard<T> extends StatelessWidget {
-  const _DsCard({required this.child});
+  const _DsCard({required this.child, this.value});
 
   final Widget child;
+  final String? value;
 
   @override
   Widget build(BuildContext context) => _DsBox(child: child);
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(StringProperty('value', value));
+  }
 }
 
 class _AppButton extends ElevatedButton {
