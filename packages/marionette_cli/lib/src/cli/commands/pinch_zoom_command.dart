@@ -43,21 +43,16 @@ class PinchZoomCommand extends InstanceCommand {
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
-    final matcher = buildMatcherFromArgs(
+    final matcher = buildValidatedMatcherFromArgs(
       key: argResults?['key'] as String?,
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
       type: argResults?['type'] as String?,
-      x: _parseNum(argResults?['x'] as String?),
-      y: _parseNum(argResults?['y'] as String?),
+      x: argResults?['x'] as String?,
+      y: argResults?['y'] as String?,
       ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
+      onUsageError: usageException,
     );
-
-    final xStr = argResults?['x'] as String?;
-    final yStr = argResults?['y'] as String?;
-    if ((xStr == null) != (yStr == null)) {
-      usageException('--x and --y must be provided together.');
-    }
 
     if (!hasSelector(matcher)) {
       usageException(
@@ -68,13 +63,15 @@ class PinchZoomCommand extends InstanceCommand {
 
     final scaleStr = argResults?['scale'] as String;
     final scale = double.tryParse(scaleStr);
-    if (scale == null || scale <= 0) {
+    if (scale == null || !scale.isFinite || scale <= 0) {
       usageException('--scale must be a positive number, got "$scaleStr".');
     }
 
     final distanceStr = argResults?['start-distance'] as String;
     final startDistance = double.tryParse(distanceStr);
-    if (startDistance == null || startDistance <= 0) {
+    if (startDistance == null ||
+        !startDistance.isFinite ||
+        startDistance <= 0) {
       usageException(
         '--start-distance must be a positive number, got "$distanceStr".',
       );
@@ -89,10 +86,5 @@ class PinchZoomCommand extends InstanceCommand {
         response['message'] as String? ?? 'Successfully pinch zoomed';
     stdout.writeln(message);
     return 0;
-  }
-
-  num? _parseNum(String? value) {
-    if (value == null) return null;
-    return num.tryParse(value);
   }
 }
