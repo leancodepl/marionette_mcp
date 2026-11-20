@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show SemanticsProperties;
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 
@@ -9,6 +10,9 @@ class ElementTreeFinder {
   const ElementTreeFinder(this.configuration);
 
   final MarionetteConfiguration configuration;
+
+  static final _placeholder =
+      String.fromCharCode(PlaceholderSpan.placeholderCodeUnit);
 
   /// Returns a list of interactive elements from the current widget tree.
   ///
@@ -50,13 +54,19 @@ class ElementTreeFinder {
     required CompactionMode compaction,
   }) {
     final widget = element.widget;
-    final entry = _extractElementData(element, widget, compaction: compaction);
+    final stops = configuration.shouldStopAtElement(element);
+    final entry = _extractElementData(
+      element,
+      widget,
+      compaction: compaction,
+      collapsesSubtree: stops,
+    );
 
     if (entry != null) {
       result.add(entry.data);
     }
 
-    if (configuration.shouldStopAtElement(element)) {
+    if (stops) {
       // A toggle below whose state the entry did not take is listed on its
       // own, or no output would carry its state.
       if (!(entry?.wroteToggleState ?? false)) {
@@ -76,6 +86,7 @@ class ElementTreeFinder {
     Element element,
     Widget widget, {
     required CompactionMode compaction,
+    required bool collapsesSubtree,
   }) {
     // Only process elements with render objects
     final renderObject = element.renderObject;
@@ -94,7 +105,11 @@ class ElementTreeFinder {
     // Semantics(label: 'Save', child: ElevatedButton(...)) wrapper would
     // shadow the inner button.
     final compact = compaction == CompactionMode.compact;
-    final discoverableText = switch (text ?? _extractSemanticsText(widget)) {
+    final discoverableText = switch (text ??
+        _extractSemanticsText(widget) ??
+        (isInteractive && collapsesSubtree
+            ? _extractMergedLabel(element)
+            : null)) {
       final found? when compact && _isIconGlyph(found) => null,
       final found => found,
     };
@@ -288,8 +303,12 @@ class ElementTreeFinder {
     void visit(Element child) {
       final inner = child.widget;
       if (_isBuiltInToggle(inner)) {
-        final toggleEntry =
-            _extractElementData(child, inner, compaction: compaction);
+        final toggleEntry = _extractElementData(
+          child,
+          inner,
+          compaction: compaction,
+          collapsesSubtree: configuration.shouldStopAtElement(child),
+        );
         if (toggleEntry != null) {
           result.add(toggleEntry.data);
         }
@@ -417,14 +436,131 @@ class ElementTreeFinder {
   /// class-level dartdoc on `MarionetteConfiguration` for the rationale.
   static String? _extractSemanticsText(Widget widget) {
     if (widget is! Semantics) return null;
-    final label = widget.properties.label;
+    final label = _semanticsLabel(widget.properties);
     final value = widget.properties.value;
-    final hasLabel = label != null && label.isNotEmpty;
     final hasValue = value != null && value.isNotEmpty;
-    if (hasLabel && hasValue) return '$label: $value';
-    if (hasLabel) return label;
+    if (label != null && hasValue) return '$label: $value';
+    if (label != null) return label;
     if (hasValue) return value;
     return null;
+  }
+
+  /// The nonempty `label` of [properties], or the text of its
+  /// `attributedLabel`: `Semantics` takes one or the other, never both.
+  static String? _semanticsLabel(SemanticsProperties properties) {
+    final label = properties.label ?? properties.attributedLabel?.string;
+    return label == null || label.isEmpty ? null : label;
+  }
+
+  /// A discovery-only label for a control traversal stops at, built from the
+  /// text its children show and the explicit `Semantics` labels below it
+  /// (such as an `Icon`'s `semanticLabel`), in tree order and joined line by
+  /// line. It reads only what [RenderObject.visitChildrenForSemantics]
+  /// reaches, which leaves out `ExcludeSemantics` (an `Icon`'s glyph),
+  /// `Offstage`, the hidden children of an `IndexedStack` and the like.
+  ///
+  /// This is a hybrid of the visible text and the accessibility labels, not
+  /// what Flutter's accessibility tree announces: a `Text` reports its
+  /// visible text, `WidgetSpan` content included, even when its
+  /// `semanticsLabel` says something else.
+  /// `tap(text:)` still matches each `Text` on its own, so a label merged from
+  /// several children, taken from `Semantics` alone or filled with
+  /// `WidgetSpan` content does not match.
+  /// A control holding an [EditableText] anywhere below it, including below
+  /// `Semantics(excludeSemantics: true)`, is a field, whose `text` is its
+  /// value rather than the label around it, so it gets none.
+  String? _extractMergedLabel(Element element) {
+    final root = element.renderObject;
+    if (root == null ||
+        _findDescendant(element, (widget) => widget is EditableText) != null) {
+      return null;
+    }
+
+    final reachable = _semanticsReachableFrom(root);
+    final labels = <String>[];
+    element.visitChildren(
+      (child) => _collectLabels(child, reachable, labels),
+    );
+    return labels.isEmpty ? null : labels.join('\n');
+  }
+
+  /// [root] and every render object below it that
+  /// [RenderObject.visitChildrenForSemantics] reaches.
+  static Set<RenderObject> _semanticsReachableFrom(RenderObject root) {
+    final reachable = <RenderObject>{root};
+    void collect(RenderObject child) {
+      if (reachable.add(child)) child.visitChildrenForSemantics(collect);
+    }
+
+    root.visitChildrenForSemantics(collect);
+    return reachable;
+  }
+
+  /// Adds the labels of [element] and its subtree to [labels] in tree order,
+  /// skipping elements whose render object is not in [reachable].
+  void _collectLabels(
+    Element element,
+    Set<RenderObject> reachable,
+    List<String> labels,
+  ) {
+    if (!reachable.contains(element.renderObject)) return;
+    if (element.widget
+        case Semantics(:final properties, :final excludeSemantics)) {
+      if (_semanticsLabel(properties) case final label?) labels.add(label);
+      if (excludeSemantics) return;
+    }
+    final text = configuration.extractTextFromWidget(element);
+    if (text == null) {
+      element.visitChildren(
+        (child) => _collectLabels(child, reachable, labels),
+      );
+      return;
+    }
+    final inlineText = _fillPlaceholders(element, text);
+    if (inlineText.isNotEmpty) labels.add(inlineText);
+  }
+
+  /// Replaces each placeholder a `WidgetSpan` leaves in [text] with the labels
+  /// of the widget it embeds. [RichText] builds those widgets as its children,
+  /// one per placeholder and in the same order.
+  ///
+  /// The semantics walk starts again at the [RichText], because a `Text` with
+  /// a `semanticsLabel` excludes it, while its visible text is what is read.
+  /// What the embedded widgets exclude themselves stays left out.
+  String _fillPlaceholders(Element textElement, String text) {
+    if (!text.contains(_placeholder)) return text;
+
+    final inlineLabels = <String>[];
+    final richText = textElement.widget is RichText
+        ? textElement
+        : _findDescendant(textElement, (widget) => widget is RichText);
+    if (richText case final RenderObjectElement richText) {
+      final reachable = _semanticsReachableFrom(richText.renderObject);
+      richText.visitChildren((child) {
+        final labels = <String>[];
+        _collectLabels(child, reachable, labels);
+        inlineLabels.add(labels.join(' '));
+      });
+    }
+    final remaining = inlineLabels.iterator;
+    return text.replaceAllMapped(
+      _placeholder,
+      (_) => remaining.moveNext() ? remaining.current : '',
+    );
+  }
+
+  /// The first element below [element], in tree order, whose widget passes
+  /// [test], including one that the semantics walk skips.
+  static Element? _findDescendant(
+    Element element,
+    bool Function(Widget widget) test,
+  ) {
+    Element? found;
+    element.visitChildren(
+      (child) =>
+          found ??= test(child.widget) ? child : _findDescendant(child, test),
+    );
+    return found;
   }
 
   /// Checks if the element is currently visible in the view it is mounted in.

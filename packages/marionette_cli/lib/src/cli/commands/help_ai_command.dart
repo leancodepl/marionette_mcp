@@ -158,7 +158,10 @@ List interactive UI elements in the app's widget tree.
     marionette -i my-app get-interactive-elements --compaction=none
     marionette --uri ws://127.0.0.1:8181/ws get-interactive-elements
 
-  Output (stdout), one line per element:
+  Output (stdout), one line per element; inside a value a line break prints
+  as \n, a carriage return as \r and a backslash as \\. Unescape a copied
+  value before you pass it to --text or --key: Text: "C:\\temp" is
+  --text 'C:\temp'.
     Found 3 interactive element(s):
 
     Type: ElevatedButton, Key: "submit_button", Text: "Submit"
@@ -166,8 +169,14 @@ List interactive UI elements in the app's widget tree.
     Type: IconButton, Text: ""
 
   Each element may have: type, key, text, identifier, and additional
-  properties. Use the key, identifier, or text values as matchers for tap,
-  enter-text, scroll-to. On a screen that repeats the same subtree, pass
+  properties. To act on an element, pass its key or identifier, the text of
+  one visible Text widget, or its coordinates. A button or tile reports the
+  labels of its children as its text. When that text joins several labels
+  ("Accept terms\nRequired"), comes from a Semantics label (an icon's
+  semanticLabel), or includes the content of a WidgetSpan ("Hi Bob" from
+  Text.rich with WidgetSpan(child: Text("Bob"))), it is for discovery only:
+  --text does not match it.
+  On a screen that repeats the same subtree, pass
   --ancestor-keys <wrapper key> to list just that subtree, then reuse the same
   keys as --ancestor-keys on tap/enter-text to act inside it.
 

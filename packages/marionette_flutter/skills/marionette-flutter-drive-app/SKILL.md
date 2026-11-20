@@ -131,6 +131,15 @@ dropped connection) is abandoned; don't pick it up or reuse its title. See
   translated; coordinates break on any layout shift, font scale or screen size.
   Coordinates are a last-resort diagnostic: needing them means the widget
   needs a key or `Semantics(identifier: ...)`.
+- **Discovery text is not always a selector.** A button or list tile reports
+  the labels of its children as its `text`. When that text joins several
+  labels (`"Accept terms\nRequired"`), comes from a `Semantics` label (an
+  icon's `semanticLabel`), or includes the content of a `WidgetSpan`
+  (`"Hi Bob"` from `Text.rich` with `WidgetSpan(child: Text("Bob"))`),
+  `tap(text:)` does not match it: use the key, the identifier, the text of
+  one visible `Text`, or coordinates. The listing prints a line break as
+  `\n`, a carriage return as `\r` and a backslash as `\\`; unescape a copied
+  value before you pass it back.
 - **Repeated keys: scope the match with `ancestor_keys`.** Every tool takes the
   first match, so on a screen that repeats a subtree (grid cells, repeated
   cards, a dev screen embedding several copies of the app) a plain

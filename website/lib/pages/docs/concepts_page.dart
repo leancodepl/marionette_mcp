@@ -138,7 +138,13 @@ class ConceptsPage extends StatelessComponent {
                 'every widget with text, and every `Semantics` with a label '
                 'or value. Each entry carries its type, key, text, Semantics '
                 'identifier and bounds, so the agent can name a target and '
-                'knows where it is.',
+                'knows where it is. A button or list tile reports the labels '
+                'of its children as its text. When that text joins several '
+                'labels, comes from a `Semantics` label or includes the '
+                'content of a `WidgetSpan`, it is for discovery only: the text '
+                'matcher compares one `Text` at a time, without its '
+                '`WidgetSpan` content, so the agent selects by key, '
+                'identifier, the text of one visible `Text`, or coordinates.',
               ),
             ),
             const p([
