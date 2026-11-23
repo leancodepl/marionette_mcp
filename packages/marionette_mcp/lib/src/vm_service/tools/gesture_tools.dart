@@ -206,7 +206,7 @@ void registerGestureTools(
     ..registerTool(
       'long_press',
       description:
-          'Simulates a long press gesture on an element in the Flutter app. This is useful for triggering context menus, reorderable lists, or any widget that responds to long press. You can match elements by their key, identifier, text, type, or coordinates. An optional duration parameter controls how long the press is held (default: 600ms). Requires an active connection established via connect.',
+          'Simulates a long press gesture on an element in the Flutter app. This is useful for triggering context menus or any widget that responds to long press; to drag after the press, use swipe with hold_duration. You can match elements by their key, identifier, text, type, or coordinates. An optional duration parameter controls how long the press is held (default: 600ms). Requires an active connection established via connect.',
       annotations: const ToolAnnotations(title: 'Long Press Element'),
       inputSchema: ToolInputSchema(
         properties: {
@@ -276,6 +276,7 @@ void registerGestureTools(
           '1. Element-based: provide key, identifier, or text to identify the element, plus a direction (left, right, up, down) and optional distance in pixels (default 200). '
           '2. Coordinate-based: provide startX, startY, endX, endY for precise control. '
           'Useful for interacting with PageView, Dismissible, Drawer, Slider, and other swipe-based widgets. '
+          'In both modes, set hold_duration to hold the pointer down before it moves, for widgets that start a drag on long press, such as ReorderableListView items on Android and iOS. '
           'Requires an active connection established via connect.',
       annotations: const ToolAnnotations(title: 'Swipe'),
       inputSchema: ToolInputSchema(
@@ -313,6 +314,10 @@ void registerGestureTools(
           ),
           'endY': JsonSchema.number(
             description: 'End Y coordinate for coordinate-based swipe.',
+          ),
+          'hold_duration': JsonSchema.number(
+            description:
+                'How long to hold the pointer down before it moves, in milliseconds. No hold when omitted.',
           ),
           'ancestor_keys': JsonSchema.array(
             items: JsonSchema.string(),
@@ -360,6 +365,11 @@ void registerGestureTools(
           if (args.containsKey('distance')) {
             swipeArgs['distance'] = args['distance'].toString();
           }
+        }
+
+        final holdDuration = (args['hold_duration'] as num?)?.toInt();
+        if (holdDuration != null) {
+          swipeArgs['holdDuration'] = holdDuration;
         }
 
         return runTool(logger, 'swipe', () async {

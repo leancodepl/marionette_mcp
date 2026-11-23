@@ -16,6 +16,7 @@
 - Fix `connect` waiting indefinitely when the app stops answering, for example while its device is asleep or the app is paused in the debugger: it now fails after 30 seconds with an error that says what to check, and no longer waits for a previously connected app that stopped responding to close its connection ([#131](https://github.com/leancodepl/marionette_mcp/issues/131))
 - Fix CLI gesture commands accepting invalid arguments: `tap`, `secondary-tap` and `long-press` now require `--x` and `--y` together, like `double-tap` and `pinch-zoom`; coordinates, `--scale`, `--start-distance` and `--distance` must be finite numbers; `long-press --duration` and `swipe --distance` must be positive. A usage error raised by a command now exits with 64 instead of 1 ([#153](https://github.com/leancodepl/marionette_mcp/pull/153))
 - Fix `swipe` on an element acting on a widget hidden behind a dialog or another route: like `tap`, it now targets the element that receives the pointer, and fails when the matching element is covered. `distance` must be a positive number and swipe coordinates must be finite ([#151](https://github.com/leancodepl/marionette_mcp/pull/151))
+- Add `hold_duration` to `swipe` (`--hold-duration` in the CLI): it holds the pointer down for that many milliseconds before it moves, in both modes, so widgets that start a drag on long press can be dragged, such as a `ReorderableListView` item on Android and iOS ([#156](https://github.com/leancodepl/marionette_mcp/issues/156))
 
 # 0.7.0
 

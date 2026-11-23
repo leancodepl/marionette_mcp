@@ -350,10 +350,16 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
     --end-x <number>      End X coordinate
     --end-y <number>      End Y coordinate
 
+  Options for both modes:
+    --hold-duration <ms>  Hold the pointer down before it moves, for widgets
+                          that start a drag on long press (ReorderableListView
+                          items on Android and iOS)
+
   Examples:
     marionette -i my-app swipe --type PageView --direction left
     marionette -i my-app swipe --key carousel --direction right --distance 300
     marionette -i my-app swipe --start-x 300 --start-y 400 --end-x 50 --end-y 400
+    marionette -i my-app swipe --key item_1 --direction down --hold-duration 600
 
   Output (stdout):
     Swiped left on element matching: {type: PageView}

@@ -580,6 +580,9 @@ class VmServiceConnector {
   /// - Element-based: [args] should contain a matcher ('key' or 'text'),
   ///   'direction' ('left', 'right', 'up', 'down'), and optional 'distance'
   ///
+  /// In both modes an optional 'holdDuration' holds the pointer down for that
+  /// many milliseconds before it moves.
+  ///
   /// Throws [NotConnectedException] if not connected.
   Future<Map<String, dynamic>> swipe(Map<String, dynamic> args) {
     return _callExtension('marionette.swipe', args);

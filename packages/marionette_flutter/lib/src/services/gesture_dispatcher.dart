@@ -398,13 +398,16 @@ class GestureDispatcher {
   /// [direction] for [distance] pixels.
   ///
   /// The swipe starts from the center of the matched element and moves in the
-  /// specified direction.
+  /// specified direction. A [holdDuration] above zero holds the pointer down
+  /// before it moves, which starts a long-press drag (for example a
+  /// [ReorderableListView] item on Android and iOS).
   Future<void> swipe(
     WidgetMatcher matcher,
     WidgetFinder widgetFinder,
     MarionetteConfiguration configuration, {
     required String direction,
     double distance = 200.0,
+    Duration holdDuration = Duration.zero,
     List<KeyMatcher> ancestors = const [],
   }) async {
     if (!distance.isFinite || distance <= 0) {
@@ -432,7 +435,12 @@ class GestureDispatcher {
           'Must be one of: left, right, up, down'),
     };
 
-    await drag(start, end, viewId: _viewIdOfElement(element));
+    await drag(
+      start,
+      end,
+      viewId: _viewIdOfElement(element),
+      holdDuration: holdDuration,
+    );
   }
 
   /// Simulates a pinch zoom gesture centered on an element matching [matcher].
@@ -600,7 +608,18 @@ class GestureDispatcher {
   /// [viewId] is the view the drag is dispatched to; it defaults to the first
   /// rendered view. Callers that start from an element should pass that
   /// element's view instead.
-  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
+  ///
+  /// The pointer is held down for [holdDuration] before it moves.
+  Future<void> drag(
+    Offset from,
+    Offset to, {
+    int? viewId,
+    Duration holdDuration = Duration.zero,
+  }) async {
+    if (holdDuration.isNegative) {
+      throw ArgumentError('holdDuration must not be negative');
+    }
+
     if (!from.dx.isFinite ||
         !from.dy.isFinite ||
         !to.dx.isFinite ||
@@ -639,7 +658,7 @@ class GestureDispatcher {
       ]);
     }
 
-    final records = [
+    await _handlePointerEventRecord([
       [
         PointerAddedEvent(
           position: from,
@@ -653,6 +672,13 @@ class GestureDispatcher {
           viewId: resolvedViewId,
         ),
       ],
+    ]);
+
+    if (holdDuration > Duration.zero) {
+      await Future<void>.delayed(holdDuration);
+    }
+
+    await _handlePointerEventRecord([
       ...moveRecords,
       [
         PointerUpEvent(
@@ -667,9 +693,7 @@ class GestureDispatcher {
           viewId: resolvedViewId,
         ),
       ],
-    ];
-
-    await _handlePointerEventRecord(records);
+    ]);
   }
 
   /// Handles a list of pointer event records by dispatching them with proper timing.

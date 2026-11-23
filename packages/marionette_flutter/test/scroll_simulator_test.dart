@@ -1433,7 +1433,12 @@ class _WidgetTesterGestureDispatcher extends GestureDispatcher {
   int dragCount = 0;
 
   @override
-  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
+  Future<void> drag(
+    Offset from,
+    Offset to, {
+    int? viewId,
+    Duration holdDuration = Duration.zero,
+  }) async {
     dragCount++;
     await _tester.drag(_scrollableFinder, to - from);
     await _tester.pump();
@@ -1450,7 +1455,12 @@ class _DismissingGestureDispatcher extends GestureDispatcher {
   int dragCount = 0;
 
   @override
-  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
+  Future<void> drag(
+    Offset from,
+    Offset to, {
+    int? viewId,
+    Duration holdDuration = Duration.zero,
+  }) async {
     dragCount++;
     await _tester.dragFrom(from, to - from);
     _dismissed.value = true;
@@ -1472,7 +1482,12 @@ class _ScrollingGestureDispatcher extends GestureDispatcher {
   final List<int?> viewIds = <int?>[];
 
   @override
-  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
+  Future<void> drag(
+    Offset from,
+    Offset to, {
+    int? viewId,
+    Duration holdDuration = Duration.zero,
+  }) async {
     viewIds.add(viewId);
 
     final target = _controller.offset - (to.dy - from.dy);
@@ -1495,7 +1510,12 @@ class _CoordinateGestureDispatcher extends GestureDispatcher {
   int get dragCount => dragOrigins.length;
 
   @override
-  Future<void> drag(Offset from, Offset to, {int? viewId}) async {
+  Future<void> drag(
+    Offset from,
+    Offset to, {
+    int? viewId,
+    Duration holdDuration = Duration.zero,
+  }) async {
     dragOrigins.add(from);
     await _tester.dragFrom(from, to - from);
     await _tester.pump();

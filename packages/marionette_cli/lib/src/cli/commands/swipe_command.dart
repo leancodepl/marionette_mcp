@@ -29,8 +29,12 @@ class SwipeCommand extends InstanceCommand {
       ..addOption('start-y',
           help: 'Start Y coordinate for coordinate-based swipe.')
       ..addOption('end-x', help: 'End X coordinate for coordinate-based swipe.')
-      ..addOption('end-y',
-          help: 'End Y coordinate for coordinate-based swipe.');
+      ..addOption('end-y', help: 'End Y coordinate for coordinate-based swipe.')
+      ..addOption(
+        'hold-duration',
+        help: 'Milliseconds to hold the pointer down before it moves, in '
+            'either mode. For widgets that start a drag on long press.',
+      );
   }
 
   final InstanceRegistry _registry;
@@ -127,6 +131,17 @@ class SwipeCommand extends InstanceCommand {
         ..addAll(matcher)
         ..['direction'] = direction
         ..['distance'] = distance;
+    }
+
+    if (argResults?['hold-duration'] case final String holdDurationStr) {
+      final holdDuration = int.tryParse(holdDurationStr);
+      if (holdDuration == null || holdDuration <= 0) {
+        usageException(
+          '--hold-duration must be a positive integer, got: '
+          '"$holdDurationStr"',
+        );
+      }
+      swipeArgs['holdDuration'] = holdDuration;
     }
 
     final response = await connector.swipe(swipeArgs);
