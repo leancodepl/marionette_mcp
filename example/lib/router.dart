@@ -10,6 +10,7 @@ import 'screens/mouse_tap_screen.dart';
 import 'screens/page_view_screen.dart';
 import 'screens/pinch_zoom_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/reorderable_list_screen.dart';
 import 'screens/scoped_matching_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/testing/keyboard_screen.dart';
@@ -41,6 +42,7 @@ const availablePages = <String, String>{
   'about': '/settings/about',
   'page_view': '/settings/page-view',
   'dismissible': '/settings/dismissible',
+  'reorderable_list': '/settings/reorderable-list',
   'pinch_zoom': '/settings/pinch-zoom',
   'mouse_tap': '/settings/mouse-tap',
   'scoped_matching': '/settings/scoped-matching',
@@ -113,6 +115,10 @@ final router = GoRouter(
             GoRoute(
               path: 'dismissible',
               builder: (context, state) => const DismissibleScreen(),
+            ),
+            GoRoute(
+              path: 'reorderable-list',
+              builder: (context, state) => const ReorderableListScreen(),
             ),
             GoRoute(
               path: 'pinch-zoom',
