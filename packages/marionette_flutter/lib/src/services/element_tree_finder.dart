@@ -186,19 +186,14 @@ class ElementTreeFinder {
     // Unlike Switch, most toggles (Checkbox, Radio, the *ListTile variants, the
     // Cupertino controls) declare none of their state as diagnostics, so
     // without this a checked box looks like an empty one. Only an element that
-    // owns its toggle reports it: a built-in toggle or toggle tile, or an
-    // interactive app widget the app stops traversal at that holds exactly
-    // one toggle. A text field, button or GestureDetector must not claim the
+    // owns its toggle reports it: a built-in or typed toggle or toggle tile,
+    // or an interactive app widget the app stops traversal at that holds
+    // exactly one toggle. A text field, button or GestureDetector must not claim the
     // state of a checkbox inside it, and a value the widget declares itself
     // wins.
     var wroteToggleState = false;
     if (isInteractive &&
-        (_isBuiltInToggle(widget) ||
-            configuration.shouldAppStopAtElement(element) ||
-            configuration.controlKindFor(element) ==
-                MarionetteControlKind.toggle ||
-            configuration.controlKindFor(element) ==
-                MarionetteControlKind.radio)) {
+        (_isToggle(element) || configuration.shouldAppStopAtElement(element))) {
       final toggle = _findToggleState(element);
       if (toggle != null) {
         // A tristate checkbox's indeterminate "mixed" state is a `null`
@@ -279,7 +274,7 @@ class ElementTreeFinder {
   /// deprecated `groupValue`; the widget alone cannot tell with a
   /// `RadioGroup`, which Flutter 3.27 lacks. Null when there is no toggle or
   /// more than one.
-  static ({bool? value, bool isRadio})? _findToggleState(Element element) {
+  ({bool? value, bool isRadio})? _findToggleState(Element element) {
     final found = <({bool? value, bool isRadio})>[];
     void visit(Element child, bool inRadio) {
       if (found.length > 1) return;
@@ -287,7 +282,8 @@ class ElementTreeFinder {
       final isRadio = inRadio ||
           inner is Radio ||
           inner is RadioListTile ||
-          inner is CupertinoRadio;
+          inner is CupertinoRadio ||
+          configuration.controlKindFor(child) == MarionetteControlKind.radio;
       if (child is StatefulElement && child.state is ToggleableStateMixin) {
         final state = child.state as ToggleableStateMixin;
         found.add((value: state.value, isRadio: isRadio));
@@ -300,7 +296,7 @@ class ElementTreeFinder {
     return found.singleOrNull;
   }
 
-  /// Adds each built-in toggle below [element] to [result], in tree order.
+  /// Adds each toggle below [element] to [result], in tree order.
   void _listNestedToggles(
     Element element,
     List<Map<String, dynamic>> result, {
@@ -308,7 +304,7 @@ class ElementTreeFinder {
   }) {
     void visit(Element child) {
       final inner = child.widget;
-      if (_isBuiltInToggle(inner)) {
+      if (_isToggle(child)) {
         final toggleEntry = _extractElementData(
           child,
           inner,
@@ -324,6 +320,16 @@ class ElementTreeFinder {
     }
 
     element.visitChildren(visit);
+  }
+
+  /// Whether [element] is a built-in toggle or one an integration or the app
+  /// classifies as a toggle or radio.
+  bool _isToggle(Element element) {
+    return _isBuiltInToggle(element.widget) ||
+        switch (configuration.controlKindFor(element)) {
+          MarionetteControlKind.toggle || MarionetteControlKind.radio => true,
+          MarionetteControlKind.textField || null => false,
+        };
   }
 
   static bool _isBuiltInToggle(Widget widget) {

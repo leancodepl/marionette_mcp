@@ -160,4 +160,48 @@ void main() {
       expect(_entry(untouched, 'CupertinoTextField')['text'], '');
     },
   );
+
+  testWidgets('reports the effective state of radios and a tristate checkbox', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app([
+        RadioGroup<int>(
+          groupValue: 2,
+          onChanged: (_) {},
+          child: const Column(
+            children: [
+              CupertinoRadio<int>(key: ValueKey('first'), value: 1),
+              CupertinoRadio<int>(key: ValueKey('second'), value: 2),
+            ],
+          ),
+        ),
+        CupertinoCheckbox(tristate: true, value: null, onChanged: (_) {}),
+      ]),
+    );
+
+    final elements = _list(_configuration);
+    Map<String, dynamic> radio(String key) =>
+        elements.singleWhere((e) => e['key'] == key);
+
+    expect(radio('first')['selected'], 'false');
+    expect(radio('second')['selected'], 'true');
+    expect(_entry(elements, 'CupertinoCheckbox')['value'], 'null');
+  });
+
+  testWidgets('a field lists its suffix switch on its own', (tester) async {
+    await tester.pumpWidget(
+      _app([
+        CupertinoTextField(
+          placeholder: 'Password',
+          suffix: CupertinoSwitch(value: true, onChanged: (_) {}),
+        ),
+      ]),
+    );
+
+    final elements = _list(_configuration);
+
+    expect(_entry(elements, 'CupertinoTextField'), isNot(contains('value')));
+    expect(_entry(elements, 'CupertinoSwitch')['value'], 'true');
+  });
 }
