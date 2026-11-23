@@ -233,4 +233,36 @@ void main() {
     expect(_entry(elements, 'Switch')['value'], 'true');
     expect(_entry(elements, 'Checkbox')['value'], 'true');
   });
+
+  testWidgets(
+    'reports adaptive Material toggles on Apple platforms by themselves',
+    (tester) async {
+      await tester.pumpWidget(
+        _app([
+          Switch.adaptive(value: true, onChanged: (_) {}),
+          Checkbox.adaptive(value: false, onChanged: (_) {}),
+          RadioGroup<int>(
+            groupValue: 1,
+            onChanged: (_) {},
+            child: const Radio<int>.adaptive(value: 1),
+          ),
+        ]),
+      );
+
+      final elements = _list(_configuration);
+
+      expect(_configuration.uiLibraries, {MarionetteUiLibrary.materialUi});
+      expect(_entry(elements, 'Switch')['value'], 'true');
+      expect(_entry(elements, 'Checkbox')['value'], 'false');
+      expect(_entry(elements, 'Radio<int>')['selected'], 'true');
+      expect(
+        elements.where((e) => '${e['type']}'.startsWith('Cupertino')),
+        isEmpty,
+      );
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.macOS,
+    }),
+  );
 }
