@@ -49,6 +49,27 @@ executes, and disconnects. If the app enables session reports
 gets its own fresh session directory, appending one line to its steps.md (see
 --session below).
 
+### UI libraries
+
+Before a control or QA session, check which extracted UI libraries the active
+app's source imports: material_ui, cupertino_ui, both or neither. In a
+monorepo, look only at the app you run, its entrypoint and the design-system
+packages it imports. A library that only the lockfile lists, or that another
+one loads (material_ui loads cupertino_ui), needs no integration.
+
+1. Register the app and run
+   `marionette -i <name> doctor --required-ui-library <library>`, repeating
+   the option for each library the source imports.
+2. When doctor reports a missing integration, add the package and extension
+   it names, run `flutter pub get`, then hot restart or relaunch the app (a
+   hot reload does not run main() again) and run doctor again.
+3. Check that a visible button, field and toggle on the screen, where there
+   are any, are listed with their text or state and respond. Say which
+   screens, platform and build mode you checked.
+
+Check again after a change to the app's dependencies, entrypoint or
+Marionette configuration.
+
 ## Global Options
 
   -i, --instance <name>    Target instance (required unless --uri is used)
@@ -168,6 +189,9 @@ List interactive UI elements in the app's widget tree.
     Type: ElevatedButton, Key: "submit_button", Text: "Submit"
     Type: TextField, Key: "email_field"
     Type: IconButton, Text: ""
+
+  A warning about the app's UI integrations goes to stderr, so stdout stays
+  the listing.
 
   Each element may have: type, key, text, identifier, and additional
   properties. To act on an element, pass its key or identifier, the text of
@@ -549,20 +573,39 @@ to be running via `flutter run`.
 
 ### doctor
 
-Check connectivity of all registered instances.
+Check connectivity and UI integrations of all registered instances, or of the
+one --instance names.
 
-  Example:
+  Options:
+    --required-ui-library <name>  material_ui or cupertino_ui, a UI library
+                                  the app's source imports. Repeat it for
+                                  each library. Needs --instance
+
+  Without --required-ui-library the UI integration check stays unverified.
+
+  Examples:
     marionette doctor
+    marionette -i my-app doctor --required-ui-library material_ui
 
   Output (stdout):
     Checking 2 instance(s)...
 
       my-app (ws://127.0.0.1:8181/ws) ... OK
+        UI integrations: unverified (configured: none; loaded: none). ...
       other-app (ws://127.0.0.1:9090/ws) ... FAILED
 
-    Some instances are unreachable. Use "marionette unregister <name>" to remove stale entries.
+    Some instances are unreachable. Use "marionette unregister --stale" to remove them.
 
-  Exit codes: 0 all reachable, 1 any unreachable
+  Output with a missing integration (stdout, exit 1):
+    Checking instance my-app...
+
+      my-app (ws://127.0.0.1:8181/ws) ... OK
+        UI integrations: missing material_ui. Add marionette_material (flutter pub add marionette_material) and call .withMaterialUi() on the MarionetteConfiguration. Then hot restart or relaunch the app: a hot reload does not run main() again.
+
+  Exit codes: 0 all reachable and no required integration missing,
+    1 any unreachable, a required integration missing, or the UI
+      integration check failed with --required-ui-library,
+    64 --required-ui-library without --instance, or an unknown instance
 
 ---
 
