@@ -603,6 +603,8 @@ void main() {
       'swipe throws when target element is behind modal barrier',
       timeout: _timeout,
       (WidgetTester tester) async {
+        var panUpdates = 0;
+
         await tester.pumpWidget(
           MaterialApp(
             home: Builder(
@@ -621,10 +623,11 @@ void main() {
                       },
                       child: const Text('Open'),
                     ),
-                    const SizedBox(
-                      key: ValueKey('blocked_swipe_target'),
-                      width: 200,
-                      height: 100,
+                    GestureDetector(
+                      key: const ValueKey('blocked_swipe_target'),
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: (_) => panUpdates++,
+                      child: const SizedBox(width: 200, height: 100),
                     ),
                   ],
                 ),
@@ -633,24 +636,35 @@ void main() {
           ),
         );
 
-        await tester.tap(find.byKey(const ValueKey('open_dialog')));
-        await tester.pumpAndSettle();
-
         final dispatcher = GestureDispatcher();
-        Object? caughtError;
-        await tester.runAsync(() async {
-          try {
-            await dispatcher.swipe(
+        Future<void> swipeTarget() => dispatcher.swipe(
               const KeyMatcher('blocked_swipe_target'),
               WidgetFinder(),
               const MarionetteConfiguration(),
               direction: 'left',
+              distance: 80,
             );
+
+        await tester.runAsync(swipeTarget);
+        await tester.pump();
+        expect(panUpdates, greaterThan(0));
+        final panUpdatesBeforeDialog = panUpdates;
+
+        await tester.tap(find.byKey(const ValueKey('open_dialog')));
+        await tester.pumpAndSettle();
+
+        Object? caughtError;
+        await tester.runAsync(() async {
+          try {
+            await swipeTarget();
           } catch (e) {
             caughtError = e;
           }
         });
+        await tester.pump();
+
         expect(caughtError, isA<Exception>());
+        expect(panUpdates, panUpdatesBeforeDialog);
       },
     );
 
@@ -665,35 +679,35 @@ void main() {
           MaterialApp(
             home: Builder(
               builder: (context) => Scaffold(
-                body: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ElevatedButton(
-                        key: const ValueKey('open_dialog'),
-                        onPressed: () {
-                          showDialog<void>(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              content: GestureDetector(
-                                key: const ValueKey('dup_swipe'),
-                                behavior: HitTestBehavior.opaque,
-                                onPanUpdate: (_) => dialogPanned = true,
-                                child: const SizedBox(width: 160, height: 80),
-                              ),
+                body: Column(
+                  children: [
+                    ElevatedButton(
+                      key: const ValueKey('open_dialog'),
+                      onPressed: () {
+                        showDialog<void>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            content: GestureDetector(
+                              key: const ValueKey('dup_swipe'),
+                              behavior: HitTestBehavior.opaque,
+                              onPanUpdate: (_) => dialogPanned = true,
+                              child: const SizedBox(width: 160, height: 80),
                             ),
-                          );
-                        },
-                        child: const Text('Open'),
-                      ),
-                      GestureDetector(
-                        key: const ValueKey('dup_swipe'),
-                        behavior: HitTestBehavior.opaque,
-                        onPanUpdate: (_) => backgroundPanned = true,
-                        child: const SizedBox(width: 160, height: 80),
-                      ),
-                    ],
-                  ),
+                          ),
+                        );
+                      },
+                      child: const Text('Open'),
+                    ),
+                    // Keeps the background detector out from under the
+                    // dialog, so a swipe that uses findElement fails here.
+                    const Spacer(),
+                    GestureDetector(
+                      key: const ValueKey('dup_swipe'),
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: (_) => backgroundPanned = true,
+                      child: const SizedBox(width: 160, height: 80),
+                    ),
+                  ],
                 ),
               ),
             ),

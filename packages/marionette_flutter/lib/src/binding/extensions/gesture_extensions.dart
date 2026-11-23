@@ -101,12 +101,83 @@ void registerGestureExtensions({
 
   registerInternalMarionetteExtension(
     name: 'marionette.swipe',
-    callback: (params) => swipeExtension(
-      params,
-      gestureDispatcher: gestureDispatcher,
-      widgetFinder: widgetFinder,
-      configuration: configuration,
-    ),
+    callback: (params) async {
+      if (params.containsKey('startX')) {
+        final startXStr = params['startX'];
+        final startYStr = params['startY'];
+        final endXStr = params['endX'];
+        final endYStr = params['endY'];
+
+        if (startXStr == null ||
+            startYStr == null ||
+            endXStr == null ||
+            endYStr == null) {
+          return MarionetteExtensionResult.invalidParams(
+            'Coordinate-based swipe requires all of: '
+            'startX, startY, endX, endY',
+          );
+        }
+
+        final startX = double.tryParse(startXStr);
+        final startY = double.tryParse(startYStr);
+        final endX = double.tryParse(endXStr);
+        final endY = double.tryParse(endYStr);
+
+        if (startX == null ||
+            !startX.isFinite ||
+            startY == null ||
+            !startY.isFinite ||
+            endX == null ||
+            !endX.isFinite ||
+            endY == null ||
+            !endY.isFinite) {
+          return MarionetteExtensionResult.invalidParams(
+            'Invalid coordinate values. '
+            'startX, startY, endX, endY must be finite numbers.',
+          );
+        }
+
+        await gestureDispatcher.drag(
+          Offset(startX, startY),
+          Offset(endX, endY),
+        );
+
+        return MarionetteExtensionResult.success({
+          'message': 'Swiped from ($startX, $startY) to ($endX, $endY)',
+        });
+      }
+
+      final matcher = WidgetMatcher.fromJson(params);
+      final direction = params['direction'];
+      if (direction == null) {
+        return MarionetteExtensionResult.invalidParams(
+          'Missing required parameter: direction '
+          '(must be one of: left, right, up, down)',
+        );
+      }
+
+      final distanceParse = parsePositiveDouble(
+        params,
+        'distance',
+        defaultValue: 200.0,
+      );
+      if (distanceParse.error case final error?) {
+        return error;
+      }
+
+      await gestureDispatcher.swipe(
+        matcher,
+        widgetFinder,
+        configuration,
+        direction: direction,
+        distance: distanceParse.value!,
+        ancestors: WidgetMatcher.ancestorsFromJson(params),
+      );
+
+      return MarionetteExtensionResult.success({
+        'message': 'Swiped $direction on element matching: ${matcher.toJson()}',
+      });
+    },
   );
 
   registerInternalMarionetteExtension(
@@ -176,110 +247,4 @@ void registerGestureExtensions({
       });
     },
   );
-}
-
-/// Handles `marionette.swipe` requests for either coordinate-based drags or
-/// element-based swipes.
-@visibleForTesting
-Future<MarionetteExtensionResult> swipeExtension(
-  Map<String, String> params, {
-  required GestureDispatcher gestureDispatcher,
-  required WidgetFinder widgetFinder,
-  required MarionetteConfiguration configuration,
-}) async {
-  const coordinateKeys = ['startX', 'startY', 'endX', 'endY'];
-  const elementKeys = [
-    'key',
-    'identifier',
-    'text',
-    'type',
-    'ancestor_keys',
-    'direction',
-    'distance',
-  ];
-
-  final hasCoordinate = coordinateKeys.any(params.containsKey);
-  if (hasCoordinate) {
-    final hasElementParam = elementKeys.any(params.containsKey);
-    if (hasElementParam) {
-      return MarionetteExtensionResult.invalidParams(
-        'Cannot mix coordinate-based swipe parameters '
-        '(startX, startY, endX, endY) with element-based parameters.',
-      );
-    }
-
-    final startXStr = params['startX'];
-    final startYStr = params['startY'];
-    final endXStr = params['endX'];
-    final endYStr = params['endY'];
-
-    if (startXStr == null ||
-        startYStr == null ||
-        endXStr == null ||
-        endYStr == null) {
-      return MarionetteExtensionResult.invalidParams(
-        'Coordinate-based swipe requires all of: '
-        'startX, startY, endX, endY',
-      );
-    }
-
-    final startX = double.tryParse(startXStr);
-    final startY = double.tryParse(startYStr);
-    final endX = double.tryParse(endXStr);
-    final endY = double.tryParse(endYStr);
-
-    if (startX == null ||
-        !startX.isFinite ||
-        startY == null ||
-        !startY.isFinite ||
-        endX == null ||
-        !endX.isFinite ||
-        endY == null ||
-        !endY.isFinite) {
-      return MarionetteExtensionResult.invalidParams(
-        'Invalid coordinate values. '
-        'startX, startY, endX, endY must be finite numbers.',
-      );
-    }
-
-    await gestureDispatcher.drag(
-      Offset(startX, startY),
-      Offset(endX, endY),
-    );
-
-    return MarionetteExtensionResult.success({
-      'message': 'Swiped from ($startX, $startY) to ($endX, $endY)',
-    });
-  }
-
-  final matcher = WidgetMatcher.fromJson(params);
-  final direction = params['direction'];
-  if (direction == null) {
-    return MarionetteExtensionResult.invalidParams(
-      'Missing required parameter: direction '
-      '(must be one of: left, right, up, down)',
-    );
-  }
-
-  final distanceParse = parsePositiveDouble(
-    params,
-    'distance',
-    defaultValue: 200.0,
-  );
-  if (distanceParse.error case final error?) {
-    return error;
-  }
-
-  await gestureDispatcher.swipe(
-    matcher,
-    widgetFinder,
-    configuration,
-    direction: direction,
-    distance: distanceParse.value!,
-    ancestors: WidgetMatcher.ancestorsFromJson(params),
-  );
-
-  return MarionetteExtensionResult.success({
-    'message': 'Swiped $direction on element matching: ${matcher.toJson()}',
-  });
 }
