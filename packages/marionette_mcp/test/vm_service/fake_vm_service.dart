@@ -240,6 +240,7 @@ Future<CallToolResult> callConnect(
   McpClient client,
   String uri, {
   String? sessionDir,
+  List<Object>? requiredUiLibraries,
 }) =>
     client.callTool(
       CallToolRequest(
@@ -247,6 +248,8 @@ Future<CallToolResult> callConnect(
         arguments: {
           'uri': uri,
           if (sessionDir != null) 'session_dir': sessionDir,
+          if (requiredUiLibraries != null)
+            'required_ui_libraries': requiredUiLibraries,
         },
       ),
     );

@@ -26,6 +26,13 @@ enum UiSupportLibrary {
   /// The prefix of the URI of every library of this package.
   String get libraryUriPrefix => 'package:$wireName/';
 
+  /// The libraries this package loads through its own dependencies, so the
+  /// app loads them without using them.
+  Set<UiSupportLibrary> get transitiveLibraries => switch (this) {
+        materialUi => const {cupertinoUi},
+        cupertinoUi => const {},
+      };
+
   /// The library [uri] belongs to; null when it is none of these packages.
   static UiSupportLibrary? fromLibraryUri(String uri) => values
       .where((library) => uri.startsWith(library.libraryUriPrefix))

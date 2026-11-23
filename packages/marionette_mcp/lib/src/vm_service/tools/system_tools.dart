@@ -5,11 +5,14 @@ import 'package:mcp_dart/mcp_dart.dart';
 
 /// Registers MCP tools that control the Flutter app's dev workflow rather
 /// than its UI: `hot_reload` and `hot_restart`.
+///
+/// [onAppCodeChanged] runs before either one changes the app's code.
 void registerSystemTools(
   LoggedMcpServer server,
   VmServiceConnector connector,
-  logging.Logger logger,
-) {
+  logging.Logger logger, {
+  required void Function() onAppCodeChanged,
+}) {
   server
     ..registerTool(
       'hot_reload',
@@ -19,6 +22,7 @@ void registerSystemTools(
       inputSchema: const ToolInputSchema(properties: {}),
       callback: (args, extra) async {
         logger.info('Performing hot reload');
+        onAppCodeChanged();
 
         try {
           final reloaded = await connector.hotReload();
@@ -54,6 +58,7 @@ void registerSystemTools(
       inputSchema: const ToolInputSchema(properties: {}),
       callback: (args, extra) async {
         logger.info('Performing hot restart');
+        onAppCodeChanged();
 
         try {
           final restarted = await connector.hotRestart();

@@ -1,4 +1,6 @@
 import 'package:marionette_mcp/src/formatting.dart';
+import 'package:marionette_mcp/src/vm_service/ui_support_library.dart';
+import 'package:marionette_mcp/src/vm_service/ui_support_report.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -138,6 +140,152 @@ void main() {
         coveredAppWarning(
           {'elements': []},
           nativeElements: 'native_get_elements',
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('describeUiSupport', () {
+    test('gives the repair for each missing integration only', () {
+      final text = describeUiSupport(
+        UiSupportReport(
+          configuredLibraries: {UiSupportLibrary.materialUi},
+          observedLibraries: {},
+          requiredLibraries: {
+            UiSupportLibrary.materialUi,
+            UiSupportLibrary.cupertinoUi,
+          },
+        ),
+        scopeHint: 'pass required_ui_libraries',
+      );
+
+      expect(
+        text,
+        allOf(
+          contains('missing cupertino_ui'),
+          contains('flutter pub add marionette_cupertino'),
+          contains('.withCupertinoUi()'),
+          isNot(contains('marionette_material')),
+        ),
+      );
+    });
+
+    test('recommends no package for a library that is only loaded', () {
+      final text = describeUiSupport(
+        UiSupportReport(
+          configuredLibraries: {UiSupportLibrary.materialUi},
+          observedLibraries: {
+            UiSupportLibrary.materialUi,
+            UiSupportLibrary.cupertinoUi,
+          },
+          requiredLibraries: null,
+        ),
+        scopeHint: 'pass required_ui_libraries',
+      );
+
+      expect(
+        text,
+        allOf(
+          contains('pass required_ui_libraries'),
+          isNot(contains('marionette_cupertino')),
+        ),
+      );
+    });
+  });
+
+  group('uiSupportWarning', () {
+    test('says nothing when the confirmed scope is configured', () {
+      expect(
+        uiSupportWarning(
+          UiSupportReport(
+            configuredLibraries: {UiSupportLibrary.materialUi},
+            observedLibraries: {
+              UiSupportLibrary.materialUi,
+              UiSupportLibrary.cupertinoUi,
+            },
+            requiredLibraries: {UiSupportLibrary.materialUi},
+          ),
+          scopeHint: 'pass required_ui_libraries',
+        ),
+        isNull,
+      );
+    });
+
+    test('does not warn without a scope about Cupertino loaded by Material',
+        () {
+      expect(
+        uiSupportWarning(
+          UiSupportReport(
+            configuredLibraries: {UiSupportLibrary.materialUi},
+            observedLibraries: {
+              UiSupportLibrary.materialUi,
+              UiSupportLibrary.cupertinoUi,
+            },
+            requiredLibraries: null,
+          ),
+          scopeHint: 'pass required_ui_libraries',
+        ),
+        isNull,
+      );
+      expect(
+        uiSupportWarning(
+          UiSupportReport(
+            configuredLibraries: {},
+            observedLibraries: {UiSupportLibrary.cupertinoUi},
+            requiredLibraries: null,
+          ),
+          scopeHint: 'pass required_ui_libraries',
+        ),
+        startsWith('Warning: '),
+      );
+    });
+
+    test('warns about an older binding only when a UI library is loaded', () {
+      expect(
+        uiSupportWarning(
+          UiSupportReport(
+            configuredLibraries: null,
+            observedLibraries: null,
+            requiredLibraries: null,
+          ),
+          scopeHint: 'pass required_ui_libraries',
+        ),
+        isNull,
+      );
+      expect(
+        uiSupportWarning(
+          UiSupportReport(
+            configuredLibraries: null,
+            observedLibraries: {UiSupportLibrary.materialUi},
+            requiredLibraries: null,
+          ),
+          scopeHint: 'pass required_ui_libraries',
+        ),
+        startsWith('Warning: '),
+      );
+    });
+
+    test('warns about an older binding when a scope is confirmed', () {
+      expect(
+        uiSupportWarning(
+          UiSupportReport(
+            configuredLibraries: null,
+            observedLibraries: null,
+            requiredLibraries: {UiSupportLibrary.materialUi},
+          ),
+          scopeHint: 'pass required_ui_libraries',
+        ),
+        startsWith('Warning: '),
+      );
+      expect(
+        uiSupportWarning(
+          UiSupportReport(
+            configuredLibraries: null,
+            observedLibraries: null,
+            requiredLibraries: {},
+          ),
+          scopeHint: 'pass required_ui_libraries',
         ),
         isNull,
       );
