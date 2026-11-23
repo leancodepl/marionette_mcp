@@ -405,44 +405,44 @@ class MarionetteConfiguration {
   String? extractTextFromWidget(Element element) {
     final typedKind = controlKindFor(element);
     if (typedKind != null) {
-      final appText = extractText?.call(element);
-      if (appText != null) return appText;
-      for (final support in _additionalWidgetSupport) {
-        final integrationText = support.extractText(element);
-        if (integrationText != null) return integrationText;
-      }
-      return _extractBuiltInText(element.widget) ??
-          _extractControllerlessFieldText(element);
+      return _extractAppText(element) ??
+          _extractBuiltInText(element.widget) ??
+          (typedKind == MarionetteControlKind.textField
+              ? _extractEditableTextValue(element)
+              : _extractControllerlessFieldText(element));
     }
     // The controller-less field fallback comes last so an app's own
     // extractText for such a field (e.g. one returning its label) still wins.
-    final builtInText = _extractBuiltInText(element.widget);
-    if (builtInText != null) return builtInText;
-    final appText = extractText?.call(element);
-    if (appText != null) return appText;
-    for (final support in _additionalWidgetSupport) {
-      final integrationText = support.extractText(element);
-      if (integrationText != null) return integrationText;
-    }
-    return _extractControllerlessFieldText(element);
+    return _extractBuiltInText(element.widget) ??
+        _extractAppText(element) ??
+        _extractControllerlessFieldText(element);
   }
 
-  MarionetteControlKind? controlKindFor(Element element) {
-    final appKind = controlKind?.call(element);
-    if (appKind != null) return appKind;
-    for (final support in _additionalWidgetSupport) {
-      final kind = support.controlKind(element);
-      if (kind != null) return kind;
-    }
-    return null;
-  }
+  MarionetteControlKind? controlKindFor(Element element) =>
+      _firstRuleResult(element, controlKind, (support) => support.controlKind);
 
-  String? fieldLabelFor(Element element) {
-    final appLabel = extractFieldLabel?.call(element);
-    if (appLabel != null) return appLabel;
+  String? fieldLabelFor(Element element) => _firstRuleResult(
+        element,
+        extractFieldLabel,
+        (support) => support.extractFieldLabel,
+      );
+
+  String? _extractAppText(Element element) =>
+      _firstRuleResult(element, extractText, (support) => support.extractText);
+
+  /// The first non-null result of the app's [appRule], then of each
+  /// integration's rule, in the order the integrations were composed.
+  T? _firstRuleResult<T extends Object>(
+    Element element,
+    T? Function(Element element)? appRule,
+    T? Function(Element element) Function(_AdditionalWidgetSupport support)
+        integrationRule,
+  ) {
+    final appResult = appRule?.call(element);
+    if (appResult != null) return appResult;
     for (final support in _additionalWidgetSupport) {
-      final label = support.extractFieldLabel(element);
-      if (label != null) return label;
+      final result = integrationRule(support)(element);
+      if (result != null) return result;
     }
     return null;
   }
@@ -544,6 +544,11 @@ class MarionetteConfiguration {
   static String? _extractControllerlessFieldText(Element element) {
     final widget = element.widget;
     if (widget is! TextField && widget is! TextFormField) return null;
+    return _extractEditableTextValue(element);
+  }
+
+  /// The value of the first [EditableText] below [element].
+  static String? _extractEditableTextValue(Element element) {
     String? found;
     void visit(Element child) {
       if (found != null) return;

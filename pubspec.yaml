@@ -8,6 +8,7 @@ workspace:
   - packages/marionette_mcp
   - packages/marionette_cli
   - packages/marionette_flutter
+  - packages/marionette_cupertino
   - packages/marionette_logging
   - packages/marionette_logger
   - example
