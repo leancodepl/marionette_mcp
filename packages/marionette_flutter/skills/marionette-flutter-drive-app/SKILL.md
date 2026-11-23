@@ -25,10 +25,15 @@ screenshot, read logs, hot reload. It has two halves:
 `connect` (or any CLI command) only works if the app initialized
 `MarionetteBinding`; if unsure, check `main.dart` (or ask). If it hasn't, or
 the agent can't see the app's own buttons and fields, set the app up first with
-`marionette-flutter-setup` (binding, custom design system, `LogCollector`,
+`marionette-flutter-setup` (binding, the `material_ui` and `cupertino_ui`
+integrations, custom design system, `LogCollector`,
 `MarionetteDeviceConfig`, the single-binding rule, version alignment). If that
 skill is not installed, run `dart run skills@ get -s marionette-flutter-setup`,
 or follow https://marionette.leancode.co/docs/configure/.
+
+Before each control or QA session, also when the binding is already there,
+run *Check the source first* and *Verify* in `marionette-flutter-setup`, and
+pass the result to `connect` as `required_ui_libraries`.
 
 ## When to use this
 
@@ -368,6 +373,8 @@ args.
 | `get_logs` says no collector configured                                                            | No `LogCollector` wired up                                                                          | See *Logs for `get_logs`* in `marionette-flutter-setup`                                                                          |
 | `set_device_config` returns setup instructions instead of succeeding                               | App hasn't opted in                                                                                 | See *Device-config sweeps* in `marionette-flutter-setup`, then hot restart                                                       |
 | Binding assertion error on startup (often under `flutter test`)                                    | Two `WidgetsBinding`s initialized                                                                   | See *The single-binding rule* in `marionette-flutter-setup`                                                                      |
+| `connect` reports `UI integrations: missing …`                                                     | The source uses `material_ui` or `cupertino_ui`, and the configuration lacks its integration        | Add what it names, then hot restart — see *Apps on `material_ui` or `cupertino_ui`* in `marionette-flutter-setup`                |
+| `connect` reports `UI integrations: unverified …`                                                  | No `required_ui_libraries` given, so a loaded library may come from a dependency                    | Check the app's source imports, then `connect` again with them — see *Before you start*, above                                   |
 | Session directory lands somewhere unexpected (e.g. not the project root)                           | No `MARIONETTE_SESSION_DIR` set and the server's own working directory isn't reliably the repo root | Pass `session_dir` to `connect` (`--session-dir` on the CLI) explicitly — see *Reporting what you found*, above                  |
 | A Flutter tap does nothing while a dialog, sheet or picker is open                                 | System UI covers the app; the Flutter tree still lists the widgets underneath                       | Switch to the native lane — see *System UI outside Flutter*, above                                                               |
 | Nothing above applies, and it's a release build                                                    | Marionette needs the VM Service                                                                     | Not supported by design — see *When not to use*                                                                                  |
@@ -392,7 +399,8 @@ only here. `ancestor_keys` is `--ancestor-keys`, repeated once per key,
 outermost first:
 `tap --key cell.joinButton --ancestor-keys session_2 --ancestor-keys grid.cell_3`.
 `marionette doctor` checks every registered instance and `unregister` cleans up
-stale ones. Session reports work here too, but every CLI invocation is its own
+stale ones; `marionette -i <name> doctor --required-ui-library <library>`
+checks one app's UI integrations against the libraries its source uses. Session reports work here too, but every CLI invocation is its own
 process with its own session directory: `--session <title>` (the CLI's
 `session_title`) names it and doesn't join invocations into one run, so a
 multi-step CLI run leaves one directory per command, where the MCP server keeps
