@@ -43,6 +43,9 @@ class _FakeVmService {
 
   String get uri => 'ws://127.0.0.1:${_server.port}/ws';
 
+  /// The form `flutter run` prints.
+  String get httpUri => 'http://127.0.0.1:${_server.port}/AbC=/';
+
   Future<void> _handle(HttpRequest request) async {
     // Leaving the request open simulates a VM service that accepted the
     // TCP connection but never finishes the handshake.
@@ -275,6 +278,12 @@ void main() {
 
   test('connects to a responsive VM service', () async {
     await connector.connect(vmService.uri);
+
+    expect(connector.isConnected, isTrue);
+  });
+
+  test('connects through the http URI that flutter run prints', () async {
+    await connector.connect(vmService.httpUri);
 
     expect(connector.isConnected, isTrue);
   });

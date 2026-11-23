@@ -58,7 +58,8 @@ class MarionetteCommandRunner extends CommandRunner<int> {
       )
       ..addOption(
         'uri',
-        help: 'VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws). '
+        help: 'VM service URI as flutter run prints it '
+            '(e.g., http://127.0.0.1:8181/AbC=/), or its ws://…/ws form. '
             'Bypasses the instance registry. Mutually exclusive with --instance.',
       )
       ..addOption(

@@ -90,13 +90,13 @@ final class VmServiceContext {
       ..registerTool(
         'connect',
         description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. Pass the VM service URI as `flutter run` prints it (http://127.0.0.1:PORT/TOKEN=/); its ws://…/ws form and a DevTools link work as well. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
         annotations: const ToolAnnotations(title: 'Connect to App'),
         inputSchema: ToolInputSchema(
           properties: {
             'uri': JsonSchema.string(
               description:
-                  'VM service URI (e.g., ws://127.0.0.1:8181/ws). This is printed in the Flutter app console when running in debug mode.',
+                  'VM service URI as `flutter run` prints it (e.g., http://127.0.0.1:8181/AbC=/), or its ws://…/ws form.',
             ),
             'session_title': JsonSchema.string(
               description:

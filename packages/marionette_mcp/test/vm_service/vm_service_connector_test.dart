@@ -245,6 +245,46 @@ void main() {
     });
   });
 
+  group('vmServiceWebSocketUri', () {
+    test('maps the http URI that flutter run prints to its ws URI', () {
+      expect(
+        vmServiceWebSocketUri('http://127.0.0.1:41513/AbC=/'),
+        'ws://127.0.0.1:41513/AbC=/ws',
+      );
+    });
+
+    test('maps https to wss', () {
+      expect(
+        vmServiceWebSocketUri('https://127.0.0.1:41513/AbC=/'),
+        'wss://127.0.0.1:41513/AbC=/ws',
+      );
+    });
+
+    test('keeps a ws URI unchanged', () {
+      expect(
+        vmServiceWebSocketUri('ws://127.0.0.1:41513/AbC=/ws'),
+        'ws://127.0.0.1:41513/AbC=/ws',
+      );
+    });
+
+    test('keeps a URI of another scheme unchanged', () {
+      expect(
+        vmServiceWebSocketUri('localhost:41513/AbC=/ws'),
+        'localhost:41513/AbC=/ws',
+      );
+    });
+
+    test('takes the VM service URI from a DevTools link', () {
+      expect(
+        vmServiceWebSocketUri(
+          'http://127.0.0.1:41513/AbC=/devtools/'
+          '?uri=http://127.0.0.1:41513/AbC=/',
+        ),
+        'ws://127.0.0.1:41513/AbC=/ws',
+      );
+    });
+  });
+
   group('invalidCompactionError', () {
     test('accepts null and every supported mode', () {
       expect(invalidCompactionError(null), isNull);
