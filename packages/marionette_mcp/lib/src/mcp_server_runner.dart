@@ -19,7 +19,7 @@ const _flutterInstructions = '''
 Marionette MCP enables AI agents to interact with Flutter apps running in debug mode. It provides tools to inspect UI elements, tap buttons, enter text, scroll, take screenshots, retrieve logs, and perform hot reloads and hot restarts.
 
 Usage:
-1. Start the Flutter app in debug mode and note the VM service URI (e.g., ws://127.0.0.1:8181/ws).
+1. Start the Flutter app in debug mode and note the VM service URI it prints (e.g., http://127.0.0.1:8181/AbC=/).
 2. Use the "connect" tool with the VM service URI to establish a connection.
 3. Use "get_interactive_elements" to discover available UI elements.
 4. Interact with elements using "tap", "enter_text", or "scroll_to" tools.

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_cli/src/json_file_registry.dart';
+import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 
 class RegisterCommand extends Command<int> {
   RegisterCommand(this._registry);
@@ -31,10 +32,10 @@ class RegisterCommand extends Command<int> {
 
     JsonFileRegistry.validateName(name);
 
-    if (!uri.startsWith('ws://') && !uri.startsWith('wss://')) {
+    if (!supportedVmServiceUriSchemes.contains(Uri.tryParse(uri)?.scheme)) {
       stderr.writeln(
-        'Warning: URI "$uri" does not start with ws:// or wss://. '
-        'VM service URIs are typically ws://127.0.0.1:PORT/ws.',
+        'Warning: URI "$uri" has no http(s) or ws(s) scheme. '
+        'flutter run prints VM service URIs as http://127.0.0.1:PORT/TOKEN=/.',
       );
     }
 

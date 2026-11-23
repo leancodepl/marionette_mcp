@@ -33,7 +33,7 @@ URI connections for fully stateless operation.
 ### Option A: Named Instances (stateful)
 
 1. Start your Flutter app(s) in debug mode and note VM service URI(s)
-   (printed in console, e.g., ws://127.0.0.1:XXXXX/ws).
+   (printed by flutter run, e.g., http://127.0.0.1:XXXXX/AbC=/).
 2. Register each app: `marionette register <name> <uri>`
 3. Interact using: `marionette -i <name> <command> [args]`
 4. Clean up when done: `marionette unregister <name>`
@@ -41,7 +41,7 @@ URI connections for fully stateless operation.
 ### Option B: Direct URI (stateless)
 
 1. Start your Flutter app in debug mode and note the VM service URI.
-2. Interact directly: `marionette --uri <ws-uri> <command> [args]`
+2. Interact directly: `marionette --uri <uri> <command> [args]`
 
 No registration, no cleanup. Each command opens a fresh WebSocket connection,
 executes, and disconnects. If the app enables session reports
@@ -52,8 +52,9 @@ gets its own fresh session directory, appending one line to its steps.md (see
 ## Global Options
 
   -i, --instance <name>    Target instance (required unless --uri is used)
-      --uri <ws-uri>       VM service WebSocket URI — bypasses registry,
-                           mutually exclusive with --instance
+      --uri <uri>          VM service URI as flutter run prints it, or its
+                           ws://…/ws form — bypasses registry, mutually
+                           exclusive with --instance
       --timeout <seconds>  Connection timeout (default: 5)
       --native-device <name>
                            Device connection (from native-connect) for
@@ -78,7 +79,7 @@ Register a Flutter app instance.
 
   Arguments:
     name   Any identifier without "/", "\\", or control characters (e.g. my-app, 192.168.1.1:5555)
-    uri    VM service WebSocket URI (e.g., ws://127.0.0.1:8181/ws)
+    uri    VM service URI as flutter run prints it (e.g., http://127.0.0.1:8181/AbC=/), or its ws://…/ws form
 
   Example:
     marionette register my-app ws://127.0.0.1:8181/ws
@@ -134,7 +135,7 @@ List all registered instances.
 
 List interactive UI elements in the app's widget tree.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     --ancestor-keys <str>  List only the elements inside the subtree of the
@@ -186,7 +187,7 @@ List interactive UI elements in the app's widget tree.
 
 Tap an element. Provide exactly one matching strategy.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     --key <string>        Match by ValueKey<String> (most reliable)
@@ -220,7 +221,7 @@ Secondary (right mouse button) tap an element. Desktop only — triggers
 Flutter's onSecondaryTap (e.g. context menus). Provide exactly one matching
 strategy.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     --key <string>        Match by ValueKey<String> (most reliable)
@@ -248,7 +249,7 @@ strategy.
 
 Enter text into a text field.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     --key <string>        Match text field by key
@@ -276,7 +277,7 @@ Press a keyboard key on the currently focused element. Unlike enter-text
 system, so onSubmitted, Shortcuts/Actions, and focus traversal all respond.
 The key goes to whatever has focus — focus a target first (e.g. with tap).
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     --key <string>        Key to press (mandatory). Named keys: enter, tab,
@@ -307,7 +308,7 @@ The key goes to whatever has focus — focus a target first (e.g. with tap).
 
 Simulate a system back button press (Android back / iOS swipe-back).
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Example:
     marionette -i my-app press-back-button
@@ -331,7 +332,7 @@ Simulate a system back button press (Android back / iOS swipe-back).
 Swipe/drag on the app. Useful for PageView, Dismissible, Drawer, and Slider.
 Use either element-based mode (matcher + direction) or coordinate-based mode.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Element-based options:
     --key <string>        Match by ValueKey<String> (most reliable)
@@ -365,7 +366,7 @@ Use either element-based mode (matcher + direction) or coordinate-based mode.
 
 Scroll until an element becomes visible.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     --key <string>        Match by ValueKey<String>
@@ -387,7 +388,7 @@ Scroll until an element becomes visible.
 
 Capture screenshots and save to PNG files.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     -o, --output <path>   Output file path (mandatory)
@@ -410,7 +411,7 @@ Capture screenshots and save to PNG files.
 Record a video of the running Flutter app and save to a WebM file.
 Requires ffmpeg to be installed.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Options:
     -o, --output <path>       Output file path (mandatory, must end with .webm)
@@ -453,7 +454,7 @@ Requires ffmpeg to be installed.
 
 Retrieve collected application logs.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Example:
     marionette -i my-app get-logs
@@ -480,7 +481,7 @@ Requires the app to wrap its root widget in MarionetteDeviceConfig:
 
     runApp(const MarionetteDeviceConfig(child: MyApp()));
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
   At least one of: --text-scale, --bold-text, --platform-brightness, --reset
 
   Options:
@@ -513,7 +514,7 @@ Requires the app to wrap its root widget in MarionetteDeviceConfig:
 
 Perform a hot reload of the Flutter app.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Example:
     marionette -i my-app hot-reload
@@ -533,7 +534,7 @@ and resets all state. Use it for changes a hot reload cannot pick up (e.g.
 main()/bootstrap edits, global singletons, or state shape). Requires the app
 to be running via `flutter run`.
 
-  Requires: -i <instance> or --uri <ws-uri>
+  Requires: -i <instance> or --uri <uri>
 
   Example:
     marionette -i my-app hot-restart

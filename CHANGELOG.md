@@ -15,6 +15,7 @@
 - Fix `get_interactive_elements` splitting an element over several lines when a value holds a line break. The MCP and CLI output now print a line break as `\n`, a carriage return as `\r` and a backslash as `\\`, so unescape a copied value before you pass it back as a selector
 - Fix `connect` waiting indefinitely when the app stops answering, for example while its device is asleep or the app is paused in the debugger: it now fails after 30 seconds with an error that says what to check, and no longer waits for a previously connected app that stopped responding to close its connection ([#131](https://github.com/leancodepl/marionette_mcp/issues/131))
 - Fix CLI gesture commands accepting invalid arguments: `tap`, `secondary-tap` and `long-press` now require `--x` and `--y` together, like `double-tap` and `pinch-zoom`; coordinates, `--scale`, `--start-distance` and `--distance` must be finite numbers; `long-press --duration` and `swipe --distance` must be positive. A usage error raised by a command now exits with 64 instead of 1 ([#153](https://github.com/leancodepl/marionette_mcp/pull/153))
+- Accept the VM service URI as `flutter run` prints it (`http://127.0.0.1:PORT/TOKEN=/`) in `connect`, `--uri` and `marionette register`, as well as its `https` form and a DevTools link; the `ws://…/ws` form keeps working ([#155](https://github.com/leancodepl/marionette_mcp/issues/155))
 
 # 0.7.0
 

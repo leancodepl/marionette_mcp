@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:vm_service/utils.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
 
@@ -71,6 +72,27 @@ Map<String, dynamic> interactiveElementsArgs(
       if (ancestorKeys.isNotEmpty) 'ancestor_keys': jsonEncode(ancestorKeys),
       if (compaction != null) 'compaction': compaction,
     };
+
+/// Turns the VM service URI that `flutter run` prints
+/// (`http://HOST:PORT/TOKEN=/`), its https or ws form, or a DevTools link
+/// carrying one in `uri=`, into the WebSocket URI that [vmServiceConnectUri]
+/// needs. A service URI of any other scheme (for a DevTools link, its `uri=`
+/// value) is returned unconverted, so the scheme error of
+/// [vmServiceConnectUri] names it.
+String vmServiceWebSocketUri(String uri) {
+  final parsed = Uri.parse(uri);
+  final devToolsTarget = parsed.queryParameters['uri'];
+  final serviceUri =
+      devToolsTarget == null ? parsed : Uri.parse(devToolsTarget);
+  if (!supportedVmServiceUriSchemes.contains(serviceUri.scheme)) {
+    return serviceUri.toString();
+  }
+  return convertToWebSocketUrl(serviceProtocolUrl: serviceUri).toString();
+}
+
+/// Schemes a VM service URI may have, accepted by `connect` and `register`:
+/// the http form `flutter run` prints and the WebSocket form.
+const supportedVmServiceUriSchemes = {'http', 'https', 'ws', 'wss'};
 
 /// Modifier keys accepted by [VmServiceConnector.pressKey].
 ///
@@ -165,7 +187,8 @@ class VmServiceConnector {
   /// How long [disconnect] waits for the old VM service to close.
   static const _disposeTimeout = Duration(seconds: 5);
 
-  /// Connects to a VM service at the given URI.
+  /// Connects to a VM service at [uri], in any form [vmServiceWebSocketUri]
+  /// accepts.
   ///
   /// Gives up with a [TimeoutException] when the VM service doesn't finish
   /// the handshake within [timeout], for example because the app's process
@@ -196,7 +219,7 @@ class VmServiceConnector {
     StreamSubscription<Event>? subscription;
 
     Future<void> handshake() async {
-      final connected = await vmServiceConnectUri(uri);
+      final connected = await vmServiceConnectUri(vmServiceWebSocketUri(uri));
       if (abandoned) {
         await connected.dispose();
         throw StateError('Abandoned connection to $uri');

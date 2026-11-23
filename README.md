@@ -46,9 +46,9 @@ Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP c
    dart pub global activate marionette_cli
    ```
 
-3. Run the app with `flutter run` and paste the `ws://…/ws` VM service URI it prints into the prompt, or ask the agent to run the app itself:
+3. Run the app with `flutter run` and paste the VM service URI it prints (`http://127.0.0.1:…/…=/`) into the prompt, or ask the agent to run the app itself:
 
-   > Connect to ws://127.0.0.1:9101/…/ws. On Profile, a malformed email must show an error and keep Submit disabled, and a valid one must submit.
+   > Connect to http://127.0.0.1:9101/…=/. On Profile, a malformed email must show an error and keep Submit disabled, and a valid one must submit.
 
 > [!IMPORTANT]
 > Flutter's own widgets work as is. **A custom design system needs one configuration step**, or the agent cannot see your buttons and fields: see [Configure](https://marionette.leancode.co/docs/configure/).
