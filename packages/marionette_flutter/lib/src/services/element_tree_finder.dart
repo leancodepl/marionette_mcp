@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show SemanticsProperties;
+import 'package:marionette_flutter/src/binding/marionette_control_kind.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/services/hit_test_utils.dart';
 
@@ -176,7 +177,8 @@ class ElementTreeFinder {
     // the entered value, empty for a blank field). Surface the label/hint so
     // such fields stay identifiable. TextFormField has no public `decoration`,
     // so its label is read off the TextField it builds.
-    final label = _extractFieldLabel(element);
+    final label =
+        configuration.fieldLabelFor(element) ?? _extractFieldLabel(element);
     if (label != null) {
       data['label'] = label;
     }
@@ -192,7 +194,11 @@ class ElementTreeFinder {
     var wroteToggleState = false;
     if (isInteractive &&
         (_isBuiltInToggle(widget) ||
-            configuration.shouldAppStopAtElement(element))) {
+            configuration.shouldAppStopAtElement(element) ||
+            configuration.controlKindFor(element) ==
+                MarionetteControlKind.toggle ||
+            configuration.controlKindFor(element) ==
+                MarionetteControlKind.radio)) {
       final toggle = _findToggleState(element);
       if (toggle != null) {
         // A tristate checkbox's indeterminate "mixed" state is a `null`
