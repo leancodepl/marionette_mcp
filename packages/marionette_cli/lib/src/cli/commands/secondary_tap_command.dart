@@ -33,14 +33,15 @@ class SecondaryTapCommand extends InstanceCommand {
 
   @override
   Future<int> execute(VmServiceConnector connector) async {
-    final matcher = buildMatcherFromArgs(
+    final matcher = buildValidatedMatcherFromArgs(
       key: argResults?['key'] as String?,
       identifier: argResults?['identifier'] as String?,
       text: argResults?['text'] as String?,
       type: argResults?['type'] as String?,
-      x: _parseNum(argResults?['x'] as String?),
-      y: _parseNum(argResults?['y'] as String?),
+      x: argResults?['x'] as String?,
+      y: argResults?['y'] as String?,
       ancestorKeys: argResults?['ancestor-keys'] as List<String>? ?? const [],
+      onUsageError: usageException,
     );
 
     if (!hasSelector(matcher)) {
@@ -55,10 +56,5 @@ class SecondaryTapCommand extends InstanceCommand {
         response['message'] as String? ?? 'Successfully secondary tapped';
     stdout.writeln(message);
     return 0;
-  }
-
-  num? _parseNum(String? value) {
-    if (value == null) return null;
-    return num.tryParse(value);
   }
 }
