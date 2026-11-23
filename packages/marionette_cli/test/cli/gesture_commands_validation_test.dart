@@ -18,6 +18,16 @@ class _FakeConnector implements VmServiceConnector {
       throw UnimplementedError('${invocation.memberName}');
 }
 
+class _CapturingConnector extends _FakeConnector {
+  Map<String, dynamic>? swipeArgs;
+
+  @override
+  Future<Map<String, dynamic>> swipe(Map<String, dynamic> args) async {
+    swipeArgs = args;
+    return const {'message': 'Swiped'};
+  }
+}
+
 mixin _TestableCommand on InstanceCommand {
   ArgResults? _overriddenArgResults;
 
@@ -95,6 +105,37 @@ void main() {
         ),
         throwsA(isA<UsageException>()),
       );
+    });
+
+    test('swipe rejects a --hold-duration of 0', () async {
+      await expectLater(
+        _TestableSwipeCommand(registry).executeWithArgs(
+          ['--key', 'k', '--direction', 'up', '--hold-duration', '0'],
+          connector,
+        ),
+        throwsA(isA<UsageException>()),
+      );
+    });
+
+    test('swipe forwards --hold-duration in coordinate mode', () async {
+      final capturingConnector = _CapturingConnector();
+
+      await _TestableSwipeCommand(registry).executeWithArgs(
+        [
+          ...['--start-x', '10', '--start-y', '20'],
+          ...['--end-x', '30', '--end-y', '40'],
+          ...['--hold-duration', '600'],
+        ],
+        capturingConnector,
+      );
+
+      expect(capturingConnector.swipeArgs, {
+        'startX': '10',
+        'startY': '20',
+        'endX': '30',
+        'endY': '40',
+        'holdDuration': 600,
+      });
     });
   });
 

@@ -267,7 +267,7 @@ class DrivePage extends StatelessComponent {
                 [
                   '`swipe`, `pinch_zoom`',
                   '`swipe`, `pinch-zoom`',
-                  'Pages, dismissibles, drawers, maps, images.',
+                  'Pages, dismissibles, drawers, maps, images; reorderable lists with `hold_duration`.',
                 ],
                 [
                   '`scroll_to`',

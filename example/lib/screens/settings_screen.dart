@@ -38,6 +38,14 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
+            leading: const Icon(Icons.reorder),
+            title: const Text('Reorderable List'),
+            subtitle: const Text('Long press and drag to reorder items'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.go('/settings/reorderable-list'),
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.zoom_in_outlined),
             title: const Text('Pinch Zoom'),
             subtitle: const Text('Test pinch zoom gesture'),

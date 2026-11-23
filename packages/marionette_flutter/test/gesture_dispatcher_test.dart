@@ -772,6 +772,92 @@ void main() {
     );
 
     testWidgets(
+      'swipe with a hold drags a reorderable list item to a new index',
+      timeout: _timeout,
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      (WidgetTester tester) async {
+        final items = ['a', 'b', 'c', 'd'];
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: StatefulBuilder(
+                builder: (context, setState) => ReorderableListView(
+                  onReorder: (oldIndex, newIndex) => setState(() {
+                    final item = items.removeAt(oldIndex);
+                    items.insert(
+                      newIndex > oldIndex ? newIndex - 1 : newIndex,
+                      item,
+                    );
+                  }),
+                  children: [
+                    for (final item in items)
+                      SizedBox(
+                        key: ValueKey('item_$item'),
+                        height: 60,
+                        child: Text(item),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        await tester.runAsync(
+          () => dispatcher.swipe(
+            const KeyMatcher('item_a'),
+            WidgetFinder(),
+            const MarionetteConfiguration(),
+            direction: 'down',
+            distance: 150,
+            holdDuration: const Duration(milliseconds: 600),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(items.indexOf('a'), greaterThan(0));
+      },
+    );
+
+    testWidgets(
+      'swipe rejects a negative hold',
+      timeout: _timeout,
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                key: ValueKey('target'),
+                width: 200,
+                height: 200,
+                child: ColoredBox(color: Colors.blue),
+              ),
+            ),
+          ),
+        );
+
+        final dispatcher = GestureDispatcher();
+        Object? caughtError;
+        await tester.runAsync(() async {
+          try {
+            await dispatcher.swipe(
+              const KeyMatcher('target'),
+              WidgetFinder(),
+              const MarionetteConfiguration(),
+              direction: 'left',
+              holdDuration: const Duration(milliseconds: -1),
+            );
+          } catch (e) {
+            caughtError = e;
+          }
+        });
+        expect(caughtError, isA<ArgumentError>());
+      },
+    );
+
+    testWidgets(
       'drag rejects non-finite coordinates',
       timeout: _timeout,
       (WidgetTester tester) async {

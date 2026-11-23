@@ -18,6 +18,7 @@ A multi-page Flutter app demonstrating **`call_custom_extension`** with Marionet
 | `/testing/native-screen` | Native screen | A native screen with a text field; its value returns to Flutter |
 | `/testing/notifications` | Notifications | Local notification after 3 s, opening the app from it, Android toast |
 | `/settings` | Settings | Gesture and UI demos |
+| `/settings/reorderable-list` | Reorderable List | Items reordered by a long-press drag (`swipe` with `hold_duration`) |
 | `/settings/custom-widgets` | Custom Widgets | Custom design-system widgets recognized via `MarionetteConfiguration` |
 | `/settings/toggles` | Toggles | Checkboxes, switches and radios, built-in and `DsToggle` |
 

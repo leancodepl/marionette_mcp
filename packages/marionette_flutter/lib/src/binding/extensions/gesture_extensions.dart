@@ -102,6 +102,16 @@ void registerGestureExtensions({
   registerInternalMarionetteExtension(
     name: 'marionette.swipe',
     callback: (params) async {
+      final holdParse = parseDurationMs(
+        params,
+        'holdDuration',
+        defaultValue: Duration.zero,
+        requirePositive: true,
+      );
+      if (holdParse.error case final error?) {
+        return error;
+      }
+
       if (params.containsKey('startX')) {
         final startXStr = params['startX'];
         final startYStr = params['startY'];
@@ -140,6 +150,7 @@ void registerGestureExtensions({
         await gestureDispatcher.drag(
           Offset(startX, startY),
           Offset(endX, endY),
+          holdDuration: holdParse.duration!,
         );
 
         return MarionetteExtensionResult.success({
@@ -171,6 +182,7 @@ void registerGestureExtensions({
         configuration,
         direction: direction,
         distance: distanceParse.value!,
+        holdDuration: holdParse.duration!,
         ancestors: WidgetMatcher.ancestorsFromJson(params),
       );
 
