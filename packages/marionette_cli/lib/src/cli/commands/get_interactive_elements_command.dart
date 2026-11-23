@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:marionette_cli/src/cli/commands/doctor_command.dart';
 import 'package:marionette_cli/src/cli/instance_command.dart';
 import 'package:marionette_cli/src/instance_registry.dart';
 import 'package:marionette_mcp/src/formatting.dart';
@@ -50,7 +51,22 @@ class ElementsCommand extends InstanceCommand {
       stdout.writeln(formatElement(element as Map<String, dynamic>));
     }
 
+    await _warnAboutUiSupport(connector);
     return 0;
+  }
+
+  /// Writes a warning to stderr, keeping stdout to the listing, when the
+  /// app's UI integrations need a look. Without a source-confirmed scope it
+  /// can only point at loaded libraries that have no integration.
+  Future<void> _warnAboutUiSupport(VmServiceConnector connector) async {
+    try {
+      final report = await connector.inspectUiSupport();
+      final warning =
+          uiSupportWarning(report, scopeHint: doctorScopeHint('<instance>'));
+      if (warning != null) stderr.writeln(warning);
+    } catch (e) {
+      stderr.writeln('Warning: could not check UI integrations: $e');
+    }
   }
 }
 
