@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/vm_service/ui_support_library.dart';
+import 'package:marionette_mcp/src/vm_service/ui_support_report.dart';
 import 'package:vm_service/utils.dart';
 import 'package:vm_service/vm_service.dart';
 import 'package:vm_service/vm_service_io.dart';
@@ -117,6 +119,16 @@ const supportedBrightnessValues = {'light', 'dark'};
 /// reaches the device.
 const supportedCompactionModes = {'none', 'compact'};
 
+const _getConfigurationRpc = 'ext.flutter.marionette.getConfiguration';
+
+/// What [VmServiceConnector.inspectUiSupport] reads from the app, before the
+/// required scope is applied.
+typedef _UiSupportEvidence = ({
+  Set<UiSupportLibrary>? configured,
+  Set<UiSupportLibrary>? observed,
+  String? diagnostic,
+});
+
 /// Validates [brightness] against [supportedBrightnessValues].
 ///
 /// Returns a human-readable error message, or `null` when [brightness] is
@@ -177,6 +189,12 @@ class VmServiceConnector {
   /// Bumped by every [connect] and [disconnect], so an attempt still in
   /// flight can tell it must not publish its connection.
   var _connectAttempts = 0;
+
+  /// The app's `marionette.getConfiguration` reply and UI support evidence,
+  /// read once per isolate; [_forgetAppState] drops them when the isolate or
+  /// its code changes.
+  Future<Map<String, dynamic>>? _configuration;
+  Future<_UiSupportEvidence>? _uiSupportEvidence;
 
   /// Returns true if currently connected to a VM service.
   bool get isConnected => _service != null && _isolateId != null;
@@ -249,6 +267,7 @@ class VmServiceConnector {
       _serviceEventSubscription = subscription;
       _registeredServices = registeredServices;
       _isolateId = isolateId;
+      _forgetAppState();
     }
 
     try {
@@ -307,6 +326,7 @@ class VmServiceConnector {
       final subscription = _serviceEventSubscription;
       _service = null;
       _isolateId = null;
+      _forgetAppState();
       _serviceEventSubscription = null;
       _registeredServices = {};
       _pendingServiceRequests.clear();
@@ -424,8 +444,49 @@ class VmServiceConnector {
   ///
   /// Throws [NotConnectedException] if not connected.
   Future<bool> getSessionReportsEnabled() async {
-    final response = await _callExtension('marionette.getConfiguration', {});
+    final response = await _readConfiguration();
     return response['enableSessionReports'] == true;
+  }
+
+  /// Reports which extracted UI libraries the app's configuration declares
+  /// integrations for and which ones its isolate loaded, against
+  /// [requiredLibraries], the scope a source preflight confirmed (null when
+  /// none did).
+  ///
+  /// Reads only the configuration and the isolate's library URIs, never
+  /// evaluates code in the app. Evidence the app can't give, such as the
+  /// declarations of an older binding or library metadata a VM service
+  /// leaves out, is null in the report.
+  ///
+  /// Throws [NotConnectedException] if not connected, a [FormatException]
+  /// when the binding declares malformed UI libraries, and the VM service's
+  /// error when a read fails.
+  Future<UiSupportReport> inspectUiSupport({
+    Set<UiSupportLibrary>? requiredLibraries,
+    bool refresh = false,
+  }) async {
+    _ensureConnected();
+    if (refresh) _forgetAppState();
+    final read = _uiSupportEvidence ??= _readUiSupportEvidence();
+    final _UiSupportEvidence evidence;
+    try {
+      evidence = await read;
+    } catch (_) {
+      if (identical(read, _uiSupportEvidence)) _uiSupportEvidence = null;
+      rethrow;
+    }
+    if (!identical(read, _uiSupportEvidence)) {
+      throw StateError(
+        'The app reconnected, restarted or reloaded while its UI support '
+        'was read',
+      );
+    }
+    return UiSupportReport(
+      configuredLibraries: evidence.configured,
+      observedLibraries: evidence.observed,
+      requiredLibraries: requiredLibraries,
+      diagnostic: evidence.diagnostic,
+    );
   }
 
   /// Calls a custom VM service extension registered by the Flutter app.
@@ -739,6 +800,8 @@ class VmServiceConnector {
     } catch (err) {
       _logger.severe('Hot reload failed', err);
       rethrow;
+    } finally {
+      _forgetAppState();
     }
   }
 
@@ -780,6 +843,7 @@ class VmServiceConnector {
           attempts: 10,
           delay: const Duration(milliseconds: 500),
         );
+        _forgetAppState();
         _logger.info('Reconnected to isolate after hot restart: $_isolateId');
       }
 
@@ -789,6 +853,72 @@ class VmServiceConnector {
       rethrow;
     }
   }
+
+  /// Drops what was read from the app's isolate, so the next read sees the
+  /// current isolate and code.
+  void _forgetAppState() {
+    _configuration = null;
+    _uiSupportEvidence = null;
+  }
+
+  Future<Map<String, dynamic>> _readConfiguration() async {
+    final read =
+        _configuration ??= _callExtension('marionette.getConfiguration', {});
+    try {
+      return await read;
+    } catch (_) {
+      if (identical(read, _configuration)) _configuration = null;
+      rethrow;
+    }
+  }
+
+  Future<_UiSupportEvidence> _readUiSupportEvidence() async {
+    final isolate = await _service!.getIsolate(_isolateId!);
+    final declaresConfiguration =
+        isolate.extensionRPCs?.contains(_getConfigurationRpc) ?? false;
+    final configured = declaresConfiguration
+        ? _configuredUiLibraries(await _readConfiguration())
+        : null;
+    final observed = _observedUiLibraries(isolate.libraries);
+    final unavailable = [
+      if (configured == null)
+        "The app's marionette_flutter binding predates UI integration "
+            'declarations, so its configured integrations are unknown.',
+      if (observed == null)
+        "The VM service reports no library metadata for the app's isolate, "
+            'so its loaded UI libraries are unknown.',
+    ];
+    return (
+      configured: configured,
+      observed: observed,
+      diagnostic: unavailable.isEmpty ? null : unavailable.join(' '),
+    );
+  }
+
+  /// The integrations a `marionette.getConfiguration` [response] declares;
+  /// null when a binding older than the declaration leaves `uiLibraries` out.
+  Set<UiSupportLibrary>? _configuredUiLibraries(
+    Map<String, dynamic> response,
+  ) =>
+      switch (response['uiLibraries']) {
+        null => null,
+        final wireNames => UiSupportLibrary.parseAll(wireNames),
+      };
+
+  /// The UI packages among [libraries]; null without library metadata.
+  ///
+  /// Most vm_service versions read missing metadata as an empty list, and a
+  /// running isolate always has libraries, so an empty list is missing too.
+  Set<UiSupportLibrary>? _observedUiLibraries(List<LibraryRef>? libraries) =>
+      switch (libraries) {
+        null || [] => null,
+        final libraries => libraries
+            .map((library) => library.uri)
+            .nonNulls
+            .map(UiSupportLibrary.fromLibraryUri)
+            .nonNulls
+            .toSet(),
+      };
 
   /// Finds the first isolate of [service] that has the marionette extensions.
   ///
