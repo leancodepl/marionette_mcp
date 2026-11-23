@@ -123,10 +123,17 @@ void registerGestureExtensions({
         final endX = double.tryParse(endXStr);
         final endY = double.tryParse(endYStr);
 
-        if (startX == null || startY == null || endX == null || endY == null) {
+        if (startX == null ||
+            !startX.isFinite ||
+            startY == null ||
+            !startY.isFinite ||
+            endX == null ||
+            !endX.isFinite ||
+            endY == null ||
+            !endY.isFinite) {
           return MarionetteExtensionResult.invalidParams(
             'Invalid coordinate values. '
-            'startX, startY, endX, endY must be valid numbers.',
+            'startX, startY, endX, endY must be finite numbers.',
           );
         }
 
@@ -149,19 +156,13 @@ void registerGestureExtensions({
         );
       }
 
-      final distanceStr = params['distance'];
-      final double distance;
-      if (distanceStr != null) {
-        final parsed = double.tryParse(distanceStr);
-        if (parsed == null) {
-          return MarionetteExtensionResult.invalidParams(
-            'Invalid distance value: "$distanceStr". '
-            'Must be a valid number.',
-          );
-        }
-        distance = parsed;
-      } else {
-        distance = 200.0;
+      final distanceParse = parsePositiveDouble(
+        params,
+        'distance',
+        defaultValue: 200.0,
+      );
+      if (distanceParse.error case final error?) {
+        return error;
       }
 
       await gestureDispatcher.swipe(
@@ -169,7 +170,7 @@ void registerGestureExtensions({
         widgetFinder,
         configuration,
         direction: direction,
-        distance: distance,
+        distance: distanceParse.value!,
         ancestors: WidgetMatcher.ancestorsFromJson(params),
       );
 
