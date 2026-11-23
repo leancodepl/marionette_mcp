@@ -1,5 +1,9 @@
 import 'dart:convert';
 
+import 'package:marionette_mcp/src/vm_service/ui_support_library.dart';
+import 'package:marionette_mcp/src/vm_service/ui_support_report.dart';
+import 'package:marionette_mcp/src/vm_service/ui_support_state.dart';
+
 /// Builds a widget matcher map from tool/CLI arguments.
 ///
 /// Supports matching by key, identifier, text, type, and coordinates, plus the
@@ -120,3 +124,72 @@ String? coveredAppWarning(
       'another screen covers it. The widgets below may be hidden and not '
       'reachable${nativeElements == null ? '' : '; check $nativeElements'}.';
 }
+
+/// The UI integration status of a [report] of
+/// `VmServiceConnector.inspectUiSupport`, with the repair for each missing
+/// integration. [scopeHint] tells how this transport takes the scope a
+/// source preflight confirmed.
+String describeUiSupport(
+  UiSupportReport report, {
+  required String scopeHint,
+}) {
+  final status = switch (report.missingLibraries) {
+    final missing? when missing.isEmpty =>
+      'UI integrations: configured (required: '
+          '${_libraryNames(report.requiredLibraries)}).',
+    final missing? => [
+        'UI integrations: missing ${_libraryNames(missing)}.',
+        for (final library in missing)
+          'Add ${library.integrationPackage} (flutter pub add '
+              '${library.integrationPackage}) and call '
+              '.${library.integrationExtension}() on the '
+              'MarionetteConfiguration.',
+        'Then hot restart or relaunch the app: a hot reload does not run '
+            'main() again.',
+      ].join(' '),
+    null when report.requiredLibraries == null =>
+      'UI integrations: unverified (configured: '
+          '${_libraryNames(report.configuredLibraries)}; loaded: '
+          '${_libraryNames(report.observedLibraries)}). A loaded library can '
+          'come from a dependency, so it does not need an integration by '
+          "itself. Check which UI libraries the app's source uses, then "
+          '$scopeHint.',
+    null => 'UI integrations: unknown.',
+  };
+  return [status, if (report.diagnostic case final diagnostic?) diagnostic]
+      .join(' ');
+}
+
+/// A warning with [describeUiSupport] for a listing, when [report] shows a
+/// missing integration, a confirmed scope that cannot be checked, or a loaded
+/// library that has no integration and that no other loaded library loads.
+/// Null when there is nothing to act on.
+String? uiSupportWarning(
+  UiSupportReport report, {
+  required String scopeHint,
+}) {
+  final actionable = switch (report.state) {
+    UiSupportState.configured => false,
+    UiSupportState.missing => true,
+    UiSupportState.unknown when report.requiredLibraries?.isNotEmpty ?? false =>
+      true,
+    UiSupportState.unknown => switch (report.observedLibraries) {
+        null => false,
+        final observed => observed.difference({
+            ...?report.configuredLibraries,
+            for (final library in observed) ...library.transitiveLibraries,
+          }).isNotEmpty,
+      },
+  };
+  return actionable
+      ? 'Warning: ${describeUiSupport(report, scopeHint: scopeHint)}'
+      : null;
+}
+
+/// [libraries] by wire name, "none" when empty and "unknown" when null.
+String _libraryNames(Set<UiSupportLibrary>? libraries) => switch (libraries) {
+      null => 'unknown',
+      final libraries when libraries.isEmpty => 'none',
+      final libraries =>
+        libraries.map((library) => library.wireName).join(', '),
+    };

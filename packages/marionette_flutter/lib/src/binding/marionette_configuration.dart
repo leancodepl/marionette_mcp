@@ -1,6 +1,26 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:marionette_flutter/src/binding/marionette_control_kind.dart';
+import 'package:marionette_flutter/src/binding/marionette_ui_library.dart';
 import 'package:marionette_flutter/src/services/log_collector.dart';
+
+class _AdditionalWidgetSupport {
+  const _AdditionalWidgetSupport({
+    required this.library,
+    required this.isInteractiveElement,
+    required this.shouldStopTraversalAtElement,
+    required this.extractText,
+    required this.controlKind,
+    required this.extractFieldLabel,
+  });
+
+  final MarionetteUiLibrary library;
+  final bool Function(Element element) isInteractiveElement;
+  final bool Function(Element element) shouldStopTraversalAtElement;
+  final String? Function(Element element) extractText;
+  final MarionetteControlKind? Function(Element element) controlKind;
+  final String? Function(Element element) extractFieldLabel;
+}
 
 /// How much `get_interactive_elements` reduces its payload. [compact] can also
 /// leave out an element whose only content is an icon-font glyph: text made
@@ -53,20 +73,41 @@ class MarionetteConfiguration {
       'Use isInteractiveElement instead. '
       'It will be removed in a future release.',
     )
-    this.isInteractiveWidget,
+    bool Function(Type type)? isInteractiveWidget,
     this.isInteractiveElement,
     @Deprecated(
       'Use shouldStopTraversalAtElement instead. '
       'It will be removed in a future release.',
     )
-    this.shouldStopTraversal,
+    bool Function(Type type)? shouldStopTraversal,
     this.shouldStopTraversalAtElement,
     this.extractText,
+    this.controlKind,
+    this.extractFieldLabel,
     this.maxScreenshotSize = const Size(2000, 2000),
     this.compaction = CompactionMode.compact,
     this.logCollector,
     this.enableSessionReports = false,
-  });
+  })  : _isInteractiveWidget = isInteractiveWidget,
+        _shouldStopTraversal = shouldStopTraversal,
+        _additionalWidgetSupport = const [];
+
+  MarionetteConfiguration._({
+    required bool Function(Type type)? isInteractiveWidget,
+    required this.isInteractiveElement,
+    required bool Function(Type type)? shouldStopTraversal,
+    required this.shouldStopTraversalAtElement,
+    required this.extractText,
+    required this.controlKind,
+    required this.extractFieldLabel,
+    required this.maxScreenshotSize,
+    required this.compaction,
+    required this.logCollector,
+    required this.enableSessionReports,
+    required List<_AdditionalWidgetSupport> additionalWidgetSupport,
+  })  : _isInteractiveWidget = isInteractiveWidget,
+        _shouldStopTraversal = shouldStopTraversal,
+        _additionalWidgetSupport = List.unmodifiable(additionalWidgetSupport);
 
   /// Determines if an app-specific widget type is interactive.
   ///
@@ -82,7 +123,8 @@ class MarionetteConfiguration {
     'Use isInteractiveElement instead. '
     'It will be removed in a future release.',
   )
-  final bool Function(Type type)? isInteractiveWidget;
+  bool Function(Type type)? get isInteractiveWidget => _isInteractiveWidget;
+  final bool Function(Type type)? _isInteractiveWidget;
 
   /// Determines if an app-specific widget is interactive.
   ///
@@ -119,7 +161,8 @@ class MarionetteConfiguration {
     'Use shouldStopTraversalAtElement instead. '
     'It will be removed in a future release.',
   )
-  final bool Function(Type type)? shouldStopTraversal;
+  bool Function(Type type)? get shouldStopTraversal => _shouldStopTraversal;
+  final bool Function(Type type)? _shouldStopTraversal;
 
   /// Determines if traversal should stop at an app-specific widget.
   ///
@@ -164,6 +207,21 @@ class MarionetteConfiguration {
   /// )
   /// ```
   final String? Function(Element element)? extractText;
+
+  /// Tells which typed control an app-specific widget is, so discovery reads
+  /// its value or state as for a built-in text field, toggle or radio.
+  /// Return null if not applicable.
+  ///
+  /// It runs before the rules of the optional UI integrations, so the kind it
+  /// returns wins.
+  final MarionetteControlKind? Function(Element element)? controlKind;
+
+  /// Extracts the label of an app-specific text field, which discovery
+  /// reports apart from the field's value. Return null if not applicable.
+  ///
+  /// It runs before the rules of the optional UI integrations, so the label
+  /// it returns wins.
+  final String? Function(Element element)? extractFieldLabel;
 
   /// Maximum size for screenshots in physical pixels.
   ///
@@ -236,19 +294,73 @@ class MarionetteConfiguration {
   /// See https://github.com/leancodepl/marionette_mcp/blob/main/docs/session-reports.md
   final bool enableSessionReports;
 
+  final List<_AdditionalWidgetSupport> _additionalWidgetSupport;
+
+  /// The optional UI rules actively composed into this configuration.
+  Set<MarionetteUiLibrary> get uiLibraries => Set.unmodifiable({
+        for (final library in MarionetteUiLibrary.values)
+          if (_additionalWidgetSupport.any(
+            (support) => support.library == library,
+          ))
+            library,
+      });
+
+  /// Composes typed rules for one optional UI library into this configuration.
+  /// Reapplying the same library is idempotent.
+  MarionetteConfiguration withAdditionalWidgetSupport({
+    required MarionetteUiLibrary library,
+    required bool Function(Element element) isInteractiveElement,
+    required bool Function(Element element) shouldStopTraversalAtElement,
+    required String? Function(Element element) extractText,
+    required MarionetteControlKind? Function(Element element) controlKind,
+    required String? Function(Element element) extractFieldLabel,
+  }) {
+    if (uiLibraries.contains(library)) return this;
+    return MarionetteConfiguration._(
+      isInteractiveWidget: _isInteractiveWidget,
+      isInteractiveElement: this.isInteractiveElement,
+      shouldStopTraversal: _shouldStopTraversal,
+      shouldStopTraversalAtElement: this.shouldStopTraversalAtElement,
+      extractText: this.extractText,
+      controlKind: this.controlKind,
+      extractFieldLabel: this.extractFieldLabel,
+      maxScreenshotSize: maxScreenshotSize,
+      compaction: compaction,
+      logCollector: logCollector,
+      enableSessionReports: enableSessionReports,
+      additionalWidgetSupport: [
+        ..._additionalWidgetSupport,
+        _AdditionalWidgetSupport(
+          library: library,
+          isInteractiveElement: isInteractiveElement,
+          shouldStopTraversalAtElement: shouldStopTraversalAtElement,
+          extractText: extractText,
+          controlKind: controlKind,
+          extractFieldLabel: extractFieldLabel,
+        ),
+      ],
+    );
+  }
+
   /// Checks if an element's widget is interactive (built-in + custom).
   bool isElementInteractive(Element element) {
     final widget = element.widget;
     return _isBuiltInInteractiveWidget(widget) ||
         // ignore: deprecated_member_use_from_same_package
         (isInteractiveWidget?.call(widget.runtimeType) ?? false) ||
-        (isInteractiveElement?.call(element) ?? false);
+        (isInteractiveElement?.call(element) ?? false) ||
+        _additionalWidgetSupport.any(
+          (support) => support.isInteractiveElement(element),
+        );
   }
 
   /// Returns whether traversal should stop at the given element.
   bool shouldStopAtElement(Element element) {
     return _isBuiltInStopWidget(element.widget) ||
-        shouldAppStopAtElement(element);
+        shouldAppStopAtElement(element) ||
+        _additionalWidgetSupport.any(
+          (support) => support.shouldStopTraversalAtElement(element),
+        );
   }
 
   /// Returns whether the app's own callbacks, [shouldStopTraversalAtElement]
@@ -291,11 +403,48 @@ class MarionetteConfiguration {
 
   /// Extracts text from a widget (built-in + custom).
   String? extractTextFromWidget(Element element) {
+    final typedKind = controlKindFor(element);
+    if (typedKind != null) {
+      return _extractAppText(element) ??
+          _extractBuiltInText(element.widget) ??
+          (typedKind == MarionetteControlKind.textField
+              ? _extractEditableTextValue(element)
+              : _extractControllerlessFieldText(element));
+    }
     // The controller-less field fallback comes last so an app's own
     // extractText for such a field (e.g. one returning its label) still wins.
     return _extractBuiltInText(element.widget) ??
-        extractText?.call(element) ??
+        _extractAppText(element) ??
         _extractControllerlessFieldText(element);
+  }
+
+  MarionetteControlKind? controlKindFor(Element element) =>
+      _firstRuleResult(element, controlKind, (support) => support.controlKind);
+
+  String? fieldLabelFor(Element element) => _firstRuleResult(
+        element,
+        extractFieldLabel,
+        (support) => support.extractFieldLabel,
+      );
+
+  String? _extractAppText(Element element) =>
+      _firstRuleResult(element, extractText, (support) => support.extractText);
+
+  /// The first non-null result of the app's [appRule], then of each
+  /// integration's rule, in the order the integrations were composed.
+  T? _firstRuleResult<T extends Object>(
+    Element element,
+    T? Function(Element element)? appRule,
+    T? Function(Element element) Function(_AdditionalWidgetSupport support)
+        integrationRule,
+  ) {
+    final appResult = appRule?.call(element);
+    if (appResult != null) return appResult;
+    for (final support in _additionalWidgetSupport) {
+      final result = integrationRule(support)(element);
+      if (result != null) return result;
+    }
+    return null;
   }
 
   // Built-in Flutter widget support
@@ -395,6 +544,11 @@ class MarionetteConfiguration {
   static String? _extractControllerlessFieldText(Element element) {
     final widget = element.widget;
     if (widget is! TextField && widget is! TextFormField) return null;
+    return _extractEditableTextValue(element);
+  }
+
+  /// The value of the first [EditableText] below [element].
+  static String? _extractEditableTextValue(Element element) {
     String? found;
     void visit(Element child) {
       if (found != null) return;

@@ -1,0 +1,25 @@
+name: marionette_ui_integrations_fixture
+description: "Apps that check the Marionette UI integrations for material_ui and cupertino_ui at runtime."
+publish_to: "none"
+resolution: workspace
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+  flutter: ">=3.44.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_ui: ^1.0.1
+  marionette_cupertino:
+    path: ../../../packages/marionette_cupertino
+  marionette_flutter:
+    path: ../../../packages/marionette_flutter
+  marionette_material:
+    path: ../../../packages/marionette_material
+  material_ui: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

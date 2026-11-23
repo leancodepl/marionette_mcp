@@ -1,6 +1,6 @@
 ---
 name: marionette-flutter-setup
-description: Prepare a Flutter app for Marionette, so an AI agent can drive it in debug or profile builds. Covers adding marionette_flutter, MarionetteBinding behind kDebugMode, MarionetteConfiguration for a custom design system (isInteractiveElement, extractText, Semantics), a LogCollector for get_logs, screenshot size, MarionetteDeviceConfig for set_device_config, session reports, the single-binding rule, matching marionette_mcp or marionette_cli versions, and the native lane's device setup (adb, the WebDriverAgent build, supported hosts). Use when adding Marionette to an app; when connect fails because the app has no binding, or with a version mismatch; when the app hangs at startup or hits a binding assertion after adding Marionette; when get_interactive_elements misses custom buttons or fields, or tap(text:) cannot find visible text; when get_logs says no collector is configured; or when set_device_config returns setup instructions. To drive an app that is already set up, use marionette-flutter-drive-app.
+description: Prepare a Flutter app for an AI agent to drive with Marionette in debug or profile builds. Covers adding marionette_flutter, MarionetteBinding behind kDebugMode, marionette_material and marionette_cupertino for material_ui and cupertino_ui apps, MarionetteConfiguration for a custom design system (isInteractiveElement, extractText, Semantics), a LogCollector for get_logs, screenshot size, MarionetteDeviceConfig for set_device_config, session reports, the single-binding rule, aligned bridge versions, and the native lane's device setup (adb, WebDriverAgent, hosts). Use when adding Marionette to an app; when connect fails because the app has no binding, or with a version mismatch, or reports a missing UI integration; when the app hangs at startup or hits a binding assertion; when get_interactive_elements misses custom buttons or fields, or tap(text:) cannot find visible text; when get_logs has no collector; or when set_device_config returns setup steps. To drive a set-up app, use marionette-flutter-drive-app.
 ---
 
 # marionette_flutter: set up an app
@@ -15,9 +15,9 @@ bridge and keeps the versions aligned. Driving the app is the job of
 ## Add the binding
 
 `connect` (or any CLI command) only works if the target app initialized
-`MarionetteBinding`. Check `main.dart` (or ask) before changing anything — if
-the binding is already there and the agent can see the app's widgets, the app
-is ready.
+`MarionetteBinding`. Check the entrypoint (or ask) before changing anything.
+A binding that is already there does not end the setup: run *Check the source
+first*, below, as well.
 
 ```bash
 flutter pub add marionette_flutter
@@ -34,16 +34,101 @@ void main() {
 }
 ```
 
-This is all a standard Material-widgets app needs. It runs inside `main()`, so
-any time you add or change it, **hot restart** — a hot reload doesn't
-re-execute `main()`, so the change will look like it did nothing. Gate every
+An app built on Flutter's own widgets needs nothing more. This runs inside
+`main()`, so any time you add or change it, **hot restart** — a hot reload
+doesn't re-execute `main()`, so the change will look like it did nothing. Gate every
 piece of Marionette wiring behind `kDebugMode` (or `!kReleaseMode` — see
 *Device-config sweeps*, below) so none of it ships in a release build: both
 are compile-time constants the release branch survives cleanly.
 
+## Apps on `material_ui` or `cupertino_ui`
+
+`material_ui` and `cupertino_ui` are Flutter's Material and Cupertino widget
+libraries published as pub packages. Marionette recognizes their widgets only
+when the app adds the matching integration:
+
+| The app's source uses | Add                    | Call on the configuration |
+|-----------------------|------------------------|---------------------------|
+| `material_ui`         | `marionette_material`  | `.withMaterialUi()`       |
+| `cupertino_ui`        | `marionette_cupertino` | `.withCupertinoUi()`      |
+| both                  | both packages          | both, in either order     |
+| neither               | nothing                | nothing                   |
+
+Both integrations need Flutter 3.44 or newer (Dart 3.12), and `material_ui`
+1.1.0 or `cupertino_ui` 1.0.1 or newer; `marionette_flutter` alone keeps
+Flutter 3.27.
+
+### Check the source first
+
+Run this check before each control or QA session, also when the binding is
+already there, and again after a change to the dependencies, the entrypoint or
+the Marionette configuration. Plain `flutter test` runs don't need it.
+
+1. **The active app.** In a monorepo, take the package the user runs. Another
+   app in the repository, with a different UI library, doesn't count.
+2. **The entrypoint.** Find the file `flutter run` starts (`-t`, a flavor's
+   `main_<flavor>.dart`) and where it initializes the binding.
+3. **The libraries its source uses.** Search the app and the design-system
+   packages it depends on (`.dart_tool/package_config.json` says where each
+   one resolves) for imports and exports of `package:material_ui/` and
+   `package:cupertino_ui/`, aliased ones (`as m`) included. A design-system
+   package that re-exports one counts for every app that uses it.
+4. **Not the lockfile.** `material_ui` depends on `cupertino_ui`, so
+   `cupertino_ui` appears in `pubspec.lock`, `package_config.json` and the
+   running app's libraries even when no source imports it. That alone never
+   calls for `marionette_cupertino`: Material's adaptive controls
+   (`Switch.adaptive`, `Checkbox.adaptive`, `Radio.adaptive`) need only
+   `marionette_material`.
+
+### Wire the integration
+
+In the package of the active app:
+
+```bash
+flutter pub add marionette_material    # and/or marionette_cupertino
+```
+
+Call the extension on the configuration the app already passes. Its
+callbacks, its binding (a combined `MarionetteBindingMixin` binding included)
+and its `kDebugMode` or `!kReleaseMode` gate stay as they are:
+
+```dart
+MarionetteBinding.ensureInitialized(
+  MarionetteConfiguration(
+    isInteractiveElement: isMyInteractiveWidget, // the app's own callbacks stay
+    enableSessionReports: true,
+  ).withMaterialUi().withCupertinoUi(),
+);
+```
+
+Running the setup again changes nothing: skip a dependency that is already in
+`pubspec.yaml` and an extension that is already called, and never add a second
+binding. If `flutter pub add` cannot resolve (an older Flutter, or a
+`material_ui` or `cupertino_ui` below the minimum), report the conflict.
+Don't upgrade Flutter or the UI library, add `dependency_overrides`, or copy
+the integration's rules into the app to get past it.
+
+Then run `flutter pub get` and `flutter analyze`, and **hot restart** or
+relaunch the app (relaunch a profile build). A hot reload doesn't run `main()`
+again, so it proves nothing.
+
+### Verify
+
+Pass the libraries step 3 found to `connect` as `required_ui_libraries` (`[]`
+when the source uses neither). On the CLI, register the app and run
+`marionette -i <name> doctor --required-ui-library material_ui`, repeating the
+option for each library. The result names the package and extension to add when one is
+missing; without a source-checked scope it stays unverified.
+
+Then smoke-test the screen: a visible button, a field and a toggle or radio,
+where the screen has them, are listed by `get_interactive_elements` with their
+text, value or state, and `tap` and `enter_text` work on them. Report which
+screens, controls, platform and build mode you checked. A control the screen
+didn't show is not verified.
+
 ## Custom design system? Teach Marionette about it
 
-Zero-config setup only recognizes stock Material widgets (`ElevatedButton`,
+Zero-config setup only recognizes Flutter's own widgets (`ElevatedButton`,
 `TextField`, `Switch`, …) and extracts text only from `Text`, `RichText`,
 `EditableText`, `TextField`, and `TextFormField`. If the app wraps its own
 buttons, fields, or text — true of most production apps — `get_interactive_elements`
@@ -248,6 +333,7 @@ Driving it is in `marionette-flutter-drive-app` and its native-lane reference.
 
 ## Next
 
-When `connect` succeeds and `get_interactive_elements` lists the screen's
-buttons and fields, the app is ready: drive it with
+When `connect` succeeds, its UI integration check passes and
+`get_interactive_elements` lists the screen's buttons and fields, the app is
+ready: drive it with
 `marionette-flutter-drive-app`.

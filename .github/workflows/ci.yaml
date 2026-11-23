@@ -56,6 +56,21 @@ jobs:
           cd packages/marionette_logging
           flutter pub get
 
+      - name: Install dependencies for marionette_cupertino
+        run: |
+          cd packages/marionette_cupertino
+          flutter pub get
+
+      - name: Install dependencies for marionette_material
+        run: |
+          cd packages/marionette_material
+          flutter pub get
+
+      - name: Install dependencies for the UI integrations fixture
+        run: |
+          cd tool/fixtures/ui_integrations
+          flutter pub get
+
       - name: Check version.g.dart is in sync
         run: |
           dart tool/generate_version.dart
@@ -89,6 +104,21 @@ jobs:
           cd packages/marionette_logging
           flutter analyze --fatal-infos lib
 
+      - name: Analyze marionette_cupertino
+        run: |
+          cd packages/marionette_cupertino
+          flutter analyze --fatal-infos lib
+
+      - name: Analyze marionette_material
+        run: |
+          cd packages/marionette_material
+          flutter analyze --fatal-infos lib
+
+      - name: Analyze the UI integrations fixture
+        run: |
+          cd tool/fixtures/ui_integrations
+          flutter analyze --fatal-infos lib
+
       - name: Check formatting for marionette_mcp
         run: |
           cd packages/marionette_mcp
@@ -114,6 +144,16 @@ jobs:
           cd packages/marionette_logging
           dart format --set-exit-if-changed lib
 
+      - name: Check formatting for marionette_cupertino
+        run: |
+          cd packages/marionette_cupertino
+          dart format --set-exit-if-changed lib
+
+      - name: Check formatting for marionette_material
+        run: |
+          cd packages/marionette_material
+          dart format --set-exit-if-changed lib
+
       - name: Check formatting for tool
         run: |
           cd tool
@@ -134,6 +174,24 @@ jobs:
           cd packages/marionette_flutter
           flutter test --no-pub
 
+      - name: Run tests for marionette_cupertino
+        run: |
+          cd packages/marionette_cupertino
+          flutter test --no-pub
+
+      - name: Run tests for marionette_material
+        run: |
+          cd packages/marionette_material
+          flutter test --no-pub
+
+      - name: Run tests for the UI integrations fixture
+        run: |
+          cd tool/fixtures/ui_integrations
+          flutter test --no-pub
+
+      - name: Check the UI integration dependency graphs
+        run: dart tool/check_min_sdk.dart addons
+
   analyze-min-version:
     name: Analyze (min supported Flutter/Dart)
     runs-on: ubuntu-latest
@@ -152,74 +210,35 @@ jobs:
           flutter-version: '3.27.0'
           cache: true
 
-      - name: Install dependencies for marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart pub get
+      # The full workspace holds the UI integrations, which need a newer SDK,
+      # so the script checks the other packages in a workspace of their own.
+      - name: Analyze and test in a workspace without the UI integrations
+        run: dart tool/check_min_sdk.dart legacy
 
-      - name: Install dependencies for marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart pub get
+  analyze-addons-min-version:
+    name: Analyze UI integrations (min supported Flutter/Dart and UI libraries)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-      - name: Install dependencies for marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter pub get
+    permissions:
+      contents: read
 
-      - name: Install dependencies for marionette_logger
-        run: |
-          cd packages/marionette_logger
-          flutter pub get
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
 
-      - name: Install dependencies for marionette_logging
-        run: |
-          cd packages/marionette_logging
-          flutter pub get
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          cache: true
 
-      - name: Analyze marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart analyze --fatal-infos lib bin
-
-      - name: Analyze marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart analyze --fatal-infos lib bin
-
-      - name: Analyze marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter analyze --fatal-infos lib
-
-      - name: Analyze marionette_logger
-        run: |
-          cd packages/marionette_logger
-          flutter analyze --fatal-infos lib
-
-      - name: Analyze marionette_logging
-        run: |
-          cd packages/marionette_logging
-          flutter analyze --fatal-infos lib
-
-      - name: Run tests for marionette_mcp
-        run: |
-          cd packages/marionette_mcp
-          dart test
-
-      - name: Run tests for marionette_cli
-        run: |
-          cd packages/marionette_cli
-          dart test
-
-      - name: Run tests for marionette_flutter
-        run: |
-          cd packages/marionette_flutter
-          flutter test --no-pub
+      - name: Analyze and test with the lowest allowed versions
+        run: dart tool/check_min_sdk.dart addons --lowest
 
   publish:
     name: Publish packages
-    needs: [analyze, analyze-min-version]
+    needs: [analyze, analyze-min-version, analyze-addons-min-version]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
 
@@ -257,6 +276,14 @@ jobs:
       - name: Publish marionette_flutter to pub.dev
         run: flutter pub publish --force
         working-directory: packages/marionette_flutter
+
+      - name: Publish marionette_cupertino to pub.dev
+        run: flutter pub publish --force
+        working-directory: packages/marionette_cupertino
+
+      - name: Publish marionette_material to pub.dev
+        run: flutter pub publish --force
+        working-directory: packages/marionette_material
 
       - name: Publish marionette_logger to pub.dev
         run: flutter pub publish --force

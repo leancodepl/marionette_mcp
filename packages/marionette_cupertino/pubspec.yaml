@@ -1,0 +1,28 @@
+name: marionette_cupertino
+description: Flutter extensions for AI agent interaction via MCP — lets Claude, Copilot, and Cursor tap, scroll, type, and screenshot your app. Support for the cupertino_ui widget library.
+version: 0.7.0
+homepage: https://marionette.leancode.co/
+repository: https://github.com/leancodepl/marionette_mcp
+issue_tracker: https://github.com/leancodepl/marionette_mcp/issues
+documentation: https://marionette.leancode.co/docs/configure/
+topics:
+  - mcp
+  - ai
+  - agent
+  - flutter
+  - cupertino
+resolution: workspace
+
+environment:
+  sdk: ">=3.12.0 <4.0.0"
+  flutter: ">=3.44.0"
+
+dependencies:
+  cupertino_ui: ^1.0.1
+  flutter:
+    sdk: flutter
+  marionette_flutter: ^0.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

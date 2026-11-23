@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:marionette_flutter/src/binding/marionette_ui_library.dart';
 import 'package:marionette_flutter/src/binding/marionette_configuration.dart';
 import 'package:marionette_flutter/src/binding/marionette_extension_result.dart';
 import 'package:marionette_flutter/src/binding/register_extension.dart';
@@ -66,6 +67,13 @@ void registerInfoExtensions({
     callback: (params) async {
       return MarionetteExtensionResult.success({
         'enableSessionReports': enableSessionReports,
+        'uiLibraries': [
+          for (final library in configuration.uiLibraries)
+            switch (library) {
+              MarionetteUiLibrary.materialUi => 'material_ui',
+              MarionetteUiLibrary.cupertinoUi => 'cupertino_ui',
+            },
+        ],
       });
     },
   );

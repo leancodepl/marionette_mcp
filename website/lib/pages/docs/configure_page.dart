@@ -39,6 +39,27 @@ Semantics(
   child: ElevatedButton(onPressed: _submit, child: const Text('Submit')),
 )''';
 
+const _materialUi = '''
+MarionetteBinding.ensureInitialized(
+  MarionetteConfiguration(
+    isInteractiveElement: isMyInteractiveWidget, // your callbacks stay
+  ).withMaterialUi(),
+);''';
+
+const _cupertinoUi = '''
+MarionetteBinding.ensureInitialized(
+  MarionetteConfiguration(
+    isInteractiveElement: isMyInteractiveWidget, // your callbacks stay
+  ).withCupertinoUi(),
+);''';
+
+const _bothUis = '''
+MarionetteBinding.ensureInitialized(
+  MarionetteConfiguration(
+    isInteractiveElement: isMyInteractiveWidget, // your callbacks stay
+  ).withMaterialUi().withCupertinoUi(),
+);''';
+
 const _logging = '''
 MarionetteBinding.ensureInitialized(
   MarionetteConfiguration(logCollector: LoggingLogCollector()),
@@ -141,6 +162,7 @@ const _stopTraversalNever =
 const _toc = [
   ('symptoms', 'Start from the symptom'),
   ('defaults', 'What works as is'),
+  ('ui-libraries', 'UI libraries'),
   ('reference', 'The configuration'),
   ('interactive', 'Interactive widgets'),
   ('text', 'Text'),
@@ -181,6 +203,10 @@ class ConfigurePage extends StatelessComponent {
             DocTable(
               headers: ['Symptom', 'Fix'],
               rows: [
+                [
+                  '`connect` reports a missing UI integration',
+                  'Add the package and extension it names, then hot restart.',
+                ],
                 [
                   'Your own controls are missing from the listing',
                   'Add them to `isInteractiveElement`.',
@@ -273,6 +299,125 @@ class ConfigurePage extends StatelessComponent {
               code([.text('label')]),
               .text(', so a field without a key still has a name.'),
             ]),
+            p(
+              rich(
+                'These are the widgets of the Flutter SDK. The `material_ui` '
+                'and `cupertino_ui` packages need their '
+                '[integration](#ui-libraries).',
+              ),
+            ),
+          ],
+        ),
+        DocSection(
+          id: 'ui-libraries',
+          heading: 'UI libraries',
+          children: [
+            p(
+              rich(
+                '`material_ui` and `cupertino_ui` publish Flutter’s Material '
+                'and Cupertino widgets as pub packages. Marionette recognizes '
+                'their widgets through one optional package each. Add the '
+                'one for every library your app’s source imports.',
+              ),
+            ),
+            const DocTable(
+              headers: ['Your source imports', 'Add', 'Then call'],
+              rows: [
+                [
+                  '`material_ui`',
+                  '`marionette_material`',
+                  '`withMaterialUi()`',
+                ],
+                [
+                  '`cupertino_ui`',
+                  '`marionette_cupertino`',
+                  '`withCupertinoUi()`',
+                ],
+                ['both', 'both packages', 'both, in either order'],
+              ],
+            ),
+            p(
+              rich(
+                'Both need Flutter 3.44 or newer, `material_ui` 1.1.0 or '
+                '`cupertino_ui` 1.0.1 or newer. `marionette_flutter` alone '
+                'still runs on Flutter 3.27.',
+              ),
+            ),
+            const Tabs(
+              name: 'ui-libraries',
+              groupLabel: 'UI library setup',
+              tabs: [
+                TabItem('material', 'material_ui', [
+                  CodeBlock(
+                    source: 'flutter pub add marionette_material',
+                    language: .shell,
+                    title: 'terminal',
+                  ),
+                  CodeBlock(
+                    source: _materialUi,
+                    language: .dart,
+                    title: 'lib/main.dart',
+                  ),
+                ]),
+                TabItem('cupertino', 'cupertino_ui', [
+                  CodeBlock(
+                    source: 'flutter pub add marionette_cupertino',
+                    language: .shell,
+                    title: 'terminal',
+                  ),
+                  CodeBlock(
+                    source: _cupertinoUi,
+                    language: .dart,
+                    title: 'lib/main.dart',
+                  ),
+                ]),
+                TabItem('both', 'both', [
+                  CodeBlock(
+                    source:
+                        'flutter pub add marionette_material '
+                        'marionette_cupertino',
+                    language: .shell,
+                    title: 'terminal',
+                  ),
+                  CodeBlock(
+                    source: _bothUis,
+                    language: .dart,
+                    title: 'lib/main.dart',
+                  ),
+                ]),
+              ],
+            ),
+            p(
+              rich(
+                'Call the extension on the configuration you already pass. '
+                'Your callbacks, a combined binding and the `kDebugMode` gate '
+                'stay as they are, and a second call changes nothing. Hot '
+                'restart or relaunch afterwards: `main()` does not re-run on '
+                'a hot reload.',
+              ),
+            ),
+            const Callout(
+              'Check the source, not the lockfile. `material_ui` depends on '
+              '`cupertino_ui`, so a `material_ui` app has `cupertino_ui` in '
+              'its lockfile and loads it at run time. That alone needs no '
+              '`marionette_cupertino`, and the adaptive Material switches, '
+              'checkboxes and radios work with `marionette_material` alone. '
+              'Add `marionette_cupertino` only when your app or its design '
+              'system imports `cupertino_ui`. In a monorepo, look at the app '
+              'you run.',
+            ),
+            p(
+              rich(
+                'Pass the libraries your source imports to `connect` as '
+                '`required_ui_libraries`, or to '
+                '`marionette -i <name> doctor --required-ui-library <library>`'
+                ' on the CLI. Both say whether the app configures their '
+                'integrations and name what is missing; without the list, '
+                'the result stays unverified. Then check that a button, a '
+                'field and a toggle on screen are listed and respond. A '
+                'screen you did not open is not verified.',
+              ),
+            ),
           ],
         ),
         DocSection(
@@ -299,6 +444,16 @@ class ConfigurePage extends StatelessComponent {
                   '`extractText`',
                   '`null`',
                   'Return the text your widgets show.',
+                ],
+                [
+                  '`controlKind`',
+                  '`null`',
+                  'Mark your fields, toggles and radios to read their state.',
+                ],
+                [
+                  '`extractFieldLabel`',
+                  '`null`',
+                  'Return the label of your fields, apart from the value.',
                 ],
                 [
                   '`logCollector`',

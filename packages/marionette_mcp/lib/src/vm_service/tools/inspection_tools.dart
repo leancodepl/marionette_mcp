@@ -3,6 +3,7 @@ import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/session/session.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/tool_runner.dart';
+import 'package:marionette_mcp/src/vm_service/ui_support_library.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -10,12 +11,15 @@ import 'package:mcp_dart/mcp_dart.dart';
 /// `get_interactive_elements`, `get_logs`, `take_screenshots`.
 ///
 /// [nativeElements] names the tool that reads a covered screen; null when the
-/// native lane is off.
+/// native lane is off. [requiredUiLibraries] gives the scope `connect` took
+/// from a source preflight; the listing warns when the app lacks one of its
+/// integrations.
 void registerInspectionTools(
   LoggedMcpServer server,
   VmServiceConnector connector,
   logging.Logger logger, {
   required String? nativeElements,
+  required Set<UiSupportLibrary>? Function() requiredUiLibraries,
 }) {
   server
     ..registerTool(
@@ -61,6 +65,14 @@ void registerInspectionTools(
 
           final buffer = StringBuffer();
           if (coveredAppWarning(response, nativeElements: nativeElements)
+              case final warning?) {
+            buffer.writeln('$warning\n');
+          }
+          if (await _uiSupportWarning(
+            connector,
+            logger,
+            requiredUiLibraries(),
+          )
               case final warning?) {
             buffer.writeln('$warning\n');
           }
@@ -157,6 +169,11 @@ void registerInspectionTools(
     );
 }
 
+/// How `connect` takes the UI libraries a source preflight confirmed, for
+/// the UI integration status.
+const uiSupportScopeHint =
+    'call connect again with them in required_ui_libraries';
+
 /// Handles a `take_screenshots` invocation: captures via [connector], then
 /// either returns the images inline or — when `args['inline'] == false` —
 /// saves them into [session]'s screenshots directory and returns their paths.
@@ -211,6 +228,26 @@ Future<CallToolResult> takeScreenshots(
       ),
     ],
   );
+}
+
+/// The listing's warning about the app's UI integrations against
+/// [requiredUiLibraries]. Null without a confirmed scope, which `connect`
+/// already reported on, and when the scope is covered.
+Future<String?> _uiSupportWarning(
+  VmServiceConnector connector,
+  logging.Logger logger,
+  Set<UiSupportLibrary>? requiredUiLibraries,
+) async {
+  if (requiredUiLibraries == null) return null;
+  try {
+    final report = await connector.inspectUiSupport(
+      requiredLibraries: requiredUiLibraries,
+    );
+    return uiSupportWarning(report, scopeHint: uiSupportScopeHint);
+  } catch (err) {
+    logger.warning('Failed to check UI integrations', err);
+    return 'Warning: could not check UI integrations: $err';
+  }
 }
 
 /// `ancestor_keys` as worded for `get_interactive_elements`, which lists a

@@ -46,12 +46,14 @@ Marionette connects Claude Code, Cursor, Codex, Gemini CLI, Copilot or any MCP c
    dart pub global activate marionette_cli
    ```
 
-3. Run the app with `flutter run` and paste the `ws://…/ws` VM service URI it prints into the prompt, or ask the agent to run the app itself:
+3. Run the app with `flutter run` and paste the VM service URI it prints (`http://127.0.0.1:…/…=/`) into the prompt, or ask the agent to run the app itself:
 
-   > Connect to ws://127.0.0.1:9101/…/ws. On Profile, a malformed email must show an error and keep Submit disabled, and a valid one must submit.
+   > Connect to http://127.0.0.1:9101/…=/. On Profile, a malformed email must show an error and keep Submit disabled, and a valid one must submit.
 
 > [!IMPORTANT]
 > Flutter's own widgets work as is. **A custom design system needs one configuration step**, or the agent cannot see your buttons and fields: see [Configure](https://marionette.leancode.co/docs/configure/).
+>
+> An app whose source imports the [`material_ui`](https://pub.dev/packages/material_ui) or [`cupertino_ui`](https://pub.dev/packages/cupertino_ui) packages adds `marionette_material` or `marionette_cupertino` and calls `withMaterialUi()` or `withCupertinoUi()` on its configuration (both, for both). A library in the lockfile only, like `cupertino_ui` under `material_ui`, needs neither. See [UI libraries](https://marionette.leancode.co/docs/configure/#ui-libraries).
 
 ## What the agent can do
 
@@ -75,7 +77,7 @@ For UI **outside** the Flutter widget tree (system permission dialogs, OS sheets
 
 | Skill | Teaches the agent to |
 | --- | --- |
-| `marionette-flutter-setup` | Add the binding, configure a custom design system, logs and device config |
+| `marionette-flutter-setup` | Add the binding and the UI library integrations, configure a custom design system, logs and device config |
 | `marionette-flutter-drive-app` | Drive the app with the MCP tools or the CLI, and write the report |
 | `marionette-flutter-to-patrol` | Turn a verified run into Patrol tests |
 
@@ -90,7 +92,7 @@ npx skills add leancodepl/marionette_mcp # without the Dart toolchain
 | --- | --- |
 | [Start](https://marionette.leancode.co/docs/) | Setup, every agent's config, the first prompt, the example app, FAQ |
 | [Concepts](https://marionette.leancode.co/docs/concepts/) | How the agent sees a screen, selectors, compaction, the single-binding rule |
-| [Configure](https://marionette.leancode.co/docs/configure/) | Custom design systems, Semantics, logs, device config, custom extensions |
+| [Configure](https://marionette.leancode.co/docs/configure/) | UI libraries, custom design systems, Semantics, logs, device config, custom extensions |
 | [Drive](https://marionette.leancode.co/docs/drive/) | Prompts for common jobs, every tool with its CLI command, the CLI |
 | [Reports](https://marionette.leancode.co/docs/reports/) | Session folders, `steps.md`, `report.md`, the verdict |
 | [Native lane](https://marionette.leancode.co/docs/native/) | **System UI outside Flutter: dialogs, pickers, notifications, WebViews — setup, workflow, what each lane sees.** |
@@ -102,6 +104,8 @@ npx skills add leancodepl/marionette_mcp # without the Dart toolchain
 | [`marionette_flutter`](https://pub.dev/packages/marionette_flutter) | The binding in your app. **Required.** |
 | [`marionette_mcp`](https://pub.dev/packages/marionette_mcp) | The MCP server your agent runs. |
 | [`marionette_cli`](https://pub.dev/packages/marionette_cli) | The `marionette` CLI, for shell-only agents. |
+| [`marionette_material`](https://pub.dev/packages/marionette_material) | Support for the `material_ui` widgets. Flutter 3.44+. |
+| [`marionette_cupertino`](https://pub.dev/packages/marionette_cupertino) | Support for the `cupertino_ui` widgets. Flutter 3.44+. |
 | [`marionette_logging`](https://pub.dev/packages/marionette_logging) | Log collection from the `logging` package. |
 | [`marionette_logger`](https://pub.dev/packages/marionette_logger) | Log collection from the `logger` package. |
 

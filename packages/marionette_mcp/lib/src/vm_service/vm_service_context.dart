@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:logging/logging.dart' as logging;
+import 'package:marionette_mcp/src/formatting.dart';
 import 'package:marionette_mcp/src/session/session_manager.dart';
 import 'package:marionette_mcp/src/session/step_logger.dart';
 import 'package:marionette_mcp/src/version.g.dart' as v;
@@ -12,6 +13,7 @@ import 'package:marionette_mcp/src/vm_service/tools/inspection_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/keyboard_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/system_tools.dart';
 import 'package:marionette_mcp/src/vm_service/tools/text_tools.dart';
+import 'package:marionette_mcp/src/vm_service/ui_support_library.dart';
 import 'package:marionette_mcp/src/vm_service/vm_service_connector.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
@@ -38,6 +40,12 @@ final class VmServiceContext {
   final logging.Logger _logger;
   final SessionManager _sessionManager;
   final StepLogger _stepLogger;
+
+  /// The UI libraries a source preflight confirmed for the connected app,
+  /// from `connect`'s `required_ui_libraries`; null when it gave none. Holds
+  /// only for the current connection and code, so a reconnect, hot reload or
+  /// hot restart clears it.
+  Set<UiSupportLibrary>? _requiredUiLibraries;
 
   /// Records tool calls into the session `connect` opens; shared with the
   /// native lane so its calls land in the same steps.md.
@@ -76,13 +84,19 @@ final class VmServiceContext {
       connector,
       _logger,
       nativeElements: enableNativeLane ? 'native_get_elements' : null,
+      requiredUiLibraries: () => _requiredUiLibraries,
     );
     registerGestureTools(loggedServer, connector, _logger);
     registerTextTools(loggedServer, connector, _logger);
     registerKeyboardTools(loggedServer, connector, _logger);
     registerDeviceTools(loggedServer, connector, _logger);
     registerExtensionTools(loggedServer, connector, _logger);
-    registerSystemTools(loggedServer, connector, _logger);
+    registerSystemTools(
+      loggedServer,
+      connector,
+      _logger,
+      onAppCodeChanged: () => _requiredUiLibraries = null,
+    );
   }
 
   void _registerConnectionTools(McpServer server) {
@@ -90,13 +104,13 @@ final class VmServiceContext {
       ..registerTool(
         'connect',
         description:
-            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. The VM service URI is typically in the format ws://127.0.0.1:PORT/ws and can be found in the Flutter app output when running in debug mode. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
+            'Connects to a Flutter app via its VM service URI. This must be called before using any other tools. Pass the VM service URI as `flutter run` prints it (http://127.0.0.1:PORT/TOKEN=/); its ws://…/ws form and a DevTools link work as well. If the app enabled session reports (MarionetteConfiguration.enableSessionReports), this also opens a fresh session directory under .marionette/sessions/ where the step log and screenshots for this run are kept.',
         annotations: const ToolAnnotations(title: 'Connect to App'),
         inputSchema: ToolInputSchema(
           properties: {
             'uri': JsonSchema.string(
               description:
-                  'VM service URI (e.g., ws://127.0.0.1:8181/ws). This is printed in the Flutter app console when running in debug mode.',
+                  'VM service URI as `flutter run` prints it (e.g., http://127.0.0.1:8181/AbC=/), or its ws://…/ws form.',
             ),
             'session_title': JsonSchema.string(
               description:
@@ -108,6 +122,22 @@ final class VmServiceContext {
                   'opens its own fresh session directory, even if this '
                   'matches an earlier title. Falls back to "run-<timestamp>" '
                   'when omitted.',
+            ),
+            'required_ui_libraries': JsonSchema.array(
+              items: JsonSchema.string(
+                enumValues: [
+                  for (final library in UiSupportLibrary.values)
+                    library.wireName,
+                ],
+              ),
+              uniqueItems: true,
+              description:
+                  'The extracted UI libraries the app uses, as found by '
+                  "checking its active entrypoint's source imports, not its "
+                  'lockfile: a library a dependency loads needs no '
+                  'integration. connect then reports whether the app '
+                  'configures their Marionette integrations. Omit when the '
+                  'source was not checked; pass [] when it uses none.',
             ),
             'session_dir': JsonSchema.string(
               description:
@@ -121,6 +151,11 @@ final class VmServiceContext {
         ),
         callback: (args, extra) async {
           final uri = args['uri'] as String;
+          // The input schema already rejects unknown and repeated names.
+          final requiredUiLibraries = switch (args['required_ui_libraries']) {
+            null => null,
+            final wireNames => UiSupportLibrary.parseAll(wireNames),
+          };
           _logger.info('Connecting to app at $uri');
           // A new connect attempt immediately supersedes whatever session
           // was active before, regardless of whether this attempt itself
@@ -128,12 +163,14 @@ final class VmServiceContext {
           // still in flight (or after it fails) would append to a session
           // that's no longer the one actually in use.
           _stepLogger.session = null;
+          _requiredUiLibraries = null;
 
           final call = ++_connectCalls;
           bool isCurrent() => call == _connectCalls;
           CallToolResult result;
           try {
-            result = await _connect(args, isCurrent).timeout(_connectTimeout);
+            result = await _connect(args, requiredUiLibraries, isCurrent)
+                .timeout(_connectTimeout);
           } on TimeoutException {
             _logger.severe('Timed out connecting to app at $uri');
             if (isCurrent()) {
@@ -172,6 +209,7 @@ final class VmServiceContext {
             // Retire dynamic tools before tearing down the connection so a
             // mid-disconnect tools/list reflects only what's still callable.
             _disableDynamicTools();
+            _requiredUiLibraries = null;
             await connector.disconnect();
 
             final session = _stepLogger.session;
@@ -208,14 +246,16 @@ final class VmServiceContext {
       );
   }
 
-  /// Connects to the app at the `connect` tool's [args] and sets up the
-  /// dynamic tools and the session.
+  /// Connects to the app at the `connect` tool's [args], sets up the dynamic
+  /// tools and the session, and reports the app's UI integrations against
+  /// [requiredUiLibraries].
   ///
   /// Runs under the tool's deadline, and keeps running in the background
   /// when it fires, so it changes the connection, the tools and the session
   /// only while [isCurrent] says this call wasn't timed out or replaced.
   Future<CallToolResult> _connect(
     Map<String, dynamic> args,
+    Set<UiSupportLibrary>? requiredUiLibraries,
     bool Function() isCurrent,
   ) async {
     final uri = args['uri'] as String;
@@ -282,14 +322,13 @@ final class VmServiceContext {
           err,
         );
       }
+      final uiSupport = await _uiSupportStatus(requiredUiLibraries);
       if (!isCurrent()) return _replacedResult;
+      _requiredUiLibraries = requiredUiLibraries;
+      final connected = 'Successfully connected to app at $uri\n$uiSupport';
       if (!sessionReportsEnabled) {
         _stepLogger.session = null;
-        return CallToolResult(
-          content: [
-            TextContent(text: 'Successfully connected to app at $uri'),
-          ],
-        );
+        return CallToolResult(content: [TextContent(text: connected)]);
       }
 
       try {
@@ -302,7 +341,7 @@ final class VmServiceContext {
         return CallToolResult(
           content: [
             TextContent(
-              text: 'Successfully connected to app at $uri\n'
+              text: '$connected\n'
                   'Opened session: ${session.directory.path}',
             ),
           ],
@@ -323,7 +362,7 @@ final class VmServiceContext {
         return CallToolResult(
           content: [
             TextContent(
-              text: 'Successfully connected to app at $uri\n'
+              text: '$connected\n'
                   'Could not open a session directory, so this run '
                   'will not be logged: $err',
             ),
@@ -336,6 +375,22 @@ final class VmServiceContext {
         isError: true,
         content: [TextContent(text: 'Failed to connect to app: $err')],
       );
+    }
+  }
+
+  /// The `connect` result line on the app's UI integrations, or on why they
+  /// could not be checked: the connection works either way.
+  Future<String> _uiSupportStatus(
+    Set<UiSupportLibrary>? requiredUiLibraries,
+  ) async {
+    try {
+      final report = await connector.inspectUiSupport(
+        requiredLibraries: requiredUiLibraries,
+      );
+      return describeUiSupport(report, scopeHint: uiSupportScopeHint);
+    } catch (err) {
+      _logger.warning('Failed to check UI integrations', err);
+      return 'UI integrations: could not be checked: $err';
     }
   }
 
